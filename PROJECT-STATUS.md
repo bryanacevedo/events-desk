@@ -77,7 +77,6 @@ From `node scripts/eval-report.ts` and the title report from the same code. Deta
 ## Needs Bryan
 
 - First push, then the first CI run. The first commit is made locally (2026-11-09).
-- The two explainer videos: scripts drafted at `~/Documents/Career/github-portfolio/videos/events-desk/SCRIPTS.md`, waiting on his approval before anything is rendered.
 - Publish the repository. Real event logos stay in the public version (decided).
 - Paid Apollo and a ZeroBounce key, then one real run on a very small list. The waterfall lineup is set in Apollo, and a sample of a few hundred contacts decides it.
 - Connect Salesforce when wanted. Confirm Do Not Call.
@@ -89,5 +88,6 @@ From `node scripts/eval-report.ts` and the title report from the same code. Deta
 ## History
 
 - 2026-11-08: slices 1 to 8; first real eval recording; workbook redesign; Excel upload and Google Sheet delivery; tiering and enrichment steps 1 to 9; the simulated world and spend guard; seat requests, Budget, Usage, Settings and the new shell. Two fresh reviewers checked the README and the code, and all reproduced bugs were fixed with tests.
+- 2026-11-09: GitHub walkthrough video made (84 s, voiced, captions, `docs/video/`). Bryan chose one video, no narrated cut. Project: `~/Developer/events-desk-video`.
 - 2026-11-09, late: Google app in production, home and privacy pages live, sample Sheet public to view. Two goldfish reviews of the whole system; every code defect they named fixed or disclosed (decision 30, `tests/goldfish-fixes.test.ts`).
 - 2026-11-09: screen rounds 1 to 5 and a cleanup pass; Sheet design passes 1 and 2 (decisions 18 to 20); original files and event delete (21); model-written Summary (22); Apollo and ZeroBounce only, with reuse and saved credits (23); real re-recording of the evals, second look cut (24); title gate (25); AI priced from tokens (26); Summary retest (27); Salesforce checks, person record and write-back on a simulated CRM (28); new registrations (29). The simulated wrong-priority-A floor moved from 20% to 25% (decision 27).

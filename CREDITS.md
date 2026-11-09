@@ -33,3 +33,10 @@ The photographers are credited here anyway. The names are invented and do not de
 | Zoe Hartley | [@mdishakrahman](https://unsplash.com/@mdishakrahman) | https://unsplash.com/photos/14sDcYjYl9Q |
 | Noah Fischer | [@tonyluginsland](https://unsplash.com/@tonyluginsland) | https://unsplash.com/photos/bbOOTiq-EPA |
 | Owen Park | [@miracletwentyone](https://unsplash.com/@miracletwentyone) | https://unsplash.com/photos/iFgRcqHznqg |
+
+## Walkthrough video
+
+- Music: "Calm Minimal" by Kulakovka, Pixabay #275611, Pixabay Content License.
+- Voice: Chatterbox TTS (Resemble AI, MIT), run locally.
+- Sound effects: rendered with earshot (MIT).
+- App screens: this app's own screens, with the demo's sample data. Rendered with HyperFrames.

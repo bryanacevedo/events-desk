@@ -6,6 +6,10 @@ You ask for a seat. Someone approves it. You upload the attendee list. The desk 
 
 It is a portfolio project. Read "What is proven and what is not" below before you trust any number in it.
 
+[![Watch the 84-second walkthrough](docs/video/poster.jpg)](docs/video/events-desk.mp4)
+
+The walkthrough follows one list from the demo: invented people, simulated vendors.
+
 ## What it does for you
 
 - **Seats.** Each person asks for their own seat from a catalog of events. Approvers decide. Nobody approves their own request. A budget warning never blocks a decision.
