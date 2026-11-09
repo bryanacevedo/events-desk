@@ -77,7 +77,7 @@ From `node scripts/eval-report.ts` and the title report from the same code. Deta
 
 ## Needs Bryan
 
-- After publish: build everything after delivery (learning layer, event scores, sequences, reply handling, meetings booked, Salesforce sync). Green-lit 2026-11-09, not started.
+- v2, everything after delivery: spec at `docs/LIFECYCLE.md`, reviewed twice, any-sequencer design. Green-lit 2026-11-09, build not started.
 - Paid Apollo and a ZeroBounce key, then one real run on a very small list. The waterfall lineup is set in Apollo, and a sample of a few hundred contacts decides it.
 - Connect Salesforce when wanted. Confirm Do Not Call.
 - The real credit allotment in each vendor's pool, for the Usage page.
