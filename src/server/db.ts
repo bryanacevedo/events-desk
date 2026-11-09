@@ -33,7 +33,9 @@ export function clean<T>(rows: Row[]): T[] {
 
 export async function pglite(dataDir?: string): Promise<Db> {
   const { PGlite } = await import("@electric-sql/pglite");
-  const pg = new PGlite(dataDir);
+  // A small host: Postgres keeps its caches short. Queries get slower, not wrong.
+  const small = process.env.PUBLIC_DEMO === "1" ? { startParams: [...(PGlite as unknown as { defaultStartParams: string[] }).defaultStartParams, "-c", "shared_buffers=16MB", "-c", "temp_buffers=1MB", "-c", "work_mem=2MB", "-c", "maintenance_work_mem=8MB", "-c", "wal_buffers=1MB"] } : {};
+  const pg = new PGlite(dataDir, small);
   await pg.exec("SET TIME ZONE 'UTC'");
   const query = async <T>(text: string, params: unknown[] = []) => clean<T>((await pg.query<Row>(text, params)).rows);
   return {
