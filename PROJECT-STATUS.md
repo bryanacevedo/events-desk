@@ -12,7 +12,7 @@ Checked on 2026-11-09 by running them:
 - `npx tsc --noEmit`: clean.
 - `EVALS_STRICT=1 npx vitest run` on the three eval test files: passes, so no recording is stale and CI would not be red on evals.
 
-**Public** at https://github.com/bryanacevedo/events-desk since 2026-11-09. CI passed on the first push. The walkthrough is hosted on the project's GitHub Pages site.
+**Public** at https://github.com/bryanacevedo/events-desk since 2026-11-09. CI passed on the first push. The walkthrough is hosted on the project's GitHub Pages site. **Live demo** at https://events-desk.onrender.com (Render free plan, `render.yaml`, service `events-desk`). It opens prebuilt data (`samples/demo-snapshot.tgz`, rebuild with `make demo-snapshot` when the seed changes), must run on Node 26 (Node 24 needs about 840 MB to start and the plan allows 512), takes no uploads (`PUBLIC_DEMO`), and sleeps after 15 idle minutes, then needs about a minute. Measured on Render: 269 MB peak, through a live research run. Render API key: `~/.config/credentials/render.env`.
 
 To resume: run `npx vitest run`, then pick from "Needs Bryan" below.
 

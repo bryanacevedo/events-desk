@@ -6,6 +6,8 @@ Events Desk is for a person who runs events all year. You go to a lot of confere
 
 You ask for a seat. Someone approves it. You upload the attendee list. The desk works out which companies and people matter, finds and checks their emails, and hands back a Google Sheet (or an Excel file) your sales team can work from. If more people register later, you upload the new file and the desk adds only the new ones.
 
+**[Try the live demo](https://events-desk.onrender.com).** Everything in it is invented and every vendor is simulated. If it has been idle, the first load takes about a minute.
+
 It is a portfolio project. Read "What is proven and what is not" below before you trust any number in it.
 
 [![Watch the 3-minute walkthrough](docs/video/poster.jpg)](https://bryanacevedo.github.io/events-desk-site/video/events-desk.mp4)
@@ -78,7 +80,7 @@ Also: every drop has a reason and the database refuses one without it, and Conci
 
 Also not proven: whether Apollo bills its search endpoints, the real delivery path of a delivered event to Google (only the sample workbook has been published for real), the real website reader, and a real model reading an ICP document. In the demo, the ICP is read by a deterministic parser written for the demo document.
 
-**There is no real login, and the personal-data GET routes are open.** "Acting as" is a switch in every mode, including live. Anyone who can open the app can act as anyone, including the GTM team and the approvers. `WRITE_KEY`, if set, is one shared key for changes, does not identify anyone, and is not sent by the web app, so setting it leaves the screens read-only. Every GET route is open, with no key and no login: people, companies, cases, event activity, seat requests, the workbook, the original attendee files and rows, the opt-out list, and Settings (only changes to Settings are refused). The server listens on this machine only unless `HOST` says otherwise. Do not expose this app publicly. Run it behind your own access control.
+**There is no real login, and the personal-data GET routes are open.** "Acting as" is a switch in every mode, including live. Anyone who can open the app can act as anyone, including the GTM team and the approvers. `WRITE_KEY`, if set, is one shared key for changes, does not identify anyone, and is not sent by the web app, so setting it leaves the screens read-only. Every GET route is open, with no key and no login: people, companies, cases, event activity, seat requests, the workbook, the original attendee files and rows, the opt-out list, and Settings (only changes to Settings are refused). The server listens on this machine only unless `HOST` says otherwise. Do not expose a real deployment publicly: run it behind your own access control. The hosted demo is safe to leave open because it holds only invented data, uses no keys, takes no uploads and resets when it restarts.
 
 **The accuracy numbers from the simulated world are authored.** The generator and the simulated vendors make mistakes at rates chosen by the author. A test that reports how often tiering was right on that world is checking that the code handles those chosen mistakes. It says nothing about real vendors or a real model. One test floor was moved from 20% to 25% because the simulated second-look model had an invented catch rate (decision 27).
 
