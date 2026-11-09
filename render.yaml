@@ -8,8 +8,9 @@ services:
     startCommand: node src/server/node.ts --demo
     healthCheckPath: /api/health
     envVars:
+      # Node 24 needs about 840 MB to start the demo database; Node 26 needs about 300.
       - key: NODE_VERSION
-        value: "24"
+        value: 26.13.0
       - key: HOST
         value: 0.0.0.0
       - key: NODE_OPTIONS
