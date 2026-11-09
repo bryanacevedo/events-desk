@@ -26,6 +26,10 @@ export async function deleteEvent(db: Db, actor: string, eventId: string, approv
     const [e] = await q<{ id: string; name: string; stage: string; starts_on: string; country: string | null; parent_event_id: string | null }>("SELECT id, name, stage, starts_on::text AS starts_on, country, parent_event_id FROM events WHERE id = $1 FOR UPDATE", [eventId]);
     if (!e) throw new RuleError("That event does not exist.");
     if (e.parent_event_id) throw new RuleError("New registrations are discarded, not deleted.");
+    const [seq] = await q("SELECT 1 FROM sequences WHERE event_id = $1 LIMIT 1", [eventId]);
+    if (seq) throw new RuleError("This event has sequences, so its history has to stay. It cannot be deleted.");
+    const [met] = await q("SELECT 1 FROM meetings WHERE event_id = $1 LIMIT 1", [eventId]);
+    if (met) throw new RuleError("This event has meetings on record, so it cannot be deleted.");
     if (RUNNING_STAGES.includes(e.stage)) throw new RuleError("A run is in progress. Delete it once it stops.");
     // Its top-ups go with it, and what they spent is kept with what it spent.
     const family = [eventId, ...(await q<{ id: string }>("SELECT id FROM events WHERE parent_event_id = $1", [eventId])).map((t) => t.id)];

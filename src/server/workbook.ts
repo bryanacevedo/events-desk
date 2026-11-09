@@ -20,6 +20,7 @@
    The .xlsx stands on its own in Excel. The Google-native layer (fonts, chips, filter views, groups) is added after upload by
    sheets-polish.ts from the `SheetPlan` that `buildDelivery` returns beside the bytes. */
 
+import { stopContacts } from "./enroll-ops.ts";
 import ExcelJS from "exceljs";
 import { getSettingsNow } from "./approvals.ts";
 import type { Db } from "./db.ts";
@@ -1164,6 +1165,7 @@ export async function reviewContact(db: Db, id: string, actor: string, contactId
     const who = c.full_name ?? "that person";
     if (decision === "drop") {
       const dropped = await dropInReview(q, id, contactId);
+      if (dropped) await stopContacts(q, [contactId], "remove", "dropped_in_review");
       if (dropped) await logActivity(q, id, actor, "review", `Dropped ${who} in review`);
       return { dropped, kept: 0 };
     }

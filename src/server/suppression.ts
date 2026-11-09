@@ -5,6 +5,7 @@
 import type { Db } from "./db.ts";
 import { addSuppression } from "./caches.ts";
 import { queueOptOut } from "./crm-outbox.ts";
+import { stopContacts } from "./enroll-ops.ts";
 import { logActivity, RuleError } from "./events.ts";
 import type { Crm } from "./providers.ts";
 import { looksLikeEmail, nameKey } from "../shared/email.ts";
@@ -27,6 +28,8 @@ export async function recordOptOut(db: Db, actor: string, b: OptOutInput, crm?: 
   await db.tx(async (q) => {
     await addSuppression({ query: q }, { kind: "opt_out", email: email || null, name_key: nk && ck ? nk : null, company_key: nk && ck ? ck : null, reason: (b.reason ?? "").trim().slice(0, 300), created_by: actor, name: name || null, company: company || null });
     await queueOptOut(q, crm, { email: email || null, name: name || null, company: company || null });
+    // Out of every sequence, at every event, whatever else is true of them. The tool is told from the row.
+    await stopContacts(q, hits.map((h) => h.id), "remove", "opt_out");
     for (const h of hits) {
       // Someone already set aside for another reason is relabeled, so they come off the Other attendees tab too.
       await q("UPDATE contacts SET drop_reason = 'opted_out', dropped_at = coalesce(dropped_at, now()) WHERE id = $1", [h.id]);

@@ -11,12 +11,13 @@
    Every producer is code; a model only supplies the flags that model_flag turns into a case. Opening is idempotent: a case already open for the same person and kind is not opened twice. */
 
 import type { Db } from "./db.ts";
+import { getSettings } from "./approvals.ts";
 import { openCase, type CaseOption } from "./cases.ts";
 import type { Loop } from "./email.ts";
 import { FLAG_WORDS } from "../shared/tiers.ts";
 import { localFitsName, nameKey } from "../shared/email.ts";
 
-const LATE_STAGES = ["proposal", "negotiation", "contract", "closing", "verbal"];
+export const DEFAULT_LATE_STAGES = ["proposal", "negotiation", "contract", "closing", "verbal"];
 /** A fixed rule, never a model: a doubt about the person says Drop; a doubt about the address says Keep and try another channel. */
 export const suggestForFlags = (flags: string[]) => (flags.some((f) => ["title_company_mismatch", "likely_left_company", "name_looks_wrong"].includes(f)) ? "drop" : "keep");
 
@@ -70,7 +71,7 @@ export async function openLaterCases(db: Db, eventId: string) {
   // A late-stage deal with an owner: the owner should hear before outreach starts. One case per company.
   const deals = await db.query<{ id: string; name: string; deal_name: string; deal_stage: string; account_owner: string; n: number }>(
     `SELECT co.id, co.name, co.deal_name, co.deal_stage, co.account_owner, count(k.id)::int AS n FROM companies co JOIN contacts k ON k.company_id = co.id AND k.dropped_at IS NULL AND k.priority IS NOT NULL
-     WHERE co.event_id = $1 AND co.inherited_from IS NULL AND co.deal_name IS NOT NULL AND co.account_owner IS NOT NULL AND lower(co.deal_stage) = ANY($2::text[]) GROUP BY co.id`, [eventId, LATE_STAGES]);
+     WHERE co.event_id = $1 AND co.inherited_from IS NULL AND co.deal_name IS NOT NULL AND co.account_owner IS NOT NULL AND lower(co.deal_stage) = ANY($2::text[]) GROUP BY co.id`, [eventId, ((await getSettings(db.query, eventId)) as unknown as { late_stages?: string[] }).late_stages ?? DEFAULT_LATE_STAGES]);
   for (const d of deals) {
     await open({ eventId, kind: "late_stage_deal", companyId: d.id,
       summary: `${d.name} has a ${d.deal_stage.toLowerCase()} deal owned by ${d.account_owner}. ${d.n} ${d.n === 1 ? "person is" : "people are"} on the outreach list there.`,

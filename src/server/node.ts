@@ -25,6 +25,10 @@ import { sheetsFor } from "./sheets.ts";
 import { exampleDns, systemDns } from "./identity.ts";
 import { seed } from "./seed.ts";
 import { simDeps } from "./sim-vendors.ts";
+import { demoConnectors, liveConnectors } from "./connectors/setup.ts";
+import { lifecycleTick } from "./lifecycle-tick.ts";
+import type { LifecycleDeps } from "./lifecycle-deps.ts";
+import { slackNotifier } from "./slack.ts";
 
 const root = fileURLToPath(new URL("../..", import.meta.url));
 const port = Number(process.env.PORT ?? 8787);
@@ -78,12 +82,24 @@ if (kick) {
   // New registrations left at delivered and unmerged, or merged with a Sheet that never took them.
   await retryMerges(db, deps.crm, deps.sheets);
 }
-const api = createApp(db, { writeKey: mode.demo ? undefined : process.env.WRITE_KEY, demo: mode.demo, publicDemo: mode.demo && process.env.PUBLIC_DEMO === "1", kick, slack, sheets: deps.sheets, llm: deps.llm, dns: mode.liveSpend ? systemDns : exampleDns, crm: deps.crm });
+// Everything after delivery. The demo runs the real connector code over stand-in tools. Real tools need LIVE_SEND=1 and their keys.
+let live: Awaited<ReturnType<typeof liveConnectors>> = {};
+try { live = liveConnectors(env); } catch (e) { console.error((e as Error).message); process.exit(1); }
+const lifecycle: LifecycleDeps | undefined = mode.demo
+  ? { crm: deps.crm, connectors: (await demoConnectors(db)).connectors, llm: deps.llm }
+  : Object.keys(live).length ? { crm: deps.crm, connectors: live, llm: deps.llm, notify: slack ? slackNotifier(slack) : undefined, userMap: slack?.userMap } : undefined;
+const api = createApp(db, { lifecycle, writeKey: mode.demo ? undefined : process.env.WRITE_KEY, demo: mode.demo, publicDemo: mode.demo && process.env.PUBLIC_DEMO === "1", kick, slack, sheets: deps.sheets, llm: deps.llm, dns: mode.liveSpend ? systemDns : exampleDns, crm: deps.crm });
 // Write-back to the CRM runs here and never from a run, so a failed write cannot touch a delivery. A CRM that cannot write (noCrm) makes this do nothing.
 if (mayRun && canWrite(deps.crm)) {
   const sweep = () => { void drainQuietly(db, deps.crm); };
   sweep();
   setInterval(sweep, 5 * 60_000).unref();
+}
+// One pass every 5 minutes, the opt-out and CRM sweep every 15, and the checks that alert once a night.
+if (mayRun && lifecycle) {
+  let n = 0;
+  const tick = () => { n++; void lifecycleTick(db, lifecycle, { flags: n % 3 === 0, nightly: n % 288 === 0 }).catch((e) => console.error("lifecycle", e)); };
+  setInterval(tick, 5 * 60_000).unref();
 }
 if (existsSync(join(root, "dist"))) {
   api.use("/*", serveStatic({ root: "./dist" }));

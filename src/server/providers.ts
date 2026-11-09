@@ -302,9 +302,19 @@ export interface Crm {
   personFlags?(people: CrmPersonQuery[]): Promise<Record<string, CrmRecord[]>>;
   /** Whether each account is marked do not prospect, by `ref`. */
   accountFlags?(accounts: CrmAccountQuery[]): Promise<Record<string, { do_not_prospect: boolean }>>;
-  /** Updates one record that exists. There is no way to create one. Absent means nothing is written back. */
+  /** Updates one record that exists. Absent means nothing is written back. */
   write?(record: CrmRecord, patch: CrmPatch): Promise<void>;
+  /** Salesforce refuses a duplicate member, so `CrmAlreadyExists` from here counts as done. */
+  createCampaignMember?(a: { campaign: string; record: CrmRecord; key: string }): Promise<{ id: string }>;
+  /** Tasks can double on a retry, so the desk's key goes in a custom field and is looked for first. */
+  findTaskByKey?(key: string): Promise<{ id: string } | null>;
+  createTask?(a: { record: CrmRecord; subject: string; body: string; due: string; key: string }): Promise<{ id: string }>;
+  createLead?(a: { email: string; full_name: string | null; company: string; domain: string | null; key: string }): Promise<{ id: string }>;
+  /** Opportunities on each account, by `ref`. */
+  opportunities?(accounts: CrmAccountQuery[]): Promise<Record<string, CrmOpportunity[]>>;
 }
+export interface CrmOpportunity { id: string; stage: string; amount_cents: number | null; created_date: string; stage_history: { stage: string; at: string }[] }
+export class CrmAlreadyExists extends Error {}
 
 const OWNERS = ["Priya Natarajan", "Tomas Lindqvist", "Adaeze Okonkwo", "Mateo Ruiz", "Hanna Berg"];
 const DEAL_KINDS = ["platform pilot", "expansion", "renewal", "new logo"];
@@ -367,6 +377,13 @@ export const mockLlm: Llm = {
         : /software|logistics|payments/.test(input) ? { tier: 1, reason: "icp_match" }
         : { tier: 2, reason: "insufficient_information" };
       out = { ...base, segment: null, company_type: null, fact: original };
+    } else if (step === "reply_classify") {
+      const reply = prompt.slice(prompt.lastIndexOf("<<<REPLY") + 8, prompt.lastIndexOf("REPLY>>>")).toLowerCase();
+      out = { code: /out of (the )?office|away until/.test(reply) ? "out_of_office" : /left the company|no longer (with|at)/.test(reply) ? "departed" : /wrong person/.test(reply) ? "wrong_person" : /speak to|talk to my colleague/.test(reply) ? "referral" : /not interested|no thanks/.test(reply) ? "not_interested" : /next (year|quarter)|not now|bad time/.test(reply) ? "not_now" : /(book|meet|call|calendar|tuesday|wednesday|thursday)/.test(reply) ? "meeting_request" : /interested|tell me more|sounds good/.test(reply) ? "interested" : "other" };
+    } else if (step === "debrief_extract") {
+      const notes = prompt.slice(prompt.lastIndexOf("<<<NOTES") + 8, prompt.lastIndexOf("NOTES>>>")).trim();
+      const first = notes.split(/[.\n]/)[0]?.trim() ?? "";
+      out = { facts: first ? [{ account: null, theme: "general", fact: first, quote: first }] : [] };
     } else if (step === "title_parse") {
       const p = parseTitle(input.split("\n").find((l) => l.startsWith("title:"))?.slice(6).trim() ?? "");
       out = { function: p.function ?? "other", seniority: p.seniority ?? "individual", non_buyer: p.non_buyer };

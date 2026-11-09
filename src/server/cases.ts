@@ -14,10 +14,14 @@ import { logActivity, newId, RuleError } from "./events.ts";
 import { adoptFromParent } from "./inherit.ts";
 import { mergeAfterAnswer } from "./identity.ts";
 import { isFreeWebmail, isPlaceholderDomain } from "../shared/layer0.ts";
+import { applyLifecycleAnswer, LIFECYCLE_KINDS, type LifecycleKind } from "./lifecycle-cases.ts";
+import { applyReplyAnswer } from "./replies.ts";
+import type { Crm } from "./providers.ts";
 
 export const BLOCKING_KINDS = ["ambiguous_identity", "company_not_found", "unknown_tier", "second_look_disagreement", "fuzzy_list_match", "crm_customer_mismatch", "subsidiary_inheritance"] as const;
 export const LATER_KINDS = ["attendee_vendor_mismatch", "name_email_mismatch", "free_webmail", "same_person_two_companies", "late_stage_deal", "model_flag"] as const;
 export type CaseKind = (typeof BLOCKING_KINDS)[number] | (typeof LATER_KINDS)[number];
+const isLifecycle = (k: string): k is LifecycleKind => (LIFECYCLE_KINDS as readonly string[]).includes(k);
 export const isBlocking = (k: string) => (BLOCKING_KINDS as readonly string[]).includes(k);
 
 export interface CaseOption { value: string; label: string; effect: string }
@@ -88,7 +92,7 @@ export async function openCase(q: Db["query"], c: NewCase) {
 }
 
 interface CaseRow {
-  id: string; event_id: string; kind: CaseKind; company_id: string | null; contact_id: string | null; blocking: boolean; summary: string; facts: unknown;
+  id: string; event_id: string; kind: CaseKind | LifecycleKind; company_id: string | null; contact_id: string | null; blocking: boolean; summary: string; facts: unknown;
   payload: Record<string, unknown>; suggested: string | null; options: CaseOption[]; status: string; decision: string | null; decision_data: unknown; decided_by: string | null;
 }
 const COLS = "id, event_id, kind, company_id, contact_id, blocking, summary, facts, payload, suggested, options, status, decision, decision_data, decided_by";
@@ -198,7 +202,7 @@ const APPLY: Record<CaseKind, Apply> = {
 export interface AnswerResult { id: string; status: "answered" | "skipped"; decision: string; already_decided: boolean }
 
 /** Answers one case. A second answer changes nothing and says what the first was. */
-export async function answerCase(db: Db, eventId: string, caseId: string, actor: string, decision: string, data: Record<string, unknown> = {}): Promise<AnswerResult> {
+export async function answerCase(db: Db, eventId: string, caseId: string, actor: string, decision: string, data: Record<string, unknown> = {}, crm?: Crm | null): Promise<AnswerResult> {
   return db.tx(async (q) => {
     const [c] = await q<CaseRow>(`SELECT ${COLS} FROM review_cases WHERE id = $1 AND event_id = $2 FOR UPDATE`, [caseId, eventId]);
     if (!c) throw new RuleError("That case does not exist on this event.");
@@ -207,7 +211,8 @@ export async function answerCase(db: Db, eventId: string, caseId: string, actor:
     if (e.ended_at) throw new RuleError("These new registrations were stopped.");
     if (c.blocking && !["researching", "ready_for_review"].includes(e.stage)) throw new RuleError("Spending has already started, so this case can no longer change what is paid for.");
     if (!c.options.some((o) => o.value === decision) && !(c.kind === "ambiguous_identity" && decision.startsWith("pick:"))) throw new RuleError(`"${decision}" is not an answer to this case.`);
-    await APPLY[c.kind](q, c, decision, data, actor);
+    if (isLifecycle(c.kind)) await applyLifecycleAnswer(q, c, decision, actor, applyReplyAnswer, crm);
+    else await APPLY[c.kind](q, c, decision, data, actor);
     await q("UPDATE review_cases SET status = 'answered', decision = $2, decision_data = $3::jsonb, decided_by = $4, decided_at = now() WHERE id = $1", [c.id, decision, JSON.stringify(data), actor]);
     await logActivity(q, eventId, actor, "case", `Settled: ${c.summary} (${decision})`);
     return { id: c.id, status: "answered", decision, already_decided: false };
@@ -222,7 +227,7 @@ export async function skipOpenCases(db: Db, eventId: string, actor: string) {
     if (!["researching", "ready_for_review"].includes(e.stage)) throw new RuleError("Spending has already started, so there is nothing left to skip.");
     const open = await q<CaseRow>(`SELECT ${COLS} FROM review_cases WHERE event_id = $1 AND blocking AND status = 'open' FOR UPDATE`, [eventId]);
     for (const c of open) {
-      const reason = SKIP_REASON[c.kind];
+      const reason = isLifecycle(c.kind) ? undefined : SKIP_REASON[c.kind];
       if (reason && c.company_id) await dropCompany(q, eventId, c.company_id, reason);
       await q("UPDATE review_cases SET status = 'skipped', decision = 'skipped', decided_by = $2, decided_at = now() WHERE id = $1", [c.id, actor]);
     }

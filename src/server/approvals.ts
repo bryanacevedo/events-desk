@@ -6,6 +6,7 @@ import type { Db } from "./db.ts";
 import { endTopUpWithin, EVENT_COLS, logActivity, moveWithin, newId, RuleError } from "./events.ts";
 import { undoFreePass } from "./research.ts";
 import { pinIcp } from "./icp.ts";
+import { applyMotionCard } from "./motion.ts";
 import type { EventRow } from "../shared/domain.ts";
 import type { Icp } from "../shared/icp.ts";
 import { quote, titleRule, validateSettingsPatch, type CardInputs, type Settings } from "../shared/cost.ts";
@@ -140,6 +141,8 @@ export async function decideApproval(db: Db, d: Decision): Promise<DecisionResul
         await undoFreePass(q, a.event_id);
         await moveWithin(q, a.event_id, "mapped", d.actor, { detail: `Declined the Research card: ${d.reason!.trim()}` });
       }
+    } else if (a.kind === "motion") {
+      await applyMotionCard(q, a.card_id!, a.event_id, d.actor, status, d.reason);
     } else if (a.kind === "outreach") {
       await q("UPDATE cost_cards SET status = $2 WHERE id = $1", [a.card_id, status]);
       // A declined Outreach card returns to the review step. The research stays paid for.

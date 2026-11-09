@@ -105,6 +105,17 @@ A CRM that cannot answer fails the gate. At launch that **pauses the whole seque
 - **Sender limits:** per-sender daily caps live in the tool; where it exposes them the desk warns. A bounce rate over a configured threshold (default 3%, a rule of thumb to confirm) pauses that sequence and opens a case. Authentication and one-click unsubscribe are the sending tool's job, and the launch checklist says so.
 - **Legal basis is a person's decision.** Before launch the uploader records the basis for contacting this list, per region. Region comes from the company's country, then the person's location. Unknown is its own region. The desk stores who recorded it and what they said, gives no legal advice, and excludes any region with no recorded basis.
 
+## 5a. The sending layer
+
+A sequence that does not have enough healthy senders does not go out. Built in `src/shared/sending.ts` and `src/server/sending.ts`. Every number is a default to confirm against real sending.
+
+- **How many.** The desk simulates the sequence: first touches spread over the launch days (default 5), each later step landing on top. The busiest day divided by the per-sender cap (default 30 emails a day, 20 LinkedIn actions) is how many senders it needs, plus 20% spare.
+- **Which ones.** Each connector lists its accounts with health. A sender is refused for: not connected, health not reported or below the floor (default 90, raised to the tool's own guidance), under 14 days warm, bounce over 2%, spam over 0.3%, or already fully used by other live sequences. The rest are ranked healthiest first and spread, at most 4 per domain.
+- **Proof it lands.** A domain with no SPF and DMARC record is not used. Where a placement test tool is in use, a domain with no passing test in 7 days is not used (at least 80% to inbox). DKIM needs a selector the desk does not know, so the tool's own check stands for it, and the launch checklist says so.
+- **Short means stopped.** Too few healthy senders: the sequence is marked short, says how many it lacks, and pauses if someone launches it anyway.
+- **While it runs.** Every sweep re-reads every sender. One that goes bad is dropped and a spare takes over. With no spare left, the sequence pauses and a person hears.
+- **What a tool cannot do.** A tool that does not show its accounts (Gong) is marked "not visible" and the screen says the desk cannot vouch for them. A tool that shows them but cannot be told which to use (HeyReach) gets a named list for a person to attach.
+
 ## 6. Touch log and holds
 
 `touches (id, domain, person_id null, contact_id null, event_id, kind, channel, reason, at, source, dedup_key unique)`.

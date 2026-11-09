@@ -2,6 +2,11 @@
    before anything is read from it. Approvals go through decideApproval, the same
    function the demo panel calls. */
 
+import type { LifecycleDeps, Notifier } from "./lifecycle-deps.ts";
+import { answerDebrief } from "./closeout.ts";
+import { bookMeeting, recordOutcome } from "./meetings.ts";
+import { decideOwner } from "./owners.ts";
+import { drainOps } from "./sequences.ts";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type { Hono } from "hono";
 import { currentUploader, decideApproval } from "./approvals.ts";
@@ -133,7 +138,20 @@ const modal = (callback_id: string, title: string, blocks: unknown[], private_me
 type View = { callback_id: string; private_metadata: string; state: { values: Record<string, { value: { value: string | null } }> } };
 const field = (v: View, id: string) => (v.state.values[id]?.value.value ?? "").trim();
 
-export function mountSlack(app: Hono<any>, db: Db, cfg: SlackConfig, kick?: (eventId: string) => void) {
+const LIFECYCLE_ACTIONS = new Set(["owner_mine", "owner_include_all", "meeting_booked", "meeting_held", "meeting_no_show", "meeting_cancelled", "debrief_open"]);
+
+/** Direct messages and the event's thread. True only when Slack says the message went. */
+export function slackNotifier(cfg: SlackConfig): Notifier {
+  return {
+    async dm(slackId, m) { return (await slackCall(cfg, "chat.postMessage", { channel: slackId, text: m.text, blocks: m.blocks })).ok; },
+    async thread(thread, m) {
+      const j = await slackCall(cfg, "chat.postMessage", { channel: cfg.channel, text: m.text, blocks: m.blocks, ...(thread ? { thread_ts: thread } : {}) }) as { ok: boolean; ts?: string };
+      return j.ok ? thread ?? j.ts ?? null : null;
+    },
+  };
+}
+
+export function mountSlack(app: Hono<any>, db: Db, cfg: SlackConfig, kick?: (eventId: string) => void, lifecycle?: LifecycleDeps) {
   const now = () => (cfg.now ? cfg.now() : Math.floor(Date.now() / 1000));
   const signed = async (c: { req: { text(): Promise<string>; header(n: string): string | undefined } }) => {
     const body = await c.req.text();
@@ -175,6 +193,20 @@ export function mountSlack(app: Hono<any>, db: Db, cfg: SlackConfig, kick?: (eve
 
     if (p.type === "block_actions") {
       const action = p.actions?.[0];
+      if (lifecycle && LIFECYCLE_ACTIONS.has(action?.action_id)) {
+        const named = Object.entries(cfg.userMap ?? {}).find(([, id]) => id === actor)?.[0];
+        const respond = (text: string) => (cfg.fetch ?? fetch)(p.response_url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ replace_original: false, response_type: "ephemeral", text }) });
+        if (!named) { await respond("You are not on the desk's list. Ask GTM Engineering to add you."); return c.body(null, 200); }
+        try {
+          if (action.action_id === "debrief_open") { await slackCall(cfg, "views.open", { trigger_id: p.trigger_id, view: modal("debrief_write", "Your debrief", [input("body", "Who mattered, what they said, what you would do differently")], action.value) }); return c.body(null, 200); }
+          if (action.action_id === "meeting_booked") { await slackCall(cfg, "views.open", { trigger_id: p.trigger_id, view: modal("meeting_book", "Book the meeting", [input("when", "When? For example 2027-03-02 15:00 UTC")], action.value) }); return c.body(null, 200); }
+          if (action.action_id === "owner_mine") { const r = await decideOwner(db, lifecycle, action.value, named, "mine"); await respond(`${r.company} is yours. Nobody there will be sequenced.`); }
+          else if (action.action_id === "owner_include_all") { for (const id of String(action.value).split(",")) await decideOwner(db, lifecycle, id, named, "include"); await respond("Included. Thanks."); }
+          else { await recordOutcome(db, lifecycle, action.value, action.action_id.replace("meeting_", "") as "held" | "no_show" | "cancelled", named); await respond("Recorded."); }
+          await drainOps(db, lifecycle);
+        } catch (e) { if (!(e instanceof RuleError)) throw e; await respond(e.message); }
+        return c.body(null, 200);
+      }
       if (action?.action_id === "decline") {
         await slackCall(cfg, "views.open", { trigger_id: p.trigger_id, view: modal("decline_reason", "Decline", [input("reason", "Why are you declining?")], action.value) });
         return c.body(null, 200);
@@ -198,6 +230,9 @@ export function mountSlack(app: Hono<any>, db: Db, cfg: SlackConfig, kick?: (eve
     if (p.type === "view_submission") {
       const v: View = p.view;
       try {
+        const named = Object.entries(cfg.userMap ?? {}).find(([, id]) => id === actor)?.[0];
+        if (lifecycle && named && v.callback_id === "debrief_write") { await answerDebrief(db, v.private_metadata, named, field(v, "body")); return c.json({ response_action: "clear" }); }
+        if (lifecycle && named && v.callback_id === "meeting_book") { await bookMeeting(db, lifecycle, { contact_id: v.private_metadata, scheduled_at: field(v, "when"), source: "reply", rep: named }, named); return c.json({ response_action: "clear" }); }
         if (v.callback_id === "decline_reason") {
           if (v.private_metadata.startsWith("sr_")) await decideSeat(db, { requestId: v.private_metadata, actor, decision: "decline", reason: field(v, "reason"), userMap: cfg.userMap });
           else await decideApproval(db, { approvalId: v.private_metadata, actor: await actorFor(db, cfg, v.private_metadata, actor), decision: "decline", reason: field(v, "reason") });
