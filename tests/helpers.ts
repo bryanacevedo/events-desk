@@ -1,10 +1,23 @@
+import { postgresJs } from "../src/server/db.ts";
 import { readdirSync, readFileSync } from "node:fs";
 import { migrate, pglite, type Db } from "../src/server/db.ts";
 
 /** A throwaway real Postgres with every migration applied. */
+/** TEST_ALL_ON_POSTGRES points every test at real Postgres, one schema per database. Used to find what PGlite hides. */
 export async function freshDb(): Promise<Db> {
-  const db = await pglite();
+  const url = process.env.TEST_ALL_ON_POSTGRES;
+  let db: Db;
+  let schema = "";
+  if (url) {
+    schema = `t_${crypto.randomUUID().replace(/-/g, "")}`;
+    const admin = await postgresJs(url, { max: 1 });
+    await admin.exec(`CREATE SCHEMA ${schema}`);
+    await admin.close();
+    db = await postgresJs(url, { max: 3, schema });
+  } else db = await pglite();
   await migrate(db, readdirSync("migrations").filter((f) => f.endsWith(".sql")).map((name) => ({ name, sql: readFileSync(`migrations/${name}`, "utf8") })));
+  /* The Concierge role reaches public by default; a throwaway schema has to grant it. */
+  if (schema) await db.exec(`GRANT USAGE ON SCHEMA ${schema} TO concierge_reader`);
   return db;
 }
 

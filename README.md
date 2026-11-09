@@ -109,7 +109,7 @@ The company-tier report also shows the second look, a second model that checked 
 
 The Summary check has seen three real model calls. Eight of the nine parts passed the checks first time, and the ninth was a false rejection that is fixed. Three calls is too few to call a rate.
 
-**Tests.** `npx vitest run` passes 824 tests with 1 skipped, across 52 files (825 in all), and `npx tsc --noEmit` is clean. The skipped test is the `NOT MEASURED` check in `tests/company-tier-evals.test.ts`, which runs only when that recording is stale. Continuous integration runs the type check, the tests with evals held strict, the build and a boot smoke test on every push.
+**Tests.** `npx vitest run` passes 827 tests with 8 skipped, across 54 files (835 in all), and `npx tsc --noEmit` is clean. Seven of the skipped tests need a real Postgres and run in CI, which starts one; the whole suite has also passed on real Postgres. The other skipped test is the `NOT MEASURED` check in `tests/company-tier-evals.test.ts`, which runs only when that recording is stale. Continuous integration runs the type check, the tests with evals held strict, the build and a boot smoke test on every push.
 
 ## Run the demo
 

@@ -46,10 +46,10 @@ export async function pglite(dataDir?: string): Promise<Db> {
   };
 }
 
-export async function postgresJs(url: string, opts: { max?: number } = {}): Promise<Db> {
+export async function postgresJs(url: string, opts: { max?: number; schema?: string } = {}): Promise<Db> {
   const { default: postgres } = await import("postgres");
   // prepare:false keeps it compatible with transaction-mode poolers (Supabase pooler, Hyperdrive).
-  const sql = postgres(url, { prepare: false, max: opts.max ?? 5, connection: { TimeZone: "UTC" }, types: { date: { to: 1082, from: [1082], serialize: (x: string) => x, parse: (x: string) => x } } });
+  const sql = postgres(url, { prepare: false, max: opts.max ?? 5, connection: { TimeZone: "UTC", ...(opts.schema ? { search_path: opts.schema } : {}) }, types: { /* The SQL sends JSON as text, cast with ::jsonb. The driver's default would encode that text a second time and store a string. */ jsonb: { to: 3802, from: [114, 3802], serialize: (x: unknown) => (typeof x === "string" ? x : JSON.stringify(x)), parse: (x: string) => JSON.parse(x) }, date: { to: 1082, from: [1082], serialize: (x: string) => x, parse: (x: string) => x } } });
   const query = async <T>(text: string, params: unknown[] = []) => clean<T>(await sql.unsafe<Row[]>(text, params as never[]));
   return {
     query,

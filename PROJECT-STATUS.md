@@ -8,7 +8,7 @@ All nine build slices are done, and the later design work (tiering and enrichmen
 
 Checked on 2026-11-09 by running them:
 
-- `npx vitest run`: 824 passed, 1 skipped, 52 files (825 tests).
+- `npx vitest run`: 827 passed, 8 skipped, 54 files (835 tests). Seven skips need TEST_DATABASE_URL and run in CI. With TEST_ALL_ON_POSTGRES the whole suite also passes on real Postgres (2026-11-09).
 - `npx tsc --noEmit`: clean.
 - `EVALS_STRICT=1 npx vitest run` on the three eval test files: passes, so no recording is stale and CI would not be red on evals.
 
