@@ -1,5 +1,7 @@
 # Events Desk
 
+[![CI](https://github.com/bryanacevedo/events-desk/actions/workflows/ci.yml/badge.svg)](https://github.com/bryanacevedo/events-desk/actions/workflows/ci.yml)
+
 Events Desk is for a person who runs events all year. You go to a lot of conferences. For each one you need three things: who asked for a seat and who said yes, who is worth meeting in the attendee list, and how to reach them without paying for the same data twice.
 
 You ask for a seat. Someone approves it. You upload the attendee list. The desk works out which companies and people matter, finds and checks their emails, and hands back a Google Sheet (or an Excel file) your sales team can work from. If more people register later, you upload the new file and the desk adds only the new ones.
@@ -105,7 +107,7 @@ The company-tier report also shows the second look, a second model that checked 
 
 The Summary check has seen three real model calls. Eight of the nine parts passed the checks first time, and the ninth was a false rejection that is fixed. Three calls is too few to call a rate.
 
-**Tests.** `npx vitest run` passes 824 tests with 1 skipped, across 52 files (825 in all), and `npx tsc --noEmit` is clean. The skipped test is the `NOT MEASURED` check in `tests/company-tier-evals.test.ts`, which runs only when that recording is stale. The continuous-integration workflow has never run, because nothing has been pushed yet.
+**Tests.** `npx vitest run` passes 824 tests with 1 skipped, across 52 files (825 in all), and `npx tsc --noEmit` is clean. The skipped test is the `NOT MEASURED` check in `tests/company-tier-evals.test.ts`, which runs only when that recording is stale. Continuous integration runs the type check, the tests with evals held strict, the build and a boot smoke test on every push.
 
 ## Run the demo
 

@@ -12,6 +12,8 @@ Checked on 2026-11-09 by running them:
 - `npx tsc --noEmit`: clean.
 - `EVALS_STRICT=1 npx vitest run` on the three eval test files: passes, so no recording is stale and CI would not be red on evals.
 
+**Public** at https://github.com/bryanacevedo/events-desk since 2026-11-09. CI passed on the first push. The walkthrough is hosted on the project's GitHub Pages site.
+
 To resume: run `npx vitest run`, then pick from "Needs Bryan" below.
 
 ## Proven and not proven
@@ -30,7 +32,6 @@ To resume: run `npx vitest run`, then pick from "Needs Bryan" below.
 - No real Research run has priced a tier call inside the app, so the cost card's AI estimate for tiering is arithmetic, not a measurement (decision 26).
 - There is no real login. "Acting as" is self-asserted in every mode. The personal-data GET routes (contacts, workbook, original files and rows, opt-outs) are open. `WRITE_KEY` is one shared key.
 - The people-world, email-world and other world tests use authored rates. They show the code copes with those rates, nothing about real data.
-- The continuous-integration workflow has never run (nothing pushed yet).
 
 ## Real model evals (Opus 5.5, recorded 2026-11-08 and 2026-11-09)
 
