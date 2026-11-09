@@ -27,6 +27,12 @@ import { seed } from "./seed.ts";
 import { simDeps } from "./sim-vendors.ts";
 
 const root = fileURLToPath(new URL("../..", import.meta.url));
+if (process.env.MEM_LOG === "1") {
+  const read = (f: string) => { try { return readFileSync(f, "utf8").trim(); } catch { return "n/a"; } };
+  const stat = (k: string) => (read("/sys/fs/cgroup/memory.stat").match(new RegExp(`^${k} (\\d+)`, "m"))?.[1] ?? "0");
+  const mb = (n: number | string) => Math.round(Number(n) / 1048576);
+  setInterval(() => { const m = process.memoryUsage(); console.log(`MEM rss=${mb(m.rss)} heap=${mb(m.heapUsed)} ab=${mb(m.arrayBuffers)} ext=${mb(m.external)} cg=${mb(read("/sys/fs/cgroup/memory.current"))} anon=${mb(stat("anon"))} file=${mb(stat("file"))} shmem=${mb(stat("shmem"))}`); }, 1000);
+}
 const port = Number(process.env.PORT ?? 8787);
 const migrateOnly = process.argv.includes("--migrate");
 
