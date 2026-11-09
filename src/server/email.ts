@@ -475,7 +475,10 @@ export async function emailJob(c: Ctx, job: Job, lost: boolean) {
       await save();
       continue;
     }
-    return drop(exhaustedReason(S.cand!, S.errs));
+    const reason = exhaustedReason(S.cand!, S.errs);
+    // Nobody found an address, but a named person with a LinkedIn profile can still be reached there. They stay on the list with no email.
+    if (reason === "no_email_found" && r.linkedin && r.full_name && !r.name_hidden) { await save(); return c.db.tx((q) => enqueue(q, c.eventId, "flag", { contact_id: contactId })); }
+    return drop(reason);
   }
 }
 

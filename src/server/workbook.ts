@@ -391,7 +391,7 @@ function peopleTab(wb: ExcelJS.Workbook, name: string, people: Person[], title: 
     p.tab = name; p.row = r;
     const f = p.firmo ?? {};
     const values: (string | number | null)[] = [
-      p.priority, p.full_name, p.title, words(p.title_seniority), words(p.title_function), p.email, emailStatus(p), "", p.no_calls ? "No calls" : "",
+      p.priority, p.full_name ?? "Name unknown", p.title, words(p.title_seniority), words(p.title_function), p.email, emailStatus(p), "", p.no_calls ? "No calls" : "",
       p.company, p.tier, p.tier ? FIT_WORDS[p.tier] : "", f.industry ?? "", f.employees ?? null, f.country ?? "", f.revenue ?? null, "",
       accountTypeWord(p.account_type), heatWord(p.heat), p.account_owner ?? "", dealWords(p.deal_name), p.deal_stage ?? "", null,
       p.source === "attendee" ? "Attendee list" : "Found at the company", emailFrom(p.email_source), null, p.person_location ?? "", words(p.vendor_seniority), p.departments ?? "", p.role_since ?? "", p.employer ?? "",

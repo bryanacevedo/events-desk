@@ -446,7 +446,7 @@ describe("the live adapters, on faked responses", () => {
     });
     expect(fp.provides).not.toContain("business_model");
     const a = await fp.search("acme.com", "Acme");
-    expect(a).toEqual({ firmo: { employees: 640, industry: "computer software", description: "Cloud tools." }, charged: 0 });
+    expect(a).toMatchObject({ firmo: { employees: 640, industry: "computer software", description: "Cloud tools." }, charged: 0 });
     const b = await fp.enrich("acme.com", "Acme");
     expect(b.charged).toBe(s.research.firmographics_cost);
     expect(b.firmo).toEqual({ employees: 640, industry: "computer software", country: "Spain" });

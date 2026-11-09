@@ -108,6 +108,8 @@ async function ensureFirmo(c: Ctx, co: CompanyRow, icp: Icp, reuseStored: boolea
     const r = await withVendorWait(c, () => g.call(() => fp.search(domain, co.name)));
     firmo = cleanFirmo(r.firmo);
     meta.searched = true;
+    // A company known only by its email domain gets its real name the first time a data source gives one.
+    if (r.company_name) await c.db.query("UPDATE companies SET name = $2, name_provisional = false WHERE id = $1 AND name_provisional", [co.id, r.company_name]);
   }
   let changed = !cached;
   if (!meta.enriched && missingNeeded(icp, firmo).some((m) => !fp.provides || fp.provides.includes(m))) {

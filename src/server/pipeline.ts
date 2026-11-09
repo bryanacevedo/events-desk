@@ -25,7 +25,8 @@ import { attachReverse, dbReveals, finishIdentity, applyResolution, loadIdentity
 import { domainsForName, getFinderResult, getLinkedinResult, isOptedOut, logReuse, putLinkedinResult } from "./caches.ts";
 import { VendorDown, VendorHealth, UNLIMITED, type GuardConfig } from "./vendor-health.ts";
 import { titleRule, type Settings, type Tier } from "../shared/cost.ts";
-import { cleanLinkedin, companyKey } from "../shared/ingest.ts";
+import { cleanLinkedin, companyKey, labelFromDomain } from "../shared/ingest.ts";
+import { emailDomain, isFreeWebmail, isPlaceholderDomain, isWebmailTypo } from "../shared/layer0.ts";
 import type { Flow } from "../shared/domain.ts";
 import { vendorWords } from "../shared/vendors.ts";
 import { nameKey } from "../shared/email.ts";
@@ -322,13 +323,17 @@ async function reverseJob(c: Ctx, job: Job, lost: boolean) {
     g.assertAvailable();
     return paidVendor(c, "reverse_lookup", rv.name, rv.cost, "credits", async () => {
       const o = await g.call(() => (byEmail ? rv.byEmail(p.email!) : rv.byLinkedin(p.linkedin!)), { paid: true });
-      return { value: o.company, charged: o.charged };
+      return { value: o, charged: o.charged };
     });
   });
   if (r.kind === "refused") return drop("budget_cap");
   if (r.kind === "error") return drop("vendor_error");
-  await attempt(c, contact_id, rv.name, "reverse_lookup", r.value ? "found" : "miss");
-  if (!r.value || !(await attachReverse(c.db, c.eventId, contact_id, r.value, "reverse_lookup"))) return drop();
+  await attempt(c, contact_id, rv.name, "reverse_lookup", r.value.company ? "found" : "miss");
+  if (r.value.company) { if (!(await attachReverse(c.db, c.eventId, contact_id, r.value.company, "reverse_lookup", r.value.person))) return drop(); return; }
+  // The lookup knew nothing, but a work address still says where the person works.
+  const d = p.email ? emailDomain(p.email) : null;
+  if (d && !isFreeWebmail(d) && !isWebmailTypo(d) && !isPlaceholderDomain(d) && await attachReverse(c.db, c.eventId, contact_id, { name: labelFromDomain(d), domain: d }, "email_domain", r.value.person, true)) return;
+  return drop();
 }
 
 async function discovery(c: Ctx, job: Job, lost: boolean) {

@@ -53,8 +53,11 @@ export function parseTable(lines: string[][]): Parsed {
   // A header names a company, an email or a LinkedIn column; a file may have no company column at all.
   const knownHeader = (r: string[]) => r.some((c) => SYNONYMS.company.includes(header(c)) || SYNONYMS.email.includes(header(c)) || SYNONYMS.linkedin.includes(header(c)));
   const at = lines.slice(0, 10).findIndex(knownHeader);
-  // One column with no header we recognize is a plain list of companies.
-  if (at < 0 && lines.every((r) => r.length === 1)) return { headers: ["company"], rows: lines, headless: true };
+  // One column with no header we recognize is a plain list. Its values say of what: addresses, LinkedIn profiles, or companies.
+  if (at < 0 && lines.every((r) => r.length === 1)) {
+    const share = (shape: RegExp) => lines.filter((r) => shape.test(r[0])).length / lines.length;
+    return { headers: [share(EMAIL) >= 0.6 ? "email" : share(LINKEDIN) >= 0.6 ? "linkedin" : "company"], rows: lines, headless: true };
+  }
   const start = Math.max(at, 0);
   return { headers: lines[start], rows: lines.slice(start + 1), headless: false };
 }
@@ -102,6 +105,15 @@ export function companyKey(name: string) {
   return words.join(" ");
 }
 
+
+/** A readable stand-in for a company known only by a work email's domain: "acme.co.uk" reads "Acme". Replaced when a data source gives the real name. */
+export function labelFromDomain(domain: string) {
+  const parts = domain.toLowerCase().split(".");
+  parts.pop();
+  if (parts.length > 1 && ["co", "com", "org", "net", "ac", "gov", "edu"].includes(parts[parts.length - 1])) parts.pop();
+  const root = parts[parts.length - 1] ?? domain;
+  return root.charAt(0).toUpperCase() + root.slice(1);
+}
 
 const cleanName = (s: string) => {
   const t = s.replace(/\s+/g, " ").trim();

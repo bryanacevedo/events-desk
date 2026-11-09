@@ -40,9 +40,9 @@ When a cap runs out, code checks still act (section 8). Anything that needed the
 The mapper already accepts these. Reverse lookup runs only on the two-card flow, and that is where this is supported: single-card events stay as they are.
 
 - `ReverseLookup` gains a person result (`full_name`, `title`, `linkedin`). `attachReverse` writes them only where the row is blank. The live adapter stops discarding `j.person`.
-- A work email's domain gives the company's identity free. Its name starts as a provisional label from the domain and is replaced when firmographics return one. Webmail needs the paid lookup, priced on the card.
+- Every person with no company gets the paid lookup, priced on the card. Placing work emails free by domain was built and backed out: in the authored world it raised false merges from 2 to 6, because a work address can be a former employer's. When the lookup finds nothing, a work email's domain places the person, under a provisional label from the domain that firmographics replace. Webmail with no match drops.
 - A one-column headerless list of emails or LinkedIn URLs is detected as that, by its values, not read as companies.
-- A person with a verified address and no name stays on the list, marked `name unknown`, and cannot be sequenced until a person names them, because templates need a name. A person with no address drops as `no_email_found`, as today.
+- A person with a verified address and no name stays on the list, marked `name unknown`, and cannot be sequenced until a person names them, because templates need a name. A named person with a LinkedIn profile and no address found stays on the list for LinkedIn only. Anyone else with no address drops as `no_email_found`, as today.
 - No title means the title-unknown priority, as today.
 - Tests: email-only, LinkedIn-only, mixed, all-webmail, headerless.
 

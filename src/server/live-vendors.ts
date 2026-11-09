@@ -138,6 +138,7 @@ function candidateOf(o: any): CompanyCandidate | null {
   return { name: String(o.name), domain, parent_name: parent?.name ?? null, parent_domain: companyDomain(parent?.primary_domain) ?? null, country: o.country ?? o.organization_country ?? null, employees: typeof o.estimated_num_employees === "number" ? o.estimated_num_employees : null };
 }
 const str = (v: unknown, max = 80) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null);
+const reversePerson = (p: any) => (p ? { full_name: str(p.name, 120), title: str(p.title, 160), linkedin: cleanLinkedin(p.linkedin_url) } : null);
 function personOf(p: any): PersonMatchResult | null {
   if (!p?.id) return null;
   const email = p.email && !/not_unlocked/.test(String(p.email)) ? String(p.email).toLowerCase() : null;
@@ -175,8 +176,8 @@ export function apolloIdentity(s: Settings, apollo: ApolloCall): Identity {
     },
     reverse: {
       name: "apollo_reverse", cost: rv,
-      async byEmail(email) { const j = await apollo("people/match", { email }); return { company: candidateOf(j.person?.organization), charged: rv }; },
-      async byLinkedin(url) { const j = await apollo("people/match", { linkedin_url: url }); return { company: candidateOf(j.person?.organization), charged: rv }; },
+      async byEmail(email) { const j = await apollo("people/match", { email }); return { company: candidateOf(j.person?.organization), person: reversePerson(j.person), charged: rv }; },
+      async byLinkedin(url) { const j = await apollo("people/match", { linkedin_url: url }); return { company: candidateOf(j.person?.organization), person: reversePerson(j.person), charged: rv }; },
     },
     dns: systemDns,
   };
@@ -208,7 +209,7 @@ export function apolloFirmographics(s: Settings, apollo: ApolloCall): Firmograph
     async search(domain) {
       const j = await apollo("mixed_companies/search", { q_organization_domains_list: [domain], page: 1, per_page: 1 });
       const o = (j.organizations ?? j.accounts ?? [])[0];
-      return { firmo: o ? orgFirmo(o) : null, charged: 0 };
+      return { firmo: o ? orgFirmo(o) : null, charged: 0, company_name: str(o?.name, 160) };
     },
     async enrich(domain) {
       const j = await apollo("organizations/enrich", { domain }, { get: true });

@@ -77,10 +77,13 @@ export interface PersonMatch {
   name: string; cost: number;
   match(p: { first: string; last: string; full_name: string; company: string; title?: string | null }): Promise<{ person: PersonMatchResult | null; charged: number }>;
 }
+/** Who a reverse lookup found. Written to a row only where the row is blank. */
+export interface ReversePerson { full_name: string | null; title: string | null; linkedin: string | null }
+export interface ReverseResult { company: CompanyCandidate | null; person?: ReversePerson | null; charged: number }
 export interface ReverseLookup {
   name: string; cost: number;
-  byEmail(email: string): Promise<{ company: CompanyCandidate | null; charged: number }>;
-  byLinkedin(url: string): Promise<{ company: CompanyCandidate | null; charged: number }>;
+  byEmail(email: string): Promise<ReverseResult>;
+  byLinkedin(url: string): Promise<ReverseResult>;
 }
 /** Does the domain have a mail server? Free (a DNS lookup). */
 export interface Dns { hasMailServer(domain: string): Promise<boolean> }
@@ -94,7 +97,7 @@ export interface FirmographicsLookup {
   name: string; cost: number;
   /** The fields this vendor can ever return. A paid enrich is bought only for a missing field the vendor provides. Absent means all of them. */
   provides?: readonly ("employees" | "industry" | "business_model" | "country" | "description")[];
-  search(domain: string, name: string): Promise<{ firmo: FirmoRecord | null; charged: number }>;
+  search(domain: string, name: string): Promise<{ firmo: FirmoRecord | null; charged: number; company_name?: string | null }>;
   enrich(domain: string, name: string): Promise<{ firmo: FirmoRecord | null; charged: number }>;
 }
 /** One read of a company's own site, as plain text, or null when there is nothing to read. Free: no vendor credit. */
@@ -163,7 +166,8 @@ export function mockIdentity(s: Settings): Identity {
       async byEmail(email) {
         const d = email.slice(email.lastIndexOf("@") + 1).toLowerCase();
         if (!d.endsWith(".example")) return { company: null, charged: s.research.reverse_lookup_cost };
-        return { company: { name: titleCase(d.split(".")[0]), domain: d }, charged: s.research.reverse_lookup_cost };
+        const local = email.slice(0, email.lastIndexOf("@"));
+        return { company: { name: titleCase(d.split(".")[0]), domain: d }, person: local.includes(".") ? { full_name: local.split(".").map(titleCase).join(" "), title: null, linkedin: null } : null, charged: s.research.reverse_lookup_cost };
       },
       async byLinkedin() { return { company: null, charged: s.research.reverse_lookup_cost }; },
     },

@@ -367,7 +367,8 @@ describe("stage 4 in the pipeline", () => {
     await processEvent(db, id, withIdentity(v.id));
     const drops = Object.fromEntries((await db.query<{ drop_reason: string; n: number }>("SELECT drop_reason, count(*)::int AS n FROM contacts WHERE event_id = $1 AND dropped_at IS NOT NULL GROUP BY 1", [id])).map((r) => [r.drop_reason, r.n]));
     // Lee (not found) and Pat (LinkedIn the vendor cannot place) drop as no_company. "Nobody" had nothing at upload.
-    expect(drops).toEqual({ junk_row: 1, no_company: 2 });
+    // Lee's lookup found nothing, but a work address still says where Lee works. Pat has no address to fall back on.
+    expect(drops).toEqual({ junk_row: 1, no_company: 1 });
     const sam = await db.query<{ company: string; domain: string }>("SELECT co.name AS company, co.primary_domain AS domain FROM contacts c JOIN companies co ON co.id = c.company_id WHERE c.full_name = 'Sam Okafor'");
     expect(sam[0]).toEqual({ company: "Acme Rockets", domain: "acme.example" });
     expect((await spendByStep(db, id)).find((x) => x.step === "reverse_lookup")!.n).toBe(3);

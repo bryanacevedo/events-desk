@@ -16,14 +16,14 @@
 import { resolveMx, resolve4 } from "node:dns/promises";
 import type { Db } from "./db.ts";
 import { VendorDown, type VendorHealth } from "./vendor-health.ts";
-import type { CompanyCandidate, Crm, Dns, Identity, PersonMatchResult } from "./providers.ts";
+import type { CompanyCandidate, Crm, Dns, Identity, PersonMatchResult, ReversePerson } from "./providers.ts";
 import { openCase } from "./cases.ts";
 import { dropAtCompany, enqueue } from "./work.ts";
 import { logActivity, newId } from "./events.ts";
 import { mapNameToDomain, MISS_DAYS } from "./caches.ts";
 import { checkAccounts, crmConnected } from "./crm-checks.ts";
 import { adoptFromParent } from "./inherit.ts";
-import { companyKey } from "../shared/ingest.ts";
+import { cleanLinkedin, companyKey } from "../shared/ingest.ts";
 import { isFreeWebmail, isPlaceholderDomain, nameSet, resemblesDomain } from "../shared/layer0.ts";
 import { companyDomain, emailDomainChoice, employerMatches, IDENTITY, splitName, weigh, type FileEvidence } from "../shared/identity.ts";
 import type { Settings } from "../shared/cost.ts";
@@ -436,10 +436,12 @@ export async function finishIdentity(db: Db, eventId: string, s: Settings, crm: 
 /* ---------------------------------------------------------- reverse lookup */
 
 /** Attaches a person who came in with no company to the company a reverse lookup found: the event's company at that domain, or a new one. */
-export async function attachReverse(db: Db, eventId: string, contactId: string, found: CompanyCandidate, via: string) {
+export async function attachReverse(db: Db, eventId: string, contactId: string, found: CompanyCandidate, via: string, person?: ReversePerson | null, provisional = false) {
   const domain = companyDomain(found.domain);
   if (!domain || !found.name) return false;
   await db.tx(async (q) => {
+    // What the lookup says about the person only fills what the file left blank.
+    if (person) await q("UPDATE contacts SET full_name = coalesce(full_name, $2), title = coalesce(title, $3), linkedin = coalesce(linkedin, $4) WHERE id = $1", [contactId, person.full_name, person.title, cleanLinkedin(person.linkedin)]);
     let [co] = await q<{ id: string }>("SELECT id FROM companies WHERE event_id = $1 AND primary_domain = $2 LIMIT 1", [eventId, domain]);
     if (!co) {
       const key = companyKey(found.name);
@@ -447,11 +449,12 @@ export async function attachReverse(db: Db, eventId: string, contactId: string, 
       if (co) await q("UPDATE companies SET primary_domain = $2, identity_state = 'resolved', identity_via = $3, identity_evidence = identity_evidence || $4::jsonb WHERE id = $1 AND identity_state <> 'resolved'", [co.id, domain, via, JSON.stringify([{ source: "resolved", via, value: domain }])]);
       else {
         const id = newId("co");
-        await q("INSERT INTO companies (id, event_id, key, name, primary_domain, identity_state, identity_via, parent_name, parent_domain, identity_evidence) VALUES ($1, $2, $3, $4, $5, 'resolved', $6, $7, $8, $9::jsonb)",
-          [id, eventId, key, found.name, domain, via, found.parent_name ?? null, found.parent_domain ?? null, JSON.stringify([{ source: "resolved", via, value: domain }])]);
+        await q("INSERT INTO companies (id, event_id, key, name, primary_domain, identity_state, identity_via, parent_name, parent_domain, identity_evidence, name_provisional) VALUES ($1, $2, $3, $4, $5, 'resolved', $6, $7, $8, $9::jsonb, $10)",
+          [id, eventId, key, found.name, domain, via, found.parent_name ?? null, found.parent_domain ?? null, JSON.stringify([{ source: "resolved", via, value: domain }]), provisional]);
         co = { id };
       }
     }
+    if (!provisional) await q("UPDATE companies SET name = $2, name_provisional = false WHERE id = $1 AND name_provisional", [co.id, found.name]);
     await q("UPDATE contacts SET company_id = $2 WHERE id = $1", [contactId, co.id]);
     await q("UPDATE source_rows SET company_id = $2 WHERE id = (SELECT source_row_id FROM contacts WHERE id = $1)", [contactId, co.id]);
   });

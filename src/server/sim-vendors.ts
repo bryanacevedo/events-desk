@@ -399,7 +399,7 @@ export function simVendors(world: World, s: Settings, opts: SimOpts = {}): Vendo
         const co = person?.company_id ? idx.byId.get(person.company_id) : idx.byDomain.get(domain);
         const hit = co && u(`rev|${e}`) < IR.reverse.work_email;
         audit({ vendor: "reverse_lookup_sim", op: "email", klass: hit ? "hit" : "miss", truth: co?.id ?? null });
-        return { company: hit ? asCandidate(co!) : null, charged: cost };
+        return { company: hit ? asCandidate(co!) : null, person: hit && person ? { full_name: person.full_name, title: person.title, linkedin: person.linkedin } : null, charged: cost };
       },
       async byLinkedin(url) {
         const cost = s.research.reverse_lookup_cost;
@@ -408,7 +408,7 @@ export function simVendors(world: World, s: Settings, opts: SimOpts = {}): Vendo
         const co = person?.company_id ? idx.byId.get(person.company_id) : null;
         const hit = co && u(`revli|${url}`) < IR.reverse.linkedin;
         audit({ vendor: "reverse_lookup_sim", op: "linkedin", klass: hit ? "hit" : "miss", truth: co?.id ?? null });
-        return { company: hit ? asCandidate(co!) : null, charged: cost };
+        return { company: hit ? asCandidate(co!) : null, person: hit && person ? { full_name: person.full_name, title: person.title, linkedin: person.linkedin } : null, charged: cost };
       },
     },
     dns: { async hasMailServer(domain) { return domain.toLowerCase().endsWith(".example"); } },
