@@ -101,7 +101,7 @@ The company-tier report also shows the second look, a second model that checked 
 
 The Summary check has seen three real model calls. Eight of the nine parts passed the checks first time, and the ninth was a false rejection that is fixed. Three calls is too few to call a rate.
 
-**Tests.** `npx vitest run` passes 824 tests with 1 skipped, across 52 files (825 in all), and `npx tsc --noEmit` is clean. The skipped test is the `NOT MEASURED` check in `tests/company-tier-evals.test.ts`, which runs only when that recording is stale. The continuous-integration workflow has never run, because the project has no git history yet.
+**Tests.** `npx vitest run` passes 824 tests with 1 skipped, across 52 files (825 in all), and `npx tsc --noEmit` is clean. The skipped test is the `NOT MEASURED` check in `tests/company-tier-evals.test.ts`, which runs only when that recording is stale. The continuous-integration workflow has never run, because nothing has been pushed yet.
 
 ## Run the demo
 

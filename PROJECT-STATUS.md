@@ -30,7 +30,7 @@ To resume: run `npx vitest run`, then pick from "Needs Bryan" below.
 - No real Research run has priced a tier call inside the app, so the cost card's AI estimate for tiering is arithmetic, not a measurement (decision 26).
 - There is no real login. "Acting as" is self-asserted in every mode. The personal-data GET routes (contacts, workbook, original files and rows, opt-outs) are open. `WRITE_KEY` is one shared key.
 - The people-world, email-world and other world tests use authored rates. They show the code copes with those rates, nothing about real data.
-- The continuous-integration workflow has never run (no git repository).
+- The continuous-integration workflow has never run (nothing pushed yet).
 
 ## Real model evals (Opus 5.5, recorded 2026-11-08 and 2026-11-09)
 
@@ -76,8 +76,8 @@ From `node scripts/eval-report.ts` and the title report from the same code. Deta
 
 ## Needs Bryan
 
-- `git init` and the first commit, then the first CI run.
-- The two explainer videos: the scripts need his approval before anything is rendered.
+- First push, then the first CI run. The first commit is made locally (2026-11-09).
+- The two explainer videos: scripts drafted at `~/Documents/Career/github-portfolio/videos/events-desk/SCRIPTS.md`, waiting on his approval before anything is rendered.
 - Publish the repository. Real event logos stay in the public version (decided).
 - Paid Apollo and a ZeroBounce key, then one real run on a very small list. The waterfall lineup is set in Apollo, and a sample of a few hundred contacts decides it.
 - Connect Salesforce when wanted. Confirm Do Not Call.
