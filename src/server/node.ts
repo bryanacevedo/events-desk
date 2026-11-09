@@ -6,6 +6,7 @@
 
    Safety lives in modes.ts: `--demo` ignores DATABASE_URL and every vendor and model key. */
 
+import { execFileSync } from "node:child_process";
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
@@ -39,6 +40,10 @@ if (migrateOnly && !url) { console.error("--migrate needs DATABASE_URL."); proce
 const dataDir = join(root, ".data", mode.demo ? "demo" : "local");
 if (mode.demo) rmSync(dataDir, { recursive: true, force: true });
 mkdirSync(dataDir, { recursive: true });
+// Building the sample data takes about 1 GB, more than a small host has. The hosted demo opens a copy built ahead of time (make demo-snapshot).
+const snapshot = join(root, "samples", "demo-snapshot.tgz");
+const fromSnapshot = mode.demo && process.env.PUBLIC_DEMO === "1" && existsSync(snapshot);
+if (fromSnapshot) execFileSync("tar", ["xzf", snapshot, "-C", join(root, ".data")]);
 const db: Db = url ? await postgresJs(url) : await pglite(dataDir);
 
 const migrations = readdirSync(join(root, "migrations")).filter((f) => f.endsWith(".sql"))
@@ -48,7 +53,7 @@ if (migrateOnly) { console.log("Migrations applied."); await db.close(); process
 
 const empty = (await db.query<{ n: number }>("SELECT count(*)::int AS n FROM events"))[0]?.n === 0;
 const mayLoadSample = !url || process.env.SEED_SAMPLE === "1";
-if (mode.demo || (empty && mayLoadSample)) {
+if ((mode.demo && !fromSnapshot) || (empty && mayLoadSample && !fromSnapshot)) {
   const t0 = Date.now();
   await seed(db, mode.demo ? { real: true } : {});
   console.log(`Loaded the sample events in ${Date.now() - t0} ms.${mode.demo ? " Includes the flagship with about 1,650 rows." : ""}`);
