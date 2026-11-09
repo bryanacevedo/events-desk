@@ -1,0 +1,103 @@
+{
+  "icp": "B2B companies with 200 to 5000 employees that sell to other businesses and run a sales team. Strong fit: software, logistics technology, payments. Weak fit: agencies, consultancies, and companies that sell only to consumers.",
+  "excluded_companies": [
+    "Rivalcrest Systems"
+  ],
+  "existing_customers": [
+    "Pinefold"
+  ],
+  "target_titles": [
+    "VP Sales",
+    "Head of Revenue Operations",
+    "Chief Revenue Officer"
+  ],
+  "title_keywords": {
+    "1": [
+      "chief revenue",
+      "cro",
+      "vp",
+      "vice president",
+      "head of sales",
+      "head of revenue",
+      "head of growth",
+      "revops",
+      "revenue operations"
+    ],
+    "2": [
+      "director",
+      "head of",
+      "manager",
+      "lead"
+    ],
+    "3": [
+      "assistant",
+      "intern",
+      "student",
+      "coordinator"
+    ]
+  },
+  "contacts_per_company": 3,
+  "add_prospects": false,
+  "discovery_cost": 1,
+  "finders": [
+    {
+      "name": "finder_one",
+      "cost": 1
+    }
+  ],
+  "verifiers": [
+    {
+      "name": "verifier_one",
+      "cost": 1
+    }
+  ],
+  "waterfall": {
+    "name": "email_waterfall",
+    "reserve": 10,
+    "max_wait_minutes": 30
+  },
+  "linkedin": {
+    "name": "linkedin_lookup",
+    "cost": 1
+  },
+  "llm_call_cents": 1,
+  "pools": {
+    "Apollo": { "allotment": null, "period": "month" },
+    "ZeroBounce": { "allotment": null, "period": "year" }
+  },
+  "approvers": [
+    "Dan Whitlock"
+  ],
+  "agent_question_limit": 50,
+  "calls_per_question": 3,
+  "research": {
+    "person_match_cost": 1,
+    "reverse_lookup_cost": 1,
+    "firmographics_cost": 1,
+    "retier_share": 0.1,
+    "tier_calls_per_company": 4,
+    "website_read_calls": 1
+  },
+  "outreach": {
+    "quota_tier1": 5,
+    "quota_tier2": 3,
+    "candidates_per_person": 3,
+    "probe_cost": 1,
+    "verifier_retries": 1,
+    "search_cost": 0,
+    "reveal_cost": 1,
+    "pattern_guess": false
+  },
+  "estimate": {
+    "finder_hit": 0.6,
+    "verifier_pass": 0.75,
+    "linkedin_on_file": 0.2
+  },
+  "limits": {
+    "tier1_share_warning": 0.25,
+    "small_list_companies": 20,
+    "freshness_days": 180,
+    "verification_reuse_days": 30,
+    "firmographics_cache_days": 90
+  }
+}

@@ -1,0 +1,925 @@
+{
+ "note": "FROZEN HOLDOUT. Do not tune on it. 30 fictional hard cases and 38 real public companies labeled by hand against the demo ICP. The real companies' facts are the author's own knowledge: remembered, approximate, unverified, possibly dated. The test pins this file's hash.",
+ "items": [
+  {
+   "id": "hold_f01",
+   "name": "Pellam Freight Systems",
+   "set": "holdout",
+   "source": "fictional",
+   "firmo": {
+    "employees": 3100,
+    "industry": "Freight software",
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "hold_f02",
+   "name": "Orville Settlements",
+   "set": "holdout",
+   "source": "fictional",
+   "firmo": {
+    "employees": 205,
+    "industry": "Invoicing and settlement",
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "hold_f03",
+   "name": "Tarn Ledger",
+   "set": "holdout",
+   "source": "fictional",
+   "firmo": {
+    "employees": 5000,
+    "industry": "Payments",
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "The range ends at 5,000 and includes it."
+  },
+  {
+   "id": "hold_f04",
+   "name": "Wick Data Platforms",
+   "set": "holdout",
+   "source": "fictional",
+   "firmo": {
+    "employees": 5001,
+    "industry": "Data platforms",
+    "business_model": "B2B"
+   },
+   "tier": 2,
+   "why": "One employee over the range, in a strong vertical."
+  },
+  {
+   "id": "hold_f05",
+   "name": "Ravenel Logistics Technology",
+   "set": "holdout",
+   "source": "fictional",
+   "firmo": {
+    "employees": 199,
+    "industry": "Warehouse automation",
+    "business_model": "B2B"
+   },
+   "tier": 2,
+   "why": "One employee under the range, in a strong vertical."
+  },
+  {
+   "id": "hold_f06",
+   "name": "Hobart Fabrication",
+   "set": "holdout",
+   "source": "fictional",
+   "firmo": {
+    "employees": 1200,
+    "industry": "Industrial manufacturing",
+    "business_model": "B2B"
+   },
+   "tier": 2,
+   "why": "Sells to businesses, and either in the size range or in a strong vertical, but not both."
+  },
+  {
+   "id": "hold_f07",
+   "name": "Calder Wholesale",
+   "set": "holdout",
+   "source": "fictional",
+   "firmo": {
+    "employees": 640,
+    "industry": "Wholesale distribution",
+    "business_model": "B2B"
+   },
+   "tier": 2,
+   "why": "Sells to businesses, and either in the size range or in a strong vertical, but not both."
+  },
+  {
+   "id": "hold_f08",
+   "name": "Mirren Insurance Brokers",
+   "set": "holdout",
+   "source": "fictional",
+   "firmo": {
+    "employees": 90,
+    "industry": "Insurance brokerage",
+    "business_model": "B2B"
+   },
+   "tier": 3,
+   "why": "Outside the ICP: consumer-only, an agency or consultancy, or a business-to-business company that is neither in range nor in a strong vertical."
+  },
+  {
+   "id": "hold_f09",
+   "name": "Sorrel Metals",
+   "set": "holdout",
+   "source": "fictional",
+   "firmo": {
+    "employees": 60,
+    "industry": "Machined components",
+    "business_model": "B2B"
+   },
+   "tier": 3,
+   "why": "Outside the ICP: consumer-only, an agency or consultancy, or a business-to-business company that is neither in range nor in a strong vertical."
+  },
+  {
+   "id": "hold_f10",
+   "name": "Dunlin Cloud Kitchens",
+   "set": "holdout",
+   "source": "fictional",
+   "firmo": {
+    "employees": 2000,
+    "industry": "Restaurants",
+    "business_model": "B2C"
+   },
+   "tier": 3,
+   "why": "The name says cloud; it sells meals to consumers."
+  },
+  {
+   "id": "hold_f11",
+   "name": "Brightline Freight Consulting",
+   "set": "holdout",
+   "source": "fictional",
+   "firmo": {
+    "employees": 450,
+    "industry": "Supply chain consulting",
+    "business_model": "B2B"
+   },
+   "tier": 3,
+   "why": "The name says freight; it is a consultancy."
+  },
+  {
+   "id": "hold_f12",
+   "name": "Quarrel Software Studio",
+   "set": "holdout",
+   "source": "fictional",
+   "firmo": {
+    "employees": 120,
+    "industry": "Software development agency",
+    "business_model": "B2B",
+    "description": "Builds apps for other companies and bills by the hour."
+   },
+   "tier": 3,
+   "why": "The name says software; it is an agency."
+  },
+  {
+   "id": "hold_f13",
+   "name": "Halden Payments Advisory",
+   "set": "holdout",
+   "source": "fictional",
+   "firmo": {
+    "employees": 800,
+    "industry": "Payments consulting",
+    "business_model": "B2B"
+   },
+   "tier": 3,
+   "why": "The name says payments; it is a consultancy."
+  },
+  {
+   "id": "hold_f14",
+   "name": "Fenmoor Telematics",
+   "set": "holdout",
+   "source": "fictional",
+   "firmo": {
+    "employees": 80,
+    "industry": "Fleet telematics",
+    "business_model": "B2B"
+   },
+   "tier": 2,
+   "why": "Sells to businesses, and either in the size range or in a strong vertical, but not both."
+  },
+  {
+   "id": "hold_f15",
+   "name": "Larch Treasury Software",
+   "set": "holdout",
+   "source": "fictional",
+   "firmo": {
+    "employees": 28000,
+    "industry": "Treasury software",
+    "business_model": "B2B"
+   },
+   "tier": 2,
+   "why": "Sells to businesses, and either in the size range or in a strong vertical, but not both."
+  },
+  {
+   "id": "hold_f16",
+   "name": "Corvane Health Network",
+   "set": "holdout",
+   "source": "fictional",
+   "firmo": {
+    "employees": 1500,
+    "industry": "Clinic networks",
+    "business_model": "B2B2C"
+   },
+   "tier": 2,
+   "why": "Sells to businesses, and either in the size range or in a strong vertical, but not both."
+  },
+  {
+   "id": "hold_f17",
+   "name": "Ivybridge Apps",
+   "set": "holdout",
+   "source": "fictional",
+   "firmo": {
+    "employees": 400,
+    "industry": "Consumer mobile apps",
+    "business_model": "B2C"
+   },
+   "tier": 3,
+   "why": "Outside the ICP: consumer-only, an agency or consultancy, or a business-to-business company that is neither in range nor in a strong vertical."
+  },
+  {
+   "id": "hold_f18",
+   "name": "Selkirk Brewing",
+   "set": "holdout",
+   "source": "fictional",
+   "firmo": {
+    "employees": 900,
+    "industry": "Brewing and beverages",
+    "business_model": "B2C"
+   },
+   "tier": 3,
+   "why": "Outside the ICP: consumer-only, an agency or consultancy, or a business-to-business company that is neither in range nor in a strong vertical."
+  },
+  {
+   "id": "hold_f19",
+   "name": "Norwood Merchant Acquiring",
+   "set": "holdout",
+   "source": "fictional",
+   "firmo": {
+    "employees": 1800,
+    "industry": "Merchant acquiring",
+    "business_model": "B2B2C"
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "hold_f20",
+   "name": "Aldous Workflow",
+   "set": "holdout",
+   "source": "fictional",
+   "firmo": {
+    "employees": 450,
+    "industry": "Workflow software",
+    "business_model": "B2B2C"
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "hold_f21",
+   "name": "Tessel Works",
+   "set": "holdout",
+   "source": "fictional",
+   "firmo": {
+    "business_model": "B2B",
+    "description": "Builds route optimisation software for delivery fleets."
+   },
+   "tier": 1,
+   "why": "Headcount missing: a reader cannot place it. Full facts (about 700 employees) would make it tier 1.",
+   "incomplete": true
+  },
+  {
+   "id": "hold_f22",
+   "name": "Umber Group",
+   "set": "holdout",
+   "source": "fictional",
+   "firmo": {
+    "employees": 500,
+    "industry": "Business services",
+    "business_model": "B2B"
+   },
+   "tier": 2,
+   "why": "In range, not a strong vertical, and not an agency or consultancy by what is shown."
+  },
+  {
+   "id": "hold_f23",
+   "name": "Vesper and Lane",
+   "set": "holdout",
+   "source": "fictional",
+   "firmo": {
+    "employees": 350
+   },
+   "tier": 3,
+   "why": "Only a headcount: Unknown for a reader. Full facts (an agency) would make it tier 3.",
+   "incomplete": true
+  },
+  {
+   "id": "hold_f24",
+   "name": "Wren Holdings",
+   "set": "holdout",
+   "source": "fictional",
+   "firmo": {
+    "country": "Ireland"
+   },
+   "tier": 2,
+   "why": "Only a country: Unknown for a reader. Full facts would make it tier 2.",
+   "incomplete": true
+  },
+  {
+   "id": "hold_f25",
+   "name": "Yarrow Systems",
+   "set": "holdout",
+   "source": "fictional",
+   "firmo": {
+    "employees": 2400,
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "No industry or description: Unknown for a reader. Full facts (a software company) would make it tier 1.",
+   "incomplete": true
+  },
+  {
+   "id": "hold_f26",
+   "name": "Zinnia Retail Cloud",
+   "set": "holdout",
+   "source": "fictional",
+   "firmo": {
+    "employees": 900,
+    "description": "Sells home goods to shoppers online."
+   },
+   "tier": 3,
+   "why": "The business model is missing, and the description says shoppers."
+  },
+  {
+   "id": "hold_f27",
+   "name": "Ashgrove Partners",
+   "set": "holdout",
+   "source": "fictional",
+   "firmo": {
+    "employees": 40,
+    "industry": "Management consulting",
+    "business_model": "B2B"
+   },
+   "tier": 3,
+   "why": "Outside the ICP: consumer-only, an agency or consultancy, or a business-to-business company that is neither in range nor in a strong vertical."
+  },
+  {
+   "id": "hold_f28",
+   "name": "Brackenridge Payments",
+   "set": "holdout",
+   "source": "fictional",
+   "firmo": {
+    "employees": 12,
+    "industry": "Payments",
+    "business_model": "B2B"
+   },
+   "tier": 2,
+   "why": "Strong vertical, far under the range."
+  },
+  {
+   "id": "hold_f29",
+   "name": "Copperfield Logistics Technology",
+   "set": "holdout",
+   "source": "fictional",
+   "firmo": {
+    "employees": 4999,
+    "industry": "Logistics technology",
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "hold_f30",
+   "name": "Dovecote Media Buying",
+   "set": "holdout",
+   "source": "fictional",
+   "firmo": {
+    "employees": 700,
+    "industry": "Media buying",
+    "business_model": "B2B"
+   },
+   "tier": 3,
+   "why": "An agency."
+  },
+  {
+   "id": "hold_r01",
+   "name": "Gong",
+   "set": "holdout",
+   "source": "real_public_author_knowledge",
+   "firmo": {
+    "employees": 1300,
+    "industry": "Revenue intelligence software",
+    "business_model": "B2B",
+    "description": "Sells software that records and analyses sales calls for revenue teams."
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "hold_r02",
+   "name": "Clari",
+   "set": "holdout",
+   "source": "real_public_author_knowledge",
+   "firmo": {
+    "employees": 600,
+    "industry": "Revenue platform software",
+    "business_model": "B2B",
+    "description": "Sells forecasting and pipeline software to sales organisations."
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "hold_r03",
+   "name": "Gainsight",
+   "set": "holdout",
+   "source": "real_public_author_knowledge",
+   "firmo": {
+    "employees": 800,
+    "industry": "Customer success software",
+    "business_model": "B2B",
+    "description": "Sells customer success software to companies."
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "hold_r04",
+   "name": "Outreach",
+   "set": "holdout",
+   "source": "real_public_author_knowledge",
+   "firmo": {
+    "employees": 900,
+    "industry": "Sales engagement software",
+    "business_model": "B2B",
+    "description": "Sells sales engagement software to sales teams."
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "hold_r05",
+   "name": "project44",
+   "set": "holdout",
+   "source": "real_public_author_knowledge",
+   "firmo": {
+    "employees": 1000,
+    "industry": "Supply chain visibility software",
+    "business_model": "B2B",
+    "description": "Sells shipment tracking and logistics visibility software to shippers and carriers."
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "hold_r06",
+   "name": "Descartes Systems Group",
+   "set": "holdout",
+   "source": "real_public_author_knowledge",
+   "firmo": {
+    "employees": 2100,
+    "industry": "Logistics software",
+    "business_model": "B2B",
+    "description": "Sells logistics and supply chain software."
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "hold_r07",
+   "name": "Manhattan Associates",
+   "set": "holdout",
+   "source": "real_public_author_knowledge",
+   "firmo": {
+    "employees": 4500,
+    "industry": "Supply chain software",
+    "business_model": "B2B",
+    "description": "Sells warehouse and supply chain software."
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "hold_r08",
+   "name": "Samsara",
+   "set": "holdout",
+   "source": "real_public_author_knowledge",
+   "firmo": {
+    "employees": 3500,
+    "industry": "Fleet telematics software",
+    "business_model": "B2B",
+    "description": "Sells fleet tracking and operations software."
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "hold_r09",
+   "name": "BILL Holdings",
+   "set": "holdout",
+   "source": "real_public_author_knowledge",
+   "firmo": {
+    "employees": 2200,
+    "industry": "Payments software",
+    "business_model": "B2B",
+    "description": "Sells accounts payable and payments software to businesses."
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "hold_r10",
+   "name": "Paymentus",
+   "set": "holdout",
+   "source": "real_public_author_knowledge",
+   "firmo": {
+    "employees": 1200,
+    "industry": "Payments software",
+    "business_model": "B2B",
+    "description": "Sells bill payment software to billers and utilities."
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "hold_r11",
+   "name": "Marqeta",
+   "set": "holdout",
+   "source": "real_public_author_knowledge",
+   "firmo": {
+    "employees": 800,
+    "industry": "Card issuing payments platform",
+    "business_model": "B2B",
+    "description": "Sells card issuing technology to companies."
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "hold_r12",
+   "name": "Cloudflare",
+   "set": "holdout",
+   "source": "real_public_author_knowledge",
+   "firmo": {
+    "employees": 4200,
+    "industry": "Cloud security and network software",
+    "business_model": "B2B",
+    "description": "Sells internet security and network services to companies."
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "hold_r13",
+   "name": "Pipedrive",
+   "set": "holdout",
+   "source": "real_public_author_knowledge",
+   "firmo": {
+    "employees": 900,
+    "industry": "CRM software",
+    "business_model": "B2B",
+    "description": "Sells sales CRM software to small and medium businesses."
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "hold_r14",
+   "name": "Zuora",
+   "set": "holdout",
+   "source": "real_public_author_knowledge",
+   "firmo": {
+    "employees": 1200,
+    "industry": "Subscription billing software",
+    "business_model": "B2B",
+    "description": "Sells subscription billing software to companies."
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "hold_r15",
+   "name": "Salesforce",
+   "set": "holdout",
+   "source": "real_public_author_knowledge",
+   "firmo": {
+    "employees": 76000,
+    "industry": "Business software",
+    "business_model": "B2B",
+    "description": "Sells CRM and cloud software to companies."
+   },
+   "tier": 2,
+   "why": "Strong vertical, far over the range."
+  },
+  {
+   "id": "hold_r16",
+   "name": "SAP",
+   "set": "holdout",
+   "source": "real_public_author_knowledge",
+   "firmo": {
+    "employees": 107000,
+    "industry": "Enterprise software",
+    "business_model": "B2B",
+    "description": "Sells enterprise software to large companies."
+   },
+   "tier": 2,
+   "why": "Strong vertical, far over the range."
+  },
+  {
+   "id": "hold_r17",
+   "name": "Datadog",
+   "set": "holdout",
+   "source": "real_public_author_knowledge",
+   "firmo": {
+    "employees": 6500,
+    "industry": "Monitoring software",
+    "business_model": "B2B",
+    "description": "Sells observability software to engineering teams."
+   },
+   "tier": 2,
+   "why": "Strong vertical, over the range."
+  },
+  {
+   "id": "hold_r18",
+   "name": "Snowflake",
+   "set": "holdout",
+   "source": "real_public_author_knowledge",
+   "firmo": {
+    "employees": 7000,
+    "industry": "Data platform software",
+    "business_model": "B2B",
+    "description": "Sells a cloud data platform to companies."
+   },
+   "tier": 2,
+   "why": "Strong vertical, over the range."
+  },
+  {
+   "id": "hold_r19",
+   "name": "Stripe",
+   "set": "holdout",
+   "source": "real_public_author_knowledge",
+   "firmo": {
+    "employees": 8000,
+    "industry": "Payments",
+    "business_model": "B2B",
+    "description": "Sells payment processing to online businesses."
+   },
+   "tier": 2,
+   "why": "Strong vertical, over the range."
+  },
+  {
+   "id": "hold_r20",
+   "name": "PayPal",
+   "set": "holdout",
+   "source": "real_public_author_knowledge",
+   "firmo": {
+    "employees": 24000,
+    "industry": "Payments",
+    "business_model": "B2B2C",
+    "description": "Runs a payments network for consumers and merchants."
+   },
+   "tier": 2,
+   "why": "Strong vertical, far over the range; sells to businesses too."
+  },
+  {
+   "id": "hold_r21",
+   "name": "Atlassian",
+   "set": "holdout",
+   "source": "real_public_author_knowledge",
+   "firmo": {
+    "employees": 12000,
+    "industry": "Collaboration software",
+    "business_model": "B2B",
+    "description": "Sells team collaboration software to companies."
+   },
+   "tier": 2,
+   "why": "Strong vertical, over the range."
+  },
+  {
+   "id": "hold_r22",
+   "name": "Okta",
+   "set": "holdout",
+   "source": "real_public_author_knowledge",
+   "firmo": {
+    "employees": 5900,
+    "industry": "Identity software",
+    "business_model": "B2B",
+    "description": "Sells identity and access software to companies."
+   },
+   "tier": 2,
+   "why": "Strong vertical, over the range."
+  },
+  {
+   "id": "hold_r23",
+   "name": "Graco",
+   "set": "holdout",
+   "source": "real_public_author_knowledge",
+   "firmo": {
+    "employees": 4000,
+    "industry": "Industrial equipment manufacturing",
+    "business_model": "B2B",
+    "description": "Makes fluid handling equipment for industry."
+   },
+   "tier": 2,
+   "why": "In range, not a strong vertical."
+  },
+  {
+   "id": "hold_r24",
+   "name": "Badger Meter",
+   "set": "holdout",
+   "source": "real_public_author_knowledge",
+   "firmo": {
+    "employees": 2000,
+    "industry": "Flow measurement manufacturing",
+    "business_model": "B2B",
+    "description": "Makes flow measurement products for utilities and industry."
+   },
+   "tier": 2,
+   "why": "In range, not a strong vertical."
+  },
+  {
+   "id": "hold_r25",
+   "name": "Lindsay Corporation",
+   "set": "holdout",
+   "source": "real_public_author_knowledge",
+   "firmo": {
+    "employees": 1200,
+    "industry": "Irrigation equipment manufacturing",
+    "business_model": "B2B",
+    "description": "Makes irrigation equipment for farms."
+   },
+   "tier": 2,
+   "why": "In range, not a strong vertical."
+  },
+  {
+   "id": "hold_r26",
+   "name": "Gorman-Rupp",
+   "set": "holdout",
+   "source": "real_public_author_knowledge",
+   "firmo": {
+    "employees": 1300,
+    "industry": "Pump manufacturing",
+    "business_model": "B2B",
+    "description": "Makes pumps for industrial and municipal customers."
+   },
+   "tier": 2,
+   "why": "In range, not a strong vertical."
+  },
+  {
+   "id": "hold_r27",
+   "name": "McKinsey and Company",
+   "set": "holdout",
+   "source": "real_public_author_knowledge",
+   "firmo": {
+    "employees": 45000,
+    "industry": "Management consulting",
+    "business_model": "B2B",
+    "description": "Advises companies and governments on strategy and operations."
+   },
+   "tier": 3,
+   "why": "A consultancy."
+  },
+  {
+   "id": "hold_r28",
+   "name": "Boston Consulting Group",
+   "set": "holdout",
+   "source": "real_public_author_knowledge",
+   "firmo": {
+    "employees": 33000,
+    "industry": "Management consulting",
+    "business_model": "B2B",
+    "description": "Advises companies on strategy."
+   },
+   "tier": 3,
+   "why": "A consultancy."
+  },
+  {
+   "id": "hold_r29",
+   "name": "WPP",
+   "set": "holdout",
+   "source": "real_public_author_knowledge",
+   "firmo": {
+    "employees": 100000,
+    "industry": "Advertising agency group",
+    "business_model": "B2B",
+    "description": "Runs advertising and marketing agencies for brands."
+   },
+   "tier": 3,
+   "why": "An agency group."
+  },
+  {
+   "id": "hold_r30",
+   "name": "Omnicom Group",
+   "set": "holdout",
+   "source": "real_public_author_knowledge",
+   "firmo": {
+    "employees": 75000,
+    "industry": "Advertising agency group",
+    "business_model": "B2B",
+    "description": "Runs advertising and marketing agencies for brands."
+   },
+   "tier": 3,
+   "why": "An agency group."
+  },
+  {
+   "id": "hold_r31",
+   "name": "Netflix",
+   "set": "holdout",
+   "source": "real_public_author_knowledge",
+   "firmo": {
+    "employees": 13000,
+    "industry": "Video streaming",
+    "business_model": "B2C",
+    "description": "Sells a streaming subscription to consumers."
+   },
+   "tier": 3,
+   "why": "Sells only to consumers."
+  },
+  {
+   "id": "hold_r32",
+   "name": "Duolingo",
+   "set": "holdout",
+   "source": "real_public_author_knowledge",
+   "firmo": {
+    "employees": 800,
+    "industry": "Language learning software",
+    "business_model": "B2C",
+    "description": "Sells a language learning app to consumers."
+   },
+   "tier": 3,
+   "why": "Sells only to consumers, although it is software and in range."
+  },
+  {
+   "id": "hold_r33",
+   "name": "Peloton",
+   "set": "holdout",
+   "source": "real_public_author_knowledge",
+   "firmo": {
+    "employees": 2500,
+    "industry": "Fitness equipment and subscriptions",
+    "business_model": "B2C",
+    "description": "Sells exercise equipment and classes to consumers."
+   },
+   "tier": 3,
+   "why": "Sells only to consumers, although in range."
+  },
+  {
+   "id": "hold_r34",
+   "name": "Starbucks",
+   "set": "holdout",
+   "source": "real_public_author_knowledge",
+   "firmo": {
+    "employees": 380000,
+    "industry": "Coffee retail",
+    "business_model": "B2C",
+    "description": "Runs coffee shops."
+   },
+   "tier": 3,
+   "why": "Sells only to consumers."
+  },
+  {
+   "id": "hold_r35",
+   "name": "Caterpillar",
+   "set": "holdout",
+   "source": "real_public_author_knowledge",
+   "firmo": {
+    "employees": 113000,
+    "industry": "Heavy equipment manufacturing",
+    "business_model": "B2B",
+    "description": "Makes construction and mining machinery."
+   },
+   "tier": 3,
+   "why": "Out of range and not a strong vertical."
+  },
+  {
+   "id": "hold_r36",
+   "name": "Deere and Company",
+   "set": "holdout",
+   "source": "real_public_author_knowledge",
+   "firmo": {
+    "employees": 75000,
+    "industry": "Agricultural machinery manufacturing",
+    "business_model": "B2B",
+    "description": "Makes farm and construction machinery."
+   },
+   "tier": 3,
+   "why": "Out of range and not a strong vertical."
+  },
+  {
+   "id": "hold_r37",
+   "name": "JPMorgan Chase",
+   "set": "holdout",
+   "source": "real_public_author_knowledge",
+   "firmo": {
+    "employees": 310000,
+    "industry": "Banking",
+    "business_model": "B2B2C",
+    "description": "A bank serving consumers, companies and governments."
+   },
+   "tier": 3,
+   "why": "Out of range and not a strong vertical."
+  },
+  {
+   "id": "hold_r38",
+   "name": "Walmart",
+   "set": "holdout",
+   "source": "real_public_author_knowledge",
+   "firmo": {
+    "employees": 2100000,
+    "industry": "Retail",
+    "business_model": "B2C",
+    "description": "Runs retail stores and an online shop."
+   },
+   "tier": 3,
+   "why": "Sells only to consumers."
+  }
+ ]
+}

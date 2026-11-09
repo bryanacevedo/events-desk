@@ -1,0 +1,1637 @@
+{
+ "marketing manager": {
+  "function": "marketing",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "sales director": {
+  "function": "sales",
+  "seniority": "director",
+  "non_buyer": false
+ },
+ "account executive": {
+  "function": "sales",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "warehouse supervisor": {
+  "function": "operations",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "senior head of marketing": {
+  "function": "marketing",
+  "seniority": "vp",
+  "non_buyer": false
+ },
+ "ux researcher": {
+  "function": "design",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "quality manager": {
+  "function": "operations",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "senior payroll specialist": {
+  "function": "finance",
+  "seniority": "senior",
+  "non_buyer": false
+ },
+ "regional director": {
+  "function": "sales",
+  "seniority": "director",
+  "non_buyer": false
+ },
+ "senior security analyst": {
+  "function": "it_security",
+  "seniority": "senior",
+  "non_buyer": false
+ },
+ "senior inside sales representative": {
+  "function": "sales",
+  "seniority": "senior",
+  "non_buyer": false
+ },
+ "account manager": {
+  "function": "sales",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "junior receptionist": {
+  "function": "admin",
+  "seniority": "individual",
+  "non_buyer": true
+ },
+ "director comercial": {
+  "function": "sales",
+  "seniority": "director",
+  "non_buyer": false
+ },
+ "senior partnership lead": {
+  "function": "partnerships",
+  "seniority": "senior",
+  "non_buyer": false
+ },
+ "jefa de marketing": {
+  "function": "marketing",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "asistente administrativa": {
+  "function": "admin",
+  "seniority": "individual",
+  "non_buyer": true
+ },
+ "senior business development manager": {
+  "function": "sales",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "founder & chief everything officer": {
+  "function": "executive",
+  "seniority": "owner",
+  "non_buyer": false
+ },
+ "senior devops engineer": {
+  "function": "engineering",
+  "seniority": "senior",
+  "non_buyer": false
+ },
+ "chief marketing officer": {
+  "function": "marketing",
+  "seniority": "c_level",
+  "non_buyer": false
+ },
+ "junior paralegal": {
+  "function": "legal",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "senior accountant": {
+  "function": "finance",
+  "seniority": "senior",
+  "non_buyer": false
+ },
+ "senior research scientist": {
+  "function": "engineering",
+  "seniority": "senior",
+  "non_buyer": false
+ },
+ "sales enablement manager": {
+  "function": "sales",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "research scientist": {
+  "function": "engineering",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "intern": {
+  "function": "other",
+  "seniority": "individual",
+  "non_buyer": true
+ },
+ "commercial director": {
+  "function": "sales",
+  "seniority": "director",
+  "non_buyer": false
+ },
+ "production planner": {
+  "function": "operations",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "demand generation manager": {
+  "function": "marketing",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "graphic designer": {
+  "function": "design",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "responsable de cuentas clave": {
+  "function": "sales",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "co-founder": {
+  "function": "executive",
+  "seniority": "owner",
+  "non_buyer": false
+ },
+ "ejecutivo de cuentas": {
+  "function": "sales",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "senior marketing intern": {
+  "function": "marketing",
+  "seniority": "senior",
+  "non_buyer": true
+ },
+ "socio director": {
+  "function": "executive",
+  "seniority": "owner",
+  "non_buyer": false
+ },
+ "president": {
+  "function": "executive",
+  "seniority": "c_level",
+  "non_buyer": false
+ },
+ "vice president, sales": {
+  "function": "sales",
+  "seniority": "vp",
+  "non_buyer": false
+ },
+ "gerente de ventas": {
+  "function": "sales",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "chief executive officer": {
+  "function": "executive",
+  "seniority": "c_level",
+  "non_buyer": false
+ },
+ "senior revenue operations manager": {
+  "function": "revenue_operations",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "junior legal counsel": {
+  "function": "legal",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "ceo": {
+  "function": "executive",
+  "seniority": "c_level",
+  "non_buyer": false
+ },
+ "junior sales enablement manager": {
+  "function": "sales",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "senior sales engineer": {
+  "function": "sales",
+  "seniority": "senior",
+  "non_buyer": false
+ },
+ "revenue operations manager": {
+  "function": "revenue_operations",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "director of marketing": {
+  "function": "marketing",
+  "seniority": "director",
+  "non_buyer": false
+ },
+ "controller": {
+  "function": "finance",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "dream weaver & head of culture": {
+  "function": "hr",
+  "seniority": "vp",
+  "non_buyer": false
+ },
+ "executive": {
+  "function": "other",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "owner": {
+  "function": "executive",
+  "seniority": "owner",
+  "non_buyer": false
+ },
+ "responsable marketing": {
+  "function": "marketing",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "business development manager": {
+  "function": "sales",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "fondateur et pdg": {
+  "function": "executive",
+  "seniority": "owner",
+  "non_buyer": false
+ },
+ "key account manager": {
+  "function": "sales",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "channel manager": {
+  "function": "partnerships",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "logistics coordinator": {
+  "function": "operations",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "comptable": {
+  "function": "finance",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "chief financial officer": {
+  "function": "finance",
+  "seniority": "c_level",
+  "non_buyer": false
+ },
+ "solutions engineer": {
+  "function": "sales",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "manager": {
+  "function": "other",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "directrice générale": {
+  "function": "executive",
+  "seniority": "c_level",
+  "non_buyer": false
+ },
+ "leiter marketing": {
+  "function": "marketing",
+  "seniority": "director",
+  "non_buyer": false
+ },
+ "it administrator": {
+  "function": "it_security",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "representative": {
+  "function": "sales",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "growth ninja": {
+  "function": "sales",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "consultant": {
+  "function": "other",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "chief revenue officer": {
+  "function": "sales",
+  "seniority": "c_level",
+  "non_buyer": false
+ },
+ "recruiter": {
+  "function": "hr",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "accountant": {
+  "function": "finance",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "sales manager": {
+  "function": "sales",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "regional sales manager": {
+  "function": "sales",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "head of growth": {
+  "function": "sales",
+  "seniority": "vp",
+  "non_buyer": false
+ },
+ "vp of everything": {
+  "function": "other",
+  "seniority": "vp",
+  "non_buyer": false
+ },
+ "analyst": {
+  "function": "other",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "senior sales development representative": {
+  "function": "sales",
+  "seniority": "senior",
+  "non_buyer": false
+ },
+ "sales operations analyst": {
+  "function": "revenue_operations",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "chief commercial officer": {
+  "function": "sales",
+  "seniority": "c_level",
+  "non_buyer": false
+ },
+ "senior facilities manager": {
+  "function": "operations",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "vp customer success": {
+  "function": "customer_success",
+  "seniority": "vp",
+  "non_buyer": false
+ },
+ "business development representative": {
+  "function": "sales",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "senior key account manager": {
+  "function": "sales",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "support engineer": {
+  "function": "support",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "financial analyst": {
+  "function": "finance",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "field marketing manager": {
+  "function": "marketing",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "product designer": {
+  "function": "design",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "chief evangelist": {
+  "function": "marketing",
+  "seniority": "c_level",
+  "non_buyer": false
+ },
+ "senior controller": {
+  "function": "finance",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "senior ux researcher": {
+  "function": "design",
+  "seniority": "senior",
+  "non_buyer": false
+ },
+ "hr manager": {
+  "function": "hr",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "partner": {
+  "function": "executive",
+  "seniority": "owner",
+  "non_buyer": false
+ },
+ "senior product designer": {
+  "function": "design",
+  "seniority": "senior",
+  "non_buyer": false
+ },
+ "sales engineer": {
+  "function": "sales",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "advisor": {
+  "function": "other",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "senior demand generation manager": {
+  "function": "marketing",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "managing director": {
+  "function": "executive",
+  "seniority": "c_level",
+  "non_buyer": false
+ },
+ "devops engineer": {
+  "function": "engineering",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "growth marketing manager": {
+  "function": "marketing",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "chief operating officer": {
+  "function": "operations",
+  "seniority": "c_level",
+  "non_buyer": false
+ },
+ "vp business development": {
+  "function": "sales",
+  "seniority": "vp",
+  "non_buyer": false
+ },
+ "principal disruptor": {
+  "function": "other",
+  "seniority": "senior",
+  "non_buyer": false
+ },
+ "sr. customer support agent": {
+  "function": "support",
+  "seniority": "senior",
+  "non_buyer": false
+ },
+ "director ejecutivo": {
+  "function": "executive",
+  "seniority": "c_level",
+  "non_buyer": false
+ },
+ "qa engineer": {
+  "function": "engineering",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "sales rockstar": {
+  "function": "sales",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "senior customer support agent": {
+  "function": "support",
+  "seniority": "senior",
+  "non_buyer": false
+ },
+ "junior director of sales": {
+  "function": "sales",
+  "seniority": "director",
+  "non_buyer": false
+ },
+ "gerente de marketing": {
+  "function": "marketing",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "vicepresidente de ventas": {
+  "function": "sales",
+  "seniority": "vp",
+  "non_buyer": false
+ },
+ "fundador y ceo": {
+  "function": "executive",
+  "seniority": "owner",
+  "non_buyer": false
+ },
+ "vp sales": {
+  "function": "sales",
+  "seniority": "vp",
+  "non_buyer": false
+ },
+ "civil engineer": {
+  "function": "engineering",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "senior quality manager": {
+  "function": "operations",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "sales development representative": {
+  "function": "sales",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "general manager": {
+  "function": "executive",
+  "seniority": "c_level",
+  "non_buyer": false
+ },
+ "vp revenue operations": {
+  "function": "revenue_operations",
+  "seniority": "vp",
+  "non_buyer": false
+ },
+ "associate": {
+  "function": "other",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "diretor comercial": {
+  "function": "sales",
+  "seniority": "director",
+  "non_buyer": false
+ },
+ "receptionist": {
+  "function": "admin",
+  "seniority": "individual",
+  "non_buyer": true
+ },
+ "representante de ventas": {
+  "function": "sales",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "customer success manager": {
+  "function": "customer_success",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "softwareentwickler": {
+  "function": "engineering",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "junior data scientist": {
+  "function": "engineering",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "vertriebsleiter": {
+  "function": "sales",
+  "seniority": "director",
+  "non_buyer": false
+ },
+ "vp marketing": {
+  "function": "marketing",
+  "seniority": "vp",
+  "non_buyer": false
+ },
+ "assistente administrativo": {
+  "function": "admin",
+  "seniority": "individual",
+  "non_buyer": true
+ },
+ "chief growth officer": {
+  "function": "sales",
+  "seniority": "c_level",
+  "non_buyer": false
+ },
+ "brand manager": {
+  "function": "marketing",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "sr. executive assistant": {
+  "function": "admin",
+  "seniority": "senior",
+  "non_buyer": true
+ },
+ "compliance officer": {
+  "function": "legal",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "svp sales": {
+  "function": "sales",
+  "seniority": "vp",
+  "non_buyer": false
+ },
+ "junior revenue operations manager": {
+  "function": "revenue_operations",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "partnership lead": {
+  "function": "partnerships",
+  "seniority": "senior",
+  "non_buyer": false
+ },
+ "sr. sales manager": {
+  "function": "sales",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "chief customer officer": {
+  "function": "customer_success",
+  "seniority": "c_level",
+  "non_buyer": false
+ },
+ "junior it administrator": {
+  "function": "it_security",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "senior intern": {
+  "function": "other",
+  "seniority": "senior",
+  "non_buyer": true
+ },
+ "senior legal counsel": {
+  "function": "legal",
+  "seniority": "senior",
+  "non_buyer": false
+ },
+ "paralegal": {
+  "function": "legal",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "administrative assistant": {
+  "function": "admin",
+  "seniority": "individual",
+  "non_buyer": true
+ },
+ "inside sales representative": {
+  "function": "sales",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "director of sales": {
+  "function": "sales",
+  "seniority": "director",
+  "non_buyer": false
+ },
+ "product marketing manager": {
+  "function": "marketing",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "founder": {
+  "function": "executive",
+  "seniority": "owner",
+  "non_buyer": false
+ },
+ "junior brand manager": {
+  "function": "marketing",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "engenheiro de software": {
+  "function": "engineering",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "senior procurement manager": {
+  "function": "operations",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "customer support agent": {
+  "function": "support",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "coordinator": {
+  "function": "other",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "senior operations manager": {
+  "function": "operations",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "ingeniera de software": {
+  "function": "engineering",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "senior data scientist": {
+  "function": "engineering",
+  "seniority": "senior",
+  "non_buyer": false
+ },
+ "specialist": {
+  "function": "other",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "officer": {
+  "function": "other",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "supply chain analyst": {
+  "function": "operations",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "executive assistant": {
+  "function": "admin",
+  "seniority": "individual",
+  "non_buyer": true
+ },
+ "senior office manager": {
+  "function": "admin",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "directora de marketing": {
+  "function": "marketing",
+  "seniority": "director",
+  "non_buyer": false
+ },
+ "director of first impressions": {
+  "function": "admin",
+  "seniority": "director",
+  "non_buyer": false
+ },
+ "sócio-diretor": {
+  "function": "executive",
+  "seniority": "owner",
+  "non_buyer": false
+ },
+ "senior support engineer": {
+  "function": "support",
+  "seniority": "senior",
+  "non_buyer": false
+ },
+ "project manager": {
+  "function": "operations",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "talent acquisition specialist": {
+  "function": "hr",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "senior civil engineer": {
+  "function": "engineering",
+  "seniority": "senior",
+  "non_buyer": false
+ },
+ "security analyst": {
+  "function": "it_security",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "revenue wizard": {
+  "function": "sales",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "contador": {
+  "function": "finance",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "junior ux researcher": {
+  "function": "design",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "asistente de dirección": {
+  "function": "admin",
+  "seniority": "individual",
+  "non_buyer": true
+ },
+ "facilities manager": {
+  "function": "operations",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "senior account executive": {
+  "function": "sales",
+  "seniority": "senior",
+  "non_buyer": false
+ },
+ "director": {
+  "function": "other",
+  "seniority": "director",
+  "non_buyer": false
+ },
+ "payroll specialist": {
+  "function": "finance",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "senior director of marketing": {
+  "function": "marketing",
+  "seniority": "director",
+  "non_buyer": false
+ },
+ "coordinador de logística": {
+  "function": "operations",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "analista financiero": {
+  "function": "finance",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "senior receptionist": {
+  "function": "admin",
+  "seniority": "senior",
+  "non_buyer": true
+ },
+ "mechanical engineer": {
+  "function": "engineering",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "junior data engineer": {
+  "function": "engineering",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "directora de recursos humanos": {
+  "function": "hr",
+  "seniority": "director",
+  "non_buyer": false
+ },
+ "senior data engineer": {
+  "function": "engineering",
+  "seniority": "senior",
+  "non_buyer": false
+ },
+ "jefe de almacén": {
+  "function": "operations",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "vp of sales": {
+  "function": "sales",
+  "seniority": "vp",
+  "non_buyer": false
+ },
+ "senior channel manager": {
+  "function": "partnerships",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "senior sales manager": {
+  "function": "sales",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "chief vibes officer": {
+  "function": "other",
+  "seniority": "c_level",
+  "non_buyer": false
+ },
+ "directeur des ventes": {
+  "function": "sales",
+  "seniority": "director",
+  "non_buyer": false
+ },
+ "lead": {
+  "function": "other",
+  "seniority": "senior",
+  "non_buyer": false
+ },
+ "head of revenue operations": {
+  "function": "revenue_operations",
+  "seniority": "vp",
+  "non_buyer": false
+ },
+ "legal counsel": {
+  "function": "legal",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "senior paralegal": {
+  "function": "legal",
+  "seniority": "senior",
+  "non_buyer": false
+ },
+ "junior growth marketing manager": {
+  "function": "marketing",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "senior talent acquisition specialist": {
+  "function": "hr",
+  "seniority": "senior",
+  "non_buyer": false
+ },
+ "senior director of sales": {
+  "function": "sales",
+  "seniority": "director",
+  "non_buyer": false
+ },
+ "abogada corporativa": {
+  "function": "legal",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "office manager": {
+  "function": "admin",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "director general": {
+  "function": "executive",
+  "seniority": "c_level",
+  "non_buyer": false
+ },
+ "técnico de soporte": {
+  "function": "support",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "junior account manager": {
+  "function": "sales",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "chief happiness officer": {
+  "function": "hr",
+  "seniority": "c_level",
+  "non_buyer": false
+ },
+ "partnerships manager": {
+  "function": "partnerships",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "junior recruiter": {
+  "function": "hr",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "customer delight hero": {
+  "function": "customer_success",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "senior regional sales manager": {
+  "function": "sales",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "junior demand generation manager": {
+  "function": "marketing",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "data engineer": {
+  "function": "engineering",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "operations manager": {
+  "function": "operations",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "senior compliance officer": {
+  "function": "legal",
+  "seniority": "senior",
+  "non_buyer": false
+ },
+ "chargé de compte": {
+  "function": "sales",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "head of marketing": {
+  "function": "marketing",
+  "seniority": "vp",
+  "non_buyer": false
+ },
+ "cro": {
+  "function": "sales",
+  "seniority": "c_level",
+  "non_buyer": false
+ },
+ "senior recruiter": {
+  "function": "hr",
+  "seniority": "senior",
+  "non_buyer": false
+ },
+ "senior software engineer": {
+  "function": "engineering",
+  "seniority": "senior",
+  "non_buyer": false
+ },
+ "senior solutions engineer": {
+  "function": "sales",
+  "seniority": "senior",
+  "non_buyer": false
+ },
+ "ingénieur logiciel": {
+  "function": "engineering",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "junior inside sales representative": {
+  "function": "sales",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "senior business development representative": {
+  "function": "sales",
+  "seniority": "senior",
+  "non_buyer": false
+ },
+ "senior account manager": {
+  "function": "sales",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "founder & ceo": {
+  "function": "executive",
+  "seniority": "owner",
+  "non_buyer": false
+ },
+ "procurement manager": {
+  "function": "operations",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "senior field marketing manager": {
+  "function": "marketing",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "software engineer": {
+  "function": "engineering",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "senior partnerships manager": {
+  "function": "partnerships",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "senior commercial director": {
+  "function": "sales",
+  "seniority": "director",
+  "non_buyer": false
+ },
+ "junior regional director": {
+  "function": "sales",
+  "seniority": "director",
+  "non_buyer": false
+ },
+ "senior mechanical engineer": {
+  "function": "engineering",
+  "seniority": "senior",
+  "non_buyer": false
+ },
+ "senior project manager": {
+  "function": "operations",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "senior financial analyst": {
+  "function": "finance",
+  "seniority": "senior",
+  "non_buyer": false
+ },
+ "vice president of revenue": {
+  "function": "sales",
+  "seniority": "vp",
+  "non_buyer": false
+ },
+ "global head of strategic synergies": {
+  "function": "other",
+  "seniority": "vp",
+  "non_buyer": false
+ },
+ "senior sales director": {
+  "function": "sales",
+  "seniority": "director",
+  "non_buyer": false
+ },
+ "senior marketing manager": {
+  "function": "marketing",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "senior graphic designer": {
+  "function": "design",
+  "seniority": "senior",
+  "non_buyer": false
+ },
+ "junior research scientist": {
+  "function": "engineering",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "senior supply chain analyst": {
+  "function": "operations",
+  "seniority": "senior",
+  "non_buyer": false
+ },
+ "analista de vendas": {
+  "function": "sales",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "junior product marketing manager": {
+  "function": "marketing",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "analista financeira": {
+  "function": "finance",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "gerente de contas": {
+  "function": "sales",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "senior logistics coordinator": {
+  "function": "operations",
+  "seniority": "senior",
+  "non_buyer": false
+ },
+ "senior production planner": {
+  "function": "operations",
+  "seniority": "senior",
+  "non_buyer": false
+ },
+ "gerente general": {
+  "function": "executive",
+  "seniority": "c_level",
+  "non_buyer": false
+ },
+ "senior sales operations analyst": {
+  "function": "revenue_operations",
+  "seniority": "senior",
+  "non_buyer": false
+ },
+ "head of sales": {
+  "function": "sales",
+  "seniority": "vp",
+  "non_buyer": false
+ },
+ "marketing intern": {
+  "function": "marketing",
+  "seniority": "individual",
+  "non_buyer": true
+ },
+ "junior support engineer": {
+  "function": "support",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "sr. sales director": {
+  "function": "sales",
+  "seniority": "director",
+  "non_buyer": false
+ },
+ "senior brand manager": {
+  "function": "marketing",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "junior business development manager": {
+  "function": "sales",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "assistante de direction": {
+  "function": "admin",
+  "seniority": "individual",
+  "non_buyer": true
+ },
+ "sr. warehouse supervisor": {
+  "function": "operations",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "junior commercial director": {
+  "function": "sales",
+  "seniority": "director",
+  "non_buyer": false
+ },
+ "senior growth marketing manager": {
+  "function": "marketing",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "senior product marketing manager": {
+  "function": "marketing",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "junior supply chain analyst": {
+  "function": "operations",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "junior channel manager": {
+  "function": "partnerships",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "junior project manager": {
+  "function": "operations",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "managing partner": {
+  "function": "executive",
+  "seniority": "owner",
+  "non_buyer": false
+ },
+ "junior product designer": {
+  "function": "design",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "sr. head of marketing": {
+  "function": "marketing",
+  "seniority": "vp",
+  "non_buyer": false
+ },
+ "principal": {
+  "function": "other",
+  "seniority": "senior",
+  "non_buyer": false
+ },
+ "junior customer success manager": {
+  "function": "customer_success",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "junior partnership lead": {
+  "function": "partnerships",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "senior executive assistant": {
+  "function": "admin",
+  "seniority": "senior",
+  "non_buyer": true
+ },
+ "junior marketing manager": {
+  "function": "marketing",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "junior graphic designer": {
+  "function": "design",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "sachbearbeiter": {
+  "function": "admin",
+  "seniority": "individual",
+  "non_buyer": true
+ },
+ "data scientist": {
+  "function": "engineering",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "inhaber": {
+  "function": "executive",
+  "seniority": "owner",
+  "non_buyer": false
+ },
+ "junior customer support agent": {
+  "function": "support",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "junior sales development representative": {
+  "function": "sales",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "buchhalterin": {
+  "function": "finance",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "junior director of marketing": {
+  "function": "marketing",
+  "seniority": "director",
+  "non_buyer": false
+ },
+ "diretor executivo": {
+  "function": "executive",
+  "seniority": "c_level",
+  "non_buyer": false
+ },
+ "senior customer success manager": {
+  "function": "customer_success",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "geschäftsführer": {
+  "function": "executive",
+  "seniority": "c_level",
+  "non_buyer": false
+ },
+ "président": {
+  "function": "executive",
+  "seniority": "c_level",
+  "non_buyer": false
+ },
+ "sr. facilities manager": {
+  "function": "operations",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "senior it administrator": {
+  "function": "it_security",
+  "seniority": "senior",
+  "non_buyer": false
+ },
+ "junior solutions engineer": {
+  "function": "sales",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "junior sales manager": {
+  "function": "sales",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "sr. security analyst": {
+  "function": "it_security",
+  "seniority": "senior",
+  "non_buyer": false
+ },
+ "sr. solutions engineer": {
+  "function": "sales",
+  "seniority": "senior",
+  "non_buyer": false
+ },
+ "junior sales operations analyst": {
+  "function": "revenue_operations",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "presidente": {
+  "function": "executive",
+  "seniority": "c_level",
+  "non_buyer": false
+ },
+ "junior compliance officer": {
+  "function": "legal",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "senior qa engineer": {
+  "function": "engineering",
+  "seniority": "senior",
+  "non_buyer": false
+ },
+ "junior business development representative": {
+  "function": "sales",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "junior procurement manager": {
+  "function": "operations",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "junior administrative assistant": {
+  "function": "admin",
+  "seniority": "individual",
+  "non_buyer": true
+ },
+ "senior regional director": {
+  "function": "sales",
+  "seniority": "director",
+  "non_buyer": false
+ },
+ "junior partnerships manager": {
+  "function": "partnerships",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "junior mechanical engineer": {
+  "function": "engineering",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "junior operations manager": {
+  "function": "operations",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "senior warehouse supervisor": {
+  "function": "operations",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "junior hr manager": {
+  "function": "hr",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "gerente geral": {
+  "function": "executive",
+  "seniority": "c_level",
+  "non_buyer": false
+ },
+ "senior hr manager": {
+  "function": "hr",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "junior head of marketing": {
+  "function": "marketing",
+  "seniority": "vp",
+  "non_buyer": false
+ },
+ "junior field marketing manager": {
+  "function": "marketing",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "junior key account manager": {
+  "function": "sales",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "junior warehouse supervisor": {
+  "function": "operations",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "junior executive assistant": {
+  "function": "admin",
+  "seniority": "individual",
+  "non_buyer": true
+ },
+ "geschäftsführerin": {
+  "function": "executive",
+  "seniority": "c_level",
+  "non_buyer": false
+ },
+ "senior administrative assistant": {
+  "function": "admin",
+  "seniority": "senior",
+  "non_buyer": true
+ },
+ "sr. demand generation manager": {
+  "function": "marketing",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "sr. account manager": {
+  "function": "sales",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "sr. operations manager": {
+  "function": "operations",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "junior financial analyst": {
+  "function": "finance",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "sr. regional director": {
+  "function": "sales",
+  "seniority": "director",
+  "non_buyer": false
+ },
+ "junior controller": {
+  "function": "finance",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "senior sales enablement manager": {
+  "function": "sales",
+  "seniority": "manager",
+  "non_buyer": false
+ },
+ "junior talent acquisition specialist": {
+  "function": "hr",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "junior production planner": {
+  "function": "operations",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "junior sales engineer": {
+  "function": "sales",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "junior logistics coordinator": {
+  "function": "operations",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "junior software engineer": {
+  "function": "engineering",
+  "seniority": "individual",
+  "non_buyer": false
+ },
+ "junior intern": {
+  "function": "other",
+  "seniority": "individual",
+  "non_buyer": true
+ },
+ "phd candidate": {
+  "function": "other",
+  "seniority": "individual",
+  "non_buyer": true
+ },
+ "master's student": {
+  "function": "other",
+  "seniority": "individual",
+  "non_buyer": true
+ },
+ "student": {
+  "function": "other",
+  "seniority": "individual",
+  "non_buyer": true
+ },
+ "freelance writer": {
+  "function": "other",
+  "seniority": "individual",
+  "non_buyer": true
+ },
+ "journalist": {
+  "function": "other",
+  "seniority": "individual",
+  "non_buyer": true
+ },
+ "reporter": {
+  "function": "other",
+  "seniority": "individual",
+  "non_buyer": true
+ },
+ "editor": {
+  "function": "other",
+  "seniority": "individual",
+  "non_buyer": true
+ },
+ "freelance designer": {
+  "function": "other",
+  "seniority": "individual",
+  "non_buyer": true
+ },
+ "independent consultant": {
+  "function": "other",
+  "seniority": "individual",
+  "non_buyer": true
+ }
+}

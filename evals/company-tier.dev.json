@@ -1,0 +1,1564 @@
+{
+ "note": "Development set. Tune prompts on this. Fictional companies and hand-written edge cases; labels follow samples/orrery-icp.md and the facts shown.",
+ "items": [
+  {
+   "id": "dev_co0",
+   "name": "Brindle Works 0",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 4808,
+    "industry": "logistics technology",
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "dev_co1",
+   "name": "Cobalt Network 1",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 520,
+    "industry": "logistics technology",
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "dev_co2",
+   "name": "Dunmore Systems 2",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 4680,
+    "industry": "logistics technology",
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "dev_co3",
+   "name": "Ember Labs 3",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 456,
+    "industry": "payments",
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "dev_co4",
+   "name": "Fenwick Exchange 4",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 2888,
+    "industry": "logistics technology",
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "dev_co5",
+   "name": "Galeforth Holdings 5",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 3016,
+    "industry": "payments",
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "dev_co6",
+   "name": "Hollis Group 6",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 4744,
+    "industry": "B2B software",
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "dev_co7",
+   "name": "Ironvale Supply 7",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 3528,
+    "industry": "B2B software",
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "dev_co8",
+   "name": "Juniper Collective 8",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 4872,
+    "industry": "B2B software",
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "dev_co9",
+   "name": "Kelso Partners 9",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 4672,
+    "industry": "B2B software",
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "dev_co10",
+   "name": "Larkspur Works 10",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 1216,
+    "industry": "payments",
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "dev_co11",
+   "name": "Marlow Network 11",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 296,
+    "industry": "B2B software",
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "dev_co12",
+   "name": "Nettle Systems 12",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 1608,
+    "industry": "payments",
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "dev_co13",
+   "name": "Orchard Labs 13",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 1416,
+    "industry": "B2B software",
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "dev_co14",
+   "name": "Pallister Exchange 14",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 1800,
+    "industry": "B2B software",
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "dev_co15",
+   "name": "Quillon Holdings 15",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 4552,
+    "industry": "B2B software",
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "dev_co16",
+   "name": "Rookery Group 16",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 328,
+    "industry": "B2B software",
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "dev_co17",
+   "name": "Sable Supply 17",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 328,
+    "industry": "logistics technology",
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "dev_co18",
+   "name": "Thistle Collective 18",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 3336,
+    "industry": "logistics technology",
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "dev_co19",
+   "name": "Umbra Partners 19",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 1672,
+    "industry": "logistics technology",
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "dev_co20",
+   "name": "Vantor Works 20",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 2888,
+    "industry": "B2B software",
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "dev_co21",
+   "name": "Wexley Network 21",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 4552,
+    "industry": "B2B software",
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "dev_co22",
+   "name": "Yarrow Systems 22",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 2632,
+    "industry": "B2B software",
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "dev_co23",
+   "name": "Zephyrine Labs 23",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 3656,
+    "industry": "B2B software",
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "dev_co24",
+   "name": "Brindle Exchange 24",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 2440,
+    "industry": "payments",
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "dev_co25",
+   "name": "Cobalt Holdings 25",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 1800,
+    "industry": "B2B software",
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "dev_co26",
+   "name": "Dunmore Group 26",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 1032,
+    "industry": "B2B software",
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "dev_co27",
+   "name": "Ember Supply 27",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 3912,
+    "industry": "logistics technology",
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "dev_co28",
+   "name": "Fenwick Collective 28",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 3208,
+    "industry": "B2B software",
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "dev_co29",
+   "name": "Galeforth Partners 29",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 2184,
+    "industry": "logistics technology",
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "dev_co30",
+   "name": "Hollis Works 30",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 4360,
+    "industry": "logistics technology",
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "dev_co31",
+   "name": "Ironvale Network 31",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 840,
+    "industry": "payments",
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "dev_co32",
+   "name": "Juniper Systems 32",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 456,
+    "industry": "payments",
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "dev_co33",
+   "name": "Kelso Labs 33",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 1544,
+    "industry": "payments",
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "dev_co34",
+   "name": "Larkspur Exchange 34",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 904,
+    "industry": "logistics technology",
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "dev_co35",
+   "name": "Marlow Holdings 35",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 2504,
+    "industry": "logistics technology",
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "dev_co36",
+   "name": "Nettle Group 36",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 520,
+    "industry": "logistics technology",
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "dev_co37",
+   "name": "Orchard Supply 37",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 4104,
+    "industry": "payments",
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "dev_co38",
+   "name": "Pallister Collective 38",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 712,
+    "industry": "logistics technology",
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "dev_co39",
+   "name": "Quillon Partners 39",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 3208,
+    "industry": "B2B software",
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "Sells to businesses, strong vertical, 200 to 5,000 employees."
+  },
+  {
+   "id": "dev_co40",
+   "name": "Rookery Works 40",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 3592,
+    "industry": "insurance brokerage",
+    "business_model": "B2B"
+   },
+   "tier": 2,
+   "why": "Sells to businesses, and either in the size range or in a strong vertical, but not both."
+  },
+  {
+   "id": "dev_co41",
+   "name": "Sable Network 41",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 1800,
+    "industry": "wholesale distribution",
+    "business_model": "B2B"
+   },
+   "tier": 2,
+   "why": "Sells to businesses, and either in the size range or in a strong vertical, but not both."
+  },
+  {
+   "id": "dev_co42",
+   "name": "Thistle Systems 42",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 2624,
+    "industry": "insurance brokerage",
+    "business_model": "B2B"
+   },
+   "tier": 2,
+   "why": "Sells to businesses, and either in the size range or in a strong vertical, but not both."
+  },
+  {
+   "id": "dev_co43",
+   "name": "Umbra Labs 43",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 4232,
+    "industry": "industrial manufacturing",
+    "business_model": "B2B"
+   },
+   "tier": 2,
+   "why": "Sells to businesses, and either in the size range or in a strong vertical, but not both."
+  },
+  {
+   "id": "dev_co44",
+   "name": "Vantor Exchange 44",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 328,
+    "industry": "wholesale distribution",
+    "business_model": "B2B"
+   },
+   "tier": 2,
+   "why": "Sells to businesses, and either in the size range or in a strong vertical, but not both."
+  },
+  {
+   "id": "dev_co45",
+   "name": "Wexley Holdings 45",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 1800,
+    "industry": "insurance brokerage",
+    "business_model": "B2B"
+   },
+   "tier": 2,
+   "why": "Sells to businesses, and either in the size range or in a strong vertical, but not both."
+  },
+  {
+   "id": "dev_co46",
+   "name": "Yarrow Group 46",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 904,
+    "industry": "industrial manufacturing",
+    "business_model": "B2B"
+   },
+   "tier": 2,
+   "why": "Sells to businesses, and either in the size range or in a strong vertical, but not both."
+  },
+  {
+   "id": "dev_co47",
+   "name": "Zephyrine Supply 47",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 3208,
+    "industry": "insurance brokerage",
+    "business_model": "B2B"
+   },
+   "tier": 2,
+   "why": "Sells to businesses, and either in the size range or in a strong vertical, but not both."
+  },
+  {
+   "id": "dev_co48",
+   "name": "Brindle Collective 48",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 712,
+    "industry": "industrial manufacturing",
+    "business_model": "B2B"
+   },
+   "tier": 2,
+   "why": "Sells to businesses, and either in the size range or in a strong vertical, but not both."
+  },
+  {
+   "id": "dev_co49",
+   "name": "Cobalt Partners 49",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 392,
+    "industry": "wholesale distribution",
+    "business_model": "B2B"
+   },
+   "tier": 2,
+   "why": "Sells to businesses, and either in the size range or in a strong vertical, but not both."
+  },
+  {
+   "id": "dev_co50",
+   "name": "Dunmore Works 50",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 520,
+    "industry": "insurance brokerage",
+    "business_model": "B2B"
+   },
+   "tier": 2,
+   "why": "Sells to businesses, and either in the size range or in a strong vertical, but not both."
+  },
+  {
+   "id": "dev_co51",
+   "name": "Ember Network 51",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 2312,
+    "industry": "wholesale distribution",
+    "business_model": "B2B"
+   },
+   "tier": 2,
+   "why": "Sells to businesses, and either in the size range or in a strong vertical, but not both."
+  },
+  {
+   "id": "dev_co52",
+   "name": "Fenwick Systems 52",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 3016,
+    "industry": "insurance brokerage",
+    "business_model": "B2B"
+   },
+   "tier": 2,
+   "why": "Sells to businesses, and either in the size range or in a strong vertical, but not both."
+  },
+  {
+   "id": "dev_co53",
+   "name": "Galeforth Labs 53",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 4424,
+    "industry": "insurance brokerage",
+    "business_model": "B2B"
+   },
+   "tier": 2,
+   "why": "Sells to businesses, and either in the size range or in a strong vertical, but not both."
+  },
+  {
+   "id": "dev_co54",
+   "name": "Hollis Exchange 54",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 3080,
+    "industry": "wholesale distribution",
+    "business_model": "B2B"
+   },
+   "tier": 2,
+   "why": "Sells to businesses, and either in the size range or in a strong vertical, but not both."
+  },
+  {
+   "id": "dev_co55",
+   "name": "Ironvale Holdings 55",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 1736,
+    "industry": "insurance brokerage",
+    "business_model": "B2B"
+   },
+   "tier": 2,
+   "why": "Sells to businesses, and either in the size range or in a strong vertical, but not both."
+  },
+  {
+   "id": "dev_co56",
+   "name": "Juniper Group 56",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 1544,
+    "industry": "wholesale distribution",
+    "business_model": "B2B"
+   },
+   "tier": 2,
+   "why": "Sells to businesses, and either in the size range or in a strong vertical, but not both."
+  },
+  {
+   "id": "dev_co57",
+   "name": "Kelso Supply 57",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 4744,
+    "industry": "industrial manufacturing",
+    "business_model": "B2B"
+   },
+   "tier": 2,
+   "why": "Sells to businesses, and either in the size range or in a strong vertical, but not both."
+  },
+  {
+   "id": "dev_co58",
+   "name": "Larkspur Collective 58",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 3528,
+    "industry": "industrial manufacturing",
+    "business_model": "B2B"
+   },
+   "tier": 2,
+   "why": "Sells to businesses, and either in the size range or in a strong vertical, but not both."
+  },
+  {
+   "id": "dev_co59",
+   "name": "Marlow Partners 59",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 776,
+    "industry": "insurance brokerage",
+    "business_model": "B2B"
+   },
+   "tier": 2,
+   "why": "Sells to businesses, and either in the size range or in a strong vertical, but not both."
+  },
+  {
+   "id": "dev_co60",
+   "name": "Nettle Works 60",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 50,
+    "industry": "B2B software",
+    "business_model": "B2B"
+   },
+   "tier": 2,
+   "why": "Sells to businesses, and either in the size range or in a strong vertical, but not both."
+  },
+  {
+   "id": "dev_co61",
+   "name": "Orchard Network 61",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 79,
+    "industry": "B2B software",
+    "business_model": "B2B"
+   },
+   "tier": 2,
+   "why": "Sells to businesses, and either in the size range or in a strong vertical, but not both."
+  },
+  {
+   "id": "dev_co62",
+   "name": "Pallister Systems 62",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 101,
+    "industry": "B2B software",
+    "business_model": "B2B"
+   },
+   "tier": 2,
+   "why": "Sells to businesses, and either in the size range or in a strong vertical, but not both."
+  },
+  {
+   "id": "dev_co63",
+   "name": "Quillon Labs 63",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 40,
+    "industry": "B2B software",
+    "business_model": "B2B"
+   },
+   "tier": 2,
+   "why": "Sells to businesses, and either in the size range or in a strong vertical, but not both."
+  },
+  {
+   "id": "dev_co64",
+   "name": "Rookery Exchange 64",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 21,
+    "industry": "B2B software",
+    "business_model": "B2B"
+   },
+   "tier": 2,
+   "why": "Sells to businesses, and either in the size range or in a strong vertical, but not both."
+  },
+  {
+   "id": "dev_co65",
+   "name": "Sable Holdings 65",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 104,
+    "industry": "B2B software",
+    "business_model": "B2B"
+   },
+   "tier": 2,
+   "why": "Sells to businesses, and either in the size range or in a strong vertical, but not both."
+  },
+  {
+   "id": "dev_co66",
+   "name": "Thistle Group 66",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 20,
+    "industry": "B2B software",
+    "business_model": "B2B"
+   },
+   "tier": 2,
+   "why": "Sells to businesses, and either in the size range or in a strong vertical, but not both."
+  },
+  {
+   "id": "dev_co67",
+   "name": "Umbra Supply 67",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 73,
+    "industry": "B2B software",
+    "business_model": "B2B"
+   },
+   "tier": 2,
+   "why": "Sells to businesses, and either in the size range or in a strong vertical, but not both."
+  },
+  {
+   "id": "dev_co68",
+   "name": "Vantor Collective 68",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 23,
+    "industry": "B2B software",
+    "business_model": "B2B"
+   },
+   "tier": 2,
+   "why": "Sells to businesses, and either in the size range or in a strong vertical, but not both."
+  },
+  {
+   "id": "dev_co69",
+   "name": "Wexley Partners 69",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 105,
+    "industry": "B2B software",
+    "business_model": "B2B"
+   },
+   "tier": 2,
+   "why": "Sells to businesses, and either in the size range or in a strong vertical, but not both."
+  },
+  {
+   "id": "dev_co70",
+   "name": "Yarrow Works 70",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 784,
+    "industry": "marketing agency",
+    "business_model": "B2B"
+   },
+   "tier": 3,
+   "why": "Outside the ICP: consumer-only, an agency or consultancy, or a business-to-business company that is neither in range nor in a strong vertical."
+  },
+  {
+   "id": "dev_co71",
+   "name": "Zephyrine Network 71",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 284,
+    "industry": "marketing agency",
+    "business_model": "B2B"
+   },
+   "tier": 3,
+   "why": "Outside the ICP: consumer-only, an agency or consultancy, or a business-to-business company that is neither in range nor in a strong vertical."
+  },
+  {
+   "id": "dev_co72",
+   "name": "Brindle Systems 72",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 576,
+    "industry": "marketing agency",
+    "business_model": "B2B"
+   },
+   "tier": 3,
+   "why": "Outside the ICP: consumer-only, an agency or consultancy, or a business-to-business company that is neither in range nor in a strong vertical."
+  },
+  {
+   "id": "dev_co73",
+   "name": "Cobalt Labs 73",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 108,
+    "industry": "marketing agency",
+    "business_model": "B2B"
+   },
+   "tier": 3,
+   "why": "Outside the ICP: consumer-only, an agency or consultancy, or a business-to-business company that is neither in range nor in a strong vertical."
+  },
+  {
+   "id": "dev_co74",
+   "name": "Dunmore Exchange 74",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 242,
+    "industry": "marketing agency",
+    "business_model": "B2B"
+   },
+   "tier": 3,
+   "why": "Outside the ICP: consumer-only, an agency or consultancy, or a business-to-business company that is neither in range nor in a strong vertical."
+  },
+  {
+   "id": "dev_co75",
+   "name": "Ember Holdings 75",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 152,
+    "industry": "marketing agency",
+    "business_model": "B2B"
+   },
+   "tier": 3,
+   "why": "Outside the ICP: consumer-only, an agency or consultancy, or a business-to-business company that is neither in range nor in a strong vertical."
+  },
+  {
+   "id": "dev_co76",
+   "name": "Fenwick Group 76",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 814,
+    "industry": "marketing agency",
+    "business_model": "B2B"
+   },
+   "tier": 3,
+   "why": "Outside the ICP: consumer-only, an agency or consultancy, or a business-to-business company that is neither in range nor in a strong vertical."
+  },
+  {
+   "id": "dev_co77",
+   "name": "Galeforth Supply 77",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 544,
+    "industry": "marketing agency",
+    "business_model": "B2B"
+   },
+   "tier": 3,
+   "why": "Outside the ICP: consumer-only, an agency or consultancy, or a business-to-business company that is neither in range nor in a strong vertical."
+  },
+  {
+   "id": "dev_co78",
+   "name": "Hollis Collective 78",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 236,
+    "industry": "marketing agency",
+    "business_model": "B2B"
+   },
+   "tier": 3,
+   "why": "Outside the ICP: consumer-only, an agency or consultancy, or a business-to-business company that is neither in range nor in a strong vertical."
+  },
+  {
+   "id": "dev_co79",
+   "name": "Ironvale Partners 79",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 516,
+    "industry": "marketing agency",
+    "business_model": "B2B"
+   },
+   "tier": 3,
+   "why": "Outside the ICP: consumer-only, an agency or consultancy, or a business-to-business company that is neither in range nor in a strong vertical."
+  },
+  {
+   "id": "dev_co80",
+   "name": "Juniper Works 80",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 180,
+    "industry": "marketing agency",
+    "business_model": "B2B"
+   },
+   "tier": 3,
+   "why": "Outside the ICP: consumer-only, an agency or consultancy, or a business-to-business company that is neither in range nor in a strong vertical."
+  },
+  {
+   "id": "dev_co81",
+   "name": "Kelso Network 81",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 892,
+    "industry": "marketing agency",
+    "business_model": "B2B"
+   },
+   "tier": 3,
+   "why": "Outside the ICP: consumer-only, an agency or consultancy, or a business-to-business company that is neither in range nor in a strong vertical."
+  },
+  {
+   "id": "dev_co82",
+   "name": "Larkspur Systems 82",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 518,
+    "industry": "marketing agency",
+    "business_model": "B2B"
+   },
+   "tier": 3,
+   "why": "Outside the ICP: consumer-only, an agency or consultancy, or a business-to-business company that is neither in range nor in a strong vertical."
+  },
+  {
+   "id": "dev_co83",
+   "name": "Marlow Labs 83",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 778,
+    "industry": "marketing agency",
+    "business_model": "B2B"
+   },
+   "tier": 3,
+   "why": "Outside the ICP: consumer-only, an agency or consultancy, or a business-to-business company that is neither in range nor in a strong vertical."
+  },
+  {
+   "id": "dev_co84",
+   "name": "Nettle Exchange 84",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 546,
+    "industry": "marketing agency",
+    "business_model": "B2B"
+   },
+   "tier": 3,
+   "why": "Outside the ICP: consumer-only, an agency or consultancy, or a business-to-business company that is neither in range nor in a strong vertical."
+  },
+  {
+   "id": "dev_co85",
+   "name": "Orchard Holdings 85",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 1608,
+    "industry": "restaurants",
+    "business_model": "B2C"
+   },
+   "tier": 3,
+   "why": "Outside the ICP: consumer-only, an agency or consultancy, or a business-to-business company that is neither in range nor in a strong vertical."
+  },
+  {
+   "id": "dev_co86",
+   "name": "Pallister Group 86",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 2184,
+    "industry": "consumer mobile apps",
+    "business_model": "B2C"
+   },
+   "tier": 3,
+   "why": "Outside the ICP: consumer-only, an agency or consultancy, or a business-to-business company that is neither in range nor in a strong vertical."
+  },
+  {
+   "id": "dev_co87",
+   "name": "Quillon Supply 87",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 4936,
+    "industry": "consumer mobile apps",
+    "business_model": "B2C"
+   },
+   "tier": 3,
+   "why": "Outside the ICP: consumer-only, an agency or consultancy, or a business-to-business company that is neither in range nor in a strong vertical."
+  },
+  {
+   "id": "dev_co88",
+   "name": "Rookery Collective 88",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 4296,
+    "industry": "restaurants",
+    "business_model": "B2C"
+   },
+   "tier": 3,
+   "why": "Outside the ICP: consumer-only, an agency or consultancy, or a business-to-business company that is neither in range nor in a strong vertical."
+  },
+  {
+   "id": "dev_co89",
+   "name": "Sable Partners 89",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 3336,
+    "industry": "restaurants",
+    "business_model": "B2C"
+   },
+   "tier": 3,
+   "why": "Outside the ICP: consumer-only, an agency or consultancy, or a business-to-business company that is neither in range nor in a strong vertical."
+  },
+  {
+   "id": "dev_co90",
+   "name": "Thistle Works 90",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 2696,
+    "industry": "consumer mobile apps",
+    "business_model": "B2C"
+   },
+   "tier": 3,
+   "why": "Outside the ICP: consumer-only, an agency or consultancy, or a business-to-business company that is neither in range nor in a strong vertical."
+  },
+  {
+   "id": "dev_co91",
+   "name": "Umbra Network 91",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 776,
+    "industry": "restaurants",
+    "business_model": "B2C"
+   },
+   "tier": 3,
+   "why": "Outside the ICP: consumer-only, an agency or consultancy, or a business-to-business company that is neither in range nor in a strong vertical."
+  },
+  {
+   "id": "dev_co92",
+   "name": "Vantor Systems 92",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 4232,
+    "industry": "retail clothing",
+    "business_model": "B2C"
+   },
+   "tier": 3,
+   "why": "Outside the ICP: consumer-only, an agency or consultancy, or a business-to-business company that is neither in range nor in a strong vertical."
+  },
+  {
+   "id": "dev_co93",
+   "name": "Wexley Labs 93",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 2824,
+    "industry": "restaurants",
+    "business_model": "B2C"
+   },
+   "tier": 3,
+   "why": "Outside the ICP: consumer-only, an agency or consultancy, or a business-to-business company that is neither in range nor in a strong vertical."
+  },
+  {
+   "id": "dev_co94",
+   "name": "Yarrow Exchange 94",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 4296,
+    "industry": "restaurants",
+    "business_model": "B2C"
+   },
+   "tier": 3,
+   "why": "Outside the ICP: consumer-only, an agency or consultancy, or a business-to-business company that is neither in range nor in a strong vertical."
+  },
+  {
+   "id": "dev_co95",
+   "name": "Zephyrine Holdings 95",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 3272,
+    "industry": "retail clothing",
+    "business_model": "B2C"
+   },
+   "tier": 3,
+   "why": "Outside the ICP: consumer-only, an agency or consultancy, or a business-to-business company that is neither in range nor in a strong vertical."
+  },
+  {
+   "id": "dev_co96",
+   "name": "Brindle Group 96",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 4104,
+    "industry": "restaurants",
+    "business_model": "B2C"
+   },
+   "tier": 3,
+   "why": "Outside the ICP: consumer-only, an agency or consultancy, or a business-to-business company that is neither in range nor in a strong vertical."
+  },
+  {
+   "id": "dev_co97",
+   "name": "Cobalt Supply 97",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 4744,
+    "industry": "consumer mobile apps",
+    "business_model": "B2C"
+   },
+   "tier": 3,
+   "why": "Outside the ICP: consumer-only, an agency or consultancy, or a business-to-business company that is neither in range nor in a strong vertical."
+  },
+  {
+   "id": "dev_co98",
+   "name": "Dunmore Collective 98",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 3592,
+    "industry": "restaurants",
+    "business_model": "B2C"
+   },
+   "tier": 3,
+   "why": "Outside the ICP: consumer-only, an agency or consultancy, or a business-to-business company that is neither in range nor in a strong vertical."
+  },
+  {
+   "id": "dev_co99",
+   "name": "Ember Partners 99",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 4168,
+    "industry": "retail clothing",
+    "business_model": "B2C"
+   },
+   "tier": 3,
+   "why": "Outside the ICP: consumer-only, an agency or consultancy, or a business-to-business company that is neither in range nor in a strong vertical."
+  },
+  {
+   "id": "dev_x01",
+   "name": "Eskdale Payments",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 199,
+    "industry": "Payments",
+    "business_model": "B2B"
+   },
+   "tier": 2,
+   "why": "One employee under the range, in a strong vertical."
+  },
+  {
+   "id": "dev_x02",
+   "name": "Fairlie Payments",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 200,
+    "industry": "Payments",
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "The range starts at 200."
+  },
+  {
+   "id": "dev_x03",
+   "name": "Gorsedd Data",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 5000,
+    "industry": "Data platforms",
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "The range ends at 5,000 and includes it."
+  },
+  {
+   "id": "dev_x04",
+   "name": "Haverill Cloud",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 5001,
+    "industry": "B2B software",
+    "business_model": "B2B"
+   },
+   "tier": 2,
+   "why": "One employee over the range, in a strong vertical."
+  },
+  {
+   "id": "dev_x05",
+   "name": "Ingleby Pixel Agency",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 400,
+    "industry": "Digital marketing agency",
+    "business_model": "B2B"
+   },
+   "tier": 3,
+   "why": "An agency; its revenue is billable hours."
+  },
+  {
+   "id": "dev_x06",
+   "name": "Jessamy Advisory",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 300,
+    "industry": "Supply chain consulting",
+    "business_model": "B2B"
+   },
+   "tier": 3,
+   "why": "A consultancy, whatever its subject."
+  },
+  {
+   "id": "dev_x07",
+   "name": "Kestrel Rides",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 900,
+    "industry": "Ride hailing app",
+    "business_model": "B2C"
+   },
+   "tier": 3,
+   "why": "Sells only to consumers."
+  },
+  {
+   "id": "dev_x08",
+   "name": "Lowther Machine Works",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 800,
+    "industry": "Machined components",
+    "business_model": "B2B"
+   },
+   "tier": 2,
+   "why": "In range, not a strong vertical."
+  },
+  {
+   "id": "dev_x09",
+   "name": "Marram Health Group",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 2200,
+    "industry": "Clinic networks",
+    "business_model": "B2B2C"
+   },
+   "tier": 2,
+   "why": "Sells to businesses and consumers, in range, not a strong vertical."
+  },
+  {
+   "id": "dev_x10",
+   "name": "Nethercott Freight Software",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 1800,
+    "industry": "Freight software",
+    "business_model": "B2B2C"
+   },
+   "tier": 1,
+   "why": "Sells to businesses too, strong vertical, in range."
+  },
+  {
+   "id": "dev_x11",
+   "name": "Oakhurst",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 700,
+    "business_model": "B2B",
+    "description": "Develops payment processing software for merchants."
+   },
+   "tier": 1,
+   "why": "The description puts it in payments, in range."
+  },
+  {
+   "id": "dev_x12",
+   "name": "Pennard",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 700,
+    "industry": "Footwear",
+    "description": "Sells running shoes to consumers through its own shops."
+   },
+   "tier": 3,
+   "why": "The business model is missing, and the description says consumers only."
+  },
+  {
+   "id": "dev_x13",
+   "name": "Quillan Group",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "industry": "B2B software",
+    "business_model": "B2B"
+   },
+   "tier": 1,
+   "why": "Headcount missing: a reader cannot place it. Full facts (about 600 employees) would make it tier 1.",
+   "incomplete": true
+  },
+  {
+   "id": "dev_x14",
+   "name": "Rushmere",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "country": "Spain"
+   },
+   "tier": 2,
+   "why": "Nothing but a country: Unknown for a reader. Full facts would make it tier 2.",
+   "incomplete": true
+  },
+  {
+   "id": "dev_x15",
+   "name": "Saltmarsh Insurance",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 150,
+    "industry": "Insurance brokerage",
+    "business_model": "B2B"
+   },
+   "tier": 3,
+   "why": "Out of range and not a strong vertical."
+  },
+  {
+   "id": "dev_x16",
+   "name": "Thornley Treasury",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 30000,
+    "industry": "Treasury software",
+    "business_model": "B2B"
+   },
+   "tier": 2,
+   "why": "Strong vertical, far over the range."
+  },
+  {
+   "id": "dev_x17",
+   "name": "Ullswater Wholesale",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 90,
+    "industry": "Wholesale distribution",
+    "business_model": "B2B"
+   },
+   "tier": 3,
+   "why": "Out of range and not a strong vertical."
+  },
+  {
+   "id": "dev_x18",
+   "name": "Vellacott Fleet",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 60,
+    "industry": "Fleet telematics",
+    "business_model": "B2B"
+   },
+   "tier": 2,
+   "why": "Strong vertical, under the range."
+  },
+  {
+   "id": "dev_x19",
+   "name": "Wetherby Consulting",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 1200,
+    "industry": "Management consulting",
+    "business_model": "B2B"
+   },
+   "tier": 3,
+   "why": "A consultancy."
+  },
+  {
+   "id": "dev_x20",
+   "name": "Yewdale Games",
+   "set": "dev",
+   "source": "fictional",
+   "firmo": {
+    "employees": 300,
+    "industry": "Games",
+    "business_model": "B2C"
+   },
+   "tier": 3,
+   "why": "Sells only to consumers."
+  }
+ ]
+}

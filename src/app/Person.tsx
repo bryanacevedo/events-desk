@@ -1,0 +1,103 @@
+/* One person, opened from a row of the people table: who they are, how the priority was made,
+   and the address that was confirmed. Anything unsettled about the data is a case, not a flag here.
+   A person still on the list can be opted out from here; that spans every event and has no undo, so it asks first. */
+
+import { useState } from "react";
+import { FLAG_WORDS } from "../shared/tiers";
+import { useActor } from "./App";
+import { send, type PersonRow } from "./api";
+import { ConfirmDialog } from "./Patterns";
+import { dropWords } from "./words";
+
+const GRID: Record<1 | 2 | 3, Record<1 | 2 | 3, "A" | "B" | "C">> = { 1: { 1: "A", 2: "B", 3: "C" }, 2: { 1: "B", 2: "C", 3: "C" }, 3: { 1: "C", 2: "C", 3: "C" } };
+
+export function PriorityGrid({ company, title }: { company: 1 | 2 | 3 | null; title: 1 | 2 | 3 | null }) {
+  return (
+    <table className="mat" aria-label={`Priority grid: company tier down, title tier across.${company ? ` This person is company ${company}${title ? `, title ${title}` : ", no title"}.` : ""}`}>
+      <thead><tr><th></th><th>T1</th><th>T2</th><th>T3</th></tr></thead>
+      <tbody>
+        {([1, 2, 3] as const).map((c) => (
+          <tr key={c}><th>C{c}</th>{([1, 2, 3] as const).map((t) => {
+            const p = GRID[c][t];
+            const on = company === c && title === t;
+            return <td key={t} className={on ? "on" : p === "C" ? "c" : undefined}>{p}</td>;
+          })}</tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+export function whyPriority(c: Pick<PersonRow, "company" | "company_tier" | "title" | "title_tier" | "priority">): string {
+  const company = c.company ?? "The company";
+  if (!c.company_tier) return "Not tiered yet.";
+  if (!c.title_tier) return `${company} is tier ${c.company_tier}. No title, so the company tier decides: ${c.priority}.`;
+  return `${company} is tier ${c.company_tier}. ${c.title ?? "The title"} is a tier ${c.title_tier} title. Together: ${c.priority}.`;
+}
+
+/** The quiet "Opt out" on the panel, its confirmation, and the call. `onDone` tells the list the person is now dropped. */
+function OptOut({ c, onDone }: { c: PersonRow; onDone: () => void }) {
+  const { actor } = useActor();
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const who = c.full_name ?? c.email ?? "this person";
+  const run = async () => {
+    setBusy(true); setError("");
+    const body = { ...(c.email ? { email: c.email } : {}), ...(c.full_name && c.company ? { name: c.full_name, company: c.company } : {}) };
+    const r = await send("POST", "/api/suppressions", actor, body);
+    setBusy(false);
+    if (!r.ok) { setError(r.error); return; }
+    setOpen(false);
+    onDone();
+  };
+  return (
+    <>
+      <button className="textlink" type="button" onClick={() => setOpen(true)}>Opt out</button>
+      {open && (
+        <ConfirmDialog title={`Opt out ${who}?`} confirm={busy ? "Opting out…" : "Opt out"} cancel="Keep them" busy={busy} error={error} onConfirm={run} onClose={() => { if (!busy) setOpen(false); }}>
+          <p>{who} comes off every outreach list and is never looked up again, at every event.</p>
+          <p className="mute">{c.email ? `By address, ${c.email}.` : `By name, at ${c.company ?? "their company"}.`} This cannot be undone.</p>
+        </ConfirmDialog>
+      )}
+    </>
+  );
+}
+
+export function Person({ c, onClose, onChange }: { c: PersonRow; onClose: () => void; onChange?: () => void }) {
+  const [optedOut, setOptedOut] = useState(false);
+  const notes = c.flags.filter((f) => f !== "not_reviewed");
+  const canOptOut = !c.drop_reason && !optedOut && Boolean(c.email || (c.full_name && c.company));
+  const dropped = optedOut ? "opted_out" : c.drop_reason;
+  return (
+    <article className="panel" aria-label={c.full_name ?? "Person"} data-person={c.id}>
+      <div className="col">
+        <h2>{c.full_name ?? "No name on the row"}</h2>
+        <p style={{ fontSize: 16 }}>{[c.title, c.company].filter(Boolean).join(", ") || "No title or company"}</p>
+        <p className="mute">{c.source === "prospect" ? "Found at the company, not on the attendee list." : "On the attendee list."}{c.employer && c.employer !== c.company ? ` Vendor says ${c.employer}.` : ""}</p>
+        {c.linkedin && <a className="mute u wrap-any" href={c.linkedin} target="_blank" rel="noopener noreferrer">{c.linkedin.replace(/^https?:\/\/(www\.)?/, "")}</a>}
+        <div className="actions panel-acts">
+          <button className="btn line small" type="button" onClick={onClose}>Close</button>
+          {canOptOut && <OptOut c={c} onDone={() => { setOptedOut(true); onChange?.(); }} />}
+        </div>
+      </div>
+      <div className="col">
+        <div className="grid-row">
+          <PriorityGrid company={c.company_tier} title={c.title_tier} />
+          <div className="col">
+            <p className="lead">{c.priority ? `Priority ${c.priority}` : "No priority yet"}</p>
+            <p>{whyPriority(c)}</p>
+          </div>
+        </div>
+      </div>
+      <div className="col">
+        <p style={{ fontSize: 16 }}>{c.email ? "Email confirmed" : "No email"}</p>
+        {c.email && <p className="mute wrap-any">{c.email}</p>}
+        {c.last_verified_at && <p className="mute">Last verified {new Date(c.last_verified_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</p>}
+        {c.seen_at > 1 && <p className="mute">Seen at {c.seen_at} events</p>}
+        {notes.map((f) => <p key={f} className="mute">{FLAG_WORDS[f] ?? f.replace(/_/g, " ")}.</p>)}
+        {dropped && <p className={`dropnote${optedOut ? " fresh" : ""}`}><i aria-hidden="true" />{dropWords(dropped)}{optedOut ? ", at every event" : ""}.</p>}
+      </div>
+    </article>
+  );
+}

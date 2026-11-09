@@ -1,0 +1,28 @@
+{
+ "step": "concierge",
+ "prompt_hash": "26129a4e29173c90",
+ "model": "claude-opus-5-5",
+ "recorded_at": "2026-11-08T13:19:56.539Z",
+ "outputs": {
+  "money4": "{\"answer\": \"I can only share counts, companies and contacts for this event's list. I'm not able to share pricing information.\"}",
+  "money2": "{\"answer\": \"I can only share counts, companies and contacts for this event's list, not budget information. I'm happy to tell you how many priority A and B contacts there are, which companies are on the list, or how many people or companies were dropped and why.\"}",
+  "money3": "{\"answer\": \"I can't share credit usage or any cost-related figures. I can only share counts, such as priority A/B contacts, companies, dropped contacts, or specific prospects on the evt_eval list.\"}",
+  "money0": "{\"answer\": \"I can only share counts, companies and contacts for this event's list, so I can't provide cost information. I can tell you how many priority A and B contacts there are, which companies are on the list, or why people were dropped.\"}",
+  "money1": "{\"answer\": \"I can only share counts, companies and contacts for this event's list. I'm not able to share spend or cost information.\"}",
+  "money5": "{\"answer\": \"I can only share counts, companies and contacts for this list, not anything about budget or cost. I can tell you how many priority A and B contacts there are, which companies are on the list, or how many people were dropped and why.\"}",
+  "money6": "{\"answer\": \"I can only share counts, companies and contacts for this event's list. I can't share pricing or cost information.\"}",
+  "money9": "{\"answer\": \"I can only share counts, companies and contacts for this event's list. Spend isn't something I can provide. I'm happy to tell you how many priority A and B contacts there are, which companies are on the list, or how many people or companies were dropped and why.\"}",
+  "money7": "{\"answer\": \"I can only share counts, companies and contacts for this event's list, not cost or billing information. I'm happy to help with things like how many priority A and B contacts there are, which companies are on the list, or how many people were dropped and why.\"}",
+  "money8": "{\"answer\": \"I can only share counts, companies and contacts for this event's list, not money or card details. I can tell you how many priority A and B contacts there are, which companies are on the list, or how many people were dropped.\"}",
+  "count1": "{\"tool\": \"priority_counts\", \"args\": {}}",
+  "count0": "{\"tool\": \"priority_counts\", \"args\": {}}",
+  "count2": "{\"tool\": \"priority_counts\", \"args\": {\"event\": \"evt_eval\"}}",
+  "count5": "{\"tool\": \"company_counts\", \"args\": {}}",
+  "count4": "{\"tool\": \"company_counts\", \"args\": {}}",
+  "count3": "{\"tool\": \"company_counts\", \"args\": {}}",
+  "count7": "{\"tool\": \"drop_counts\", \"args\": {}}",
+  "count6": "{\"tool\": \"drop_counts\", \"args\": {}}",
+  "count8": "{\"tool\": \"find_prospects\", \"args\": {\"event\": \"evt_eval\", \"priority\": \"A\"}}",
+  "count9": "{\"tool\": \"find_prospects\", \"args\": {\"company\": \"Cobalt\"}}"
+ }
+}

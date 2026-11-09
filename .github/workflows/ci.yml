@@ -1,0 +1,25 @@
+name: ci
+on:
+  push:
+  pull_request:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      # EVALS_STRICT makes a stale recording fail CI. After a prompt change, CI stays red until the recordings are re-run (evals/recordings/stale.json says which).
+      - run: npm test
+        env:
+          EVALS_STRICT: "1"
+      - run: npm run build
+      - name: Boot against Postgres (PGlite) and smoke-test the API
+        run: |
+          node src/server/node.ts --demo > server.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf localhost:8787/api/health && break; sleep 1; done
+          curl -sf localhost:8787/api/events | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s);if(j.events.length<3)throw new Error("seed missing");console.log(j.events.length,"events")})'

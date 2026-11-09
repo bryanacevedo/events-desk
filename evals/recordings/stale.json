@@ -1,0 +1,14 @@
+{
+  "website_read": {
+    "since": "2026-11-08",
+    "reason": "New prompt, never recorded. It needs page text, which the eval sets do not carry, so it is not part of the model-judgment recordings; it is covered by tests with a scripted model only.",
+    "rerun": "none planned",
+    "calls_estimate": 0
+  },
+  "perspective": {
+    "since": "2026-11-09",
+    "reason": "New prompt (the Summary perspective), never run against a real model. It is gated at run time by the checks in src/server/perspective-check.ts, not by an accuracy score, so there is nothing to score in CI. Three real calls were made on 2026-11-09 (decision 27): 8 of 9 parts passed the checks first time, the ninth was a shown false reject that is now fixed. Three is too few to call a rate.",
+    "rerun": "none planned; make one real call on a delivered two-card event and read the activity line",
+    "calls_estimate": 0
+  }
+}

@@ -1,0 +1,1011 @@
+{
+ "tabs": [
+  {
+   "title": "Summary",
+   "kind": "summary",
+   "tabColor": "#15231B",
+   "headerRow": 1,
+   "firstRow": 1,
+   "lastRow": 69,
+   "columns": [
+    {
+     "header": "A"
+    },
+    {
+     "header": "B"
+    },
+    {
+     "header": "C"
+    },
+    {
+     "header": "D"
+    },
+    {
+     "header": "E"
+    },
+    {
+     "header": "F"
+    },
+    {
+     "header": "G"
+    },
+    {
+     "header": "H"
+    },
+    {
+     "header": "I"
+    },
+    {
+     "header": "J"
+    },
+    {
+     "header": "K"
+    },
+    {
+     "header": "L"
+    }
+   ],
+   "groups": [],
+   "dropdowns": [],
+   "filterViews": [],
+   "headingCells": [
+    "A2:I3",
+    "J2:L3",
+    "A6:L6",
+    "A15:L15",
+    "A23:L23",
+    "A30:L30",
+    "A31",
+    "A32",
+    "A33",
+    "A34",
+    "A35",
+    "A36",
+    "A37",
+    "A39:L39",
+    "J40",
+    "J41",
+    "J42",
+    "J43",
+    "J44",
+    "A46:L46",
+    "A57:L57",
+    "A62:L62"
+   ],
+   "sparklines": [
+    {
+     "cell": "K40",
+     "value": "J40",
+     "max": 1650
+    },
+    {
+     "cell": "K41",
+     "value": "J41",
+     "max": 1650
+    },
+    {
+     "cell": "K42",
+     "value": "J42",
+     "max": 1650
+    },
+    {
+     "cell": "K43",
+     "value": "J43",
+     "max": 1650
+    },
+    {
+     "cell": "K44",
+     "value": "J44",
+     "max": 1650
+    }
+   ]
+  },
+  {
+   "title": "Review",
+   "kind": "review",
+   "tabColor": "#D1501C",
+   "headerRow": 4,
+   "firstRow": 5,
+   "lastRow": 40,
+   "columns": [
+    {
+     "header": "case_id",
+     "hidden": true
+    },
+    {
+     "header": "contact_id",
+     "hidden": true
+    },
+    {
+     "header": "Case"
+    },
+    {
+     "header": "Name"
+    },
+    {
+     "header": "Title"
+    },
+    {
+     "header": "Company"
+    },
+    {
+     "header": "Priority"
+    },
+    {
+     "header": "Email"
+    },
+    {
+     "header": "What we found"
+    },
+    {
+     "header": "LinkedIn"
+    },
+    {
+     "header": "Web search"
+    },
+    {
+     "header": "Suggested"
+    },
+    {
+     "header": "Decision",
+     "edit": true
+    },
+    {
+     "header": "What happens"
+    }
+   ],
+   "groups": [
+    {
+     "label": "Case",
+     "from": 1,
+     "to": 3,
+     "folded": false
+    },
+    {
+     "label": "Person",
+     "from": 4,
+     "to": 8,
+     "folded": false
+    },
+    {
+     "label": "What we found",
+     "from": 9,
+     "to": 12,
+     "folded": false
+    },
+    {
+     "label": "Decision",
+     "from": 13,
+     "to": 14,
+     "folded": false
+    }
+   ],
+   "dropdowns": [
+    {
+     "column": 13,
+     "from": 5,
+     "to": 16,
+     "values": [
+      "Keep",
+      "Drop",
+      "Dismiss"
+     ],
+     "strict": true
+    },
+    {
+     "column": 13,
+     "from": 17,
+     "to": 40,
+     "values": [
+      "Keep",
+      "Dismiss"
+     ],
+     "strict": true
+    }
+   ],
+   "filterViews": [
+    {
+     "title": "Still open",
+     "column": 13,
+     "blank": true
+    },
+    {
+     "title": "Registered elsewhere",
+     "column": 3,
+     "equals": "Registered elsewhere"
+    },
+    {
+     "title": "Doubt about the person",
+     "column": 3,
+     "equals": "Doubt about the person"
+    },
+    {
+     "title": "Personal address",
+     "column": 3,
+     "equals": "Personal address"
+    },
+    {
+     "title": "Late-stage deal",
+     "column": 3,
+     "equals": "Late-stage deal"
+    }
+   ],
+   "headingCells": [
+    "A1",
+    "C2"
+   ],
+   "sparklines": []
+  },
+  {
+   "title": "Attendees",
+   "kind": "table",
+   "tabColor": "#1F5D3F",
+   "headerRow": 3,
+   "firstRow": 4,
+   "lastRow": 136,
+   "columns": [
+    {
+     "header": "Priority"
+    },
+    {
+     "header": "Name"
+    },
+    {
+     "header": "Title"
+    },
+    {
+     "header": "Seniority"
+    },
+    {
+     "header": "Function"
+    },
+    {
+     "header": "Email"
+    },
+    {
+     "header": "Email status"
+    },
+    {
+     "header": "LinkedIn"
+    },
+    {
+     "header": "No calls"
+    },
+    {
+     "header": "Company"
+    },
+    {
+     "header": "Tier"
+    },
+    {
+     "header": "Fit"
+    },
+    {
+     "header": "Industry"
+    },
+    {
+     "header": "Employees"
+    },
+    {
+     "header": "Country"
+    },
+    {
+     "header": "Revenue"
+    },
+    {
+     "header": "Website"
+    },
+    {
+     "header": "Account type"
+    },
+    {
+     "header": "Heat"
+    },
+    {
+     "header": "Account owner"
+    },
+    {
+     "header": "Open deal"
+    },
+    {
+     "header": "Stage"
+    },
+    {
+     "header": "Last activity"
+    },
+    {
+     "header": "Source"
+    },
+    {
+     "header": "Email from"
+    },
+    {
+     "header": "Record refreshed"
+    },
+    {
+     "header": "Location"
+    },
+    {
+     "header": "Vendor seniority"
+    },
+    {
+     "header": "Departments"
+    },
+    {
+     "header": "In role since"
+    },
+    {
+     "header": "Employer per vendor"
+    },
+    {
+     "header": "Company tier"
+    },
+    {
+     "header": "Title tier"
+    },
+    {
+     "header": "Flags"
+    },
+    {
+     "header": "Outreach status",
+     "edit": true
+    },
+    {
+     "header": "Notes",
+     "edit": true
+    },
+    {
+     "header": "contact_id",
+     "hidden": true
+    }
+   ],
+   "groups": [
+    {
+     "label": "Person",
+     "from": 1,
+     "to": 9,
+     "folded": false
+    },
+    {
+     "label": "Company",
+     "from": 10,
+     "to": 17,
+     "folded": false
+    },
+    {
+     "label": "CRM",
+     "from": 18,
+     "to": 23,
+     "folded": false
+    },
+    {
+     "label": "Outreach",
+     "from": 35,
+     "to": 37,
+     "folded": false
+    },
+    {
+     "label": "Detail",
+     "from": 24,
+     "to": 34,
+     "folded": true
+    }
+   ],
+   "dropdowns": [
+    {
+     "column": 35,
+     "from": 4,
+     "to": 136,
+     "values": [
+      "Not started",
+      "Contacted",
+      "Replied",
+      "Meeting set",
+      "Not interested",
+      "Bounced"
+     ],
+     "strict": true
+    }
+   ],
+   "filterViews": [
+    {
+     "title": "Priority A",
+     "column": 1,
+     "equals": "A"
+    },
+    {
+     "title": "Not started",
+     "column": 35,
+     "blank": true
+    },
+    {
+     "title": "Hot accounts",
+     "column": 19,
+     "equals": "Hot"
+    },
+    {
+     "title": "Owner: Priya Natarajan",
+     "column": 20,
+     "equals": "Priya Natarajan"
+    },
+    {
+     "title": "Owner: Hanna Berg",
+     "column": 20,
+     "equals": "Hanna Berg"
+    },
+    {
+     "title": "Owner: Adaeze Okonkwo",
+     "column": 20,
+     "equals": "Adaeze Okonkwo"
+    },
+    {
+     "title": "Owner: Tomas Lindqvist",
+     "column": 20,
+     "equals": "Tomas Lindqvist"
+    },
+    {
+     "title": "Owner: Mateo Ruiz",
+     "column": 20,
+     "equals": "Mateo Ruiz"
+    }
+   ],
+   "headingCells": [
+    "A1"
+   ],
+   "sparklines": []
+  },
+  {
+   "title": "Prospects",
+   "kind": "table",
+   "tabColor": "#1F5D3F",
+   "headerRow": 3,
+   "firstRow": 4,
+   "lastRow": 115,
+   "columns": [
+    {
+     "header": "Priority"
+    },
+    {
+     "header": "Name"
+    },
+    {
+     "header": "Title"
+    },
+    {
+     "header": "Seniority"
+    },
+    {
+     "header": "Function"
+    },
+    {
+     "header": "Email"
+    },
+    {
+     "header": "Email status"
+    },
+    {
+     "header": "LinkedIn"
+    },
+    {
+     "header": "No calls"
+    },
+    {
+     "header": "Company"
+    },
+    {
+     "header": "Tier"
+    },
+    {
+     "header": "Fit"
+    },
+    {
+     "header": "Industry"
+    },
+    {
+     "header": "Employees"
+    },
+    {
+     "header": "Country"
+    },
+    {
+     "header": "Revenue"
+    },
+    {
+     "header": "Website"
+    },
+    {
+     "header": "Account type"
+    },
+    {
+     "header": "Heat"
+    },
+    {
+     "header": "Account owner"
+    },
+    {
+     "header": "Open deal"
+    },
+    {
+     "header": "Stage"
+    },
+    {
+     "header": "Last activity"
+    },
+    {
+     "header": "Source"
+    },
+    {
+     "header": "Email from"
+    },
+    {
+     "header": "Record refreshed"
+    },
+    {
+     "header": "Location"
+    },
+    {
+     "header": "Vendor seniority"
+    },
+    {
+     "header": "Departments"
+    },
+    {
+     "header": "In role since"
+    },
+    {
+     "header": "Employer per vendor"
+    },
+    {
+     "header": "Company tier"
+    },
+    {
+     "header": "Title tier"
+    },
+    {
+     "header": "Flags"
+    },
+    {
+     "header": "Outreach status",
+     "edit": true
+    },
+    {
+     "header": "Notes",
+     "edit": true
+    },
+    {
+     "header": "contact_id",
+     "hidden": true
+    }
+   ],
+   "groups": [
+    {
+     "label": "Person",
+     "from": 1,
+     "to": 9,
+     "folded": false
+    },
+    {
+     "label": "Company",
+     "from": 10,
+     "to": 17,
+     "folded": false
+    },
+    {
+     "label": "CRM",
+     "from": 18,
+     "to": 23,
+     "folded": false
+    },
+    {
+     "label": "Outreach",
+     "from": 35,
+     "to": 37,
+     "folded": false
+    },
+    {
+     "label": "Detail",
+     "from": 24,
+     "to": 34,
+     "folded": true
+    }
+   ],
+   "dropdowns": [
+    {
+     "column": 35,
+     "from": 4,
+     "to": 115,
+     "values": [
+      "Not started",
+      "Contacted",
+      "Replied",
+      "Meeting set",
+      "Not interested",
+      "Bounced"
+     ],
+     "strict": true
+    }
+   ],
+   "filterViews": [
+    {
+     "title": "Priority A",
+     "column": 1,
+     "equals": "A"
+    },
+    {
+     "title": "Not started",
+     "column": 35,
+     "blank": true
+    },
+    {
+     "title": "Hot accounts",
+     "column": 19,
+     "equals": "Hot"
+    },
+    {
+     "title": "Owner: Hanna Berg",
+     "column": 20,
+     "equals": "Hanna Berg"
+    },
+    {
+     "title": "Owner: Priya Natarajan",
+     "column": 20,
+     "equals": "Priya Natarajan"
+    },
+    {
+     "title": "Owner: Adaeze Okonkwo",
+     "column": 20,
+     "equals": "Adaeze Okonkwo"
+    },
+    {
+     "title": "Owner: Tomas Lindqvist",
+     "column": 20,
+     "equals": "Tomas Lindqvist"
+    },
+    {
+     "title": "Owner: Mateo Ruiz",
+     "column": 20,
+     "equals": "Mateo Ruiz"
+    }
+   ],
+   "headingCells": [
+    "A1"
+   ],
+   "sparklines": []
+  },
+  {
+   "title": "Companies",
+   "kind": "table",
+   "tabColor": "#1F5D3F",
+   "headerRow": 3,
+   "firstRow": 4,
+   "lastRow": 403,
+   "columns": [
+    {
+     "header": "Company"
+    },
+    {
+     "header": "Website"
+    },
+    {
+     "header": "Parent"
+    },
+    {
+     "header": "Status"
+    },
+    {
+     "header": "Tier"
+    },
+    {
+     "header": "Fit"
+    },
+    {
+     "header": "Segment"
+    },
+    {
+     "header": "Company type"
+    },
+    {
+     "header": "Employees"
+    },
+    {
+     "header": "Size band"
+    },
+    {
+     "header": "Industry"
+    },
+    {
+     "header": "Sells to"
+    },
+    {
+     "header": "Country"
+    },
+    {
+     "header": "City"
+    },
+    {
+     "header": "Revenue"
+    },
+    {
+     "header": "Founded"
+    },
+    {
+     "header": "Funding stage"
+    },
+    {
+     "header": "LinkedIn"
+    },
+    {
+     "header": "Account type"
+    },
+    {
+     "header": "Heat"
+    },
+    {
+     "header": "Account owner"
+    },
+    {
+     "header": "Open deal"
+    },
+    {
+     "header": "Stage"
+    },
+    {
+     "header": "Last activity"
+    },
+    {
+     "header": "Why this tier"
+    },
+    {
+     "header": "Tiered by"
+    },
+    {
+     "header": "About it"
+    },
+    {
+     "header": "Facts from"
+    },
+    {
+     "header": "Listed"
+    },
+    {
+     "header": "On the list"
+    },
+    {
+     "header": "Priority A"
+    },
+    {
+     "header": "Account band"
+    }
+   ],
+   "groups": [
+    {
+     "label": "Account",
+     "from": 1,
+     "to": 4,
+     "folded": false
+    },
+    {
+     "label": "Fit",
+     "from": 5,
+     "to": 8,
+     "folded": false
+    },
+    {
+     "label": "Firmographics",
+     "from": 9,
+     "to": 18,
+     "folded": false
+    },
+    {
+     "label": "CRM",
+     "from": 19,
+     "to": 24,
+     "folded": false
+    },
+    {
+     "label": "Outreach list",
+     "from": 29,
+     "to": 32,
+     "folded": false
+    },
+    {
+     "label": "Detail",
+     "from": 25,
+     "to": 28,
+     "folded": true
+    }
+   ],
+   "dropdowns": [],
+   "filterViews": [
+    {
+     "title": "On the outreach list",
+     "column": 4,
+     "equals": "On the outreach list"
+    },
+    {
+     "title": "Tier 1",
+     "column": 5,
+     "equals": "1"
+    },
+    {
+     "title": "Focus accounts",
+     "column": 32,
+     "equals": "Focus"
+    },
+    {
+     "title": "Existing customers",
+     "column": 4,
+     "equals": "Existing customer"
+    }
+   ],
+   "headingCells": [
+    "A1"
+   ],
+   "sparklines": []
+  },
+  {
+   "title": "Other attendees",
+   "kind": "table",
+   "tabColor": null,
+   "headerRow": 3,
+   "firstRow": 4,
+   "lastRow": 853,
+   "columns": [
+    {
+     "header": "Name"
+    },
+    {
+     "header": "Title"
+    },
+    {
+     "header": "Company"
+    },
+    {
+     "header": "Company tier"
+    },
+    {
+     "header": "Title tier"
+    },
+    {
+     "header": "Why they are here"
+    },
+    {
+     "header": "Email on the attendee list"
+    },
+    {
+     "header": "What happened"
+    }
+   ],
+   "groups": [
+    {
+     "label": "Person",
+     "from": 1,
+     "to": 3,
+     "folded": false
+    },
+    {
+     "label": "Why",
+     "from": 4,
+     "to": 6,
+     "folded": false
+    },
+    {
+     "label": "Outcome",
+     "from": 7,
+     "to": 8,
+     "folded": false
+    }
+   ],
+   "dropdowns": [],
+   "filterViews": [],
+   "headingCells": [
+    "A1"
+   ],
+   "sparklines": []
+  },
+  {
+   "title": "Meetings",
+   "kind": "meetings",
+   "tabColor": "#E9DFCB",
+   "headerRow": 3,
+   "firstRow": 4,
+   "lastRow": 63,
+   "columns": [
+    {
+     "header": "Contact",
+     "edit": true
+    },
+    {
+     "header": "Company"
+    },
+    {
+     "header": "Account owner"
+    },
+    {
+     "header": "Date",
+     "edit": true
+    },
+    {
+     "header": "Time",
+     "edit": true
+    },
+    {
+     "header": "Location",
+     "edit": true
+    },
+    {
+     "header": "Status",
+     "edit": true
+    },
+    {
+     "header": "Outcome",
+     "edit": true
+    },
+    {
+     "header": "Notes",
+     "edit": true
+    }
+   ],
+   "groups": [
+    {
+     "label": "Who",
+     "from": 1,
+     "to": 3,
+     "folded": false
+    },
+    {
+     "label": "When",
+     "from": 4,
+     "to": 6,
+     "folded": false
+    },
+    {
+     "label": "Outcome",
+     "from": 7,
+     "to": 9,
+     "folded": false
+    }
+   ],
+   "dropdowns": [
+    {
+     "column": 1,
+     "from": 4,
+     "to": 63,
+     "rangeRef": "Lists!$A$2:$A$5000",
+     "strict": false
+    },
+    {
+     "column": 7,
+     "from": 4,
+     "to": 63,
+     "values": [
+      "Proposed",
+      "Booked",
+      "Held",
+      "No-show",
+      "Cancelled"
+     ],
+     "strict": true
+    },
+    {
+     "column": 8,
+     "from": 4,
+     "to": 63,
+     "values": [
+      "Next meeting",
+      "Intro to owner",
+      "Send material",
+      "Not a fit",
+      "Pending"
+     ],
+     "strict": true
+    }
+   ],
+   "filterViews": [],
+   "headingCells": [
+    "A1"
+   ],
+   "sparklines": []
+  }
+ ]
+}
