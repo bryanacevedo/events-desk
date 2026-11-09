@@ -452,7 +452,7 @@ Slices 1 to 7 each run end to end with `make demo`. Slice 8 adds key-only paths 
 6. Review flagging and its recording, workbook, review import.
 7. MCP server, Q&A agent, its recording, evals in CI.
 8. Real adapters behind env keys, Slack connected.
-9. README in PLAN's order (problem, demo, architecture, decisions, real vs mocked, how to run), ADRs, then the two explainer videos under PLAN's video gate.
+9. README in PLAN's order (problem, demo, architecture, decisions, real vs mocked, how to run), ADRs, then the walkthrough video (one end-to-end video, by Bryan's choice).
 
 **Cut line, if the time box slips:** drop review import, real vendor adapters and live Slack, in that order, and say so under "real vs mocked". MCP and evals are never cut; they are the proof for AI-engineer roles.
 

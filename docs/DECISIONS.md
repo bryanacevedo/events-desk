@@ -196,3 +196,7 @@ Two reviewers, one reading the README against the code and one reading only the 
 
 **Left as they are, and said so in the README.** The AI cap counts calls and its dollars are an estimate. ICP reading and the test bench are outside the cards and Usage. Apollo's searches are treated as free, unconfirmed. There is no login, so the server listens on this machine unless `HOST` says otherwise, and `/ask-desk` answers only mapped users and approvers.
 
+## 31. One end-to-end video (2026-11-09)
+
+The plan called for two videos, a short one for visitors and a narrated one for Bryan. A first 84-second cut passed its sound, frame and fact checks and still failed: it skipped most of the system. Bryan chose one video that does both jobs. It runs 3:19, covers every part of the system against a written list, and follows one person from the raw file to the Sheet. Coverage is now part of the video gate. The film's project is kept outside this repo.
+

@@ -81,17 +81,18 @@ const failingVendors = (s: Settings) => {
   return { ...v, finders: v.finders.map((f) => ({ ...f, find: async () => { throw new Error("The finder is down"); } })) };
 };
 let cached: string[] | null = null;
-const windowCsv = (start: number, count: number) => {
+const exportBanner = (name: string, count: number) => [`${name}: registration export,,,,,,,,,,,,,,`, `"Exported from the registration desk. ${count} registrations, all ticket types.",,,,,,,,,,,,,,`];
+const windowCsv = (start: number, count: number, name: string) => {
   cached ??= readFileSync(new URL("../../samples/attendees-large.csv", import.meta.url), "utf8").split(/\r?\n/);
   const body = cached.length - 3, from = start % Math.max(1, body - count);
-  return [...cached.slice(0, 3), ...cached.slice(3 + from, 3 + from + count)].join("\n") + "\n";
+  return [...exportBanner(name, count), cached[2], ...cached.slice(3 + from, 3 + from + count)].join("\n") + "\n";
 };
 
 export async function seedReal(db: Db) {
   const real: Real[] = JSON.parse(readFileSync(new URL("../../samples/real-events.json", import.meta.url), "utf8"));
   const pending = async (id: string) => (await db.query<{ id: string }>("SELECT id FROM approvals WHERE event_id = $1 AND status = 'pending'", [id]))[0].id;
   let cursor = 0;
-  let topUp: { id: string; from: number; rows: number } | null = null;
+  let topUp: { id: string; from: number; rows: number; name: string } | null = null;
   const deps = simDeps();
   // Only when set: delivered events get this link as their outreach list's Google Sheet. Nothing is hard-coded.
   const sheetUrl = process.env.SAMPLE_SHEET_URL?.trim() || null;
@@ -128,8 +129,8 @@ export async function seedReal(db: Db) {
     // Attendee lists are windows of the large registration export, so numbers differ from event to event.
     const big = i === 15;
     const n = rows ?? 0;
-    await ingestUpload(db, id, uploader, `${id.slice(4)}-registrations.csv`, big ? readFileSync(new URL("../../samples/attendees-large.csv", import.meta.url), "utf8") : windowCsv(cursor, n));
-    if (i === TOP_UP_AT) topUp = { id, from: cursor, rows: n };
+    await ingestUpload(db, id, uploader, `${id.slice(4)}-registrations.csv`, big ? [...exportBanner(r.name, 1650), ...readFileSync(new URL("../../samples/attendees-large.csv", import.meta.url), "utf8").split(/\r?\n/).slice(2)].join("\n") : windowCsv(cursor, n, r.name));
+    if (i === TOP_UP_AT) topUp = { id, from: cursor, rows: n, name: r.name };
     cursor += n;
     if (upto === "mapped") continue;
     await requestResearchCard(db, id, uploader);
@@ -154,8 +155,8 @@ export async function seedReal(db: Db) {
   // New registrations waiting to run on one delivered event: the rows it already has, then people it does not. Everyone in the file is fictional, from the same export as the other lists.
   if (topUp) {
     await processEvent(db, topUp.id, deps);
-    const late = windowCsv(cursor, 12).split("\n").slice(3).join("\n");
-    const made = await createTopUp(db, topUp.id, "Maya Ortiz", `${topUp.id.slice(4)}-late-registrations.csv`, windowCsv(topUp.from, topUp.rows) + late);
+    const late = windowCsv(cursor, 12, topUp.name).split("\n").slice(3).join("\n");
+    const made = await createTopUp(db, topUp.id, "Maya Ortiz", `${topUp.id.slice(4)}-late-registrations.csv`, windowCsv(topUp.from, topUp.rows, topUp.name) + late);
     if (made.top_up_id) await requestResearchCard(db, made.top_up_id, "Maya Ortiz");
   }
   // One suggestion waiting, so the Seats screen shows a new event next to the listed ones.

@@ -4,7 +4,7 @@
 
 ## Where it stands
 
-Build slices 1 to 8 of 9 are done, and the later design work (tiering and enrichment, data hygiene, new registrations, the screen rounds, the Sheet design) is built. Everything runs end to end on simulated vendors and mocks. `make demo` goes from seat request to a delivered Google-Sheet-style workbook. `make ask Q="..."` runs Concierge over its MCP server. Slice 9 is not done: git init, the first CI run, and the two explainer videos.
+All nine build slices are done, and the later design work (tiering and enrichment, data hygiene, new registrations, the screen rounds, the Sheet design) is built. Everything runs end to end on simulated vendors and mocks. `make demo` goes from seat request to a delivered Google-Sheet-style workbook. `make ask Q="..."` runs Concierge over its MCP server. The walkthrough video is in the README. Bryan chose one end-to-end video over two cuts.
 
 Checked on 2026-11-09 by running them:
 
@@ -77,8 +77,6 @@ From `node scripts/eval-report.ts` and the title report from the same code. Deta
 ## Needs Bryan
 
 - After publish: build everything after delivery (learning layer, event scores, sequences, reply handling, meetings booked, Salesforce sync). Green-lit 2026-11-09, not started.
-- First push, then the first CI run. The first commit is made locally (2026-11-09).
-- Publish the repository. Real event logos stay in the public version (decided).
 - Paid Apollo and a ZeroBounce key, then one real run on a very small list. The waterfall lineup is set in Apollo, and a sample of a few hundred contacts decides it.
 - Connect Salesforce when wanted. Confirm Do Not Call.
 - The real credit allotment in each vendor's pool, for the Usage page.
