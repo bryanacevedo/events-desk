@@ -73,7 +73,7 @@ if (kick) {
   // New registrations left at delivered and unmerged, or merged with a Sheet that never took them.
   await retryMerges(db, deps.crm, deps.sheets);
 }
-const api = createApp(db, { writeKey: mode.demo ? undefined : process.env.WRITE_KEY, demo: mode.demo, kick, slack, sheets: deps.sheets, llm: deps.llm, dns: mode.liveSpend ? systemDns : exampleDns, crm: deps.crm });
+const api = createApp(db, { writeKey: mode.demo ? undefined : process.env.WRITE_KEY, demo: mode.demo, publicDemo: mode.demo && process.env.PUBLIC_DEMO === "1", kick, slack, sheets: deps.sheets, llm: deps.llm, dns: mode.liveSpend ? systemDns : exampleDns, crm: deps.crm });
 // Write-back to the CRM runs here and never from a run, so a failed write cannot touch a delivery. A CRM that cannot write (noCrm) makes this do nothing.
 if (mayRun && canWrite(deps.crm)) {
   const sweep = () => { void drainQuietly(db, deps.crm); };

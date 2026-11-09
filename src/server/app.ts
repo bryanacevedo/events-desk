@@ -30,7 +30,7 @@ import { mountBudgetRoutes } from "./budget-routes.ts";
 import { mountEventViews } from "./event-views.ts";
 import { validateRequest, type ActivityRow, type EventRow } from "../shared/domain.ts";
 
-export interface AppConfig { writeKey?: string; demo: boolean; kick?: (eventId: string) => void; slack?: SlackConfig; sheets?: SheetPublisher; /** The model the ICP compile and test bench use. Defaults to the mock. */ llm?: Llm; /** The mail-server check used before the Research card. Defaults to the one for mock and simulated domains. */ dns?: Dns; /** The CRM an opt-out is queued for. */ crm?: Crm }
+export interface AppConfig { writeKey?: string; demo: boolean; /** The hosted demo: no login, so it takes no files a later visitor could read. */ publicDemo?: boolean; kick?: (eventId: string) => void; slack?: SlackConfig; sheets?: SheetPublisher; /** The model the ICP compile and test bench use. Defaults to the mock. */ llm?: Llm; /** The mail-server check used before the Research card. Defaults to the one for mock and simulated domains. */ dns?: Dns; /** The CRM an opt-out is queued for. */ crm?: Crm }
 type Ctx = { Variables: { actor: string } };
 
 const bad = (msg: string, status: 400 | 401 | 403 | 404 | 409 = 400) => Response.json({ error: msg }, { status });
@@ -46,6 +46,7 @@ export function createApp(db: Db, cfg: AppConfig) {
       const actor = decodeURIComponent(c.req.header("x-actor") ?? "").trim();
       if (!actor) return bad("Say who you are before making changes.");
       c.set("actor", actor.slice(0, 60));
+      if (cfg.publicDemo && /^\/api\/events\/[^/]+\/(upload|new-registrations)$/.test(c.req.path)) return bad("This public demo does not take files. To try your own list, run it yourself: the README shows how.", 403);
       // Settings and the ICP are GTM Engineering's. Acting as is not security; this keeps the desk honest until a real login.
       if (/^\/api\/(icp|settings)(\/|$)/.test(c.req.path) && !isGtm(c.get("actor"))) return bad(SETTINGS_REFUSAL, 403);
     }

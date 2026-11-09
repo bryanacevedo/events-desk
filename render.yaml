@@ -1,0 +1,18 @@
+# The public demo: simulated vendors, invented people, no keys. Its database lives in the running instance, so every restart is a fresh copy.
+services:
+  - type: web
+    name: events-desk
+    runtime: node
+    plan: free
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: node src/server/node.ts --demo
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: HOST
+        value: 0.0.0.0
+      - key: PUBLIC_DEMO
+        value: "1"
+      - key: SAMPLE_SHEET_URL
+        value: https://docs.google.com/spreadsheets/d/1bGZTGoRjTo9ag7I1b7ni5VQbTaV5rdsrOQmdUa75Hrg/edit
