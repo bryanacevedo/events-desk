@@ -8,7 +8,7 @@ import { DESK, nowOf, type LifecycleDeps } from "./lifecycle-deps.ts";
 import { moveMotion } from "./motion-state.ts";
 import { DEFAULT_MOTION_RATES, daysBetween, localDay, quoteMotion, type Motion } from "../shared/motion.ts";
 
-export interface StartOptions { purpose?: "outreach" | "debrief_only"; verify_once?: boolean; write_leads?: boolean }
+export interface StartOptions { purpose?: "outreach" | "debrief_only"; verify_once?: boolean; write_leads?: boolean; holdout_percent?: number }
 
 /** Asks for the Motion card. While it waits, the event stays where it is. */
 export async function requestMotionCard(db: Db, deps: LifecycleDeps, eventId: string, actor: string, opts: StartOptions = {}) {
@@ -31,7 +31,7 @@ export async function requestMotionCard(db: Db, deps: LifecycleDeps, eventId: st
     const rates = { ...DEFAULT_MOTION_RATES, ...((s as unknown as { motion?: object }).motion ?? {}) };
     const c = quoteMotion(i, rates, s.llm_call_cents);
     const id = newId("card");
-    const inputs = { ...i, purpose: opts.purpose ?? "outreach", crm_connected: crmConnected(deps.crm), verify_once: Boolean(opts.verify_once), write_leads: Boolean(opts.write_leads) };
+    const inputs = { ...i, purpose: opts.purpose ?? "outreach", crm_connected: crmConnected(deps.crm), verify_once: Boolean(opts.verify_once), write_leads: Boolean(opts.write_leads), holdout_percent: Math.min(50, Math.max(0, Math.round(opts.holdout_percent ?? 0))) };
     await q(`INSERT INTO cost_cards (id, event_id, kind, inputs, rates, lines, credits_cap, llm_cap, est_cents, step_caps) VALUES ($1, $2, 'motion', $3::jsonb, $4::jsonb, $5::jsonb, $6, $7, $8, $9::jsonb)`,
       [id, eventId, JSON.stringify(inputs), JSON.stringify({ ...rates, llm_call_cents: s.llm_call_cents }), JSON.stringify(c.lines), c.credits_cap, c.llm_cap, c.est_cents, JSON.stringify(c.step_caps)]);
     await q("INSERT INTO approvals (id, event_id, kind, card_id, requested_by, also_requested_by) VALUES ($1, $2, 'motion', $3, $4, $5)", [newId("apr"), eventId, id, e.requested_by, actor]);
@@ -44,9 +44,9 @@ export async function requestMotionCard(db: Db, deps: LifecycleDeps, eventId: st
 export async function applyMotionCard(q: Db["query"], cardId: string, eventId: string, actor: string, status: "approved" | "declined", reason?: string) {
   await q("UPDATE cost_cards SET status = $2 WHERE id = $1", [cardId, status]);
   if (status === "declined") { await logActivity(q, eventId, actor, "motion", `Declined the Motion card: ${reason?.trim()}`); return; }
-  const [c] = await q<{ inputs: { purpose: string; crm_connected: boolean; verify_once: boolean; write_leads: boolean } }>("SELECT inputs FROM cost_cards WHERE id = $1", [cardId]);
+  const [c] = await q<{ inputs: { purpose: string; crm_connected: boolean; verify_once: boolean; write_leads: boolean; holdout_percent: number } }>("SELECT inputs FROM cost_cards WHERE id = $1", [cardId]);
   if (c.inputs.purpose !== "outreach") { await logActivity(q, eventId, actor, "motion", "Confirmed the Motion card for debriefs only"); return; }
-  await q("UPDATE events SET outreach_started_by = $2, outreach_started_at = now(), verify_once = $3, write_leads = $4 WHERE id = $1", [eventId, actor, c.inputs.verify_once, c.inputs.write_leads]);
+  await q("UPDATE events SET outreach_started_by = $2, outreach_started_at = now(), verify_once = $3, write_leads = $4, holdout_percent = $5 WHERE id = $1", [eventId, actor, c.inputs.verify_once, c.inputs.write_leads, c.inputs.holdout_percent]);
   await moveMotion(q, eventId, c.inputs.crm_connected ? "owners" : "sequencing", actor, c.inputs.crm_connected ? "Started outreach: account owners get their say first" : "Started outreach. No CRM is connected, so there are no owners to ask");
 }
 

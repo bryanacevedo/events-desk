@@ -305,7 +305,7 @@ export interface Crm {
   /** Updates one record that exists. Absent means nothing is written back. */
   write?(record: CrmRecord, patch: CrmPatch): Promise<void>;
   /** Salesforce refuses a duplicate member, so `CrmAlreadyExists` from here counts as done. */
-  createCampaignMember?(a: { campaign: string; record: CrmRecord; key: string }): Promise<{ id: string }>;
+  createCampaignMember?(a: { campaign: string; record: CrmRecord; key: string; status?: string }): Promise<{ id: string }>;
   /** Tasks can double on a retry, so the desk's key goes in a custom field and is looked for first. */
   findTaskByKey?(key: string): Promise<{ id: string } | null>;
   createTask?(a: { record: CrmRecord; subject: string; body: string; due: string; key: string }): Promise<{ id: string }>;
@@ -313,7 +313,7 @@ export interface Crm {
   /** Opportunities on each account, by `ref`. */
   opportunities?(accounts: CrmAccountQuery[]): Promise<Record<string, CrmOpportunity[]>>;
 }
-export interface CrmOpportunity { id: string; stage: string; amount_cents: number | null; created_date: string; stage_history: { stage: string; at: string }[] }
+export interface CrmOpportunity { id: string; stage: string; amount_cents: number | null; created_date: string; stage_history: { stage: string; at: string }[]; close_date?: string | null; is_won?: boolean; is_closed?: boolean }
 export class CrmAlreadyExists extends Error {}
 
 const OWNERS = ["Priya Natarajan", "Tomas Lindqvist", "Adaeze Okonkwo", "Mateo Ruiz", "Hanna Berg"];

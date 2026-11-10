@@ -32,7 +32,7 @@ export function fakeInstantly(): FakeTool {
   const f = wrap(t, (m, p, q, b) => {
     let x: RegExpMatchArray | null;
     if (m === "GET" && p.endsWith("/accounts")) return json({ items: t.senders });
-    if (m === "PATCH" && (x = p.match(/\/campaigns\/([^/]+)$/))) { if (b.email_list) t.assigned.set(x[1], b.email_list); else (t.settings ??= new Map()).set(x[1], b); return json({}); }
+    if (m === "PATCH" && (x = p.match(/\/campaigns\/([^/]+)$/))) { if (b.email_list) t.assigned.set(x[1], b.email_list); else (t.settings ??= new Map()).set(x[1], { ...(t.settings?.get(x[1]) ?? {}), ...b }); return json({}); }
     if (m === "GET" && p.endsWith("/campaigns")) return json({ items: [...t.seqs.values()].map((s: any) => ({ id: s.id, name: s.name })) });
     if ((x = p.match(/\/campaigns\/([^/]+)\/duplicate$/))) { const id = t.newSeq(); t.seqs.get(id).name = b.name; return json({ id }); }
     if ((x = p.match(/\/campaigns\/([^/]+)\/pause$/))) { t.pause(x[1]); return json({}); }
@@ -95,7 +95,7 @@ export function fakeSmartlead(): FakeTool {
     if (m === "POST" && (x = p.match(/\/campaigns\/([^/]+)\/email-accounts$/))) { t.assigned.set(x[1], b.email_account_ids); return json({}); }
     if (p.endsWith("/campaigns/create")) { const id = t.newSeq(); t.seqs.get(id).name = b.name; return json({ id }); }
     if (m === "GET" && p.endsWith("/campaigns")) return json([...t.seqs.values()].map((s: any) => ({ id: s.id, name: s.name })));
-    if ((x = p.match(/\/campaigns\/([^/]+)\/sequences$/))) return json(m === "GET" ? [{ seq_number: 1 }] : { ok: true });
+    if ((x = p.match(/\/campaigns\/([^/]+)\/sequences$/))) { if (m === "GET") return json((t.copy ??= new Map()).get(x[1]) ?? [{ seq_number: 1 }]); (t.copy ??= new Map()).set(x[1], b.sequences); return json({ ok: true }); }
     if ((x = p.match(/\/campaigns\/([^/]+)\/status$/))) { t.seqs.get(x[1]).status = b.status; return json({}); }
     if ((x = p.match(/\/campaigns\/([^/]+)\/schedule$/))) { const c = ((t.cfg ??= new Map()).get(x[1]) ?? {}); c.scheduler_cron_value = { tz: b.timezone, days: b.days_of_the_week, startHour: b.start_hour, endHour: b.end_hour }; c.max_leads_per_day = b.max_new_leads_per_day; t.cfg.set(x[1], c); return json({}); }
     if ((x = p.match(/\/campaigns\/([^/]+)\/settings$/))) { const c = ((t.cfg ??= new Map()).get(x[1]) ?? {}); c.track_settings = b.track_settings; c.stop_lead_settings = b.stop_lead_settings; t.cfg.set(x[1], c); return json({}); }

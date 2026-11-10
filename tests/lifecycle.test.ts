@@ -648,6 +648,7 @@ describe("replies", () => {
     const { h, e, ana } = await go();
     await ingestEvents(db, h.deps, h.email.connector, [reply(ana.email, "Sounds good, tell me more", e.external_id)]);
     await processInbound(db, h.deps);
+    await (await import("../src/server/operating.ts")).drainNotifications(db, h.deps);
     expect(h.notify.posts).toHaveLength(1);
     expect(h.notify.posts[0].blocks.length).toBeLessThanOrEqual(5);
     expect((await db.query<{ slack_thread: string }>("SELECT slack_thread FROM events WHERE id = $1", [h.id]))[0].slack_thread).toBe("thread_1");

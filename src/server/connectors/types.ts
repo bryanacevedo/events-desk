@@ -3,6 +3,7 @@
 
 import type { Channel } from "../../shared/motion.ts";
 import type { SenderInfo } from "../../shared/sending.ts";
+import type { TemplateStep } from "../../shared/template-check.ts";
 
 export type SequenceState = "draft" | "active" | "paused" | "archived";
 
@@ -32,7 +33,7 @@ export interface PersonForTool { ref: string; email: string | null; linkedin: st
 export interface AddContact extends PersonForTool { external_id: string }
 export interface AddResult { ref: string; ok: boolean; external_id?: string; reason?: string; retry_after_minutes?: number }
 export type EventSignal = "send" | "reply" | "bounce" | "unsubscribe";
-export interface ToolEvent { provider_message_id: string; signal: EventSignal; channel: Channel; sequence_external_id: string | null; email: string | null; linkedin: string | null; external_contact_id: string | null; body: string | null; at: string }
+export interface ToolEvent { sender?: string | null; step?: number | null; hard?: boolean; provider_message_id: string; signal: EventSignal; channel: Channel; sequence_external_id: string | null; email: string | null; linkedin: string | null; external_contact_id: string | null; body: string | null; at: string }
 export interface WebhookRequest { headers: Record<string, string | undefined>; query: Record<string, string | undefined>; body: unknown }
 
 export interface Connector {
@@ -48,6 +49,9 @@ export interface Connector {
   /** Sets the sending settings instead of inheriting whatever the campaign had. */
   applySettings?(sequenceId: string, s: SendSettings): Promise<void>;
   readSettings?(sequenceId: string): Promise<SendSettings | null>;
+  /** Puts the approved words in the tool, and reads back what is there, so an edit made in the tool is caught at launch. */
+  pushCopy?(sequenceId: string, steps: TemplateStep[]): Promise<void>;
+  readCopy?(sequenceId: string): Promise<TemplateStep[] | null>;
   /** The tool's own guidance on the lowest health it should send from. */
   healthFloor?: number;
   listTemplates(): Promise<{ id: string; name: string }[]>;

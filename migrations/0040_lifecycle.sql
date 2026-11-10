@@ -256,7 +256,7 @@ CREATE INDEX debrief_facts_debrief ON debrief_facts (debrief_id);
 CREATE TABLE scorecards (
   id         text PRIMARY KEY,
   event_id   text NOT NULL REFERENCES events(id) ON DELETE CASCADE,
-  window_days integer NOT NULL CHECK (window_days IN (30, 60, 90)),
+  window_days integer NOT NULL CHECK (window_days IN (30, 60, 90, 180, 365)),
   metrics    jsonb NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (event_id, window_days)

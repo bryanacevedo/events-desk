@@ -83,6 +83,16 @@ export const debriefCard = (d: { event: string; meetings: number; debrief_id: st
   ],
 });
 
+export const overdueCard = (r: { person: string; company: string }): CardMessage => ({
+  text: `Nobody has answered ${r.person} at ${r.company}.`,
+  blocks: [say(`*Nobody has answered ${esc(r.person)}*\n${esc(r.company)} replied and is still waiting for a rep.`)],
+});
+
+export const digestCard = (d: { event: string; sent: number; replied: number; booked: number; waiting: number }): CardMessage => ({
+  text: `${d.event} today: ${d.replied} replied, ${d.booked} booked.`,
+  blocks: [header(d.event), { type: "section", fields: [{ type: "mrkdwn", text: `*Reached*\n${d.sent}` }, { type: "mrkdwn", text: `*Replied*\n${d.replied}` }, { type: "mrkdwn", text: `*Booked*\n${d.booked}` }, { type: "mrkdwn", text: `*Waiting on a rep*\n${d.waiting}` }] }],
+});
+
 export const launchCard = (s: { event: string; sequence: string; passed: number; removed: number }): CardMessage => ({
   text: `${s.sequence} is live.`,
   blocks: [say(`*${esc(s.sequence)} is live*`), small(`${s.passed} passed the launch check  ·  ${s.removed} came out`)],

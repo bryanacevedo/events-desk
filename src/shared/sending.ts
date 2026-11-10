@@ -12,6 +12,7 @@ export interface SendingRules {
   /** Health below this and a sender is not used. Connectors may raise it to their tool's own guidance. */
   min_health: number;
   min_warm_days: number;
+  full_volume_days: number;
   max_bounce_rate: number;
   max_spam_rate: number;
   /** Spread: no more than this many senders on one domain per sequence. */
@@ -22,11 +23,11 @@ export interface SendingRules {
 }
 
 export const DEFAULT_SENDING_RULES: SendingRules = {
-  daily_cap: { email: 30, linkedin: 20 }, launch_days: 5, spare_share: 0.2, min_health: 90, min_warm_days: 14,
+  daily_cap: { email: 30, linkedin: 20 }, launch_days: 5, spare_share: 0.2, min_health: 90, min_warm_days: 14, full_volume_days: 30,
   max_bounce_rate: 0.02, max_spam_rate: 0.003, max_per_domain: 4, placement_max_age_days: 7, min_inbox_rate: 0.8,
 };
 
-export interface SenderInfo { id: string; address: string; domain: string; channel: Channel; active: boolean; daily_limit: number | null; health: number | null; warm_days: number | null; bounce_rate: number | null; spam_rate: number | null }
+export interface SenderInfo { warmup_on?: boolean | null; id: string; address: string; domain: string; channel: Channel; active: boolean; daily_limit: number | null; health: number | null; warm_days: number | null; bounce_rate: number | null; spam_rate: number | null }
 
 /** The busiest day of the sequence: first touches go out over `launchDays`, and each later step lands on top of them. */
 export function peakDailySends(people: number, stepDays: number[], launchDays: number) {
@@ -42,16 +43,24 @@ export function peakDailySends(people: number, stepDays: number[], launchDays: n
 
 export interface CapacityPlan { people: number; steps: number; peak_daily: number; needed: number; spares: number; per_sender_cap: number }
 
+/** LinkedIn is sized on connection requests, the scarce action: later steps reach only people who accepted, so they are not counted against the same cap. */
 export function planCapacity(people: number, stepDays: number[], channel: Channel, r: SendingRules = DEFAULT_SENDING_RULES): CapacityPlan {
-  const { peak } = peakDailySends(people, stepDays, r.launch_days);
+  const { peak } = peakDailySends(people, channel === "linkedin" ? stepDays.slice(0, 1) : stepDays, r.launch_days);
   const cap = r.daily_cap[channel];
   const needed = Math.ceil(peak / cap);
   return { people, steps: stepDays.length, peak_daily: peak, needed, spares: needed ? Math.ceil(needed * r.spare_share) : 0, per_sender_cap: cap };
 }
 
+/** Whether the whole cadence can finish before the event. */
+export function timingFits(stepDays: number[], launchDays: number, businessDaysLeft: number) {
+  const needed = launchDays + Math.max(0, ...stepDays);
+  return { needed, fits: needed <= businessDaysLeft };
+}
+
 /** Why a sender cannot be used, or null. No data on a thing the tool does report is not a pass for health: it fails. */
 export function senderProblem(s: SenderInfo, r: SendingRules, opts: { healthFloor?: number; remaining: number }): string | null {
   if (!s.active) return "not_connected";
+  if (s.warmup_on === false) return "warmup_off";
   if (s.health === null) return "health_unknown";
   if (s.health < Math.max(r.min_health, opts.healthFloor ?? 0)) return "low_health";
   if (s.warm_days !== null && s.warm_days < r.min_warm_days) return "still_warming";
@@ -66,7 +75,9 @@ export interface SenderPick { picked: Pick[]; excluded: { id: string; address: s
 
 /** The healthiest first, spread across domains, until the busiest day is covered, then spares. `committed` is what other live sequences already take from each sender each day. */
 export function pickSenders(all: SenderInfo[], plan: CapacityPlan, committed: Record<string, number>, r: SendingRules = DEFAULT_SENDING_RULES, healthFloor?: number): SenderPick {
-  const room = (s: SenderInfo) => Math.max(0, Math.min(s.daily_limit ?? plan.per_sender_cap, plan.per_sender_cap) - (committed[s.id] ?? 0));
+  // A sender still building up sends less. Under 30 days warm, half the usual day.
+  const ceiling = (s: SenderInfo) => (s.warm_days !== null && s.warm_days < r.full_volume_days ? Math.floor(plan.per_sender_cap / 2) : plan.per_sender_cap);
+  const room = (s: SenderInfo) => Math.max(0, Math.min(s.daily_limit ?? ceiling(s), ceiling(s)) - (committed[s.id] ?? 0));
   const excluded: SenderPick["excluded"] = [];
   const usable: SenderInfo[] = [];
   for (const s of all) {
@@ -92,5 +103,6 @@ export function pickSenders(all: SenderInfo[], plan: CapacityPlan, committed: Re
 
 export const senderWords: Record<string, string> = {
   not_connected: "Not connected", health_unknown: "Health not reported", low_health: "Health too low", still_warming: "Still warming up", high_bounce: "Bounces too high", high_spam: "Spam rate too high",
+  warmup_off: "Warmup is switched off", burned: "This domain is marked burned or retired", primary_domain: "This is the company's own domain", no_consent: "The rep has not agreed to this", not_tested: "No placement test at one of the mail providers",
   fully_booked: "Already fully used by other sequences", domain_full: "Enough senders on this domain already", no_auth: "Domain has no SPF or DMARC record", failed_placement: "Failed its placement test", stale_placement: "No recent placement test",
 };

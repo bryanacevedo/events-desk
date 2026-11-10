@@ -10,55 +10,96 @@ import { DESK, nowOf, type LifecycleDeps } from "./lifecycle-deps.ts";
 import { moveMotion } from "./motion-state.ts";
 import { parseJson } from "./paid.ts";
 import { fill, promptHash } from "./prompts.ts";
-import { debriefCard, scoreCard } from "./slack-cards.ts";
+import { debriefCard, digestCard, scoreCard } from "./slack-cards.ts";
+import { queueThread, raiseAlert } from "./operating.ts";
 import { addDays, localDay } from "../shared/motion.ts";
 
 export const MIN_HELD_TO_SCORE = 5;
 export const MIN_OUTCOMES = 20;
 const INFLUENCE_DAYS = 90;
-const WINDOWS = [30, 60, 90] as const;
+const WINDOWS = [30, 60, 90, 180, 365] as const;
+const SOURCED_DAYS = 30;
+export const COST_CATEGORIES = ["sponsorship", "booth", "dinners", "swag", "tools", "rep_time"];
+
+export async function recordEventCost(db: Db, eventId: string, actor: string, category: string, amountCents: number, note: string) {
+  if (!Number.isInteger(amountCents) || amountCents < 0) throw new RuleError("Give an amount in cents, zero or more.");
+  await db.query("INSERT INTO event_costs (id, event_id, category, amount_cents, note, recorded_by) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (event_id, category) DO UPDATE SET amount_cents = $4, note = $5, recorded_by = $6, recorded_at = now()", [newId("cst"), eventId, category, amountCents, note.slice(0, 300), actor]);
+}
 const median = (xs: number[]) => { if (!xs.length) return null; const s = [...xs].sort((a, b) => a - b), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
 
 export interface Scorecard {
-  funnel: { kept: number; enrolled: number; sent: number; replied: number; booked: number; held: number }; logged_outside: number;
-  cost: { tickets_cents: number; travel_cents: number; ai_cents: number; dollars_cents: number; credits_by_step: Record<string, number> };
+  funnel: { kept: number; enrolled: number; sent: number; replied: number; booked: number; held: number }; logged_outside: number; held_all: number;
+  cost: { tickets_cents: number; travel_cents: number; ai_cents: number; other_cents: number; dollars_cents: number; credits_by_step: Record<string, number> };
   cost_per_held_cents: number | null;
-  influence: { available: boolean; opportunities: number; pipeline_cents: number };
+  /** One written definition each. Sourced: created within 30 days after a held meeting, with no open deal before it. Influenced: already open and moved forward within 90 days after one. Each opportunity counts for one event. */
+  influence: { available: boolean; opportunities: number; pipeline_cents: number; sourced: { n: number; cents: number }; influenced: { n: number; cents: number }; won: { n: number; cents: number }; stale: number };
+  control: { available: boolean; met_accounts: number; met_with_pipeline: number; control_accounts: number; control_with_pipeline: number };
+  roi: { pipeline_per_dollar: number | null; won_per_dollar: number | null; cost_missing: string[] };
   score: { held_per_thousand: number; pipeline_per_dollar: number | null } | null;
   past: { held_per_thousand: number | null; pipeline_per_dollar: number | null };
 }
 
 export async function computeScorecard(db: Db, deps: LifecycleDeps, eventId: string, windowDays: number): Promise<Scorecard> {
-  const [f] = await db.query<Scorecard["funnel"] & { logged_outside: number }>("SELECT kept, enrolled, sent, replied, booked, held, logged_outside FROM event_funnel WHERE event_id = $1", [eventId]);
+  const [f] = await db.query<Scorecard["funnel"] & { logged_outside: number; held_all: number }>("SELECT kept, enrolled, sent, replied, booked, held, logged_outside, held_all FROM event_funnel WHERE event_id = $1", [eventId]);
   const s = await getSettings(db.query, eventId);
   const [c] = await db.query<{ tickets: number; travel: number }>(
     `SELECT coalesce((SELECT sum(p.amount_cents) FROM ticket_purchases p JOIN seat_requests r ON r.id = p.seat_request_id WHERE r.event_id = $1), 0)::int AS tickets,
             coalesce((SELECT sum(travel_cents) FROM seat_requests WHERE event_id = $1 AND status <> 'declined'), 0)::int AS travel`, [eventId]);
   const ai_cents = (await spend(db, eventId)).llm * s.llm_call_cents;
+  const extras = await db.query<{ category: string; amount_cents: number }>("SELECT category, amount_cents FROM event_costs WHERE event_id = $1", [eventId]);
+  const other_cents = extras.reduce((n, e) => n + e.amount_cents, 0);
   const credits_by_step: Record<string, number> = {};
   for (const r of await spendByStep(db, eventId)) if (r.unit === "credits") credits_by_step[r.step] = (credits_by_step[r.step] ?? 0) + r.n;
-  const dollars_cents = c.tickets + c.travel + ai_cents;
+  const dollars_cents = c.tickets + c.travel + ai_cents + other_cents;
   // Influence, never sole credit: an open or moving opportunity at an account with a held meeting credited here, within the window after it.
-  let influence: Scorecard["influence"] = { available: false, opportunities: 0, pipeline_cents: 0 };
+  let influence: Scorecard["influence"] = { available: false, opportunities: 0, pipeline_cents: 0, sourced: { n: 0, cents: 0 }, influenced: { n: 0, cents: 0 }, won: { n: 0, cents: 0 }, stale: 0 };
+  let control: Scorecard["control"] = { available: false, met_accounts: 0, met_with_pipeline: 0, control_accounts: 0, control_with_pipeline: 0 };
   if (crmConnected(deps.crm) && deps.crm.opportunities) {
     const met = await db.query<{ domain: string; name: string; first_held: string }>(
       `SELECT m.domain, min(co.name) AS name, min(m.scheduled_at)::text AS first_held FROM meetings m JOIN contacts k ON k.id = m.contact_id JOIN companies co ON co.id = k.company_id WHERE m.event_id = $1 AND m.status = 'held' GROUP BY m.domain`, [eventId]);
     const opps = await deps.crm.opportunities(met.map((m) => ({ ref: m.domain, domain: m.domain, name: m.name })));
-    influence = { available: true, opportunities: 0, pipeline_cents: 0 };
-    for (const m of met) {
-      const from = Date.parse(m.first_held), to = from + INFLUENCE_DAYS * 86_400_000;
-      for (const o of opps[m.domain] ?? []) {
-        const within = (t: string) => { const d = Date.parse(t); return d >= from && d <= to; };
-        if (within(o.created_date) || o.stage_history.some((h) => within(h.at) && !/lost/i.test(h.stage))) { influence.opportunities++; influence.pipeline_cents += o.amount_cents ?? 0; }
+    influence = { ...influence, available: true };
+    const nowMs = nowOf(deps).getTime();
+    await db.tx(async (q) => {
+      for (const m of met) {
+        const held = Date.parse(m.first_held);
+        for (const o of opps[m.domain] ?? []) {
+          const created = Date.parse(o.created_date);
+          const moved = o.stage_history.filter((h) => Date.parse(h.at) >= held && Date.parse(h.at) <= held + INFLUENCE_DAYS * 86_400_000 && !/lost/i.test(h.stage)).map((h) => Date.parse(h.at)).sort((a, b) => a - b)[0];
+          const sourced = created >= held && created <= held + SOURCED_DAYS * 86_400_000;
+          const openedBefore = created < held;
+          const kind = sourced ? "sourced" : openedBefore && moved !== undefined ? "influenced" : null;
+          if (!kind) continue;
+          if (!o.is_closed && o.close_date && Date.parse(o.close_date) < nowMs) influence.stale++;
+          // A later meeting that still came before the deal moved is the closer cause, so it takes the credit. A deal never counts twice.
+          const movedAt = new Date(kind === "sourced" ? created : moved).toISOString();
+          await q(`INSERT INTO attribution_claims (opportunity_id, event_id, kind, meeting_at, moved_at, amount_cents, won) VALUES ($1, $2, $3, $4, $5, $6, $7)
+                   ON CONFLICT (opportunity_id) DO UPDATE SET event_id = CASE WHEN EXCLUDED.meeting_at > attribution_claims.meeting_at THEN EXCLUDED.event_id ELSE attribution_claims.event_id END, kind = CASE WHEN EXCLUDED.meeting_at > attribution_claims.meeting_at THEN EXCLUDED.kind ELSE attribution_claims.kind END, meeting_at = greatest(EXCLUDED.meeting_at, attribution_claims.meeting_at), amount_cents = EXCLUDED.amount_cents, won = EXCLUDED.won, updated_at = now()`,
+            [o.id, eventId, kind, new Date(held).toISOString(), movedAt, o.amount_cents ?? 0, Boolean(o.is_won)]);
+        }
       }
+    });
+    for (const c of await db.query<{ kind: "sourced" | "influenced"; amount_cents: number; won: boolean }>("SELECT kind, amount_cents, won FROM attribution_claims WHERE event_id = $1", [eventId])) {
+      influence[c.kind].n++; influence[c.kind].cents += c.amount_cents;
+      if (c.won) { influence.won.n++; influence.won.cents += c.amount_cents; }
     }
+    influence.opportunities = influence.sourced.n + influence.influenced.n;
+    influence.pipeline_cents = influence.sourced.cents + influence.influenced.cents;
+    // The control: accounts kept on this list that nobody reached, against the accounts met. An honest comparison, not proof of cause.
+    const others = await db.query<{ domain: string; name: string }>(
+      `SELECT DISTINCT co.primary_domain AS domain, co.name FROM companies co JOIN contacts k ON k.company_id = co.id WHERE co.event_id = $1 AND k.priority IS NOT NULL AND co.primary_domain IS NOT NULL
+         AND NOT EXISTS (SELECT 1 FROM touches t WHERE t.domain = co.primary_domain AND t.kind IN ('send', 'sequence_add', 'met_onsite', 'meeting_booked'))`, [eventId]);
+    const theirs = others.length ? await deps.crm.opportunities(others.map((m) => ({ ref: m.domain, domain: m.domain, name: m.name }))) : {};
+    control = { available: true, met_accounts: met.length, met_with_pipeline: met.filter((m) => (opps[m.domain] ?? []).length).length, control_accounts: others.length, control_with_pipeline: others.filter((m) => (theirs[m.domain] ?? []).length).length };
   }
-  const score = f.held < MIN_HELD_TO_SCORE || dollars_cents === 0 ? null : { held_per_thousand: Math.round((f.held / (dollars_cents / 100_000)) * 100) / 100, pipeline_per_dollar: influence.available ? Math.round((influence.pipeline_cents / dollars_cents) * 100) / 100 : null };
+  const roi: Scorecard["roi"] = { pipeline_per_dollar: influence.available && dollars_cents ? Math.round((influence.pipeline_cents / dollars_cents) * 100) / 100 : null, won_per_dollar: influence.available && dollars_cents ? Math.round((influence.won.cents / dollars_cents) * 100) / 100 : null, cost_missing: COST_CATEGORIES.filter((k) => !extras.some((e) => e.category === k)) };
+  // A conference mostly produces meetings that never came from a sequence. The score counts every held meeting, and the funnel keeps its own honest count.
+  const score = f.held_all < MIN_HELD_TO_SCORE || dollars_cents === 0 ? null : { held_per_thousand: Math.round((f.held_all / (dollars_cents / 100_000)) * 100) / 100, pipeline_per_dollar: roi.pipeline_per_dollar };
   const past = await db.query<{ metrics: Scorecard }>("SELECT metrics FROM scorecards WHERE window_days = $1 AND event_id <> $2", [windowDays, eventId]);
   const held = past.map((p) => p.metrics.score?.held_per_thousand).filter((x): x is number => typeof x === "number");
   const pipe = past.map((p) => p.metrics.score?.pipeline_per_dollar).filter((x): x is number => typeof x === "number");
-  const { logged_outside, ...funnel } = f;
-  return { funnel, logged_outside, cost: { tickets_cents: c.tickets, travel_cents: c.travel, ai_cents, dollars_cents, credits_by_step }, cost_per_held_cents: f.held ? Math.round(dollars_cents / f.held) : null, influence, score, past: { held_per_thousand: median(held), pipeline_per_dollar: median(pipe) } };
+  const { logged_outside, held_all, ...funnel } = f;
+  return { funnel, logged_outside, held_all, cost: { tickets_cents: c.tickets, travel_cents: c.travel, ai_cents, other_cents, dollars_cents, credits_by_step }, control, roi, cost_per_held_cents: f.held_all ? Math.round(dollars_cents / f.held_all) : null, influence, score, past: { held_per_thousand: median(held), pipeline_per_dollar: median(pipe) } };
 }
 
 /** First score 30 days after the event's last day, revised at 60 and 90, each version kept. */
@@ -81,7 +122,7 @@ export async function writeScorecards(db: Db, deps: LifecycleDeps) {
       written++;
       if (w === SCORE_DAYS && deps.notify) {
         const [ev] = await db.query<{ slack_thread: string | null }>("SELECT slack_thread FROM events WHERE id = $1", [e.id]);
-        try { await deps.notify.thread(ev.slack_thread, scoreCard({ event: e.name, held: metrics.funnel.held, line: metrics.score ? `${metrics.score.held_per_thousand} held per $1,000` : `Fewer than ${MIN_HELD_TO_SCORE} held meetings, so counts only` })); } catch { /* the scorecard stands without the post */ }
+        try { await deps.notify.thread(ev.slack_thread, scoreCard({ event: e.name, held: metrics.held_all, line: metrics.score ? `${metrics.score.held_per_thousand} held per $1,000` : `Fewer than ${MIN_HELD_TO_SCORE} held meetings, so counts only` })); } catch { /* the scorecard stands without the post */ }
       }
     }
   }
@@ -169,6 +210,13 @@ export async function reviewDebrief(db: Db, debriefId: string, actor: string, de
   return { status: decision };
 }
 
+/** Once a day, one card per event in market. */
+export async function dailyDigest(db: Db, deps: LifecycleDeps) {
+  for (const e of await db.query<{ id: string; name: string; sent: number; replied: number; booked: number; waiting: number }>(
+    `SELECT e.id, e.name, f.sent, f.replied, f.booked, (SELECT count(*)::int FROM inbound_messages m WHERE m.event_id = e.id AND m.respond_by IS NOT NULL AND m.handled_at IS NULL) AS waiting FROM events e JOIN event_funnel f ON f.event_id = e.id WHERE e.motion = 'in_market'`))
+    await db.tx((q) => queueThread(q, e.id, digestCard({ event: e.name, sent: e.sent, replied: e.replied, booked: e.booked, waiting: e.waiting })));
+}
+
 /* --------------------------------------------------------------- learning */
 
 export interface LearningRow { group_kind: string; group_value: string; people: number; held: number; rate: number | null; enough: boolean }
@@ -234,6 +282,6 @@ export async function integrityCheck(db: Db, deps: LifecycleDeps) {
   await check("ledger_over_cap", `SELECT k.id FROM cost_cards k WHERE k.status = 'approved' AND (SELECT coalesce(sum(CASE l.kind WHEN 'reserve' THEN l.amount WHEN 'release' THEN -l.amount ELSE 0 END), 0) FROM credit_ledger l WHERE l.card_id = k.id AND l.unit = 'credits') > k.credits_cap`);
   await check("funnel_increases_down_its_steps", `SELECT event_id FROM event_funnel WHERE enrolled > kept OR sent > enrolled OR replied > sent OR booked > replied OR held > booked`);
   await db.query("INSERT INTO integrity_runs (id, at, failures) VALUES ($1, $2, $3::jsonb)", [newId("int"), nowOf(deps).toISOString(), JSON.stringify(failures)]);
-  if (failures.length) for (const e of await db.query<{ id: string }>("SELECT id FROM events WHERE motion NOT IN ('none', 'scored') LIMIT 1")) await logActivity(db.query, e.id, DESK, "integrity", `Integrity check found problems: ${failures.map((f) => f.check).join(", ")}`);
+  if (failures.length) await raiseAlert(db, deps, "integrity", `Integrity check found problems: ${failures.map((f) => f.check).join(", ")}`);
   return { failures };
 }

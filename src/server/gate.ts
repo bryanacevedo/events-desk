@@ -42,37 +42,42 @@ export async function loadPeople(db: Db, eventId: string, ids: string[]) {
 
 /** Checks in code that need nothing from the CRM, in the spec's order, and returns the first reason to refuse. */
 async function localChecks(db: Db, p: GatePerson, channel: Channel, now: Date, bases: Set<string>): Promise<Omit<GateResult, "contact_id" | "passed"> | null> {
-  const no = (reason: string, retry_after: Date | null = null) => ({ reason, retry_after });
+  const no_ = (reason: string, retry_after: Date | null = null) => ({ reason, retry_after });
   // 1. Not dropped, not suppressed.
-  if (p.drop_reason) return no(`dropped:${p.drop_reason}`);
+  if (p.drop_reason) return no_(`dropped:${p.drop_reason}`);
   const nk = p.full_name && !p.name_hidden ? nameKey(p.full_name) : null;
-  if (await isOptedOut(db, { email: p.email, name_key: nk, company_key: p.company_key })) return no("opted_out");
-  if (p.email && await isWrongPerson(db, p.email, nk)) return no("wrong_person");
+  if (await isOptedOut(db, { email: p.email, name_key: nk, company_key: p.company_key })) return no_("opted_out");
+  if (p.email && await isWrongPerson(db, p.email, nk)) return no_("wrong_person");
   // 2. The owner has said, or the silence ran out. A pending or unanswered decision fails.
-  if (p.decision === "pending" || p.decision === "handed") return no("owner_pending", new Date(now.getTime() + HOUR));
-  if (p.decision === "mine") return no("owner_mine");
+  if (p.decision === "pending" || p.decision === "handed") return no_("owner_pending", new Date(now.getTime() + HOUR));
+  if (p.decision === "mine") return no_("owner_mine");
   // 3. Reachable on this channel, by an address that has stood up.
   if (channel === "email") {
-    if (!p.email) return no("no_email");
+    if (!p.email) return no_("no_email");
     const twice = p.verify_1 === "deliverable" && p.verify_2 === "deliverable";
-    if (!twice && !(p.verify_once && (p.verify_1 === "deliverable" || p.verify_2 === "deliverable"))) return no("not_verified_enough");
-    if (!p.verified_at || now.getTime() - Date.parse(p.verified_at) > VERIFY_WINDOW_DAYS * DAY) return no("verification_stale");
+    if (!twice && !(p.verify_once && (p.verify_1 === "deliverable" || p.verify_2 === "deliverable"))) return no_("not_verified_enough");
+    if (!p.verified_at || now.getTime() - Date.parse(p.verified_at) > VERIFY_WINDOW_DAYS * DAY) return no_("verification_stale");
     const bounced = p.crm_bounced?.[p.email.toLowerCase()];
-    if (bounced && Date.parse(bounced) >= Date.parse(p.verified_at)) return no("crm_bounced");
-  } else if (!p.linkedin) return no("no_linkedin");
+    if (bounced && Date.parse(bounced) >= Date.parse(p.verified_at)) return no_("crm_bounced");
+  } else if (!p.linkedin) return no_("no_linkedin");
   // 8, asked here because it is free. Templates need a name.
-  if (!p.full_name || p.name_hidden) return no("name_unknown");
-  if (!p.domain) return no("no_domain");
+  if (!p.full_name || p.name_hidden) return no_("name_unknown");
+  if (!p.domain) return no_("no_domain");
   // 7. A person recorded a basis for this region.
-  if (!bases.has(regionOf(p))) return no("no_legal_basis");
+  if (!bases.has(regionOf(p))) return no_("no_legal_basis");
   // 5. Not in another cadence, at any event. The other channel of the same event is the same cadence.
   const other = await db.query<{ id: string }>(
     `SELECT n.id FROM enrollments n JOIN contacts k ON k.id = n.contact_id WHERE n.state <> 'removed' AND n.event_id <> $1
        AND (n.contact_id = $2 OR ($3::text IS NOT NULL AND n.person_id = $3) OR ($4::text IS NOT NULL AND lower(k.email) = lower($4))) LIMIT 1`, [p.event_id, p.id, p.person_id, p.email]);
-  if (other.length) return no("in_another_cadence", new Date(now.getTime() + DAY));
+  if (other.length) return no_("in_another_cadence", new Date(now.getTime() + DAY));
+  // A no carries to the next event, for a while.
+  const [no] = await db.query<{ kind: string; at: string }>(
+    `SELECT t.kind, t.at::text AS at FROM touches t LEFT JOIN contacts k ON k.id = t.contact_id WHERE t.kind IN ('reply_not_interested', 'reply_not_now') AND t.at <= $4::timestamptz AND t.event_id <> $5
+       AND (t.contact_id = $1 OR ($2::text IS NOT NULL AND t.person_id = $2) OR ($3::text IS NOT NULL AND lower(k.email) = lower($3))) ORDER BY t.at DESC LIMIT 1`, [p.id, p.person_id, p.email, now.toISOString(), p.event_id]);
+  if (no) { const until = Date.parse(no.at) + (no.kind === "reply_not_now" ? 90 : 180) * DAY; if (until > now.getTime()) return no_("cool_off", new Date(until)); }
   // 6. No hold applies.
   const holds = await activeHolds(db.query, { domain: p.domain, person_id: p.person_id, event_id: p.event_id, now });
-  if (holds.length) return no(`hold:${holds[0].cause}`, new Date(holds[0].expires_at));
+  if (holds.length) return no_(`hold:${holds[0].cause}`, new Date(holds[0].expires_at));
   return null;
 }
 

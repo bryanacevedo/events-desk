@@ -44,7 +44,7 @@ export const queueCreate = (q: Db["query"], kind: "campaign_member" | "task" | "
   q("INSERT INTO crm_outbox (id, person_id, kind, payload, desk_key) VALUES ($1, $2, $3, $4::jsonb, $5) ON CONFLICT (desk_key) DO NOTHING", [newId("obx"), personId, kind, JSON.stringify(payload), key]);
 
 /** The writes that create something. Each is safe to repeat: see docs/LIFECYCLE.md, section 9. Returns the record id, or null when there was nobody to write to. */
-async function carryOutCreate(crm: Crm, kind: "campaign_member" | "task" | "lead", key: string, p: OutboxPayload & { campaign?: string; subject?: string; body?: string; due?: string; write_leads?: boolean }): Promise<string | null> {
+async function carryOutCreate(crm: Crm, kind: "campaign_member" | "task" | "lead", key: string, p: OutboxPayload & { status?: string; campaign?: string; subject?: string; body?: string; due?: string; write_leads?: boolean }): Promise<string | null> {
   const records = (await askPeople(crm, [{ ref: key, email: p.email, full_name: p.full_name, company: p.company, domain: p.domain }]))[key];
   if (kind === "lead") {
     if (records.length || !p.email) return records[0]?.id ?? null;
@@ -56,7 +56,7 @@ async function carryOutCreate(crm: Crm, kind: "campaign_member" | "task" | "lead
   }
   if (kind === "campaign_member") {
     if (!crm.createCampaignMember) return null;
-    try { return (await crm.createCampaignMember({ campaign: p.campaign!, record: records[0], key })).id; }
+    try { return (await crm.createCampaignMember({ campaign: p.campaign!, record: records[0], key, status: p.status })).id; }
     catch (e) { if (e instanceof CrmAlreadyExists) return records[0].id; throw e; }
   }
   const found = await crm.findTaskByKey?.(key);

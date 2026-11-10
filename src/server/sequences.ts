@@ -1,5 +1,6 @@
 /* Sequences on any tool (docs/LIFECYCLE.md, section 5). The desk owns the rules and a Connector is a plug. Every call to a tool is driven from a row written first, so a crash at any step replays to the same result. */
 
+import { createHash } from "node:crypto";
 import type { Db } from "./db.ts";
 import { CrmDown, askPeople, crmConnected, preSendCheck } from "./crm-checks.ts";
 import type { AddContact, Connector, SequenceState } from "./connectors/types.ts";
@@ -10,11 +11,14 @@ import { DESK, nowOf, type LifecycleDeps } from "./lifecycle-deps.ts";
 import { moveMotion } from "./motion-state.ts";
 import { openOwnerDecisions } from "./owners.ts";
 import { addTouch } from "./touches.ts";
-import { queueCampaignMembers } from "./crm-outbox.ts";
+import { cleanNames, lintTemplate, type TemplateStep } from "../shared/template-check.ts";
 import { applySendSettings, launchAllowed, planSenders, settingsConfirmed } from "./sending.ts";
 import { isGtm } from "../shared/roles.ts";
 import { localDay, zoneGroupOf, type Channel, type ZoneGroup } from "../shared/motion.ts";
 
+const ACCOUNT_DAILY = 2;
+/** A share of accounts nobody contacts, always the same ones, so the scorecard has something to compare against. */
+export const heldOut = (domain: string, percent: number) => percent > 0 && parseInt(createHash("sha256").update(domain).digest("hex").slice(0, 8), 16) % 100 < percent;
 /** Stricter on cold outreach. Counsel confirms before anyone records a basis. Legal risk: high. */
 export const STRICT_REGIONS = ["germany", "canada"];
 
@@ -50,8 +54,9 @@ export async function recordLegalBasis(db: Db, eventId: string, actor: string, r
   });
 }
 
-export async function approveTemplate(db: Db, actor: string, t: { name: string; channel: Channel; phase: "pre" | "post"; steps: unknown[]; external_id?: string | null }) {
-  if (!t.steps.length) throw new RuleError("A template needs at least one step.");
+export async function approveTemplate(db: Db, actor: string, t: { name: string; channel: Channel; phase: "pre" | "post"; steps: TemplateStep[]; external_id?: string | null }) {
+  const lint = lintTemplate(t.channel, t.steps as TemplateStep[]);
+  if (lint.errors.length) throw new RuleError(lint.errors.join(" "));
   return db.tx(async (q) => {
     const [{ v }] = await q<{ v: number }>("SELECT coalesce(max(version), 0)::int AS v FROM sequence_templates WHERE name = $1", [t.name]);
     await q("UPDATE sequence_templates SET retired_at = now() WHERE channel = $1 AND phase = $2 AND retired_at IS NULL", [t.channel, t.phase]);
@@ -85,7 +90,7 @@ async function ensureSequence(db: Db, deps: LifecycleDeps, eventId: string, even
 
 /** One button: makes the draft sequences per priority and channel and adds everyone not yet added who passes the gate. Pressing again adds only new people, after owner say for any new account. */
 export async function createDrafts(db: Db, deps: LifecycleDeps, eventId: string, actor: string) {
-  const [e] = await db.query<{ motion: string; name: string; starts_on: string; country: string | null; tools: Partial<Record<Channel, string>> }>("SELECT motion, name, starts_on::text AS starts_on, country, tools FROM events WHERE id = $1", [eventId]);
+  const [e] = await db.query<{ motion: string; name: string; starts_on: string; country: string | null; tools: Partial<Record<Channel, string>>; holdout_percent: number }>("SELECT motion, name, starts_on::text AS starts_on, country, tools, holdout_percent FROM events WHERE id = $1", [eventId]);
   if (!e) throw new RuleError("That event does not exist.");
   if (!["sequencing", "in_market"].includes(e.motion)) throw new RuleError("Sequences are set up once the account owners have had their say.");
   const channels = (Object.keys(e.tools) as Channel[]).filter((c) => e.tools[c]);
@@ -103,16 +108,20 @@ export async function createDrafts(db: Db, deps: LifecycleDeps, eventId: string,
     for (const [priority, zone] of [...new Set(reachable.map((p) => `${p.priority}|${zoneOfPerson(p)}`))].sort().map((k) => k.split("|") as [string, ZoneGroup])) {
       const seq = await ensureSequence(db, deps, eventId, e.name, channel, priority, phase, zone, tool);
       const inIt = new Set((await db.query<{ contact_id: string }>("SELECT contact_id FROM enrollments WHERE contact_id = ANY($1::text[]) AND event_id = $2 AND channel = $3 AND state <> 'removed'", [reachable.map((p) => p.id), eventId, channel])).map((r) => r.contact_id));
-      const fresh = reachable.filter((p) => p.priority === priority && zoneOfPerson(p) === zone && !inIt.has(p.id));
+      const fresh = reachable.filter((p) => p.priority === priority && zoneOfPerson(p) === zone && !inIt.has(p.id) && !heldOut(p.domain, e.holdout_percent));
       const results = await runGate(db, deps, eventId, fresh.map((p) => p.id), channel, "add");
+      const perDomain = new Map<string, number>();
       await db.tx(async (q) => {
         for (const r of results) {
           const p = fresh.find((x) => x.id === r.contact_id)!;
           if (r.passed) {
+            // Two people a day at any one company, so a whole account is not hit at once.
+            const nth = perDomain.get(p.domain) ?? 0; perDomain.set(p.domain, nth + 1);
+            const later = Math.floor(nth / ACCOUNT_DAILY) ? new Date(nowOf(deps).getTime() + Math.floor(nth / ACCOUNT_DAILY) * 86_400_000).toISOString() : null;
             const [{ person_id }] = await q<{ person_id: string | null }>("SELECT person_id FROM contacts WHERE id = $1", [p.id]);
-            await q(`INSERT INTO enrollments (id, event_id, contact_id, person_id, domain, sequence_id, channel, state, pending_op) VALUES ($1, $2, $3, $4, $5, $6, $7, 'adding', 'add')
-                     ON CONFLICT (sequence_id, contact_id) DO UPDATE SET state = 'adding', pending_op = 'add', cause = NULL, cause_id = NULL, retry_after = NULL, changed_at = now()`,
-              [newId("enr"), eventId, p.id, person_id, p.domain, seq.id, channel]);
+            await q(`INSERT INTO enrollments (id, event_id, contact_id, person_id, domain, sequence_id, channel, state, pending_op, retry_after) VALUES ($1, $2, $3, $4, $5, $6, $7, 'adding', 'add', $8)
+                     ON CONFLICT (sequence_id, contact_id) DO UPDATE SET state = 'adding', pending_op = 'add', cause = NULL, cause_id = NULL, retry_after = EXCLUDED.retry_after, changed_at = now()`,
+              [newId("enr"), eventId, p.id, person_id, p.domain, seq.id, channel, later]);
             summary.added++;
           } else summary.refused[r.reason!] = (summary.refused[r.reason!] ?? 0) + 1;
         }
@@ -126,7 +135,7 @@ export async function createDrafts(db: Db, deps: LifecycleDeps, eventId: string,
   return summary;
 }
 
-const namesOf = (full: string | null) => { const [first, ...rest] = (full ?? "").trim().split(/\s+/); return { first_name: first ?? "", last_name: rest.join(" ") }; };
+const namesOf = cleanNames;
 
 /** Carries out what the rows say is owed to the tools. A tool that fails leaves the row owed, and a later sweep finishes it. */
 export async function drainOps(db: Db, deps: LifecycleDeps, eventId: string | null = null) {
@@ -298,7 +307,6 @@ export async function observeSequences(db: Db, deps: LifecycleDeps) {
       await logActivity(q, s.event_id, DESK, "sequence", `${s.name} is live. ${results.length - failed.length} passed the launch check, ${failed.length} came out.`);
       const [e] = await q<{ motion: string }>("SELECT motion FROM events WHERE id = $1 FOR UPDATE", [s.event_id]);
       if (e.motion === "sequencing") await moveMotion(q, s.event_id, "in_market", DESK, "The first sequence went live");
-      await queueCampaignMembers(q, s.event_id, deps.crm);
     });
   }
   await drainOps(db, deps);

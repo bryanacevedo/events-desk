@@ -3,8 +3,9 @@
 import type { Db } from "./db.ts";
 import type { Connector, ToolEvent } from "./connectors/types.ts";
 import { addSuppression, putVerification } from "./caches.ts";
-import { queueOptOut } from "./crm-outbox.ts";
-import { stopContacts, stopInEvent } from "./enroll-ops.ts";
+import { canWrite, queueCreate, queueOptOut } from "./crm-outbox.ts";
+import { stopContacts, stopDomain, stopInEvent } from "./enroll-ops.ts";
+import { queueDm, queueThread, respondBy } from "./operating.ts";
 import { logActivity, newId } from "./events.ts";
 import { reserve, settle } from "./ledger.ts";
 import { DESK, nowOf, type LifecycleDeps } from "./lifecycle-deps.ts";
@@ -37,7 +38,7 @@ export async function ingestEvents(db: Db, deps: LifecycleDeps, connector: Conne
   for (const e of events) {
     const c = await findContact(db, connector.name, e);
     if (e.signal === "send") {
-      if (c) await db.tx((q) => addTouch(q, { domain: c.domain, person_id: c.person_id, contact_id: c.contact_id, event_id: c.event_id, kind: "send", channel: e.channel, at: e.at, source: connector.name, dedup_key: `${connector.name}:${e.provider_message_id}` }));
+      if (c) await db.tx((q) => addTouch(q, { domain: c.domain, person_id: c.person_id, contact_id: c.contact_id, event_id: c.event_id, kind: "send", channel: e.channel, at: e.at, source: connector.name, sender: e.sender ?? null, step: e.step ?? null, dedup_key: `${connector.name}:${e.provider_message_id}` }));
       continue;
     }
     await db.tx(async (q) => {
@@ -49,8 +50,9 @@ export async function ingestEvents(db: Db, deps: LifecycleDeps, connector: Conne
       out.new++;
       if (!c) {
         out.unmatched++;
+        await q("INSERT INTO alerts (id, key, day, text) VALUES ($1, $2, $3, $4) ON CONFLICT (key, day) DO NOTHING", [newId("alr"), `unmatched:${connector.name}`, nowOf(deps).toISOString().slice(0, 10), `${connector.name} sent a reply the desk could not match to anyone. See Replies we could not place.`]);
         // Someone who asked to be left alone is left alone, even if we cannot say which list they came from.
-        if (e.signal === "unsubscribe" && e.email) await addSuppression({ query: q }, { kind: "opt_out", email: e.email, reason: `Unsubscribed in ${connector.name}`, created_by: DESK });
+        if ((e.signal === "unsubscribe" || matchesUnsubscribe(cleanReply(e.body))) && e.email) await addSuppression({ query: q }, { kind: "opt_out", email: e.email, reason: `Unsubscribed in ${connector.name}`, created_by: DESK });
         return;
       }
       await stopContacts(q, [c.contact_id], "pause", "inbound", id);
@@ -67,6 +69,22 @@ interface Who { full_name: string | null; email: string | null; company: string;
 const who = async (q: Q, m: Pick<Msg, "contact_id" | "event_id">) => (await q<Who>(
   `SELECT k.full_name, k.email, co.name AS company, co.key AS company_key, co.id AS company_id, k.person_id, co.primary_domain AS domain, e.name AS event, e.slack_thread AS thread
    FROM contacts k JOIN companies co ON co.id = k.company_id JOIN events e ON e.id = $2 WHERE k.id = $1`, [m.contact_id, m.event_id]))[0];
+
+/** Someone at this company is talking to us: nobody else there keeps getting the sequence while they do. */
+async function holdAccount(q: Q, m: Msg, p: Who, now: Date) {
+  await addHold(q, { domain: p.domain, cause: "live_thread", cause_id: m.contact_id, expires_at: new Date(now.getTime() + 14 * DAY) });
+  await q("UPDATE enrollments SET cause = 'waiting_for_rep' WHERE contact_id = $1 AND state = 'paused'", [m.contact_id]);
+  await stopDomain(q, p.domain, "pause", "colleague_replied", m.id);
+}
+
+/** A positive reply creates its CRM trail, whatever the event's Lead setting: the campaign member, a task for the rep, and a Lead if there is no record. */
+async function positiveTrail(q: Q, m: Msg, p: Who, code: string, ctx: { crm?: Crm | null; now: Date }) {
+  if (!canWrite(ctx.crm) || !p.email) return;
+  const base = { email: p.email.toLowerCase(), full_name: p.full_name, company: p.company, domain: p.domain, event_id: m.event_id };
+  await queueCreate(q, "lead", `lead:${p.email.toLowerCase()}`, p.person_id, base);
+  await queueCreate(q, "campaign_member", `cm:${m.event_id}:${m.contact_id}`, p.person_id, { ...base, campaign: p.event, status: "Responded" });
+  await queueCreate(q, "task", `task:${m.id}`, p.person_id, { ...base, subject: `${p.full_name ?? "Someone"} at ${p.company} replied (${code.replace(/_/g, " ")})`, body: m.body ?? "", due: ctx.now.toISOString().slice(0, 10) });
+}
 
 /** What each code does, in code. `modelOnly` means nothing but a model's reading supports it, so a suppression is marked for a person to confirm. */
 async function applyCode(q: Q, m: Msg, p: Who, code: ReplyCode, ctx: { modelOnly: boolean; actor: string; now: Date; crm?: Crm | null }) {
@@ -110,17 +128,17 @@ async function applyCode(q: Q, m: Msg, p: Who, code: ReplyCode, ctx: { modelOnly
     }
     case "referral":
       await openLifecycleCase(q, { eventId: m.event_id, kind: "referral", contactId: m.contact_id, companyId: p.company_id, summary: `${p.full_name ?? "Someone"} at ${p.company} pointed us to someone else.`, facts: [{ reply: m.body ?? "(no text)" }], suggested: "added" });
-      await addHold(q, { domain: p.domain, person_id: p.person_id, cause: "live_thread", cause_id: m.contact_id, expires_at: new Date(ctx.now.getTime() + 14 * DAY) });
-      await q("UPDATE enrollments SET cause = 'waiting_for_rep' WHERE contact_id = $1 AND state = 'paused'", [m.contact_id]);
+      await holdAccount(q, m, p, ctx.now);
       break;
     case "interested":
     case "meeting_request":
-      await addHold(q, { domain: p.domain, person_id: p.person_id, cause: "live_thread", cause_id: m.contact_id, expires_at: new Date(ctx.now.getTime() + 14 * DAY) });
-      await q("UPDATE enrollments SET cause = 'waiting_for_rep' WHERE contact_id = $1 AND state = 'paused'", [m.contact_id]);
+      await holdAccount(q, m, p, ctx.now);
+      await positiveTrail(q, m, p, code, ctx);
       break;
     case "not_now":
     case "not_interested":
       await stopInEvent(q, m.contact_id, m.event_id, code, m.id);
+      if (code === "not_now" && canWrite(ctx.crm) && p.email) await queueCreate(q, "task", `recontact:${m.id}`, p.person_id, { email: p.email.toLowerCase(), full_name: p.full_name, company: p.company, domain: p.domain, event_id: m.event_id, subject: `Check back with ${p.full_name ?? "this contact"} at ${p.company}`, body: m.body ?? "", due: new Date(ctx.now.getTime() + 90 * DAY).toISOString().slice(0, 10) });
       break;
     default:
       break;
@@ -191,22 +209,24 @@ export async function processInbound(db: Db, deps: LifecycleDeps, limit = 200) {
       if (code) await applyCode(q, reading, p, code, { modelOnly: !provider && !keyword, actor: DESK, now, crm: deps.crm });
       if (doubt) { await openDoubt(q, m, p, doubt); out.doubtful++; await logActivity(q, m.event_id, DESK, "reply", `A reply needs a person: ${doubt}`); }
       await q("UPDATE inbound_messages SET status = 'done', code = $2, model_code = $3, code_matched = $4, lease_until = NULL WHERE id = $1", [m.id, code, modelCode, Boolean(provider || keyword)]);
+      await announce(q, deps, m, p, code, doubt, now);
     });
     out.processed++;
-    await announce(db, deps, m, p, code, doubt);
   }
   if (claimed.length) await drainOps(db, deps);
   return out;
 }
 
-/** The event's thread. A failed post never undoes what was decided. */
-async function announce(db: Db, deps: LifecycleDeps, m: Msg, p: Who, code: ReplyCode | null, doubt: string | null) {
-  if (!deps.notify) return;
-  const name = p.full_name ?? "Someone";
-  const card = doubt ? doubtCard({ person: name, company: p.company, body: m.body }) : code && ["interested", "meeting_request", "referral"].includes(code) ? replyCard({ event: p.event, person: name, company: p.company, code, body: m.body, contact_id: m.contact_id, channel: m.channel }) : null;
-  if (!card) return;
-  try {
-    const t = await deps.notify.thread(p.thread, card);
-    if (t && !p.thread) await db.query("UPDATE events SET slack_thread = $2 WHERE id = $1 AND slack_thread IS NULL", [m.event_id, t]);
-  } catch (e) { console.error("slack thread", (e as Error).message); }
+/** Written in the same transaction as the decision, then sent from a queue, so a Slack outage loses nothing. A hot reply goes straight to the account's owner, on a clock. */
+async function announce(q: Q, deps: LifecycleDeps, m: Msg, p: Who, code: ReplyCode | null, doubt: string | null, now: Date) {
+  const name = p.full_name ?? "Someone", body = cleanReply(m.body) || m.body;
+  const hot = !doubt && code && ["interested", "meeting_request", "referral"].includes(code);
+  if (doubt) await queueThread(q, m.event_id, doubtCard({ person: name, company: p.company, body }));
+  if (!hot) return;
+  const card = replyCard({ event: p.event, person: name, company: p.company, code: code!, body, contact_id: m.contact_id, channel: m.channel });
+  const [o] = await q<{ owner: string | null }>("SELECT coalesce((SELECT d.owner FROM owner_decisions d WHERE d.event_id = $1 AND d.company_id = $2), (SELECT account_owner FROM companies WHERE id = $2)) AS owner", [m.event_id, p.company_id]);
+  const slackId = o?.owner ? deps.userMap?.[o.owner] : undefined;
+  await q("UPDATE inbound_messages SET owner = $2, respond_by = $3 WHERE id = $1", [m.id, o?.owner ?? null, respondBy(now, deps.holidays).toISOString()]);
+  if (slackId) await queueDm(q, m.event_id, slackId, card);
+  await queueThread(q, m.event_id, card);
 }

@@ -27,6 +27,8 @@ export interface LifecycleDeps {
   mailAuth?: MailAuth;
   /** True when a placement test tool is in use: a domain with no recent passing test is not used. */
   placementRequired?: boolean;
+  /** The company's own mail domains. Cold outreach never goes out from these. */
+  primaryDomains?: string[];
 }
 
 export const nowOf = (d: LifecycleDeps) => d.now?.() ?? new Date();

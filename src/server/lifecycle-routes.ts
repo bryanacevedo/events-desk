@@ -2,7 +2,8 @@
 
 import type { Hono } from "hono";
 import type { Db } from "./db.ts";
-import { answerDebrief, learningTable, reviewDebrief, decideProposal } from "./closeout.ts";
+import { cleanNames, renderStep, type TemplateStep } from "../shared/template-check.ts";
+import { recordEventCost, answerDebrief, learningTable, reviewDebrief, decideProposal } from "./closeout.ts";
 import { RuleError } from "./events.ts";
 import type { LifecycleDeps } from "./lifecycle-deps.ts";
 import { bookMeeting, confirmRelease, ingestCalendar, recordOutcome, type CalendarEvent } from "./meetings.ts";
@@ -11,7 +12,8 @@ import { decideOwner } from "./owners.ts";
 import { ingestEvents, processInbound } from "./replies.ts";
 import { approveTemplate, attachCampaign, confirmLaunchChecklist, createDrafts, recordLegalBasis, restartSending, resumePerson, setTools, stopAllSending } from "./sequences.ts";
 import { regionOf, loadPeople } from "./gate.ts";
-import { recordPlacement } from "./sending.ts";
+import { recordConsent, recordPlacement, setDomainStatus } from "./sending.ts";
+import { captureOnsite, forgetPerson, markHandled } from "./operating.ts";
 import { isGtm } from "../shared/roles.ts";
 import { MOTION_LABEL } from "../shared/motion.ts";
 
@@ -20,7 +22,9 @@ type App = Hono<{ Variables: { actor: string } }>;
 export async function motionOverview(db: Db, deps: LifecycleDeps, id: string) {
   const [e] = await db.query<{ motion: keyof typeof MOTION_LABEL; tools: Record<string, string>; stage: string; verify_once: boolean; write_leads: boolean; outreach_started_by: string | null }>("SELECT motion, tools, stage, verify_once, write_leads, outreach_started_by FROM events WHERE id = $1", [id]);
   if (!e) return null;
-  const [sequences, funnel, owners, replies, meetings, scorecards, debriefs, card, bases, cases] = await Promise.all([
+  const [captures, unplaced, sequences, funnel, owners, replies, meetings, scorecards, debriefs, card, bases, cases] = await Promise.all([
+    db.query("SELECT id, full_name, email, company, title, note, temperature, rep, source, captured_at::text AS captured_at FROM onsite_captures WHERE event_id = $1 ORDER BY captured_at DESC LIMIT 100", [id]),
+    db.query("SELECT id, connector, channel, body, received_at::text AS received_at FROM inbound_messages WHERE status = 'unmatched' ORDER BY received_at DESC LIMIT 20"),
     db.query(`SELECT s.id, s.name, s.channel, s.priority, s.connector, s.state, s.launched_at::text AS launched_at, s.pause_reason, s.senders_needed, s.peak_daily, s.sender_status, s.sender_excluded,
                 (SELECT count(*)::int FROM enrollments n WHERE n.sequence_id = s.id AND n.state = 'enrolled') AS enrolled,
                 (SELECT count(*)::int FROM enrollments n WHERE n.sequence_id = s.id AND n.state = 'paused') AS paused,
@@ -45,7 +49,7 @@ export async function motionOverview(db: Db, deps: LifecycleDeps, id: string) {
     motion: e.motion, label: MOTION_LABEL[e.motion], stage: e.stage, tools: e.tools, verify_once: e.verify_once, write_leads: e.write_leads, started_by: e.outreach_started_by,
     connectors: Object.values(deps.connectors).map((c) => ({ name: c.name, channels: c.channels, simulated: Boolean(c.simulated), capabilities: c.capabilities })),
     poll_minutes: deps.pollMinutes ?? 5, crm_connected: Boolean(deps.crm?.connected),
-    card: card[0] ?? null, sequences, funnel: funnel[0] ?? null, owners, replies, meetings, scorecards, debriefs, open_cases: cases[0].n,
+    captures, unplaced, card: card[0] ?? null, sequences, funnel: funnel[0] ?? null, owners, replies, meetings, scorecards, debriefs, open_cases: cases[0].n,
     regions: [...counts].sort((a, b) => b[1] - a[1]).map(([region, people]) => ({ region, people, basis: bases.find((b) => b.region === region)?.basis ?? null, recorded_by: bases.find((b) => b.region === region)?.recorded_by ?? null })),
   };
 }
@@ -65,6 +69,20 @@ export function mountLifecycle(app: App, db: Db, deps: LifecycleDeps, opts: { ba
   app.post("/api/events/:id/motion/sequences", guarded(async (c) => createDrafts(db, deps, c.req.param("id"), c.get("actor"))));
   app.post("/api/motion/sequences/:sid/campaign", guarded(async (c) => attachCampaign(db, deps, c.req.param("sid"), String((await body(c)).external_id ?? ""), c.get("actor"))));
   app.post("/api/motion/sequences/:sid/checklist", guarded(async (c) => confirmLaunchChecklist(db, c.req.param("sid"), c.get("actor"))));
+  app.post("/api/events/:id/motion/capture", guarded(async (c) => { const b = await body(c); return captureOnsite(db, deps, c.req.param("id"), c.get("actor"), b); }));
+  app.post("/api/motion/replies/:rid/handled", guarded(async (c) => markHandled(db, c.req.param("rid"), c.get("actor"))));
+  app.post("/api/motion/forget", guarded(async (c) => { if (!isGtm(c.get("actor"))) throw new RuleError("Erasure requests are GTM Engineering's to carry out."); return forgetPerson(db, deps, String((await body(c)).email ?? ""), c.get("actor")); }));
+  app.post("/api/motion/consent", guarded(async (c) => { const b = await body(c); return recordConsent(db, String(b.connector), String(b.sender_id), String(b.rep), c.get("actor")); }));
+  app.post("/api/motion/domains", guarded(async (c) => { if (!isGtm(c.get("actor"))) throw new RuleError("Sending domains are GTM Engineering's to mark."); const b = await body(c); return setDomainStatus(db, String(b.domain), String(b.status), String(b.reason ?? ""), c.get("actor")); }));
+  app.post("/api/motion/sequences/:sid/placement-override", guarded(async (c) => { if (!isGtm(c.get("actor"))) throw new RuleError("Only GTM Engineering can send without a placement test."); await db.query("UPDATE sequences SET placement_override_by = $2 WHERE id = $1", [c.req.param("sid"), c.get("actor")]); }));
+  app.get("/api/motion/alerts", async (c) => c.json({ alerts: await db.query("SELECT key, day::text AS day, text, created_at::text AS created_at FROM alerts ORDER BY created_at DESC LIMIT 50"), controls: (await db.query("SELECT sending_stopped_at::text AS stopped_at, stopped_by, reason FROM desk_controls"))[0] }));
+  app.post("/api/events/:id/motion/costs", guarded(async (c) => { const b = await body(c); return recordEventCost(db, c.req.param("id"), c.get("actor"), String(b.category), Number(b.amount_cents), String(b.note ?? "")); }));
+  app.get("/api/motion/sequences/:sid/preview", async (c) => {
+    const [s] = await db.query<{ event_id: string; name: string; steps: TemplateStep[]; event: string }>("SELECT q.event_id, q.name, t.steps, e.name AS event FROM sequences q JOIN sequence_templates t ON t.id = q.template_id JOIN events e ON e.id = q.event_id WHERE q.id = $1", [c.req.param("sid")]);
+    if (!s) return bad("That sequence does not exist.", 404);
+    const rows = await db.query<{ full_name: string | null; title: string | null; company: string }>("SELECT k.full_name, k.title, co.name AS company FROM enrollments n JOIN contacts k ON k.id = n.contact_id JOIN companies co ON co.id = k.company_id WHERE n.sequence_id = $1 AND n.state <> 'removed' ORDER BY n.id LIMIT 3", [c.req.param("sid")]);
+    return c.json({ name: s.name, previews: rows.map((r) => ({ person: r.full_name, steps: s.steps.map((st) => renderStep(st, { ...cleanNames(r.full_name), company: r.company, title: r.title, event: s.event })) })) });
+  });
   app.post("/api/motion/stop", guarded(async (c) => stopAllSending(db, deps, c.get("actor"), String((await body(c)).reason ?? "No reason given"))));
   app.post("/api/motion/restart", guarded(async (c) => restartSending(db, c.get("actor"))));
   app.post("/api/events/:id/motion/contacts/:cid/resume", guarded(async (c) => resumePerson(db, deps, c.req.param("id"), c.req.param("cid"), c.get("actor"))));

@@ -10,6 +10,8 @@ import { openOwnerDecisions, ownerSweep, sendOwnerCards } from "./owners.ts";
 import { ingestEvents, processInbound } from "./replies.ts";
 import { bounceWatch, calendarSweep, drainOps, flagSweep, observeSequences, pauseSequenceById, resumeDue } from "./sequences.ts";
 import { senderSweep } from "./sending.ts";
+import { blindSweep, drainNotifications, escalateWaiting, purgeOldBodies, raiseAlert, recordRun } from "./operating.ts";
+import { dailyDigest } from "./closeout.ts";
 
 export async function pollTools(db: Db, deps: LifecycleDeps) {
   const since = new Date(nowOf(deps).getTime() - 3 * 86_400_000).toISOString();
@@ -17,12 +19,13 @@ export async function pollTools(db: Db, deps: LifecycleDeps) {
     if (c.capabilities.events === "webhook") continue;
     const seqs = await db.query<{ external_id: string }>("SELECT external_id FROM sequences WHERE connector = $1 AND launched_at IS NOT NULL AND state <> 'archived' AND external_id IS NOT NULL", [c.name]);
     if (!seqs.length) continue;
-    try { await ingestEvents(db, deps, c, await c.events(since, seqs.map((s) => s.external_id))); }
-    catch (e) { console.error("poll", c.name, (e as Error).message); }
+    try { const events = await c.events(since, seqs.map((s) => s.external_id)); await ingestEvents(db, deps, c, events); await recordRun(db, c.name, true, events.length, undefined, nowOf(deps)); }
+    catch (e) { await recordRun(db, c.name, false, 0, (e as Error).message, nowOf(deps)); console.error("poll", c.name, (e as Error).message); }
   }
 }
 
-const quietly = async (name: string, run: () => Promise<unknown>) => { try { await run(); } catch (e) { console.error("lifecycle", name, e); } };
+const running = { deps: null as LifecycleDeps | null, db: null as Db | null };
+const quietly = async (name: string, run: () => Promise<unknown>) => { try { await run(); } catch (e) { console.error("lifecycle", name, e); if (running.db && running.deps) await raiseAlert(running.db, running.deps, `step:${name}`, `The ${name} step failed: ${(e as Error).message}`).catch(() => {}); } };
 
 export async function ownerStep(db: Db, deps: LifecycleDeps) {
   for (const e of await db.query<{ id: string }>("SELECT id FROM events WHERE motion IN ('owners', 'sequencing', 'in_market') AND EXISTS (SELECT 1 FROM owner_decisions d WHERE d.event_id = events.id AND d.status = 'pending') OR motion = 'owners'")) {
@@ -32,12 +35,18 @@ export async function ownerStep(db: Db, deps: LifecycleDeps) {
   }
 }
 
+const lastOk = (db: Db) => async (connector: string) => { const [r] = await db.query<{ last_ok_at: string | null }>("SELECT last_ok_at::text AS last_ok_at FROM connector_runs WHERE connector = $1", [connector]); return r?.last_ok_at ? new Date(r.last_ok_at) : null; };
+
 export async function lifecycleTick(db: Db, deps: LifecycleDeps, opts: { flags?: boolean; nightly?: boolean } = {}) {
+  running.db = db; running.deps = deps;
   await quietly("owners", () => ownerStep(db, deps));
   await quietly("observe", () => observeSequences(db, deps));
   await quietly("ops", () => drainOps(db, deps));
   await quietly("poll", () => pollTools(db, deps));
+  await quietly("blind", () => blindSweep(db, deps, lastOk(db)));
   await quietly("inbound", () => processInbound(db, deps));
+  await quietly("notify", () => drainNotifications(db, deps));
+  await quietly("escalate", () => escalateWaiting(db, deps));
   await quietly("resume", () => resumeDue(db, deps));
   if (opts.flags) await quietly("flags", () => flagSweep(db, deps));
   await quietly("bounces", () => bounceWatch(db, deps));
@@ -49,5 +58,5 @@ export async function lifecycleTick(db: Db, deps: LifecycleDeps, opts: { flags?:
   await quietly("calendar", () => calendarSweep(db, deps));
   await quietly("score", () => writeScorecards(db, deps));
   await quietly("outbox", () => drainQuietly(db, deps.crm));
-  if (opts.nightly) { await quietly("learn", () => proposeEdits(db)); await quietly("integrity", () => integrityCheck(db, deps)); }
+  if (opts.nightly) { await quietly("digest", () => dailyDigest(db, deps)); await quietly("purge", () => purgeOldBodies(db, deps)); await quietly("learn", () => proposeEdits(db)); await quietly("integrity", () => integrityCheck(db, deps)); }
 }

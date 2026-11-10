@@ -9,13 +9,16 @@ const daysSince = (t: unknown) => (typeof t === "string" && !Number.isNaN(Date.p
 
 /* ------------------------------------------------------------- Instantly */
 
+const toInstantly = (t: string) => t.replaceAll("{{first_name}}", "{{firstName}}").replaceAll("{{last_name}}", "{{lastName}}").replaceAll("{{company}}", "{{companyName}}");
+const fromInstantly = (t: string) => t.replaceAll("{{firstName}}", "{{first_name}}").replaceAll("{{lastName}}", "{{last_name}}").replaceAll("{{companyName}}", "{{company}}");
+
 const INSTANTLY_STATE: Record<number, SequenceState> = { 0: "draft", 1: "active", 2: "paused", 3: "archived", [-1]: "paused", [-2]: "paused" };
 
 function instantlyEvent(w: any): ToolEvent | null {
   const signal = ({ reply_received: "reply", email_bounced: "bounce", lead_unsubscribed: "unsubscribe", email_sent: "send" } as const)[w?.event_type as string];
   if (!signal || !w.lead_email) return null;
   const id = String(w.email_id ?? w.id ?? `${w.event_type}:${w.lead_email}:${w.timestamp}`);
-  return { provider_message_id: `${signal}:${id}`, signal, channel: "email", sequence_external_id: w.campaign_id ?? w.campaign ?? null, email: String(w.lead_email).toLowerCase(), linkedin: null, external_contact_id: null, body: w.reply_text ?? w.reply_text_snippet ?? null, at: w.timestamp ?? new Date().toISOString() };
+  return { provider_message_id: `${signal}:${id}`, signal, channel: "email", sequence_external_id: w.campaign_id ?? w.campaign ?? null, email: String(w.lead_email).toLowerCase(), linkedin: null, external_contact_id: null, body: w.reply_text ?? w.reply_text_snippet ?? null, at: w.timestamp ?? new Date().toISOString(), sender: w.email_account ?? null, step: typeof w.step === "number" ? w.step : null, hard: w.bounce_type ? w.bounce_type === "hard" : undefined };
 }
 
 export function instantly(o: Opts): Connector {
@@ -31,9 +34,16 @@ export function instantly(o: Opts): Connector {
     healthFloor: 90,
     async listSenders() {
       const j = await api("GET", "/accounts", { query: { limit: 100 } });
-      return (j.items ?? []).map((a: any): SenderInfo => ({ id: a.email, address: a.email, domain: String(a.email).split("@")[1], channel: "email", active: a.status === 1, daily_limit: a.daily_limit ?? null, health: a.stat_warmup_score ?? a.warmup_score ?? null, warm_days: a.warmup_status === 0 ? 0 : daysSince(a.timestamp_warmup_start), bounce_rate: null, spam_rate: null }));
+      return (j.items ?? []).map((a: any): SenderInfo => ({ warmup_on: a.warmup_status === undefined ? null : a.warmup_status === 1, id: a.email, address: a.email, domain: String(a.email).split("@")[1], channel: "email", active: a.status === 1, daily_limit: a.daily_limit ?? null, health: a.stat_warmup_score ?? a.warmup_score ?? null, warm_days: a.warmup_status === 0 ? 0 : daysSince(a.timestamp_warmup_start), bounce_rate: null, spam_rate: null }));
     },
     async assignSenders(id, senders) { await api("PATCH", `/campaigns/${id}`, { body: { email_list: senders.map((s) => s.address) } }); },
+    async pushCopy(id, steps) { await api("PATCH", `/campaigns/${id}`, { body: { sequences: [{ steps: steps.map((s, i) => ({ type: "email", delay: i ? s.day - steps[i - 1].day : 0, variants: [{ subject: toInstantly(s.subject ?? ""), body: toInstantly(s.body) }] })) }] } }); },
+    async readCopy(id) {
+      const j = await api("GET", `/campaigns/${id}`), st = j.sequences?.[0]?.steps;
+      if (!st) return null;
+      let day = 0;
+      return st.map((s: any, i: number) => { if (i) day += s.delay; const v = s.variants[0]; return { day, subject: fromInstantly(v.subject) || undefined, body: fromInstantly(v.body) }; });
+    },
     async applySettings(id, x) {
       await api("PATCH", `/campaigns/${id}`, { body: { campaign_schedule: { schedules: [{ name: "Desk", timing: { from: x.from, to: x.to }, days: Object.fromEntries(x.days.map((d) => [d, true])), timezone: x.timezone }] }, stop_on_reply: x.stop_on_reply, open_tracking: x.track_opens, link_tracking: x.track_links, daily_limit: x.daily_limit } });
     },
@@ -69,7 +79,8 @@ export function instantly(o: Opts): Connector {
       const out: ToolEvent[] = [];
       for (const campaign_id of sequenceIds) {
         const j = await api("GET", "/emails", { query: { campaign_id, email_type: "received", min_timestamp_created: since, limit: 100 } });
-        for (const m of j.items ?? []) out.push({ provider_message_id: `reply:${m.id}`, signal: "reply", channel: "email", sequence_external_id: campaign_id, email: String(m.lead ?? m.from_address_email).toLowerCase(), linkedin: null, external_contact_id: null, body: m.body?.text ?? m.content_preview ?? null, at: m.timestamp_email ?? m.timestamp_created });
+        if (!Array.isArray(j.items)) throw new Error("Instantly's answer had no list in it.");
+        for (const m of j.items) out.push({ provider_message_id: `reply:${m.id}`, signal: "reply", channel: "email", sequence_external_id: campaign_id, email: String(m.lead ?? m.from_address_email).toLowerCase(), linkedin: null, external_contact_id: null, body: m.body?.text ?? m.content_preview ?? null, at: m.timestamp_email ?? m.timestamp_created });
       }
       return out;
     },
@@ -113,6 +124,7 @@ export function heyreach(o: Opts): Connector {
     sequenceState: state,
     async events(since, sequenceIds) {
       const j = await api("POST", "/inbox/GetConversationsV2", { body: { filters: { campaignIds: sequenceIds.map(Number) }, offset: 0, limit: 100 } });
+      if (!Array.isArray(j.items)) throw new Error("HeyReach's answer had no list in it.");
       const out: ToolEvent[] = [];
       for (const c of j.items ?? []) {
         const m = c.lastMessage ?? c;
@@ -162,6 +174,13 @@ export function smartlead(o: Opts): Connector {
       return out;
     },
     async assignSenders(id, senders) { await api("POST", `/campaigns/${id}/email-accounts`, { body: { email_account_ids: senders.map((s) => Number(s.id)) } }); },
+    async pushCopy(id, steps) { await api("POST", `/campaigns/${id}/sequences`, { body: { sequences: steps.map((s, i) => ({ seq_number: i + 1, seq_delay_details: { delay_in_days: i ? s.day - steps[i - 1].day : 0 }, subject: s.subject ?? "", email_body: s.body })) } }); },
+    async readCopy(id) {
+      const j = await api("GET", `/campaigns/${id}/sequences`);
+      if (!Array.isArray(j) || !j.length || j[0].email_body === undefined) return null;
+      let day = 0;
+      return j.map((s: any, i: number) => { if (i) day += s.seq_delay_details?.delay_in_days ?? 0; return { day, subject: s.subject || undefined, body: s.email_body }; });
+    },
     async applySettings(id, x) {
       await api("POST", `/campaigns/${id}/schedule`, { body: { timezone: x.timezone, days_of_the_week: x.days, start_hour: x.from, end_hour: x.to, max_new_leads_per_day: x.daily_limit } });
       await api("POST", `/campaigns/${id}/settings`, { body: { track_settings: [...(x.track_opens ? [] : ["DONT_TRACK_EMAIL_OPEN"]), ...(x.track_links ? [] : ["DONT_TRACK_LINK_CLICK"])], stop_lead_settings: x.stop_on_reply ? "REPLY_TO_AN_EMAIL" : "CLICK_ON_A_LINK" } });
@@ -199,6 +218,7 @@ export function smartlead(o: Opts): Connector {
       const out: ToolEvent[] = [];
       for (const id of sequenceIds) {
         const j = await api("GET", `/campaigns/${id}/statistics`, { query: { email_status: "replied", offset: 0, limit: 100 } });
+        if (!Array.isArray(j.data)) throw new Error("Smartlead's answer had no list in it.");
         for (const r of j.data ?? []) {
           if (!r.reply_time || r.reply_time < since) continue;
           out.push({ provider_message_id: `reply:${r.stats_id}`, signal: "reply", channel: "email", sequence_external_id: id, email: String(r.lead_email).toLowerCase(), linkedin: null, external_contact_id: null, body: r.reply_text ?? null, at: r.reply_time });
@@ -251,6 +271,7 @@ export function apollo(o: Opts): Connector {
       const out: ToolEvent[] = [];
       for (const id of sequenceIds) {
         const j = await api("POST", "/emailer_messages/search", { body: { emailer_campaign_ids: [id], per_page: 100 } });
+        if (!Array.isArray(j.emailer_messages)) throw new Error("Apollo's answer had no list in it.");
         // The server-side filters are reported unreliable, so each message's own flags are read here.
         for (const m of j.emailer_messages ?? []) {
           const at = m.replied_at ?? m.bounced_at;

@@ -7,6 +7,7 @@ import type { LifecycleDeps, Notifier } from "../src/server/lifecycle-deps.ts";
 import { requestMotionCard } from "../src/server/motion.ts";
 import { mockLlm, type Crm, type CrmRecord } from "../src/server/providers.ts";
 import { approveTemplate, recordLegalBasis, setTools } from "../src/server/sequences.ts";
+import { recordConsent } from "../src/server/sending.ts";
 import type { CardMessage } from "../src/server/slack-cards.ts";
 import { deliverEvent } from "./helpers.ts";
 
@@ -71,11 +72,12 @@ export async function deliveredInMotion(db: Db, opts: { crm?: Crm | null; csv?: 
   await recordLegalBasis(db, id, MAYA, "unknown", "Legitimate interest, attendee list");
   await recordLegalBasis(db, id, MAYA, "spain", "Legitimate interest, attendee list");
   const seedE = email.newSeq("tpl_email");
-  const { id: template } = await approveTemplate(db, "GTM", { name: "Pre email", channel: "email", phase: "pre", steps: [{ day: 0 }, { day: 3 }], external_id: seedE });
+  const { id: template } = await approveTemplate(db, "GTM", { name: "Pre email", channel: "email", phase: "pre", steps: [{ day: 0, subject: "Payments Summit", body: "Hi {{first_name}}" }, { day: 3, body: "Following up" }], external_id: seedE });
   void seedE;
-  await approveTemplate(db, "GTM", { name: "Post email", channel: "email", phase: "post", steps: [{ day: 0 }], external_id: seedE });
-  await approveTemplate(db, "GTM", { name: "Pre li", channel: "linkedin", phase: "pre", steps: [{ day: 0 }] });
-  await approveTemplate(db, "GTM", { name: "Post li", channel: "linkedin", phase: "post", steps: [{ day: 0 }] });
+  await approveTemplate(db, "GTM", { name: "Post email", channel: "email", phase: "post", steps: [{ day: 0, subject: "Good to see you", body: "Hi {{first_name}}" }], external_id: seedE });
+  await approveTemplate(db, "GTM", { name: "Pre li", channel: "linkedin", phase: "pre", steps: [{ day: 0, body: "Hi {{first_name}}" }] });
+  await approveTemplate(db, "GTM", { name: "Post li", channel: "linkedin", phase: "post", steps: [{ day: 0, body: "Hi {{first_name}}" }] });
+  for (const id2 of ["1", "2"]) await recordConsent(db, "heyreach", id2, "A Rep", MAYA);
   return { id, deps, email, li, time, notify, template };
 }
 
