@@ -15,6 +15,7 @@ import { cardBreakdown } from "../shared/vendors.ts";
 import { decideSeat, GOALS } from "./seats.ts";
 import type { Db } from "./db.ts";
 import { logActivity, RuleError } from "./events.ts";
+import { welcomeRoom } from "./event-room.ts";
 import type { Llm } from "./providers.ts";
 import { askConcierge, connectConcierge } from "../concierge/agent.ts";
 
@@ -29,6 +30,8 @@ export interface SlackConfig {
   approvers: string[];
   /** Person name to Slack user ID. A cost card is confirmed by the person who uploaded the list, and in live mode the Slack user is the only proof of who that is. Required for LIVE_SPEND=1. */
   userMap?: Record<string, string>;
+  /** The desk's own address (APP_URL), for the link in an event channel's topic. */
+  appUrl?: string;
   fetch?: typeof fetch;
   now?: () => number;
   llm?: Llm;
@@ -188,15 +191,27 @@ export async function eventChannel(db: Db, cfg: SlackConfig, eventId: string, in
     channel = await openChannel(cfg, { event_id: eventId, name: e.name, channel: null });
     if (!channel) return null;
     const [kept] = await db.query<{ slack_channel: string }>("UPDATE events SET slack_channel = coalesce(slack_channel, $2) WHERE id = $1 RETURNING slack_channel", [eventId, channel]);
+    // This call opened the room: its topic, and everyone already going.
+    if (kept.slack_channel === channel) await welcomeRoom(db.query, eventId, channel, roomTools(cfg), cfg.userMap, cfg.appUrl);
     channel = kept.slack_channel;
   }
   if (invite.length) await slackCall(cfg, "conversations.invite", { channel, users: invite.join(",") });
   return channel;
 }
 
+/** Invite, topic: the two things a new room needs. "Already there" counts as done. force: one person Slack refuses does not stop the rest. */
+function roomTools(cfg: SlackConfig) {
+  return {
+    async invite(channel: string, users: string[]) { const j = await slackCall(cfg, "conversations.invite", { channel, users: users.join(","), force: true }); return j.ok || j.error === "already_in_channel"; },
+    async topic(channel: string, text: string) { return (await slackCall(cfg, "conversations.setTopic", { channel, topic: text })).ok; },
+  };
+}
+
 export function slackNotifier(cfg: SlackConfig): Notifier {
   const open = (room: EventRoom) => openChannel(cfg, room);
   return {
+    ...roomTools(cfg),
+    async archive(channel) { const j = await slackCall(cfg, "conversations.archive", { channel }); return j.ok || j.error === "already_archived"; },
     async post(room, m, mention = []) {
       const channel = room.channel ?? await open(room);
       if (!channel) return null;

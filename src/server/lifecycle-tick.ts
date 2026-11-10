@@ -1,6 +1,7 @@
 /* One pass over everything with a clock or a queue after delivery. Started on a timer in node.ts; tests call it directly with a chosen time. A step that fails is logged and the rest still run. */
 
 import { DAY } from "../shared/policy.ts";
+import { roomStep } from "./event-room.ts";
 import type { Db } from "./db.ts";
 import { closeOut } from "./motion.ts";
 import { drainQuietly } from "./crm-outbox.ts";
@@ -75,6 +76,7 @@ async function tickOnce(db: Db, deps: LifecycleDeps, opts: { flags?: boolean; ni
   await quietly("blind", () => blindSweep(db, deps, lastOk(db)));
   await quietly("inbound", () => processInbound(db, deps));
   await quietly("notify", () => drainNotifications(db, deps));
+  await quietly("rooms", () => roomStep(db, deps));
   await quietly("escalate", () => escalateWaiting(db, deps));
   await quietly("resume", () => resumeDue(db, deps));
   if (opts.flags) await quietly("flags", () => flagSweep(db, deps));

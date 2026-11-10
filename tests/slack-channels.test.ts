@@ -6,7 +6,7 @@ import { createApp } from "../src/server/app.ts";
 import { client } from "../src/server/connectors/types.ts";
 import { lifecycleTick, tickState } from "../src/server/lifecycle-tick.ts";
 import { drainNotifications, raiseAlert } from "../src/server/operating.ts";
-import { eventChannelName, slackNotifier } from "../src/server/slack.ts";
+import { eventChannel, eventChannelName, slackNotifier } from "../src/server/slack.ts";
 import { freshDb } from "./helpers.ts";
 import { deliveredInMotion } from "./lifecycle-harness.ts";
 
@@ -38,6 +38,29 @@ describe("event channels", () => {
     expect(post.text).toMatch(/^<@UOWNER> /);
     expect(post.blocks[0].elements[0].text).toBe("For <@UOWNER>");
     expect(calls.some((c) => c.method === "chat.postMessage" && c.body.channel.startsWith("U"))).toBe(false);
+  });
+
+  it("the cost card's channel opens with its topic and everyone going, and a channel already closed counts as closed", async () => {
+    const h = await deliveredInMotion(db);
+    await db.query("INSERT INTO seat_requests (id, event_id, requester, team, role, goal, why_event, why_you, expected_meetings, status) VALUES ('sr_a', $1, 'Rep A', 'Sales', 'AE', 'new_pipeline', 'w', 'w', 3, 'approved')", [h.id]);
+    const calls: { method: string; body: any }[] = [];
+    const f = (async (url: string, init: RequestInit) => {
+      const method = url.split("/api/")[1], body = JSON.parse(String(init.body));
+      calls.push({ method, body });
+      if (method === "conversations.create") return Response.json({ ok: true, channel: { id: "C7" } });
+      if (method === "conversations.archive") return Response.json({ ok: false, error: "already_archived" });
+      return Response.json({ ok: true });
+    }) as typeof fetch;
+    const cfg = { signingSecret: "s", botToken: "t", channel: "CAPPROVALS", approvers: [], fetch: f, userMap: { "Rep A": "UREPA" }, appUrl: "https://desk.example.com" };
+    expect(await eventChannel(db, cfg, h.id, ["UUPLOADER"])).toBe("C7");
+    expect(calls.find((c) => c.method === "conversations.setTopic")!.body.topic).toMatch(/https:\/\/desk\.example\.com\/event\//);
+    expect(calls.filter((c) => c.method === "conversations.invite").map((c) => c.body.users)).toEqual(["UREPA", "UUPLOADER"]);
+    expect(calls.find((c) => c.method === "conversations.invite")!.body.force).toBe(true);
+    expect((await db.query<{ at: string | null }>("SELECT channel_invited_at::text AS at FROM seat_requests WHERE id = 'sr_a'"))[0].at).not.toBeNull();
+    // Opened once: a second call reuses it.
+    await eventChannel(db, cfg, h.id);
+    expect(calls.filter((c) => c.method === "conversations.create" || c.method === "conversations.setTopic")).toHaveLength(2);
+    expect(await slackNotifier(cfg).archive!("C7")).toBe(true);
   });
 
   it("a hot reply goes to the event channel with the owner mentioned, once", async () => {

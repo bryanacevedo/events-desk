@@ -28,10 +28,17 @@ export const clock = (iso = "2027-01-10T12:00:00Z"): Clock => {
 };
 
 /** Slack as the desk uses it. `sent` holds one entry per person a card @-mentioned; `posts` every card in an event channel; `opsPosts` the ops channel. */
-export function fakeNotifier(opts: { fail?: boolean } = {}) {
+/** A Slack stand-in. rooms: true adds the room moves (invite, topic, archive), off by default so older tests see only posts. */
+export function fakeNotifier(opts: { fail?: boolean; rooms?: boolean } = {}) {
   const sent: { to: string; card: CardMessage; channel: string }[] = [], posts: CardMessage[] = [], opsPosts: CardMessage[] = [], opened: string[] = [];
-  const n: Notifier & { sent: typeof sent; posts: typeof posts; opsPosts: typeof opsPosts; opened: typeof opened; fail: boolean } = {
-    sent, posts, opsPosts, opened, fail: Boolean(opts.fail),
+  const invited: { channel: string; users: string[] }[] = [], topics: { channel: string; text: string }[] = [], archived: string[] = [];
+  const n: Notifier & { sent: typeof sent; posts: typeof posts; opsPosts: typeof opsPosts; opened: typeof opened; fail: boolean; inviteFails: boolean; invited: typeof invited; topics: typeof topics; archived: typeof archived } = {
+    sent, posts, opsPosts, opened, fail: Boolean(opts.fail), inviteFails: false, invited, topics, archived,
+    ...(opts.rooms ? {
+      async invite(channel: string, users: string[]) { if (n.inviteFails) return false; invited.push({ channel, users }); return true; },
+      async topic(channel: string, text: string) { topics.push({ channel, text }); return true; },
+      async archive(channel: string) { archived.push(channel); return true; },
+    } : {}),
     async post(room, card, mention = []) {
       if (n.fail) return null;
       const channel = room.channel ?? `C_${room.event_id}`;

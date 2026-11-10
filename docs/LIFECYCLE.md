@@ -237,6 +237,8 @@ Every event has its own public channel (`evt-<event-name>`), opened by the desk 
 
 Seat requests and seat approvals are leadership's and never go to an event channel, where everyone is: they go to the seats channel (`SLACK_SEATS_CHANNEL`, defaulting to the approvals channel). All of it is tested against a stand-in for Slack; real channel creation and the `channels:manage` scope have not run in a real workspace. Problems that belong to no one event go to the ops channel (`SLACK_OPS_CHANNEL`, defaulting to the approvals channel): a tool gone quiet, a pass that hangs, a step that failed. One per problem per day. A Slack message that failed for good is not announced to the same Slack; it is logged, kept as an alert, and counted on `/api/health`.
 
+The event channel opens with the first cost card. It is set up then: the topic names the event, its days, its city and its page, and everyone with an approved seat is invited (later approvals by the background pass). It is archived 90 days after the event's last day, after one closing line; anything later for that event goes to the ops channel with its name. See DECISIONS §37.
+
 The background pass runs every five minutes. Every call to a tool times out at 30 seconds and every Slack call at 15, so one hung call cannot hold every stop behind it. A pass still running after 15 minutes is posted straight to the ops channel by the next timer, not queued behind the stuck pass. Once a pass has run in the process, `/api/health` answers 503 when none has finished for 20 minutes, and it carries today's alert count, for an outside uptime check that works even when Slack does not.
 
 ## 13. Integrity

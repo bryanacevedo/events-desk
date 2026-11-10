@@ -149,3 +149,9 @@ export const hotCaptureCard = (h: { person: string; company: string | null; note
   text: `Hot from the booth: ${h.person}${h.company ? ` at ${h.company}` : ""}. Follow up today.`,
   blocks: [say(`*Hot from the booth: ${esc(h.person)}*${h.company ? `\n${esc(h.company)}` : ""}`), ...(h.note.trim() ? [small(`“${quote(h.note)}”`)] : []), small("Follow up today. A task is in the CRM. This person stays out of every sequence.")],
 });
+
+/** The last message in an event's channel, the day it is archived. */
+export const roomClosingCard = (r: { event: string; days: number; url?: string }): CardMessage => ({
+  text: `${r.event} ended ${r.days} days ago. This channel is closing.`,
+  blocks: [say(`*${esc(r.event)} ended ${r.days} days ago.* This channel is closing now. Its history stays searchable, and the event's page keeps everything else.`), ...(r.url ? [{ type: "actions", elements: [link("Open event", r.url)] }] : [])],
+});

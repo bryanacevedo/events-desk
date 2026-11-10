@@ -24,6 +24,8 @@ export const BOUNCE_MIN_SENDS = 50;
 export const POST_START_LATEST_DAYS = 10;
 export const POST_WAVE_END_DAYS = 24;
 export const POST_TEMPLATE_MAX_DAYS = 10;
+/** An event's Slack channel is archived this many days after the event's last day (Bryan, 2026-11-10). Slack keeps its history. */
+export const ROOM_ARCHIVE_DAYS = 90;
 
 /** CRM deal stages late enough that the owner should hear before anyone is sequenced. */
 export const DEFAULT_LATE_STAGES = ["proposal", "negotiation", "contract", "closing", "verbal"];

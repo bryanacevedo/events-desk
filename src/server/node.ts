@@ -73,7 +73,7 @@ const deps: Deps = mode.liveSpend
 // Google only in live mode. Bad Google settings stop the start here, not at the first delivery.
 try { deps.sheets = sheetsFor(mode.liveSpend, env); } catch (e) { console.error((e as Error).message); process.exit(1); }
 const slack = mode.liveSpend
-  ? { signingSecret: env.SLACK_SIGNING_SECRET, botToken: env.SLACK_BOT_TOKEN, channel: env.SLACK_APPROVALS_CHANNEL, opsChannel: env.SLACK_OPS_CHANNEL || undefined, seatsChannel: env.SLACK_SEATS_CHANNEL || undefined, approvers: env.APPROVER_SLACK_IDS.split(",").map((s) => s.trim()), userMap: parseUserMap(env.SLACK_USER_MAP), llm: deps.llm }
+  ? { signingSecret: env.SLACK_SIGNING_SECRET, botToken: env.SLACK_BOT_TOKEN, channel: env.SLACK_APPROVALS_CHANNEL, opsChannel: env.SLACK_OPS_CHANNEL || undefined, seatsChannel: env.SLACK_SEATS_CHANNEL || undefined, appUrl: env.APP_URL || undefined, approvers: env.APPROVER_SLACK_IDS.split(",").map((s) => s.trim()), userMap: parseUserMap(env.SLACK_USER_MAP), llm: deps.llm }
   : undefined;
 // A real database with spend off must never run mock vendors: that would write fake emails into real events.
 const mayRun = mode.liveSpend || !url;
@@ -92,7 +92,7 @@ const demoSetup = mode.demo ? await demoConnectors(db) : undefined;
 const lifecycle: LifecycleDeps | undefined = demoSetup
   ? { crm: withDemoCrm(deps.crm, db, () => new Date()), connectors: demoSetup.connectors, llm: deps.llm, demoCalendar: true }
   : Object.keys(live).length ? {
-      crm: deps.crm, connectors: live, llm: deps.llm, notify: slack ? slackNotifier(slack) : undefined, userMap: slack?.userMap,
+      crm: deps.crm, connectors: live, llm: deps.llm, notify: slack ? slackNotifier(slack) : undefined, userMap: slack?.userMap, appUrl: env.APP_URL || undefined,
       // Every protection the sending layer has is on for real sending, read from the environment.
       webhookBase: env.WEBHOOK_BASE, firstCohort: Number(env.FIRST_COHORT ?? 25), placementRequired: env.PLACEMENT_REQUIRED !== "0", mailAuth: systemMailAuth,
       primaryDomains: (env.PRIMARY_DOMAINS ?? "").split(",").map((d) => d.trim().toLowerCase()).filter(Boolean), holidays: (env.HOLIDAYS ?? "").split(",").map((d) => d.trim()).filter(Boolean),

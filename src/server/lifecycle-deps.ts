@@ -15,6 +15,12 @@ export interface Notifier {
   post(room: EventRoom, message: CardMessage, mention?: string[]): Promise<string | null>;
   /** Posts to the desk's ops channel: problems that belong to no one event. True only when it was delivered. */
   ops(message: CardMessage): Promise<boolean>;
+  /** Adds people to a channel. True when they are in it, including when they already were. */
+  invite?(channel: string, users: string[]): Promise<boolean>;
+  /** Sets the channel's topic line. */
+  topic?(channel: string, text: string): Promise<boolean>;
+  /** Archives the channel. True when it is archived, including when it already was. */
+  archive?(channel: string): Promise<boolean>;
 }
 
 export interface LifecycleDeps {
@@ -23,6 +29,8 @@ export interface LifecycleDeps {
   llm: Llm;
   notify?: Notifier;
   userMap?: Record<string, string>;
+  /** The desk's own address, for links in Slack (APP_URL). Without it, Slack text carries no link. */
+  appUrl?: string;
   now?: () => Date;
   holidays?: string[];
   /** The demo only: past conferences stay in their follow-up window. Never set for real sending. */

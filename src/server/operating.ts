@@ -2,6 +2,7 @@
 
 import { DAY, LIVE_THREAD_HOLD_DAYS } from "../shared/policy.ts";
 import type { Db } from "./db.ts";
+import { welcomeRoom } from "./event-room.ts";
 import { stopContacts } from "./enroll-ops.ts";
 import { logActivity, newId, RuleError } from "./events.ts";
 import { DESK, nowOf, type LifecycleDeps } from "./lifecycle-deps.ts";
@@ -28,11 +29,16 @@ export const queueOps = (q: Q, card: CardMessage) => q("INSERT INTO notification
 /** Posts to the event's channel now, and remembers the channel the first time. For callers that must know it arrived (an owner card that did not becomes the uploader's to decide). */
 export async function postToEvent(db: Db, deps: LifecycleDeps, eventId: string, card: CardMessage, mention: (string | null | undefined)[] = []) {
   if (!deps.notify) return false;
-  const [e] = await db.query<{ name: string; slack_channel: string | null }>("SELECT name, slack_channel FROM events WHERE id = $1", [eventId]);
+  const [e] = await db.query<{ name: string; slack_channel: string | null; archived: boolean }>("SELECT name, slack_channel, slack_archived_at IS NOT NULL AS archived FROM events WHERE id = $1", [eventId]);
   if (!e) return false;
+  // A room closed 90 days after the event: anything late goes to the ops channel, named, rather than reopening it.
+  if (e.archived) { try { return await deps.notify.ops({ ...card, text: `${e.name}: ${card.text}` }); } catch { return false; } }
   let channel: string | null = null;
   try { channel = await deps.notify.post({ event_id: eventId, name: e.name, channel: e.slack_channel }, card, [...new Set(mention.filter((m): m is string => Boolean(m)))]); } catch { channel = null; }
-  if (channel && !e.slack_channel) await db.query("UPDATE events SET slack_channel = $2 WHERE id = $1 AND slack_channel IS NULL", [eventId, channel]);
+  if (channel && !e.slack_channel) {
+    const opened = await db.query("UPDATE events SET slack_channel = $2 WHERE id = $1 AND slack_channel IS NULL RETURNING id", [eventId, channel]);
+    if (opened.length) await welcomeRoom(db.query, eventId, channel, deps.notify, deps.userMap, deps.appUrl);
+  }
   return channel !== null;
 }
 
