@@ -104,6 +104,6 @@ export function ConfirmDialog({ title, confirm, cancel = "Go back", busy = false
 }
 
 /** The rest of a list, behind one quiet control: "All 7" opens it, "Fewer" closes it. */
-export function ShowMore({ open, n, onClick }: { open: boolean; n: number; onClick: () => void }) {
-  return <button type="button" className="xmore" aria-expanded={open} onClick={onClick}>{open ? "Fewer" : `All ${n}`}<Chevron open={open} /></button>;
+export function ShowMore({ open, n, onClick, noun }: { open: boolean; n: number; onClick: () => void; noun?: string }) {
+  return <button type="button" className="xmore" aria-expanded={open} onClick={onClick}>{open ? "Fewer" : `All ${n}${noun ? ` ${noun}` : ""}`}<Chevron open={open} /></button>;
 }

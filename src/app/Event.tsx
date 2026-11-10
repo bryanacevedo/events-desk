@@ -391,7 +391,8 @@ function ListBrief({ d }: { d: EventPayload }) {
   const c = d.spread?.counts;
   const tiers: [string, number, string][] = c ? [["Tier 1", c.tier1, "t1"], ["Tier 2", c.tier2, "t2"], ["Tier 3", c.tier3, "t3"], ...(c.unknown ? [["Unknown", c.unknown, "t0"] as [string, number, string]] : [])] : [];
   const reasons = all ? d.list.dropped : d.list.dropped.slice(0, 5);
-  const most = Math.max(...d.list.dropped.map((r) => r.n), 1);
+  // Each reason as a share of everyone and every row left off, as the tiers are shares of the companies researched.
+  const left = d.list.dropped.reduce((n, r) => n + r.n, 0);
   return (
     <section className="brief" aria-label="The list in brief">
       {c && c.total > 0 && (
@@ -402,9 +403,9 @@ function ListBrief({ d }: { d: EventPayload }) {
       )}
       {d.list.dropped.length > 0 && (
         <div>
-          <h3>Not on the outreach list</h3>
-          <ul>{reasons.map((r) => <BriefRow key={r.reason} label={dropWords(r.reason)} n={r.n} of={most} tone="t3" />)}</ul>
-          {d.list.dropped.length > 5 && <ShowMore open={all} n={d.list.dropped.length} onClick={() => setAll(!all)} />}
+          <h3>Left off the list<span>{num(left)}</span></h3>
+          <ul>{reasons.map((r) => <BriefRow key={r.reason} label={dropWords(r.reason)} n={r.n} of={left} tone="t3" />)}</ul>
+          {d.list.dropped.length > 5 && <ShowMore open={all} n={d.list.dropped.length} noun="reasons" onClick={() => setAll(!all)} />}
         </div>
       )}
     </section>

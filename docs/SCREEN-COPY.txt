@@ -17,7 +17,6 @@ Held back by account owners
 Keep it as my rule
 Last day of the event
 No event has finished sending yet.
-Not on the outreach list
 Not read: the card ran out
 Nothing needs anyone right now.
 One company per line: name, employees, industry, business model, expected tier, kind (won, lost or bad fit)
