@@ -51,7 +51,7 @@ export async function lifecycleTick(db: Db, deps: LifecycleDeps, opts: { flags?:
   if (ticking) {
     const since = tickState.startedAt;
     if (since && nowOf(deps).getTime() - since.getTime() > TICK_STUCK_MINUTES * 60_000)
-      await raiseAlert(db, deps, "tick:stuck", `The desk's background pass has been running since ${since.toISOString().slice(11, 16)} UTC and has not finished. Stops, replies and escalations are waiting behind it. Restart the service.`).catch(() => {});
+      await raiseAlert(db, deps, "tick:stuck", `The desk's background pass has been running since ${since.toISOString().slice(11, 16)} UTC and has not finished. Stops, replies and escalations are waiting behind it. Restart the service.`, { direct: true }).catch(() => {});
     return;
   }
   ticking = true;

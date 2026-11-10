@@ -77,10 +77,15 @@ describe("an unattended desk is visible", () => {
     const first = lifecycleTick(db, h.deps);
     await new Promise((r) => setTimeout(r, 50));
     h.time.set(new Date(h.time.now.getTime() + 16 * 60_000).toISOString());
+    const opsBefore = h.notify.opsPosts.length;
+    h.notify.ops = async (card) => { h.notify.opsPosts.push(card); return true; };
     await lifecycleTick(db, h.deps);
+    const sentBeforeRelease = h.notify.opsPosts.length > opsBefore && /stuck|has not finished/.test(h.notify.opsPosts.at(-1)!.text);
     release();
     await first;
     expect(await db.query("SELECT 1 FROM alerts WHERE key = 'tick:stuck'")).toHaveLength(1);
+    // Posted while the pass was still hung, not queued behind it.
+    expect(sentBeforeRelease).toBe(true);
   });
 
   it("/api/health fails when the pass has stopped finishing", async () => {

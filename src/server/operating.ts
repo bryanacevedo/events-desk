@@ -58,13 +58,16 @@ export async function drainNotifications(db: Db, deps: LifecycleDeps) {
 /* ----------------------------------------------------------------- alerts */
 
 /** One alert per problem per day, kept where anyone can see it. Slack is told when it can be. */
-export async function raiseAlert(db: Db, deps: LifecycleDeps, key: string, text: string) {
+export async function raiseAlert(db: Db, deps: LifecycleDeps, key: string, text: string, opts: { direct?: boolean } = {}) {
   const day = nowOf(deps).toISOString().slice(0, 10);
   const rows = await db.query("INSERT INTO alerts (id, key, day, text) VALUES ($1, $2, $3, $4) ON CONFLICT (key, day) DO NOTHING RETURNING id", [newId("alr"), key, day, text.slice(0, 500)]);
   if (!rows.length) return false;
   console.error(JSON.stringify({ event: "alert", key, text: text.slice(0, 500) }));
   // It goes to the ops channel. Not a failed Slack message itself: that would queue another message to the same broken Slack. Those show on /api/health.
-  if (!key.startsWith("notify:")) await queueOps(db.query, alertCard({ text }));
+  if (key.startsWith("notify:")) return true;
+  // A stuck pass cannot send what it queues, so that alert goes straight to Slack, and to the queue only if Slack does not take it.
+  if (opts.direct && deps.notify) { let sent = false; try { sent = await deps.notify.ops(alertCard({ text })); } catch { sent = false; } if (sent) return true; }
+  await queueOps(db.query, alertCard({ text }));
   return true;
 }
 
