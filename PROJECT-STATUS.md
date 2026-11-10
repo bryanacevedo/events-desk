@@ -85,7 +85,7 @@ From `node scripts/eval-report.ts` and the title report from the same code. Deta
 
 ## Needs Bryan
 
-- The final v2 video (next in Bryan's order, after this doc sweep), then the requirements docs for every build.
+- The v3 film is rendered and sent to Bryan for review (2026-11-10): the whole system, 3:48, three voices, one spine (Quillridge Systems and Camille Bélanger), built on v1's execution. Script `~/Developer/events-desk-video/SCRIPT-V3.md` (fresh-eyes reviewed: 9 Major, 9 Nit, all fixed or noted), file `renders/events-desk-film-v3.mp4`. It does not replace `docs/video/` or the README link until Bryan approves it. Next: the requirements docs for every build.
 - Paid Apollo and a ZeroBounce key, then one real run on a very small list. The waterfall lineup is set in Apollo, and a sample of a few hundred contacts decides it.
 - Connect Salesforce when wanted. Confirm Do Not Call.
 - The real credit allotment in each vendor's pool, for the Usage page.
