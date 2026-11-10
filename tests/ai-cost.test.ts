@@ -66,7 +66,8 @@ describe("Usage and the event page", () => {
     const ev = after.events.find((e) => e.name === "Real Summit")!;
     expect(ev.ai.cents).toBeCloseTo(after.ai.month_cents, 1);
     // The event page gets the same dollars per step.
-    const page = await (await createApp(db, { demo: true }).request(`/api/events/${id}`)).json() as { spend_by_step: { unit: string; n: number; cents?: number }[] };
+    // Dollars on the event read are leadership's and GTM's.
+    const page = await (await createApp(db, { demo: true }).request(`/api/events/${id}`, { headers: { "x-actor": "GTM Team" } })).json() as { spend_by_step: { unit: string; n: number; cents?: number }[] };
     const llmSteps = page.spend_by_step.filter((s) => s.unit === "llm");
     expect(llmSteps.every((s) => typeof s.cents === "number")).toBe(true);
     expect(llmSteps.reduce((n, s) => n + s.cents!, 0)).toBeCloseTo(after.ai.month_cents, 1);

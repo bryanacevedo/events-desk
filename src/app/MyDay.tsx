@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { get } from "./api";
 import { useActor } from "./App";
 import { Icon } from "./icons";
-import { MeetingRows, ObjectSheets, openObject, ReplyRows } from "./Objects";
+import { dayIn, headIn, MeetingRows, meetTime, NoteRows, ObjectSheets, openObject, ReplyRows, type NoteRowData } from "./Objects";
 import { Chevron } from "./Patterns";
 import { PersonAvatar } from "./PersonAvatar";
 import { eventHref, personHref, To } from "./To";
@@ -17,11 +17,11 @@ interface Day {
   replies: { id: string; event_id: string; contact_id: string; connector?: string; thread_url?: string | null; event: string; website: string | null; brand_color: string | null; full_name: string | null; company: string; code: string | null; body: string | null; respond_by: string }[];
   meetings: { id: string; event_id: string; contact_id: string; event: string; website: string | null; brand_color: string | null; scheduled_at: string; full_name: string | null; company: string; location: string | null; brief: Brief | null }[];
   captures: { id: string; event_id: string; contact_id: string | null; event: string; full_name: string | null; company: string | null; note: string; temperature: string }[];
-  slots: { id: string; event: string; starts_at: string; location: string }[];
+  slots: { id: string; event: string; starts_at: string; location: string; timezone?: string }[];
+  notes?: NoteRowData[];
 }
 
 const when = (iso: string) => new Date(iso).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
-const clock = (iso: string) => new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 const dayKey = (d: Date) => d.toLocaleDateString("en-CA");
 /** The most urgent replies show first; the rest are one press away, so thirteen replies still read at a glance. */
 const SHOWN = 6;
@@ -51,15 +51,22 @@ export function MyDay() {
 
       {d.replies.length > 0 && (
         <div className="m-sec">
-          <h2 className="md-h">Answer these first<span>{d.replies.length}</span></h2>
+          <h2 className="md-h">Answer these first</h2>
           <ReplyRows rows={(allReplies ? d.replies : d.replies.slice(0, SHOWN))} open={sheet.reply} />
           {d.replies.length > SHOWN && <button type="button" className="xmore" onClick={() => setAllReplies(!allReplies)}>{allReplies ? "Fewer" : `All ${d.replies.length}`}<Chevron /></button>}
         </div>
       )}
 
+      {(d.notes ?? []).length > 0 && (
+        <div className="m-sec">
+          <h2 className="md-h">Notes owed<span>{d.notes!.length}</span></h2>
+          <NoteRows rows={d.notes!} open={sheet.notes} />
+        </div>
+      )}
+
       {d.meetings.length > 0 && (
         <div className="m-sec">
-          <h2 className="md-h">Your meetings<span>{d.meetings.length}</span></h2>
+          <h2 className="md-h">Your meetings</h2>
           <MeetingRows rows={d.meetings} open={sheet.meeting} />
         </div>
       )}
@@ -70,13 +77,13 @@ export function MyDay() {
         <div className="folds">
           {d.slots.length > 0 && (
             <details className="fold">
-              <summary><Icon.calendar /><span className="fold-t">Free slots</span><span className="fold-peek">{plural(d.slots.length, "slot")}<i>next {when(d.slots[0].starts_at)}</i></span><Chevron /></summary>
-              <div className="sl-days">{[...new Set(d.slots.map((x) => dayKey(new Date(x.starts_at))))].map((day) => {
-                const mine = d.slots.filter((x) => dayKey(new Date(x.starts_at)) === day);
+              <summary><Icon.calendar /><span className="fold-t">Free slots</span><span className="fold-peek">{plural(d.slots.length, "slot")}<i>next {(() => { const t = meetTime(d.slots[0].starts_at, d.slots[0].timezone); return `${t.weekday} ${t.day} ${t.month}, ${t.time}`; })()}</i></span><Chevron /></summary>
+              <div className="sl-days">{[...new Set(d.slots.map((x) => `${x.event}|${dayIn(x.starts_at, x.timezone)}`))].map((day) => {
+                const mine = d.slots.filter((x) => `${x.event}|${dayIn(x.starts_at, x.timezone)}` === day);
                 return (
                   <div key={day} className="sl-day">
-                    <h4>{new Date(mine[0].starts_at).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}</h4>
-                    <p className="sl-line"><span className="sl-rep">{mine[0].event}</span><span className="sl-times">{mine.map((x) => <span key={x.id}>{clock(x.starts_at)}</span>)}</span><span className="mute">{mine[0].location}</span></p>
+                    <h4>{headIn(mine[0].starts_at, mine[0].timezone)}</h4>
+                    <p className="sl-line"><span className="sl-rep">{mine[0].event}</span><span className="sl-times">{mine.map((x) => <span key={x.id}>{meetTime(x.starts_at, x.timezone).clock}</span>)}</span><span className="mute">{mine[0].location}</span></p>
                   </div>
                 );
               })}</div>
@@ -84,7 +91,7 @@ export function MyDay() {
           )}
           {d.captures.length > 0 && (
             <details className="fold">
-              <summary><Icon.people /><span className="fold-t">People you met</span><span className="fold-peek">{d.captures.length}</span><Chevron /></summary>
+              <summary><Icon.people /><span className="fold-t">People you met</span><span className="fold-peek">{plural(new Set(d.captures.map((c) => c.event_id)).size, "event")}</span><Chevron /></summary>
               <div className="sl-days">{[...new Set(d.captures.map((c) => c.event_id))].map((ev) => {
                 const met = d.captures.filter((c) => c.event_id === ev);
                 return (

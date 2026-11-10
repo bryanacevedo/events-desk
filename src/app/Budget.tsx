@@ -4,6 +4,8 @@
 
 import { useEffect, useState } from "react";
 import type { budgetView } from "../server/budget";
+import { SideSheet } from "./SideSheet";
+import { EventLogo } from "./EventLogo";
 import { get, send } from "./api";
 import { useActor } from "./App";
 import { ExpandRow, Flag } from "./Patterns";
@@ -73,6 +75,9 @@ function SetBudget({ v, onDone, onClose }: { v: View; onDone: () => void; onClos
   );
 }
 
+
+/** The current page with an event's side sheet open, or closed: the page stays and so does the reader's place on it. */
+const withSheet = (id: string | null) => { const u = new URL(location.href); if (id) u.searchParams.set("event", id); else u.searchParams.delete("event"); return u.pathname + u.search + u.hash; };
 export function Budget({ go, search }: { go: (to: string) => void; search: URLSearchParams }) {
   const { actor, needs } = useActor();
   const year = Number(search.get("year")) || new Date().getFullYear();
@@ -80,8 +85,10 @@ export function Budget({ go, search }: { go: (to: string) => void; search: URLSe
   const [v, setV] = useState<View | null>(null);
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(q);
-  const load = () => get<View>(`/api/budget?year=${year}&q=${encodeURIComponent(q)}&page=${page}`).then((j) => setV(j));
-  useEffect(() => { load(); }, [year, q, page, needs]);
+  // Every filter in the address goes to the server, which does the filtering; the open sheet does not.
+  const filters = ["quarter", "team", "region", "show", "sort"].map((k) => (search.get(k) ? `&${k}=${encodeURIComponent(search.get(k)!)}` : "")).join("");
+  const load = () => get<View>(`/api/budget?year=${year}&q=${encodeURIComponent(q)}&page=${page}${filters}`).then((j) => setV(j));
+  useEffect(() => { load(); }, [year, q, page, needs, filters]);
   useEffect(() => { setText(q); }, [q]);
   const to = (patch: Record<string, string | null>) => {
     const p = new URLSearchParams(search);
@@ -126,21 +133,49 @@ export function Budget({ go, search }: { go: (to: string) => void; search: URLSe
       </section>
 
       <section className="btable" aria-label="By event">
-        <div className="grp"><h2 className="display">By event</h2><span className="mute small">{v.total_events}</span></div>
-        <form className="search" onSubmit={(ev) => ev.preventDefault()} role="search">
-          <label htmlFor="bq" className="sr-only">Find an event</label>
-          <input id="bq" type="search" placeholder="Find an event" autoComplete="off" value={text} onChange={(ev) => setText(ev.target.value)} />
-        </form>
-        <div className="rows" role="table" aria-label="Ticket budget by event">
-          <div className="rrow head" role="row"><span role="columnheader">Event</span><span role="columnheader">Qtr</span><span role="columnheader">Seats</span><span role="columnheader">Spent</span><span role="columnheader">Committed</span><span role="columnheader">Waiting</span></div>
-          {v.events.map((e) => (
-            <div className={`rrow${(e as { gone?: boolean }).gone ? "" : " opens"}`} role="row" key={e.event_id} onClick={(ev) => { if (!(e as { gone?: boolean }).gone && !(ev.target as HTMLElement).closest("a")) go(`/event/${e.event_id}`); }}>
-              <span role="cell" className="who-text"><p className="name">{(e as { gone?: boolean }).gone ? e.name : <a href={`/event/${e.event_id}`} onClick={(ev) => { ev.preventDefault(); go(`/event/${e.event_id}`); }}>{e.name}</a>}</p><p className="small mute">{shortDate(e.starts_on)}</p></span>
-              <span role="cell" data-l="Qtr">Q{e.quarter}</span><span role="cell" data-l="Seats">{e.seats}</span><span role="cell" data-l="Spent">{money(e.spent)}</span><span role="cell" data-l="Committed">{money(e.committed)}</span><span role="cell" data-l="Waiting" className={e.waiting ? "" : "mute"}>{money(e.waiting)}</span>
-            </div>
-          ))}
-          {!v.events.length && <p className="mute gap">{q ? "No event matches." : "Nothing yet."}</p>}
+        <div className="grp"><h2 className="display">By event</h2><span className="grp-n">{v.total_events}</span></div>
+        <div className="filters">
+          <form className="search" onSubmit={(ev) => ev.preventDefault()} role="search">
+            <label htmlFor="bq" className="sr-only">Find an event</label>
+            <input id="bq" type="search" placeholder="Find an event" autoComplete="off" value={text} onChange={(ev) => setText(ev.target.value)} />
+          </form>
+          <div className="seg" role="group" aria-label="Quarter">
+            {["", "1", "2", "3", "4"].map((k) => <button key={k} type="button" aria-pressed={(search.get("quarter") ?? "") === k} onClick={() => to({ quarter: k })}>{k ? `Q${k}` : "All"}</button>)}
+          </div>
+          <label className="filter"><span className="sr-only">Team</span>
+            <select value={search.get("team") ?? ""} onChange={(ev) => to({ team: ev.target.value })}><option value="">Every team</option>{(v.teams ?? []).map((t) => <option key={t} value={t}>{t}</option>)}</select>
+          </label>
+          <label className="filter"><span className="sr-only">Region</span>
+            <select value={search.get("region") ?? ""} onChange={(ev) => to({ region: ev.target.value })}><option value="">Every region</option>{(v.regions ?? []).map((t) => <option key={t} value={t}>{t}</option>)}</select>
+          </label>
+          <label className="filter"><span className="sr-only">Show</span>
+            <select value={search.get("show") ?? ""} onChange={(ev) => to({ show: ev.target.value })}><option value="">Any spend</option><option value="waiting">Waiting on approval</option><option value="bought">Tickets bought</option></select>
+          </label>
+          <label className="filter"><span className="sr-only">Order</span>
+            <select value={search.get("sort") ?? ""} onChange={(ev) => to({ sort: ev.target.value })}><option value="">By date</option><option value="size">Largest first</option></select>
+          </label>
         </div>
+        <ul className="ob-tray bud-rows">
+          {(() => v.events.map((e, i) => {
+            const gone = (e as { gone?: boolean }).gone, total = e.spent + e.committed + e.waiting;
+            const row = (
+              <>
+                <span className="ob-face"><EventLogo name={e.name} website={(e as { website?: string | null }).website ?? null} size={36} /></span>
+                <span className="ob-who"><b>{e.name}</b><span>{shortDate(e.starts_on)}</span></span>
+                <span className="bud-q"><b>{e.seats}</b><span>{e.seats === 1 ? "seat" : "seats"}</span></span>
+                {(() => { const qb = v.set ? v.quarters[e.quarter - 1]?.budget_cents ?? 0 : 0; if (!qb) return <span />; const share = total / qb; return (
+                  <span className="bud-share" aria-label={`${Math.round(share * 100)}% of the Q${e.quarter} budget`}>
+                    <span className="bud-share-bar" aria-hidden="true"><u style={{ width: `${Math.min(100, Math.max(share * 100, total ? 1.5 : 0))}%` }} className={share > 1 ? "over" : undefined} /></span>
+                    <span className="bud-share-n"><b>{Math.round(share * 100)}%</b> of Q{e.quarter}</span>
+                  </span>
+                ); })()}
+                <span className="bud-t"><b>{money(total)}</b><span>{e.waiting ? `${money(e.waiting)} waiting` : e.committed ? `${money(e.committed)} committed` : "tickets"}</span></span>
+              </>
+            );
+            return <li key={e.event_id} style={{ "--i": i } as React.CSSProperties}>{gone ? <div className="ob-row bud-row ob-still">{row}</div> : <a href={withSheet(e.event_id)} className="ob-row bud-row" data-opens-sheet="" data-row={e.event_id} onClick={(ev) => { ev.preventDefault(); go(withSheet(e.event_id)); }}>{row}</a>}</li>;
+          }))()}
+        </ul>
+        {!v.events.length && <p className="mute gap">{q || search.get("quarter") || search.get("team") || search.get("region") || search.get("show") ? "No event matches." : "Nothing yet."}</p>}
         {v.pages > 1 && (
           <div className="pager small"><button type="button" className="textlink" disabled={v.page <= 1} onClick={() => to({ page: String(v.page - 1) })}>Previous</button><span className="mute">{v.page} of {v.pages}</span><button type="button" className="textlink" disabled={v.page >= v.pages} onClick={() => to({ page: String(v.page + 1) })}>Next</button></div>
         )}
@@ -161,6 +196,7 @@ export function Budget({ go, search }: { go: (to: string) => void; search: URLSe
           <ul>{v.log.map((l, i) => <li key={i} className="small"><b>{l.actor}</b> {l.detail}, {shortDate(l.created_at.slice(0, 10))}</li>)}</ul>
         </ExpandRow>
       )}
+      {search.get("event") && <SideSheet id={search.get("event")!} go={go} close={() => go(withSheet(null))} lens="cost" />}
     </>
   );
 }

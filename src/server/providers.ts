@@ -138,8 +138,11 @@ const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
 /** A fictional, deterministic profile URL. The slug carries a hash so two people never share one. */
 export const mockLinkedin = (name: string | null, company: string) =>
   `https://www.linkedin.com/in/${(name ?? "contact").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "contact"}-${roll(`li${name}${company}`, 65536).toString(16).padStart(4, "0")}`;
-const FIRST = ["Alma", "Bruno", "Celia", "Dario", "Elif", "Farid", "Greta", "Hugo", "Iris", "Jonas"];
-const LAST = ["Abara", "Brandt", "Costa", "Dimitrov", "Eriksen", "Fuentes", "Grant", "Hakimi", "Ivanova", "Jensen"];
+/* Names the mock vendor gives people it finds at a company: wide enough that one event rarely shows the same first name twice. */
+const FIRST = ["Alma", "Bruno", "Celia", "Dario", "Elif", "Farid", "Greta", "Hugo", "Iris", "Jonas", "Keiko", "Lars", "Mira", "Nikhil", "Oona", "Pablo", "Quinn", "Rania", "Soren", "Talia",
+  "Umar", "Vera", "Wes", "Ximena", "Yusuf", "Zara", "Anouk", "Bilal", "Carmen", "Dmitri", "Esme", "Femi", "Gwen", "Hiro", "Ines", "Jada", "Kofi", "Lena", "Mateus", "Nadia"];
+const LAST = ["Abara", "Brandt", "Costa", "Dimitrov", "Eriksen", "Fuentes", "Grant", "Hakimi", "Ivanova", "Jensen", "Kowalski", "Lindqvist", "Moreau", "Nakamura", "Okafor", "Petrov", "Quintero", "Rossi",
+  "Sato", "Tran", "Underwood", "Varga", "Whitfield", "Yilmaz", "Zielinski", "Achebe", "Barros", "Castillo", "Delgado", "Ekström", "Ferreira", "Gallo", "Halvorsen", "Ito", "Juarez", "Kaur"];
 
 const titleCase = (s: string) => s.replace(/\b([a-z])/g, (m) => m.toUpperCase());
 /** The mock identity vendor. Every company it is asked about exists, at a domain made from its name, except about one in ten that it cannot find. */
@@ -198,7 +201,7 @@ export const mockPeopleSearch: PeopleSearch = {
   async search(q) {
     const n = Math.min(q.limit, 2 + roll(`pn${q.domain}`, 5));
     const people: FoundPerson[] = Array.from({ length: n }, (_, i) => ({
-      vendor_person_id: `mock_${q.domain}_${i}`, first_name: FIRST[roll(`pf${q.domain}${i}`, 10)], last_name: LAST[roll(`pl${q.domain}${i}`, 10)],
+      vendor_person_id: `mock_${q.domain}_${i}`, first_name: FIRST[roll(`pf${q.domain}${i}`, FIRST.length)], last_name: LAST[roll(`pl${q.domain}${i}`, LAST.length)],
       title: MOCK_TITLES[roll(`pt${q.domain}${i}`, MOCK_TITLES.length)], linkedin: null, updated_at: null, has_email: null,
     }));
     return { people, charged: 0 };
@@ -212,7 +215,7 @@ export function mockReveal(s: Settings): Reveal {
     name: "reveal_mock", cost,
     async reveal(q) {
       const m = q.vendor_person_id.match(/^mock_(.+)_(\d+)$/);
-      const last = LAST[roll(`pl${m?.[1] ?? q.domain}${m?.[2] ?? 0}`, 10)];
+      const last = LAST[roll(`pl${m?.[1] ?? q.domain}${m?.[2] ?? 0}`, LAST.length)];
       const full = `${q.first_name} ${last}`;
       return { person: { vendor_person_id: q.vendor_person_id, full_name: full, email: `${slug(q.first_name)}.${slug(last)}@${q.domain}`, linkedin: mockLinkedin(full, q.company), employer: q.company, employer_domain: q.domain, email_verified: true }, charged: cost };
     },
@@ -246,7 +249,7 @@ export function mockVendors(s: Settings): Vendors {
       async find(company, limit) {
         const n = Math.min(limit, roll(`n${company}`, limit + 1) || 1);
         const people = Array.from({ length: n }, (_, i) => ({
-          full_name: `${FIRST[roll(`f${company}${i}`, 10)]} ${LAST[roll(`l${company}${i}`, 10)]}`,
+          full_name: `${FIRST[roll(`f${company}${i}`, FIRST.length)]} ${LAST[roll(`l${company}${i}`, LAST.length)]}`,
           title: s.target_titles[i % s.target_titles.length],
           linkedin: null as string | null,
         }));
@@ -319,7 +322,7 @@ export interface Crm {
   /** Opportunities on each account, by `ref`. */
   opportunities?(accounts: CrmAccountQuery[]): Promise<Record<string, CrmOpportunity[]>>;
 }
-export interface CrmOpportunity { id: string; name?: string | null; stage: string; amount_cents: number | null; created_date: string; stage_history: { stage: string; at: string }[]; close_date?: string | null; is_won?: boolean; is_closed?: boolean }
+export interface CrmOpportunity { id: string; name?: string | null; url?: string | null; owner?: string | null; next_step?: string | null; stage: string; amount_cents: number | null; created_date: string; stage_history: { stage: string; at: string }[]; close_date?: string | null; is_won?: boolean; is_closed?: boolean }
 export class CrmAlreadyExists extends Error {}
 
 const OWNERS = ["Priya Natarajan", "Tomas Lindqvist", "Adaeze Okonkwo", "Mateo Ruiz", "Hanna Berg"];

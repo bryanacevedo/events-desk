@@ -37,7 +37,19 @@ export async function patchSettings(db: Db, eventId: string, actor: string, patc
     const [e] = await q<{ stage: string; parent_event_id: string | null }>("SELECT stage, parent_event_id FROM events WHERE id = $1 FOR UPDATE", [eventId]);
     if (!e) throw new RuleError("That event does not exist.");
     if (e.parent_event_id) throw new RuleError("New registrations use the event's own settings.");
-    if (!["requested", "approved", "mapped"].includes(e.stage)) throw new RuleError("Settings are locked once a cost card is requested. Decline the card to change them.");
+    // The desk prices the card on its own, so a setting can still change while the card waits: the card is set aside, the free
+    // work it did is put back, and it is priced again with the new settings. Once a card is confirmed, the settings are fixed.
+    if (e.stage === "quoted") {
+      const [pending] = await q<{ id: string; kind: string; card_id: string | null }>("SELECT id, kind, card_id FROM approvals WHERE event_id = $1 AND status = 'pending' AND kind IN ('card', 'research') LIMIT 1", [eventId]);
+      if (pending) {
+        await q("UPDATE approvals SET status = 'declined', decided_by = $2, decided_at = now(), reason = 'Priced again: settings changed' WHERE id = $1", [pending.id, actor]);
+        if (pending.card_id) await q("UPDATE cost_cards SET status = 'declined' WHERE id = $1", [pending.card_id]);
+        if (pending.kind === "research") await undoFreePass(q, eventId);
+        await moveWithin(q, eventId, "mapped", actor, { detail: "Settings changed; the card is priced again" });
+        e.stage = "mapped";
+      }
+    }
+    if (!["requested", "approved", "mapped"].includes(e.stage)) throw new RuleError("Settings are fixed once a cost card is confirmed.");
     const current = await getSettings(q, eventId);
     const s = { ...current, ...(patch.contacts_per_company !== undefined ? { contacts_per_company: patch.contacts_per_company as number } : {}), ...(patch.add_prospects !== undefined ? { add_prospects: patch.add_prospects as boolean } : {}) };
     await q("UPDATE event_settings SET settings = $2::jsonb WHERE event_id = $1", [eventId, JSON.stringify(s)]);

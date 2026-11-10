@@ -7,7 +7,7 @@ import type { FakeTool } from "./connectors/fake.ts";
 import type { ToolEvent } from "./connectors/types.ts";
 import { RuleError } from "./events.ts";
 import { captureOnsite, drainNotifications } from "./operating.ts";
-import { bookMeeting, recordOutcome } from "./meetings.ts";
+import { bookMeeting, eventZone, recordOutcome } from "./meetings.ts";
 import { LAST_DAY_SQL, requestMotionCard } from "./motion.ts";
 import { openOwnerDecisions, sendOwnerCards, ownerSweep } from "./owners.ts";
 import { ingestEvents, processInbound } from "./replies.ts";
@@ -19,10 +19,23 @@ import { loadPeople, regionOf } from "./gate.ts";
 import type { LifecycleDeps } from "./lifecycle-deps.ts";
 import type { Crm, CrmOpportunity } from "./providers.ts";
 import { postEventState } from "./post-event.ts";
+import { zoneAt } from "../shared/motion.ts";
+import { companyDisplayName } from "../shared/names.ts";
 
 const u = (s: string) => parseInt(createHash("sha256").update(s).digest("hex").slice(0, 8), 16) / 0xffffffff;
 const GTM = "GTM Team";
 const REP = "Maya Ortiz";
+
+/* Each kind of answer comes in several wordings, so two people never send the same sentence. The classifier reads them the same way. */
+const WORDINGS: Record<string, string[]> = {
+  "Sounds good, tell me more about how this works.": ["Sounds good, tell me more about how this works.", "Interested. How does it handle people who sign up at the door?", "Sounds good. We have this problem every show; what does setup look like?", "Interested. Could you send a short overview? I'll share it with our events lead.", "Tell me more about how this fits with the badge scanner we already use."],
+  "Happy to book a call. Thursday afternoon works for me.": ["Happy to meet at the show. Send me a time that suits you.", "Let's talk while we're both there. Mornings are easier for me.", "Sure, grab 30 minutes with me at the event.", "Yes, let's meet at the show. Booth or coffee, either works.", "Worth a chat. Pick a slot and I'll come by the booth."],
+  "I am out of office and back on 2027-12-20.": ["I am out of office and back on 2027-12-20.", "Out of the office this week, back on Monday.", "I'm away until the 21st with limited access to email.", "Out of office at a conference. I'll reply when I'm back."],
+  "Not interested, thanks.": ["Not interested, thanks.", "Not interested this year, our budget is spoken for.", "No thanks, we're set for now.", "Not interested right now, thanks for thinking of us."],
+};
+// Wordings rotate in order, so the replies on one screen never repeat each other.
+const said = new Map<string, number>();
+const wording = (body: string) => { const w = WORDINGS[body]; if (!w) return body; const n = said.get(body) ?? 0; said.set(body, n + 1); return w[n % w.length]; };
 
 const REPLIES: { share: number; body: string; signal?: ToolEvent["signal"] }[] = [
   { share: 0.12, body: "Sounds good, tell me more about how this works." },
@@ -34,13 +47,32 @@ const REPLIES: { share: number; body: string; signal?: ToolEvent["signal"] }[] =
 ];
 
 /** Deals appear at some of the accounts that were met. */
-const DEMO_DEALS = ["platform pilot", "expansion", "new logo", "renewal"];
+/** A deal already open before the event is one an account has with us (it moves forward); one opened after a meeting is new business. */
+const DEMO_DEALS = { open: ["renewal", "expansion"], fresh: ["new logo", "platform pilot"] };
+const DEMO_OWNERS = ["Priya Natarajan", "Tomas Lindqvist", "Adaeze Okonkwo", "Mateo Ruiz", "Hanna Berg"];
+const DEMO_NEXT = ["Security review with their IT team", "Pricing call on the calendar", "Pilot scope to sign off", "Order form with their legal team", "Second demo for the wider team"];
 export const demoOpportunities = (db: Db, now: () => Date) => async (accounts: { ref: string; name?: string | null }[]): Promise<Record<string, CrmOpportunity[]>> => {
   const met = new Set((await db.query<{ domain: string }>("SELECT DISTINCT domain FROM meetings WHERE status = 'held'")).map((m) => m.domain));
+  const owners = new Map((await db.query<{ domain: string; owner: string }>("SELECT DISTINCT ON (primary_domain) primary_domain AS domain, account_owner AS owner FROM companies WHERE account_owner IS NOT NULL AND primary_domain = ANY($1::text[])", [accounts.map((a) => a.ref)])).map((r) => [r.domain, r.owner]));
+  const day = (d: number) => new Date(now().getTime() + d * 86_400_000).toISOString();
+  // A deal's history hangs off the meeting it followed: opened about a week after, at proposal a few weeks later, never past today.
+  const metOn = new Map((await db.query<{ domain: string; at: string }>("SELECT domain, min(scheduled_at)::text AS at FROM meetings WHERE status = 'held' GROUP BY domain")).map((m) => [m.domain, new Date(m.at).getTime()]));
+  const after = (ref: string, d: number) => new Date(Math.min(now().getTime(), (metOn.get(ref) ?? now().getTime()) + d * 86_400_000)).toISOString();
   return Object.fromEntries(accounts.map((a) => {
   if (u(`opp|${a.ref}`) > (met.has(a.ref) ? 0.7 : 0.2)) return [a.ref, []];
-  const open = u(`old|${a.ref}`) < 0.3, today = now().toISOString();
-  return [a.ref, [{ id: `opp_${a.ref}`, name: `${a.name ?? a.ref} ${DEMO_DEALS[Math.floor(u(`deal|${a.ref}`) * DEMO_DEALS.length)]}`, stage: "Proposal", amount_cents: Math.round(2_000_000 + u(`amt|${a.ref}`) * 9_000_000), created_date: open ? new Date(now().getTime() - 80 * 86_400_000).toISOString() : today, stage_history: open ? [{ stage: "Proposal", at: today }] : [] } satisfies CrmOpportunity]];
+  // An open deal that was already running before the event moved forward after it; a new one opened after the meeting.
+  const open = u(`old|${a.ref}`) < 0.3;
+  return [a.ref, [{
+    id: `opp_${a.ref}`, name: `${companyDisplayName(a.name ?? a.ref)} ${(open ? DEMO_DEALS.open : DEMO_DEALS.fresh)[Math.floor(u(`deal|${a.ref}`) * 2)]}`,
+    url: `https://login.salesforce.com/?startURL=${encodeURIComponent(`/lightning/r/Opportunity/opp_${a.ref}/view`)}`,
+    owner: owners.get(a.ref) ?? DEMO_OWNERS[Math.floor(u(`own|${a.ref}`) * DEMO_OWNERS.length)],
+    next_step: DEMO_NEXT[Math.floor(u(`next|${a.ref}`) * DEMO_NEXT.length)],
+    stage: "Proposal", amount_cents: Math.round(2_000_000 + u(`amt|${a.ref}`) * 9_000_000),
+    created_date: open ? after(a.ref, -70) : after(a.ref, 5 + Math.round(u(`gap|${a.ref}`) * 6)), close_date: day(30 + Math.round(u(`close|${a.ref}`) * 60)),
+    stage_history: open
+      ? [{ stage: "Discovery", at: after(a.ref, -70) }, { stage: "Evaluation", at: after(a.ref, -31) }, { stage: "Proposal", at: after(a.ref, 12 + Math.round(u(`prop|${a.ref}`) * 20)) }]
+      : [{ stage: "Discovery", at: after(a.ref, 5 + Math.round(u(`gap|${a.ref}`) * 6)) }, { stage: "Proposal", at: after(a.ref, 26 + Math.round(u(`prop|${a.ref}`) * 24)) }],
+  } satisfies CrmOpportunity]];
   }));
 };
 
@@ -111,7 +143,7 @@ export async function demoAdvance(db: Db, deps: LifecycleDeps, tools: Record<str
       add(p.connector, { ...base, provider_message_id: `send:${p.contact_id}:${p.channel}`, signal: "send", body: null, sender: null, step: 0 });
       if (p.channel !== "email") continue;
       let r = u(`reply|${p.contact_id}`);
-      for (const x of REPLIES) { if (r < x.share) { add(p.connector, { ...base, provider_message_id: `reply:${p.contact_id}`, signal: x.signal ?? "reply", body: x.body || null, thread_url: p.connector === "heyreach" ? "https://app.heyreach.io/app/inbox" : "https://app.instantly.ai/app/unibox" }); break; } r -= x.share; }
+      for (const x of REPLIES) { if (r < x.share) { add(p.connector, { ...base, provider_message_id: `reply:${p.contact_id}`, signal: x.signal ?? "reply", body: x.body ? wording(x.body) : null, thread_url: p.connector === "heyreach" ? "https://app.heyreach.io/app/inbox" : "https://app.instantly.ai/app/unibox" }); break; } r -= x.share; }
     }
     for (const [name, events] of by) await ingestEvents(db, deps, deps.connectors[name], events);
     await processInbound(db, deps, 2000);
@@ -119,16 +151,29 @@ export async function demoAdvance(db: Db, deps: LifecycleDeps, tools: Record<str
     await db.query("UPDATE inbound_messages SET owner = $2 WHERE event_id = $1 AND respond_by IS NOT NULL", [eventId, REP]);
     await drainNotifications(db, deps);
     // Most of the people who said yes end up in a meeting.
+    // Before the event, meetings are booked for the show floor and none is held yet; after it opens, most are held.
+    const [{ started, opens, venue, country }] = await db.query<{ started: boolean; opens: string; venue: string | null; country: string | null }>("SELECT starts_on::date <= current_date AS started, starts_on::text AS opens, venue, country FROM events WHERE id = $1", [eventId]);
+    const tz = zoneAt(venue, country) ?? "UTC";
     const hot = await db.query<{ contact_id: string }>("SELECT contact_id FROM inbound_messages WHERE event_id = $1 AND code IN ('interested', 'meeting_request') AND NOT EXISTS (SELECT 1 FROM meetings m WHERE m.contact_id = inbound_messages.contact_id) ORDER BY id", [eventId]);
     let held = 0;
-    for (const h of hot) {
+    for (const [i, h] of hot.entries()) {
+      // The latest warm reply is still waiting for its answer, so there is always one for a rep to pick up.
+      if (i === hot.length - 1 && hot.length > 1) continue;
       if (u(`meet|${h.contact_id}`) > 0.75) continue;
       // Most held already; the rest are coming up, so a rep's day has meetings with briefs in it.
-      const upcoming = u(`soon|${h.contact_id}`) < 0.4;
-      const m = await bookMeeting(db, deps, { contact_id: h.contact_id, scheduled_at: new Date(Date.now() + (upcoming ? 2 : -1) * 86_400_000).toISOString(), source: "reply", rep: REP }, REP);
+      const upcoming = !started || u(`soon|${h.contact_id}`) < 0.4;
+      const at = started ? new Date(Date.now() + (upcoming ? 2 : -1) * 86_400_000) : new Date(`${opens.slice(0, 10)}T00:00:00Z`);
+      if (!started) {
+        // Between 09:00 and 17:00 where the event is.
+        at.setUTCHours(9 + Math.floor(u(`hour|${h.contact_id}`) * 8), u(`half|${h.contact_id}`) < 0.5 ? 0 : 30);
+        const offset = new Date(at.toLocaleString("en-US", { timeZone: tz })).getTime() - new Date(at.toLocaleString("en-US", { timeZone: "UTC" })).getTime();
+        at.setTime(at.getTime() - offset);
+      }
+      const m = await bookMeeting(db, deps, { contact_id: h.contact_id, scheduled_at: at.toISOString(), source: "reply", rep: REP }, REP);
       if (!upcoming) { await recordOutcome(db, deps, m.id, "held", REP); held++; }
     }
-    const [firstCap] = await db.query("SELECT 1 FROM onsite_captures WHERE event_id = $1 LIMIT 1", [eventId]);
+    // Nobody is met at a booth before the event opens.
+    const [firstCap] = started ? await db.query("SELECT 1 FROM onsite_captures WHERE event_id = $1 LIMIT 1", [eventId]) : [true];
     // Walk-ups met at the booth: each event takes the next three in the list, so no two events share a person.
     if (!firstCap) {
       const [{ n }] = await db.query<{ n: number }>("SELECT count(DISTINCT event_id)::int AS n FROM onsite_captures");
@@ -139,9 +184,13 @@ export async function demoAdvance(db: Db, deps: LifecycleDeps, tools: Record<str
         await captureOnsite(db, deps, eventId, REP, { full_name: w.name, email: `${w.name.split(" ")[0].toLowerCase()}@${slug}.example`, company: w.company, title: w.title, note: w.note, temperature: i === 0 ? "hot" : "warm", met: true });
       }
     }
-    await recordEventCost(db, eventId, GTM, "sponsorship", 1_500_000, "Sample figure");
-    await recordEventCost(db, eventId, GTM, "booth", 400_000, "Sample figure");
-    return { did: `Sends went out and people answered. ${held} meetings held, plus 3 walk-ups at the booth.` };
+    // Each event's own package and stand, at its own price, rounded the way invoices are.
+    const PACKAGES = ["Silver package", "Gold package", "Bronze package plus a speaking slot", "Startup pavilion package"];
+    const STANDS = ["10x10 stand and furniture", "Shared stand in the partner pavilion", "8x8 stand, power and lead scanner", "Corner stand and AV"];
+    const pick = <T,>(xs: T[], k: string) => xs[Math.floor(u(`${k}|${eventId}`) * xs.length)];
+    await recordEventCost(db, eventId, GTM, "sponsorship", 800_000 + Math.round(u(`spons|${eventId}`) * 16) * 50_000, `${pick(PACKAGES, "pkg")}, invoice ${2000 + Math.floor(u(`inv|${eventId}`) * 900)}`);
+    await recordEventCost(db, eventId, GTM, "booth", 250_000 + Math.round(u(`booth|${eventId}`) * 8) * 25_000, pick(STANDS, "stand"));
+    return { did: `Sends went out and people answered. ${held} meetings held${started ? ", plus 3 walk-ups at the booth" : ""}.` };
   }
   throw new RuleError("Nothing more to simulate here. The event closes on its own clock.");
 }
@@ -156,7 +205,7 @@ const WALKUPS = [
   { name: "Diego Ramos", company: "Altamar Logistics", title: "Head of Growth", note: "Asked for pricing and a short call next week." },
   { name: "Aiko Tanaka", company: "Hoshi Retail Systems", title: "Field Marketing Lead", note: "Interested in the seat approvals for her leadership." },
   { name: "Ben Carter", company: "Quayside Data", title: "Sales Director", note: "Came back a second time with his CMO." },
-  { name: "Priya Shah", company: "Lumen Billing", title: "Revenue Operations Manager", note: "Wants to see the CRM sync with Salesforce." },
+  { name: "Leila Shah", company: "Lumen Billing", title: "Revenue Operations Manager", note: "Wants to see the CRM sync with Salesforce." },
   { name: "Lucas Moreau", company: "Sablier Fintech", title: "Head of Events", note: "Asked how replies reach the right rep." },
   { name: "Ines Duarte", company: "Ribeira Freight", title: "Chief Revenue Officer", note: "Quick chat; send a one-pager." },
   { name: "Tomás Varga", company: "Danube Pay", title: "Head of Partnerships", note: "Wants the follow-up groups for his own team." },
@@ -192,11 +241,23 @@ export async function seedDemoStages(db: Db, deps: LifecycleDeps, tools: Record<
     if (stage === "follow_up_ready") { for (let k = 0; k < 3 && (await motion(id)).motion !== "sequencing"; k++) await demoAdvance(db, deps, tools, id); continue; }
     if (stage === "sequencing") { for (let k = 0; k < 3 && (await motion(id)).motion !== "sequencing"; k++) await demoAdvance(db, deps, tools, id); await demoAdvance(db, deps, tools, id, { pressFollowUp: true }); continue; }
     await toMarket(id);
-    if (stage === "closing" || stage === "scored") await db.tx((q) => moveMotion(q, id, "closing", "Events Desk", "Fourteen days after the event"));
+    if (stage === "closing" || stage === "scored") { await db.tx((q) => moveMotion(q, id, "closing", "Events Desk", "Fourteen days after the event")); await redateDemo(db); }
     // The scorecards run before Shoptalk closes, so NRF is scored and Shoptalk stays in closing.
     if (stage === "scored") await writeScorecards(db, deps);
   }
+  await redateDemo(db);
   await seedDemoDebriefs(db);
+  // NRF's costs are all in, as a scored event's should be; Shoptalk, still closing, has lines left for Overview to ask about.
+  for (const [category, cents, note] of [["dinners", 240_000, "Customer dinner, Tuesday"], ["swag", 0, ""], ["tools", 49_900, "Badge scanner rental"], ["rep_time", 0, ""]] as const)
+    await recordEventCost(db, "evt_nrf-2026-retail-s-big-show", "Dan Whitlock", category, cents, note);
+  await recordEventCost(db, "evt_shoptalk-spring-2026", "Dan Whitlock", "dinners", 180_000, "Dinner with two prospects");
+  // The flagship ended weeks ago. Once its meetings are in, they are dated at the event, and Maya owes her notes from it:
+  // asked two days after its last day, as the desk does.
+  const FLAGSHIP = "evt_money20-20-usa-2026";
+  for (let i = 0; i < 240; i++) { const [h] = await db.query("SELECT 1 FROM meetings WHERE event_id = $1 AND status = 'held' LIMIT 1", [FLAGSHIP]); if (h) break; await new Promise((r) => setTimeout(r, 1000)); }
+  await redateDemo(db);
+  await db.query(`INSERT INTO debriefs (id, event_id, author, prompted_at) SELECT 'dbf_demo_flagship', e.id, $2, ((${LAST_DAY_SQL})::date + 2 + time '16:00')::timestamptz FROM events e
+    WHERE e.id = $1 AND EXISTS (SELECT 1 FROM meetings m WHERE m.event_id = e.id AND m.rep = $2 AND m.status = 'held') ON CONFLICT (event_id, author) DO NOTHING`, [FLAGSHIP, REP]);
 }
 
 /* What the rep wrote after each finished sample event, so "What we learned" has something in it. Sample notes, like every attendee here:
@@ -204,11 +265,14 @@ export async function seedDemoStages(db: Db, deps: LifecycleDeps, tools: Record<
 const DEMO_NOTES: Record<string, { status: "accepted" | "answered"; body: string; facts: [string, string, string][] }> = {
   "evt_nrf-2026-retail-s-big-show": {
     status: "accepted",
-    body: "Busy floor, short conversations. The retail ops people all said some version of \"We spend the week after a show rebuilding the list in a spreadsheet.\" Two accounts already scan badges with an app; one put it as \"We have the scanner. What we don't have is anything after the scan.\" Budgets close in March: \"If it isn't in the plan by March, it waits a year.\" New logos came from the email before the show, not the booth; the booth was mostly customers.",
+    body: "Busy floor, short conversations. The retail ops people all said some version of \"We spend the week after a show rebuilding the list in a spreadsheet.\" Hoshi's events lead added \"By the time the list is clean, the buyers have forgotten us.\" Two accounts already scan badges with an app; one put it as \"We have the scanner. What we don't have is anything after the scan.\" Quayside runs its follow-up through its marketing agency: \"Our agency sends one email to everyone a week later.\" Budgets close in March: \"If it isn't in the plan by March, it waits a year.\" Two of them want a pilot on one regional show first: \"Prove it on a small show and we will bring it to the big one.\" New logos came from the email before the show, not the booth; the booth was mostly customers.",
     facts: [
       ["pain", "Retail ops teams rebuild their event list by hand the week after a show.", "We spend the week after a show rebuilding the list in a spreadsheet."],
+      ["pain", "Speed of follow-up hurts them more than the state of the list.", "By the time the list is clean, the buyers have forgotten us."],
       ["competitor", "Accounts that already scan badges want this behind their scanner, not instead of it.", "We have the scanner. What we don't have is anything after the scan."],
+      ["competitor", "Some hand the follow-up to their marketing agency, which sends one generic email a week later.", "Our agency sends one email to everyone a week later."],
       ["timing", "Next year's budgets close in March, so follow-ups have to land before then.", "If it isn't in the plan by March, it waits a year."],
+      ["timing", "Buyers want to prove it on a small regional show before trusting it with the flagship.", "Prove it on a small show and we will bring it to the big one."],
       ["relationship", "New logos booked off the email before the show; the booth was mostly existing customers.", ""],
     ],
   },
@@ -232,4 +296,97 @@ async function seedDemoDebriefs(db: Db) {
     await db.query("INSERT INTO debriefs (id, event_id, author, prompted_at, body, answered_at, extracted, status, decided_by) VALUES ($1, $2, $3, $4, $5, $4, true, $6, $7)", [id, eventId, REP, `${last.day}T16:00:00Z`, n.body, n.status, n.status === "accepted" ? "Dan Whitlock" : null]);
     for (const [i, [theme, fact, quote]] of n.facts.entries()) await db.query("INSERT INTO debrief_facts (id, debrief_id, account, theme, fact, quote) VALUES ($1, $2, NULL, $3, $4, $5)", [`${id}_${i}`, id, theme, fact, quote]);
   }
+}
+
+/* The sample runs every step in a few seconds, so everything it writes carries the same minute. A finished (closing or scored) event's activity is
+   laid back over the weeks around it, in the order it happened: added three weeks out, sends over the next days, replies the
+   week before, meetings on the show floor, at times a person would keep. Events still ahead keep their dates; their meetings
+   get ordinary hours. */
+export async function redateDemo(db: Db) {
+  const C = "(hashtext(t.contact_id)::bigint & 2147483647)";
+  const S = "(e.starts_on::date + time '13:00')";
+  const N = `greatest(1, (${LAST_DAY_SQL})::date - e.starts_on::date + 1)`;
+  const past = "e.motion IN ('closing', 'scored')";
+  const reply = (c: string) => `${S} - interval '12 days' + make_interval(days => (${c} % 6)::int, hours => 1, mins => (${c} % 420)::int)`;
+  // A meeting on the show floor: one of the event's days, between 09:00 and 17:00 in the meeting's own zone.
+  const meet = (c: string, tz: string) => `((e.starts_on::date + make_interval(days => (${c} % ${N})::int))::timestamp + interval '9 hours' + make_interval(mins => ((${c} / 7) % 16)::int * 30)) AT TIME ZONE ${tz}`;
+  const TZ_OF_TOUCH = "coalesce((SELECT m.timezone FROM meetings m WHERE m.contact_id = t.contact_id AND m.event_id = t.event_id LIMIT 1), 'UTC')";
+  await db.query(`UPDATE touches t SET at = CASE
+      WHEN t.kind = 'sequence_add' THEN ${S} - interval '21 days' + make_interval(days => (${C} % 3)::int, mins => (${C} % 240)::int) + CASE WHEN t.channel = 'linkedin' THEN interval '2 hours 17 minutes' ELSE interval '0' END
+      WHEN t.kind = 'send' THEN ${S} - interval '17 days' + make_interval(days => (${C} % 4)::int + CASE WHEN t.channel = 'linkedin' THEN 1 ELSE 0 END, mins => (${C} % 300)::int)
+      WHEN t.kind LIKE 'reply_%' THEN ${reply(C)}
+      WHEN t.kind = 'meeting_booked' THEN ${reply(C)} + make_interval(hours => 3, mins => (${C} % 90)::int)
+      WHEN t.kind LIKE 'meeting_%' THEN ${meet(C, TZ_OF_TOUCH)} + interval '45 minutes'
+      WHEN t.kind IN ('met_onsite', 'badge_scan') THEN ${S} + make_interval(days => (${C} % ${N})::int, hours => 1, mins => (${C} % 300)::int)
+      ELSE ${S} - interval '17 days' + make_interval(days => (${C} % 4)::int, mins => (${C} % 300)::int) END
+    FROM events e WHERE e.id = t.event_id AND ${past} AND t.contact_id IS NOT NULL`);
+  // Replies: every stamp on the row moves with it; a reply still open on a finished event was answered by its owner that afternoon.
+  await db.query(`UPDATE inbound_messages t SET received_at = n.at, decided_at = t.decided_at + (n.at - t.received_at), respond_by = t.respond_by + (n.at - t.received_at),
+      handled_at = coalesce(t.handled_at + (n.at - t.received_at), CASE WHEN t.respond_by IS NOT NULL THEN n.at + interval '4 hours' END),
+      handled_by = coalesce(t.handled_by, CASE WHEN t.respond_by IS NOT NULL THEN t.owner END), escalated_at = t.escalated_at + (n.at - t.received_at)
+    FROM (SELECT t.id, ${reply(C)} AS at FROM inbound_messages t JOIN events e ON e.id = t.event_id WHERE ${past} AND t.contact_id IS NOT NULL) n WHERE n.id = t.id`);
+  await db.query(`UPDATE enrollments t SET added_at = ${S} - interval '21 days' + make_interval(days => (${C} % 3)::int, mins => (${C} % 240)::int), changed_at = ${S} - interval '17 days' + make_interval(days => (${C} % 4)::int, mins => (${C} % 300)::int)
+    FROM events e WHERE e.id = t.event_id AND ${past}`);
+  await db.query(`UPDATE meetings t SET scheduled_at = n.at, outcome_at = CASE WHEN t.outcome_at IS NULL THEN NULL ELSE n.at + interval '45 minutes' END,
+      reminded_at = CASE WHEN t.reminded_at IS NULL THEN NULL ELSE n.at - interval '1 day' END, created_at = n.booked
+    FROM (SELECT t.id, ${meet(C, "t.timezone")} AS at, ${reply(C)} + interval '3 hours' AS booked FROM meetings t JOIN events e ON e.id = t.event_id WHERE ${past} AND t.contact_id IS NOT NULL) n WHERE n.id = t.id`);
+  // A finished event leaves nothing booked: a meeting never recorded went unattended.
+  await db.query(`UPDATE meetings t SET status = 'no_show', outcome_at = t.scheduled_at + interval '45 minutes' FROM events e WHERE e.id = t.event_id AND ${past} AND t.status = 'booked'`);
+  // Ahead of an event: the same days, at ordinary hours.
+  // Any event that has opened: its list was uploaded a month before, and its history runs in order from then until two weeks after it
+  // closed (or until today while it is still following up), so no step of a March event says November.
+  const T = `CASE WHEN ${past} OR (${LAST_DAY_SQL})::date < current_date - 14 THEN least(now(), ((${LAST_DAY_SQL})::date + 14 + time '15:00')::timestamptz) ELSE now() END`;
+  await db.query(`UPDATE uploads u SET created_at = (e.starts_on::date - 30 + time '14:00')::timestamptz + make_interval(mins => (hashtext(u.id)::bigint & 2147483647)::int % 240)
+    FROM events e WHERE e.id = u.event_id AND e.starts_on::date <= current_date`);
+  // What the research spent (credits, model calls, stored answers reused) was spent when the list came in, over the days after, not
+  // today: Usage's month and its pools read the right months.
+  for (const t of ["credit_ledger", "llm_calls", "reuse_log"]) {
+    await db.query(`UPDATE ${t} x SET created_at = (coalesce(p.starts_on, e.starts_on)::date - 30 + time '14:00')::timestamptz + make_interval(mins => ((hashtext(x.id::text)::bigint & 2147483647) % 7200)::int)
+      FROM events e LEFT JOIN events p ON p.id = e.parent_event_id WHERE e.id = x.event_id AND e.starts_on::date <= current_date`);
+  }
+  await db.query(`UPDATE activity_log a SET created_at = r.at FROM (
+      SELECT a.id, (e.starts_on::date - 30 + time '14:00')::timestamptz + (${T} - (e.starts_on::date - 30 + time '14:00')::timestamptz) * (row_number() OVER (PARTITION BY a.event_id ORDER BY a.created_at, a.id) - 1)::float8 / greatest(1, count(*) OVER (PARTITION BY a.event_id))::float8 AS at
+      FROM activity_log a JOIN events e ON e.id = a.event_id WHERE e.starts_on::date <= current_date) r WHERE r.id = a.id`);
+  await db.query(`UPDATE events e SET post_started_at = ((${LAST_DAY_SQL})::date + 1 + time '15:00')::timestamptz WHERE e.post_started_at IS NOT NULL AND e.starts_on::date <= current_date`);
+  // Still following up: the sends went out before the event; each reply's steps carry its reply's own time.
+  await db.query(`UPDATE touches t SET at = CASE WHEN t.kind = 'sequence_add' THEN ${S} - interval '21 days' + make_interval(days => (${C} % 3)::int, mins => (${C} % 240)::int) + CASE WHEN t.channel = 'linkedin' THEN interval '2 hours 17 minutes' ELSE interval '0' END
+      ELSE ${S} - interval '17 days' + make_interval(days => (${C} % 4)::int + CASE WHEN t.channel = 'linkedin' THEN 1 ELSE 0 END, mins => (${C} % 300)::int) END
+    FROM events e WHERE e.id = t.event_id AND e.starts_on::date <= current_date AND NOT (${past}) AND t.kind IN ('sequence_add', 'send')`);
+  await db.query(`UPDATE inbound_messages i SET received_at = i.received_at - make_interval(mins => ((hashtext(i.id)::bigint & 2147483647) % 1440)::int)
+    FROM events e WHERE e.id = i.event_id AND e.starts_on::date <= current_date AND NOT (${past}) AND i.received_at > now() - interval '1 hour'`);
+  await db.query(`UPDATE touches t SET at = i.received_at FROM inbound_messages i, events e WHERE e.id = t.event_id AND i.contact_id = t.contact_id AND i.event_id = t.event_id
+    AND e.starts_on::date <= current_date AND NOT (${past}) AND t.kind LIKE 'reply_%'`);
+  await db.query(`UPDATE touches t SET at = i.received_at + interval '3 hours' FROM inbound_messages i, events e WHERE e.id = t.event_id AND i.contact_id = t.contact_id AND i.event_id = t.event_id
+    AND e.starts_on::date <= current_date AND NOT (${past}) AND t.kind = 'meeting_booked'`);
+  // An event still ahead, already in outreach: people were added two weeks ago and emailed over the days after; each reply's steps sit at the reply,
+  // a few hours apart; a reply arrived over the last day, not all in one minute. Nothing is dated after now.
+  const ahead = "e.starts_on::date > current_date AND e.motion IN ('in_market', 'sequencing')";
+  await db.query(`UPDATE touches t SET at = CASE WHEN t.kind = 'sequence_add' THEN now() - interval '14 days' + make_interval(days => (${C} % 2)::int, mins => (${C} % 240)::int) + CASE WHEN t.channel = 'linkedin' THEN interval '2 hours 17 minutes' ELSE interval '0' END
+      ELSE now() - interval '11 days' + make_interval(days => (${C} % 4)::int + CASE WHEN t.channel = 'linkedin' THEN 1 ELSE 0 END, mins => (${C} % 300)::int) END
+    FROM events e WHERE e.id = t.event_id AND ${ahead} AND t.kind IN ('sequence_add', 'send')`);
+  await db.query(`UPDATE inbound_messages i SET received_at = i.received_at - make_interval(mins => 60 + ((hashtext(i.id)::bigint & 2147483647) % 1380)::int)
+    FROM events e WHERE e.id = i.event_id AND ${ahead} AND i.received_at > now() - interval '1 hour'`);
+  await db.query(`UPDATE touches t SET at = i.received_at FROM inbound_messages i, events e WHERE e.id = t.event_id AND i.contact_id = t.contact_id AND i.event_id = t.event_id AND ${ahead} AND t.kind LIKE 'reply_%'`);
+  await db.query(`UPDATE touches t SET at = least(now() - interval '5 minutes', i.received_at + interval '2 hours 40 minutes') FROM inbound_messages i, events e WHERE e.id = t.event_id AND i.contact_id = t.contact_id AND i.event_id = t.event_id AND ${ahead} AND t.kind = 'meeting_booked'`);
+  // Walk-ups at an event that has happened and is still following up: on its days, at booth hours where it was.
+  for (const ev of await db.query<{ id: string; n: number }>(`SELECT e.id, ${N} AS n FROM events e WHERE e.starts_on::date <= current_date AND NOT (${past})`)) {
+    const tz = await eventZone((sql, args) => db.query(sql, args), ev.id);
+    const H = "(hashtext(c.id)::bigint & 2147483647)";
+    await db.query(`UPDATE onsite_captures c SET captured_at = ((e.starts_on::date + make_interval(days => (${H} % $2)::int))::timestamp + interval '10 hours' + make_interval(mins => (${H} % 420)::int)) AT TIME ZONE $3
+      FROM events e WHERE e.id = c.event_id AND c.event_id = $1`, [ev.id, ev.n, tz]);
+    await db.query("UPDATE meetings m SET scheduled_at = c.captured_at, outcome_at = c.captured_at + interval '30 minutes', timezone = $2 FROM onsite_captures c WHERE c.event_id = $1 AND m.external_key = 'onsite:' || c.id", [ev.id, tz]);
+    await db.query("UPDATE touches t SET at = c.captured_at FROM onsite_captures c WHERE c.event_id = $1 AND t.event_id = $1 AND t.contact_id = c.contact_id AND t.kind IN ('met_onsite', 'badge_scan', 'meeting_held')", [ev.id]);
+  }
+  // Meetings after an event opened, still live: the same days, between 09:00 and 17:00 in the meeting's own zone.
+  await db.query(`UPDATE meetings t SET scheduled_at = (date_trunc('day', t.scheduled_at AT TIME ZONE t.timezone) + interval '9 hours' + make_interval(mins => ((${C} / 7) % 16)::int * 30)) AT TIME ZONE t.timezone
+    FROM events e WHERE e.id = t.event_id AND NOT (${past}) AND e.starts_on::date <= current_date AND t.contact_id IS NOT NULL AND t.source <> 'onsite'`);
+  await db.query(`UPDATE onsite_captures t SET captured_at = (e.starts_on::date + time '14:00') + make_interval(days => ((hashtext(t.id)::bigint & 2147483647) % ${N})::int, mins => ((hashtext(t.id)::bigint & 2147483647) % 300)::int)
+    FROM events e WHERE e.id = t.event_id AND ${past}`);
+  // Costs are entered when they happen: what is booked ahead (sponsorship, booth, tools) weeks before the event, the rest just after it.
+  await db.query(`UPDATE event_costs c SET recorded_at = CASE WHEN c.category IN ('sponsorship', 'booth', 'tools') THEN (e.starts_on::date - 24 + time '15:00')::timestamptz + make_interval(days => ((hashtext(c.id)::bigint & 2147483647) % 6)::int)
+      ELSE least(now(), ((${LAST_DAY_SQL})::date + 2 + time '16:00')::timestamptz + make_interval(days => ((hashtext(c.id)::bigint & 2147483647) % 3)::int)) END
+    FROM events e WHERE e.id = c.event_id AND e.starts_on::date <= current_date`);
+  // And a meeting's own step sits at the meeting.
+  await db.query(`UPDATE touches t SET at = m.scheduled_at + interval '45 minutes' FROM meetings m, events e WHERE e.id = t.event_id AND m.contact_id = t.contact_id AND m.event_id = t.event_id
+    AND e.starts_on::date <= current_date AND NOT (${past}) AND t.kind LIKE 'meeting_%' AND t.kind <> 'meeting_booked'`);
 }

@@ -7,7 +7,7 @@ import { createEvent, EVENT_COLS, moveEvent, RuleError } from "./events.ts";
 import { spend, spendByStep } from "./ledger.ts";
 import { withAiCents } from "./ai-cost.ts";
 import { answerCase, listCases, skipOpenCases } from "./cases.ts";
-import { requestOutreachCard, requestResearchCard } from "./research.ts";
+import { requestOutreachCard, requestResearchCard, setQuoteHook } from "./research.ts";
 import { listOptOuts, recordOptOut } from "./suppression.ts";
 import { correctCompanyFirmo, retier, spreadFor, type RetierOptions } from "./tiering.ts";
 import { cardRecipient, mountSlack, postApproval, type SlackConfig } from "./slack.ts";
@@ -24,7 +24,7 @@ import { benchToExample, cancelCompile, confirmCompile, reopenCompile, editDraft
 import { mockLlm, type Crm, type Dns, type Llm } from "./providers.ts";
 import type { Settings } from "../shared/cost.ts";
 import { isGtm, SETTINGS_REFUSAL } from "../shared/roles.ts";
-import { isLead, MONEY_REFUSAL } from "./money.ts";
+import { forRep, isLead, MONEY_REFUSAL } from "./money.ts";
 import { mountSettingsView } from "./settings-view.ts";
 import { mountSeatRoutes } from "./seat-routes.ts";
 import { mountBudgetRoutes } from "./budget-routes.ts";
@@ -35,7 +35,7 @@ import type { LifecycleDeps } from "./lifecycle-deps.ts";
 import type { FakeTool } from "./connectors/fake.ts";
 import { validateRequest, type ActivityRow, type EventRow } from "../shared/domain.ts";
 
-export interface AppConfig { writeKey?: string; demo: boolean; /** Everything after delivery. Absent, those routes do not exist. */ lifecycle?: LifecycleDeps; demoTools?: Record<string, FakeTool>; /** The hosted demo: no login, so it takes no files a later visitor could read. */ publicDemo?: boolean; kick?: (eventId: string) => void; slack?: SlackConfig; sheets?: SheetPublisher; /** The model the ICP compile and test bench use. Defaults to the mock. */ llm?: Llm; /** The mail-server check used before the Research card. Defaults to the one for mock and simulated domains. */ dns?: Dns; /** The CRM an opt-out is queued for. */ crm?: Crm }
+export interface AppConfig { writeKey?: string; demo: boolean; /** Everything after delivery. Absent, those routes do not exist. */ lifecycle?: LifecycleDeps; demoTools?: Record<string, FakeTool>; /** The hosted demo: no login, so it takes no files a later visitor could read. */ publicDemo?: boolean; kick?: (eventId: string) => void; slack?: SlackConfig; sheets?: SheetPublisher; /** The model the ICP compile and test bench use. Defaults to the mock. */ llm?: Llm; /** The mail-server check used before the Research card. Defaults to the one for mock and simulated domains. */ dns?: Dns; /** The CRM an opt-out is queued for. */ crm?: Crm; /** The desk prices each cost card itself once its event is ready; the uploader only confirms. Off in tests that walk the manual request. */ autoQuote?: boolean }
 type Ctx = { Variables: { actor: string } };
 
 const bad = (msg: string, status: 400 | 401 | 403 | 404 | 409 = 400) => Response.json({ error: msg }, { status });
@@ -106,7 +106,7 @@ export function createApp(db: Db, cfg: AppConfig) {
   mountBudgetRoutes(app, db, cfg);
   mountEventViews(app, db);
   // "Did it pay?" is company money: anyone else gets the overview without it.
-  app.get("/api/overview", async (c) => { const o = await overview(db, cfg.lifecycle); return c.json(isLead(c.get("actor")) ? o : { ...o, results: [] }); });
+  app.get("/api/overview", async (c) => { const o = await overview(db, cfg.lifecycle); return c.json(isLead(c.get("actor")) ? o : { ...o, results: [], needs: o.needs.filter((n) => n.kind !== "costs") }); });
 
   /* The ICP: one seller per install, one line of versions. A document is uploaded, a person sees the cost and starts the compile,
      confirms the draft, tests it on companies with known answers, and publishes. Nothing here is used for tiering until published. */
@@ -158,7 +158,7 @@ export function createApp(db: Db, cfg: AppConfig) {
 
   app.get("/api/events", async (c) => {
     const events = await db.query<EventRow>(`SELECT ${EVENT_COLS}, catalog_id, (SELECT u.uploaded_by FROM uploads u WHERE u.event_id = events.id ORDER BY u.created_at, u.id LIMIT 1) AS uploaded_by, ${WEBSITE} FROM events WHERE parent_event_id IS NULL ORDER BY starts_on, name`);
-    return c.json({ events, demo: cfg.demo });
+    return c.json({ events: isLead(c.get("actor")) ? events : events.map((e) => ({ ...e, seat_price_cents: null })), demo: cfg.demo });
   });
 
   app.get("/api/events/:id", async (c) => {
@@ -170,7 +170,13 @@ export function createApp(db: Db, cfg: AppConfig) {
     const cards = await db.query("SELECT id, kind, status, lines, inputs, credits_cap, llm_cap, est_cents, step_caps, rates - 'credit_cents' AS rates, created_at FROM cost_cards WHERE event_id = $1 ORDER BY created_at DESC", [id]);
     const [{ open }] = await db.query<{ open: number }>("SELECT count(*)::int AS open FROM review_cases WHERE event_id = $1 AND blocking AND status = 'open'", [id]);
     // `card` is the latest card, as before. Two-card events also list every card and what each step has used.
-    return c.json({ event, activity, list: await listSummary(db, id), settings: settingsRow?.settings ?? null, card: cards[0] ?? null, cards, spend: await spend(db, id), spend_by_step: await withAiCents(db, id, await spendByStep(db, id), defaultSettings().llm_call_cents), open_cases: open, uploads: await listUploads(db, id), top_ups: await topUpsOf(db, id), spread: event.flow === "two_card" && ["ready_for_review", "finding_people", "flagging", "delivered"].includes(event.stage) ? await spreadFor(db.query, id, { ...defaultSettings(), ...settingsRow?.settings }) : null, icp_version: (await db.query<{ v: number | null }>("SELECT icp_version AS v FROM events WHERE id = $1", [id]))[0]?.v ?? null });
+    // Dollars on this read are leadership's and GTM's: a rep gets the counts (credits, AI calls) and the history without the amounts.
+    const lead = isLead(c.get("actor"));
+    // Every key that holds cents, at any depth, goes; counts stay.
+    const noCents = forRep;
+    const repCards = lead ? cards : cards.map(noCents);
+    const byStep = await withAiCents(db, id, await spendByStep(db, id), defaultSettings().llm_call_cents);
+    return c.json({ event: lead ? event : { ...event, seat_price_cents: null }, activity: lead ? activity : activity.filter((a) => !/\$\s?\d/.test(String((a as { detail?: string }).detail ?? ""))), list: await listSummary(db, id), settings: settingsRow?.settings ? (lead ? settingsRow.settings : noCents(settingsRow.settings)) : null, card: repCards[0] ?? null, cards: repCards, spend: lead ? await spend(db, id) : { credits: (await spend(db, id)).credits }, spend_by_step: lead ? byStep : byStep.filter((r) => r.unit !== "llm").map(noCents), open_cases: open, uploads: await listUploads(db, id), top_ups: await topUpsOf(db, id), spread: event.flow === "two_card" && ["ready_for_review", "finding_people", "flagging", "delivered"].includes(event.stage) ? await spreadFor(db.query, id, { ...defaultSettings(), ...settingsRow?.settings }) : null, icp_version: (await db.query<{ v: number | null }>("SELECT icp_version AS v FROM events WHERE id = $1", [id]))[0]?.v ?? null });
   });
 
   if (cfg.slack) mountSlack(app, db, cfg.slack, cfg.kick, cfg.lifecycle);
@@ -189,6 +195,19 @@ export function createApp(db: Db, cfg: AppConfig) {
     }
     return event;
   };
+  // The desk prices a card on its own as soon as its event is ready for one, in the uploader's name; they confirm it. A card that cannot be made
+  // yet (a case still open, research finishing, no Slack user in live mode) waits, and the event page can still ask for it.
+  const autoQuote = async (id: string) => {
+    if (!cfg.autoQuote) return;
+    const [ev] = await db.query<{ flow: string; stage: string; parent_event_id: string | null }>("SELECT flow, stage, parent_event_id FROM events WHERE id = $1", [id]);
+    if (!ev || !(ev.stage === "mapped" || (ev.flow === "two_card" && ev.stage === "ready_for_review"))) return;
+    if ((await db.query("SELECT 1 FROM approvals WHERE event_id = $1 AND status = 'pending' AND kind IN ('card', 'research', 'outreach')", [id])).length) return;
+    const [up] = await db.query<{ uploaded_by: string }>("SELECT uploaded_by FROM uploads WHERE event_id = $1 ORDER BY created_at DESC, id DESC LIMIT 1", [id]);
+    if (!up) return;
+    await quote(id, up.uploaded_by, ev.flow, ev.stage).catch((e) => { if (!(e instanceof RuleError)) throw e; });
+  };
+  if (cfg.autoQuote) setQuoteHook(autoQuote);
+
   // A card Slack refused or never received has no button for anyone to press. The waiting card is posted again, as it is.
   app.post("/api/events/:id/card/resend", async (c) => {
     if (!cfg.slack) return bad("Cards go through Slack only in live mode.", 409);
@@ -202,6 +221,8 @@ export function createApp(db: Db, cfg: AppConfig) {
     const id = c.req.param("id");
     const [ev] = await db.query<{ flow: string; stage: string }>("SELECT flow, stage FROM events WHERE id = $1", [id]);
     if (!ev) return bad("That event does not exist.", 404);
+    if (cfg.autoQuote && (await db.query("SELECT 1 FROM approvals WHERE event_id = $1 AND status = 'pending' AND kind IN ('card', 'research', 'outreach')", [id])).length)
+      return c.json((await db.query<EventRow>(`SELECT ${EVENT_COLS} FROM events WHERE id = $1`, [id]))[0]);
     return c.json(await quote(id, c.get("actor"), ev.flow, ev.stage));
   });
 
@@ -222,7 +243,9 @@ export function createApp(db: Db, cfg: AppConfig) {
 
   app.patch("/api/events/:id/settings", async (c) => {
     const body = await c.req.json<Record<string, unknown>>().catch(() => ({}) as Record<string, unknown>);
-    return c.json(await patchSettings(db, c.req.param("id"), c.get("actor"), body));
+    const s = await patchSettings(db, c.req.param("id"), c.get("actor"), body);
+    await autoQuote(c.req.param("id"));
+    return c.json(s);
   });
 
   app.post("/api/events/:id/cancel", async (c) => {
@@ -245,6 +268,7 @@ export function createApp(db: Db, cfg: AppConfig) {
   // Registered before the :caseId route so "skip" is never read as an id.
   app.post("/api/events/:id/cases/skip", async (c) => {
     const skipped = await skipOpenCases(db, c.req.param("id"), c.get("actor"));
+    await autoQuote(c.req.param("id"));
     return c.json({ skipped });
   });
 
@@ -255,6 +279,8 @@ export function createApp(db: Db, cfg: AppConfig) {
     // A company settled by a person finishes its research at once; the Research card already covers it.
     if (!result.already_decided) cfg.kick?.(c.req.param("id"));
     if (!result.already_decided && b.decision === "drop") void refreshAfterDrop([c.req.param("id")], c.get("actor"));
+    // The last case settled, with nothing left to research: the next card is priced now.
+    if (!result.already_decided) await autoQuote(c.req.param("id"));
     return c.json(result);
   });
 
@@ -366,7 +392,9 @@ export function createApp(db: Db, cfg: AppConfig) {
     const bytes = new Uint8Array(await c.req.arrayBuffer());
     if (bytes.length > 20_000_000) return bad("That file is too large.");
     const filename = decodeURIComponent(c.req.header("x-filename") ?? "").slice(0, 200);
-    return c.json(await ingestUpload(db, c.req.param("id"), c.get("actor"), filename, bytes));
+    const out = await ingestUpload(db, c.req.param("id"), c.get("actor"), filename, bytes);
+    await autoQuote(c.req.param("id"));
+    return c.json((await db.query<EventRow>(`SELECT ${EVENT_COLS} FROM events WHERE id = $1`, [c.req.param("id")]))[0] ?? out);
   });
 
   // Manual only, and only for GTM Engineering and the seat approvers, decided here and not on the screen. Nothing is ever deleted by itself.

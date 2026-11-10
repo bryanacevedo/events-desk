@@ -34,8 +34,8 @@ const catalog = (await (await fetch(base + "/api/catalog")).json()).catalog;
 const listed = catalog.find((c) => !c.event_id && c.ends_on >= new Date().toISOString().slice(0, 10))?.id ?? "";
 const pages = [
   ["/", MAYA], ["/events", MAYA], [`/events?event=${ids[1] ?? flagship}`, MAYA], ["/events?time=all", MAYA], ["/events?time=past&region=na", MAYA], ["/events?add=1", GTM], [`/events?event=${flagship}`, MAYA], ["/events?request=1", MAYA], [`/events?request=1&catalog=${listed}`, MAYA],
-  [`/?event=${ids[1] ?? flagship}`, MAYA], ["/budget", "Dan Whitlock"], ["/budget?year=2027", MAYA], ["/budget?year=2027&q=money", MAYA], ["/usage", MAYA], ["/more", MAYA],
-  ["/seats", "Dan Whitlock"], ["/seats?status=all", "Dan Whitlock"], ["/seats?request=1", MAYA], ["/seats?mine=1&status=all", MAYA],
+  [`/?event=${ids[1] ?? flagship}`, MAYA], ["/budget", "Dan Whitlock"], ["/budget?year=2027", "Dan Whitlock"], ["/budget?year=2027&q=money", "Dan Whitlock"], ["/usage", "Dan Whitlock"], ["/more", MAYA],
+  ["/seats", "Dan Whitlock"], ["/seats?status=all", "Dan Whitlock"], ["/seats?request=1", "Dan Whitlock"], ["/seats?mine=1&status=all", "Dan Whitlock"],
   ...sections.map((q) => [`/settings${q}`, GTM]), ["/settings", MAYA], ["/settings?section=spend", "Dan Whitlock"],
   ...[...new Set([...volumes, ...ids])].map((id) => [`/event/${id}`, MAYA]),
   [`/event/${flagship}`, "Dan Whitlock"], [`/event/${byName("Dreamforce 2026") ?? flagship}?s=dropped`, MAYA], [`/event/${flagship}?ct=unknown&cq=a`, MAYA],
@@ -99,7 +99,7 @@ async function sheetBehaviour(width) {
     // The trap: Tab many times and focus never leaves the sheet.
     for (let i = 0; i < 25; i++) await page.keyboard.press("Tab");
     if (!(await page.evaluate(() => document.querySelector("[data-sheet]")?.contains(document.activeElement)))) bad(`${home}: Tab left the sheet`);
-    const full = page.getByRole("button", { name: "Open the full page" });
+    const full = page.getByRole("button", { name: /^(Open the full page|See the result)$/ });
     await full.click(); await page.waitForTimeout(300);
     if (!/\/event\//.test(new URL(page.url()).pathname)) bad(`${home}: Open the full page did not go to the event`);
   }
@@ -120,7 +120,7 @@ for (const width of widths) {
     // A page that never draws is a problem to report, not a reason to stop measuring the rest.
     if (!(await page.waitForSelector("[data-ready]", { timeout: 8000 }).then(() => true).catch(() => false))) { problems++; console.log(`${width}px ${path}  never became ready`); continue; }
     if (arrived) { const gap = Date.now() - await arrived; if (gap > 1000) { problems++; console.log(`${width}px ${path}  first content ${gap} ms after the data arrived`); } }
-    if (path.includes("?event=")) await page.waitForSelector("[data-sheet] [data-stage]", { timeout: 8000 });
+    if (path.includes("?event=")) await page.waitForSelector("[data-sheet] h2", { timeout: 8000 });
     if (path.includes("add=1")) await page.waitForSelector("[data-add]", { timeout: 8000 });
     // Open the on-request sections and one person, so their layout is measured too.
     for (const label of ["See why", "Cost and the card", "Show more"]) { const b = page.getByRole("button", { name: label, exact: true }); if (await b.count()) await b.first().click(); }
@@ -149,6 +149,18 @@ for (const width of widths) {
 
       // 1. Sideways scroll.
       if (document.documentElement.scrollWidth > vw + 1) out.push(`page scrolls sideways: ${document.documentElement.scrollWidth}px wide in a ${vw}px viewport`);
+
+      // 1b. Every row of figures: each label centred under its figure, all labels on one baseline, equal space between figures.
+      for (const row of document.querySelectorAll(".md-figs, .reach, .cost-figs")) {
+        const figs = [...row.querySelectorAll(":scope > p")].map((p) => ({ b: p.querySelector("b")?.getBoundingClientRect(), s: p.querySelector("span")?.getBoundingClientRect(), p: p.getBoundingClientRect() })).filter((f) => f.b && f.s);
+        for (const f of figs) if (Math.abs((f.b.left + f.b.right) / 2 - (f.s.left + f.s.right) / 2) > 2) out.push(`figure label not centred under its figure (${Math.round(f.s.left)}px)`);
+        // Labels share a baseline within each visual line of the row; a row that wraps is checked line by line.
+        const lines = new Map();
+        for (const f of figs) { const key = [...lines.keys()].find((t) => Math.abs(t - f.p.bottom) < 30) ?? f.p.bottom; lines.set(key, [...(lines.get(key) ?? []), f]); }
+        for (const line of lines.values()) if (line.length > 1 && Math.max(...line.map((f) => f.s.bottom)) - Math.min(...line.map((f) => f.s.bottom)) > 1) out.push("figure labels not on one baseline");
+        const gaps = figs.slice(1).map((f, i) => f.p.top === figs[i].p.top ? f.p.left - figs[i].p.right : null).filter((g) => g !== null);
+        if (gaps.length > 1 && Math.max(...gaps) - Math.min(...gaps) > 2) out.push(`uneven space between figures: ${gaps.map(Math.round).join(", ")}px`);
+      }
 
       // 2. Shared content edge: every block in main starts where its padding ends.
       const main = document.querySelector("main.main");
@@ -209,7 +221,7 @@ for (const width of widths) {
     }, width);
     if (eventPage && volumes.some((id) => path === `/event/${id}`)) {
       const st = await page.getAttribute("[data-ready]", "data-stage");
-      const ok = st === "approved" ? await page.locator("label.btn", { hasText: "Add the attendee list" }).count() : st === "delivered" ? await page.locator("button.prow").count() : await page.locator("[data-run], [data-cases], .corow").count();
+      const ok = st === "approved" ? await page.locator("label.btn", { hasText: "Add the attendee list" }).count() : st === "delivered" ? await page.locator("button.prow, [role=tablist]").count() : await page.locator("[data-run], [data-cases], .corow").count();
       if (!ok) found.push(`the ${st} event page shows nothing of its stage`);
     }
     for (const f of found) { problems++; console.log(`${width}px ${path}  ${f}`); }

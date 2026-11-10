@@ -21,6 +21,9 @@ import type { Settings } from "../shared/cost.ts";
 import { vendorWords } from "../shared/vendors.ts";
 
 const DAN = "Dan Whitlock";
+/** Accounts a rep says they know will be there, varied per person and event. */
+const KNOWN = ["Pinefold, Larkspur Freight, Brightwater", "Kestrel Ledger, Nordvik Commerce", "Hoshi Retail Systems", "Quayside Data, Lumen Billing", "Altamar Logistics, Brightmoor Payments", "Ribeira Freight"];
+
 export const ROSTER: { name: string; team: string; role: string }[] = [
   { name: "Maya Ortiz", team: "Outbound", role: "SDR" },
   { name: "Priya Nair", team: "Outbound", role: "SDR" },
@@ -110,7 +113,9 @@ export async function seedReal(db: Db) {
     const id = slug(r.name);
     // A person asks once per event. People are dealt from the roster, a different start for each event, and the uploader always asks.
     const askers = new Set<string>(approved ? [uploader] : []);
-    for (let k = 0; askers.size < Math.max(total, askers.size) && k < ROSTER.length * 2; k++) askers.add(ROSTER[(hash(r.name) + k * 7) % ROSTER.length].name);
+    // Each event deals from its own start with its own stride (the roster is 19, a prime, so any stride from 1 to 18 reaches everyone), so two events rarely ask the same people in the same order.
+    const stride = 1 + (hash(`${r.name}|stride`) % (ROSTER.length - 1));
+    for (let k = 0; askers.size < Math.max(total, askers.size) && k < ROSTER.length * 2; k++) askers.add(ROSTER[(hash(r.name) + k * stride) % ROSTER.length].name);
     const people = [...askers].slice(0, Math.max(total, approved ? 1 : 0)).map((n) => ROSTER.find((p) => p.name === n)!);
     const made: { id: string; who: string }[] = [];
     for (const [k, p] of people.entries()) {
@@ -118,7 +123,7 @@ export async function seedReal(db: Db) {
       const x = await requestSeat(db, p.name, {
         catalog_id: cid, suggestion: null, team: p.team, role: p.role, goal, why_event: WHY_EVENT[goal](r), why_you: WHY_YOU(p, r),
         expected_meetings: r.size === "flagship" ? 6 + (hash(p.name + r.name) % 9) : r.size === "regional" ? 4 + (hash(p.name + r.name) % 4) : 2 + (hash(p.name + r.name) % 3),
-        known_accounts: k % 3 === 0 ? "Pinefold, Larkspur Freight, Brightwater" : null, travel_cents: k % 4 === 0 ? 120000 + (hash(p.name) % 8) * 15000 : null,
+        known_accounts: k % 3 === 0 ? KNOWN[hash(r.name + p.name) % KNOWN.length] : null, travel_cents: k % 4 === 0 ? 90000 + (hash(p.name + r.name) % 14) * 12500 : null,
         decide_by: k % 5 === 0 ? new Date(Date.parse(r.start) - 21 * 86_400_000).toISOString().slice(0, 10) : null,
       }, { id, flow: "two_card", today: "2000-01-01" });
       made.push({ id: x.id, who: p.name });

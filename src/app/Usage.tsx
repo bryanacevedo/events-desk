@@ -5,6 +5,7 @@
 import { useEffect, useState } from "react";
 import type { usageView } from "../server/usage";
 import { CREDIT_VENDORS, type CreditVendor } from "../shared/vendors";
+import { SideSheet } from "./SideSheet";
 import { get } from "./api";
 import { EventLogo } from "./EventLogo";
 import { daysTo, shortDate } from "./words";
@@ -64,6 +65,18 @@ function Pool({ x, year, month, big = false }: { x: VendorUse; year: number; mon
   );
 }
 
+/** One vendor's use on one event: the figure, what was approved, and a hairline bar between them. Nothing used is a quiet dot. */
+function Meter({ label, used, cap, show }: { label: string; used: number; cap: number; show: (x: number) => string }) {
+  const pct = cap ? Math.min(100, (used / cap) * 100) : 0;
+  return (
+    <span className={`use-m${!used && !cap ? " none" : ""}${pct >= 80 ? " near" : ""}`} aria-label={`${label}: ${show(used)}${cap ? ` of ${show(cap)}` : ""}`}>
+      <span className="use-k">{label}</span>
+      {!used && !cap ? <span className="use-v">·</span> : <span className="use-v"><b>{show(used)}</b>{cap > 0 && <i> of {show(cap)}</i>}</span>}
+      {cap > 0 && <span className="use-bar" aria-hidden="true"><u style={{ width: `${Math.max(pct, used ? 2 : 0)}%` }} /></span>}
+    </span>
+  );
+}
+
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 /** AI is money, not a pool: a bill for the month, itemized, with the year's total on the foot. */
@@ -79,23 +92,23 @@ function Bill({ ai, year, month }: { ai: View["ai"]; year: number; month: number
         {ai.parts.map((p) => <li key={p.label}><span>{p.label}</span><i /><span>{usd(p.cents)}</span></li>)}
         {!ai.parts.length && <li className="mute"><span>No calls yet</span></li>}
       </ul>
-      {(ai.real_calls > 0 || ai.flat_calls > 0) && (
-        <p className="small mute">
-          {ai.real_calls > 0 && `${n(ai.real_calls)} real ${ai.real_calls === 1 ? "call" : "calls"} priced from the tokens used. `}
-          {ai.flat_calls > 0 && `${n(ai.flat_calls)} simulated or uncounted ${ai.flat_calls === 1 ? "call" : "calls"} at ${ai.flat_cents_per_call} cent${ai.flat_cents_per_call === 1 ? "" : "s"} each.`}
-        </p>
-      )}
+      {ai.flat_calls > 0 && <p className="bill-saved small mute"><span>Flat {ai.flat_cents_per_call}¢ a call</span><i /><span>{n(ai.flat_calls)} calls</span></p>}
       {ai.saved_cents > 0 && <p className="bill-saved small mute"><span>Saved</span><i /><span>{usd(ai.saved_cents)}</span></p>}
       <p className="bill-foot"><span>{year} so far</span><i /><span>{usd(ai.year_cents)}</span></p>
     </aside>
   );
 }
 
+
+/** The current page with an event's side sheet open, or closed: the page stays and so does the reader's place on it. */
+const withSheet = (id: string | null) => { const u = new URL(location.href); if (id) u.searchParams.set("event", id); else u.searchParams.delete("event"); return u.pathname + u.search + u.hash; };
 export function Usage({ go, search }: { go: (to: string) => void; search: URLSearchParams }) {
   const q = search.get("q") ?? "", page = Number(search.get("page")) || 1;
   const [v, setV] = useState<View | null>(null);
   const [text, setText] = useState(q);
-  useEffect(() => { get<View>(`/api/usage?q=${encodeURIComponent(q)}&page=${page}`).then(setV); }, [q, page]);
+  // Every filter in the address goes to the server, which does the filtering; the open sheet does not.
+  const filters = ["when", "near", "sort"].map((k) => (search.get(k) ? `&${k}=${encodeURIComponent(search.get(k)!)}` : "")).join("");
+  useEffect(() => { get<View>(`/api/usage?q=${encodeURIComponent(q)}&page=${page}${filters}`).then(setV); }, [q, page, filters]);
   useEffect(() => { setText(q); }, [q]);
   const to = (patch: Record<string, string | null>) => {
     const p = new URLSearchParams(search);
@@ -112,7 +125,7 @@ export function Usage({ go, search }: { go: (to: string) => void; search: URLSea
 
   return (
     <>
-      <header className="hero" data-ready="1"><div><h1>Usage</h1>{v.simulated && <p className="mute small">Simulated runs</p>}</div></header>
+      <header className="hero" data-ready="1"><div><h1>Usage</h1></div></header>
 
       <section className="pools" aria-label="Vendors and AI">
         {first && <Pool x={first} year={v.year} month={v.month} big />}
@@ -123,25 +136,37 @@ export function Usage({ go, search }: { go: (to: string) => void; search: URLSea
       </section>
 
       <section className="btable" aria-label="By event">
-        <div className="grp"><h2 className="display">By event</h2><span className="mute small">{v.total_events}</span></div>
-        <form className="search" onSubmit={(ev) => ev.preventDefault()} role="search">
-          <label htmlFor="uq" className="sr-only">Find an event</label>
-          <input id="uq" type="search" placeholder="Find an event" autoComplete="off" value={text} onChange={(ev) => setText(ev.target.value)} />
-        </form>
-        <div className="rows" role="table" aria-label="Use by event, by vendor, with AI in dollars">
-          <div className="rrow urow head" role="row"><span role="columnheader">Event</span>{CREDIT_VENDORS.map((c) => <span role="columnheader" key={c}>{c}</span>)}<span role="columnheader">AI</span></div>
-          {v.events.map((e) => (
-            <div className="rrow urow" role="row" key={e.event_id}>
-              <span role="cell" className="who-text"><p className="name"><a href={`/event/${e.event_id}`} onClick={(ev) => { ev.preventDefault(); go(`/event/${e.event_id}`); }}>{e.name}</a></p><p className="small mute">{shortDate(e.starts_on)}</p></span>
-              {CREDIT_VENDORS.map((c) => {
-                const u = e.credits[c];
-                return <span role="cell" key={c} data-l={c}>{u.used === 0 && u.cap === 0 ? <span className="mute">·</span> : <>{n(u.used)}{u.cap > 0 && <span className="mute"> of {n(u.cap)}</span>}</>}</span>;
-              })}
-              <span role="cell" data-l="AI">{e.ai.cents === 0 && e.ai.cap_cents === 0 ? <span className="mute">·</span> : <>{usd(e.ai.cents)}{e.ai.cap_cents > 0 && <span className="mute"> of {usd(e.ai.cap_cents)}</span>}</>}</span>
-            </div>
-          ))}
-          {!v.events.length && <p className="mute gap">{q ? "No event matches." : "None yet."}</p>}
+        <div className="grp"><h2 className="display">By event</h2><span className="grp-n">{n(v.total_events)}</span></div>
+        <div className="filters">
+          <form className="search" onSubmit={(ev) => ev.preventDefault()} role="search">
+            <label htmlFor="uq" className="sr-only">Find an event</label>
+            <input id="uq" type="search" placeholder="Find an event" autoComplete="off" value={text} onChange={(ev) => setText(ev.target.value)} />
+          </form>
+          <div className="seg" role="group" aria-label="When">
+            {[["", "All"], ["coming", "Coming"], ["past", "Past"]].map(([k, l]) => <button key={k} type="button" aria-pressed={(search.get("when") ?? "") === k} onClick={() => to({ when: k })}>{l}</button>)}
+          </div>
+          <div className="seg" role="group" aria-label="Use">
+            <button type="button" aria-pressed={!search.get("near")} onClick={() => to({ near: null })}>Any use</button>
+            <button type="button" aria-pressed={search.get("near") === "1"} onClick={() => to({ near: "1" })}>Near the cap</button>
+          </div>
+          <label className="filter"><span className="sr-only">Order</span>
+            <select value={search.get("sort") ?? ""} onChange={(ev) => to({ sort: ev.target.value })}><option value="">Newest first</option><option value="used">Most used first</option></select>
+          </label>
         </div>
+        <div className="use-head" aria-hidden="true"><span /><span>Event</span>{CREDIT_VENDORS.map((c) => <span key={c}>{c}</span>)}<span>AI</span></div>
+        <ul className="ob-tray use-rows">
+          {v.events.map((e, i) => (
+            <li key={e.event_id} style={{ "--i": i } as React.CSSProperties}>
+              <a href={withSheet(e.event_id)} className="ob-row use-row" data-opens-sheet="" data-row={e.event_id} onClick={(ev) => { ev.preventDefault(); go(withSheet(e.event_id)); }}>
+                <span className="ob-face"><EventLogo name={e.name} website={e.website} size={36} /></span>
+                <span className="ob-who"><b>{e.name}</b><span>{shortDate(e.starts_on)}</span></span>
+                {CREDIT_VENDORS.map((c) => <Meter key={c} label={c} used={e.credits[c].used} cap={e.credits[c].cap} show={n} />)}
+                <Meter label="AI" used={e.ai.cents} cap={e.ai.cap_cents} show={usd} />
+              </a>
+            </li>
+          ))}
+        </ul>
+        {!v.events.length && <p className="mute gap">{q || search.get("when") || search.get("near") ? "No event matches." : "None yet."}</p>}
         {v.pages > 1 && (
           <div className="pager small"><button type="button" className="textlink" disabled={v.page <= 1} onClick={() => to({ page: String(v.page - 1) })}>Previous</button><span className="mute">{v.page} of {v.pages}</span><button type="button" className="textlink" disabled={v.page >= v.pages} onClick={() => to({ page: String(v.page + 1) })}>Next</button></div>
         )}
@@ -153,6 +178,7 @@ export function Usage({ go, search }: { go: (to: string) => void; search: URLSea
           <div className="rows">{v.vendor_health.map((h) => <div className="srow" key={h.vendor}><span>{h.vendor}</span><span>{n(h.attempts)}{h.failures > 0 && <span className="mute"> · {n(h.failures)} failed</span>}</span></div>)}</div>
         </section>
       )}
+      {search.get("event") && <SideSheet id={search.get("event")!} go={go} close={() => go(withSheet(null))} lens="cost" />}
     </>
   );
 }

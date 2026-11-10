@@ -1,6 +1,7 @@
 /* Read routes the event page needs at volume. A list of 1,650 rows is never sent whole: the people and
    the companies of an event are searched, filtered and paged here, so the screen asks for 50 at a time. */
 
+import { accountOf } from "./rep-day.ts";
 import type { Hono } from "hono";
 import type { Db } from "./db.ts";
 
@@ -52,6 +53,14 @@ export function mountEventViews(app: Hono<{ Variables: { actor: string } }>, db:
        LIMIT $6 OFFSET $7`, [id, q, priority, tier, status, limit, offset, source]);
     const total = rows[0]?.total ?? 0;
     return c.json({ total, offset, limit, rows: rows.map(({ total: _t, ...r }) => r) });
+  });
+
+  // One company, opened from the list: what the desk knows of it and everyone from it on this event.
+  app.get("/api/events/:id/companies/:cid", async (c) => {
+    const a = await accountOf(db, c.req.param("id"), { companyId: c.req.param("cid") }, 100);
+    if (!a) return c.json({ error: "That company is not on this event." }, 404);
+    const [x] = await db.query<{ tier_fact: string | null; country: string | null; list_status: string | null }>("SELECT tier_fact, firmo->>'country' AS country, list_status FROM companies WHERE id = $1", [a.company_id]);
+    return c.json({ ...a, ...x });
   });
 
   app.get("/api/events/:id/companies", async (c) => {

@@ -39,7 +39,7 @@ An event has a `flow`: `two_card` (the design in `docs/TIERING-AND-ENRICHMENT.md
 |---|---|---|
 | requested | Seat count, seat price and event details are in | Approver approves or declines |
 | approved | Seats approved; waiting for a list | A CSV maps successfully |
-| mapped | Columns mapped in code, rows normalized and deduplicated, settings editable | Someone requests the card |
+| mapped | Columns mapped in code, rows normalized and deduplicated, settings editable | The desk prices the card at once (decision 39); the uploader confirms it |
 | quoted | Cost card waits for a human | Approve moves on; decline returns to `mapped` to lower settings and re-quote |
 | tiering | Companies and titles get tiers, A/B/C is computed, C stops here | Every source row is tiered or dropped |
 | enriching | Discovery, then the waterfall and double verification, on A and B only | Every contact is finished or dropped |

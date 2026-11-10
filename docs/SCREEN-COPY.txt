@@ -1,0 +1,48 @@
+# comes off every outreach list and is never looked up again, at every event.
+# credits · # AI calls
+# new, # already in
+# no tier#
+# of # held a meeting
+# of # live
+# of # used
+#% of met accounts have pipeline
+#, #, not requested. Request a seat
+A line for the version history
+Accounts you know will be there (optional)
+Budget is for leadership and GTM Engineering.
+Declined by ##
+Domain not set up to send
+Follow-up started by # on #
+Found at the company, not on the attendee list.
+From the attendee file (unverified):
+Keep it as my rule
+No event has finished sending yet.
+Not on the outreach list
+Nothing needs anyone right now.
+One company per line: name, employees, industry, business model, expected tier, kind (won, lost or bad fit)
+One ticket ###
+Page # of #
+People to look for per company
+Publish although it got under # right
+Reading replies, waiting on the uploader
+Real event names, simulated attendees.
+Results are for leadership and GTM Engineering.
+Review the cost to verify and find contacts
+Save the document as .txt or .md, or paste its text.
+Saved. Their outreach is stopped, and a task for today is in the CRM.
+Saved. Their outreach is stopped.
+Seats are for leadership and GTM Engineering.
+Take the suggested answer for all #
+That deal is no longer credited here.
+That event does not exist.
+That meeting is no longer here.
+That reply is no longer here.
+The Google Sheet stays in Drive.
+The rules changed since this test. Test again before publishing.
+This draft was thrown away.
+Those notes are not here.
+Travel per person, dollars (optional)
+Up to ##
+Usage is for leadership and GTM Engineering.
+Waiting on # to run this.
+Where the pipeline came from

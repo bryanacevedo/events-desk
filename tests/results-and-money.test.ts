@@ -105,6 +105,37 @@ describe("debriefs", () => {
   });
 });
 
+describe("notes owed", () => {
+  it("a rep sees the notes they owe on My day, and opens them; nobody else but leadership and GTM can read them", async () => {
+    const h = await heldAt({});
+    h.deps.notify = undefined; h.deps.userMap = {};
+    await sendDebriefPrompts(db, h.deps);
+    const app = createApp(db, { demo: true, lifecycle: h.deps });
+    const day = await (await app.request(`/api/motion/my-day?rep=${encodeURIComponent(MAYA)}`, { headers: as(MAYA) })).json() as { notes: { id: string; held: number }[] };
+    expect(day.notes).toHaveLength(1);
+    expect(day.notes[0].held).toBe(1);
+    const id = day.notes[0].id;
+    const mine = await (await app.request(`/api/motion/debriefs/${id}`, { headers: as(MAYA) })).json() as { met: { full_name: string }[]; status: string };
+    expect(mine.status).toBe("waiting");
+    expect(mine.met.map((m) => m.full_name)).toEqual(["Ana Ruiz"]);
+    expect((await app.request(`/api/motion/debriefs/${id}`, { headers: as("Tomas Reyes") })).status).toBe(403);
+    expect((await app.request(`/api/motion/debriefs/${id}`, { headers: as(DAN) })).status).toBe(200);
+    // Sent, it leaves My day.
+    expect((await app.request(`/api/motion/debriefs/${id}/answer`, { method: "POST", headers: { ...as(MAYA), "content-type": "application/json" }, body: JSON.stringify({ body: "Busy floor." }) })).status).toBe(200);
+    const after = await (await app.request(`/api/motion/my-day?rep=${encodeURIComponent(MAYA)}`, { headers: as(MAYA) })).json() as { notes: unknown[] };
+    expect(after.notes).toEqual([]);
+  });
+
+  it("a meeting booked without a zone takes its event's: the city where the country spans zones", async () => {
+    const h = await heldAt({});
+    await db.query("UPDATE events SET venue = 'Venetian Expo, Las Vegas', country = 'United States' WHERE id = $1", [h.id]);
+    const ben = await personAt(db, h.id, "Ana Ruiz");
+    const m = await bookMeeting(db, h.deps, { contact_id: ben.id, scheduled_at: "2027-01-16T18:00:00Z", source: "manual", rep: MAYA }, MAYA);
+    const [row] = await db.query<{ timezone: string }>("SELECT timezone FROM meetings WHERE id = $1", [m.id]);
+    expect(row.timezone).toBe("America/Los_Angeles");
+  });
+});
+
 describe("Results", () => {
   it("counts a deal once: a written card's money comes from the deal ledger, where the deal belongs to one event", async () => {
     const h = await heldAt({ [D]: [opp()] });

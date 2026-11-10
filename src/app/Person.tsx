@@ -2,6 +2,7 @@
    and the address that was confirmed. Anything unsettled about the data is a case, not a flag here.
    A person still on the list can be opted out from here; that spans every event and has no undo, so it asks first. */
 
+import { companyDisplayName as co } from "../shared/names";
 import { useState } from "react";
 import { FLAG_WORDS } from "../shared/tiers";
 import { useActor } from "./App";
@@ -31,10 +32,9 @@ export function PriorityGrid({ company, title }: { company: 1 | 2 | 3 | null; ti
 }
 
 export function whyPriority(c: Pick<PersonRow, "company" | "company_tier" | "title" | "title_tier" | "priority">): string {
-  const company = c.company ?? "The company";
-  if (!c.company_tier) return "Not tiered yet.";
-  if (!c.title_tier) return `${company} is tier ${c.company_tier}. No title, so the company tier decides: ${c.priority}.`;
-  return `${company} is tier ${c.company_tier}. ${c.title ?? "The title"} is a tier ${c.title_tier} title. Together: ${c.priority}.`;
+  if (!c.company_tier) return "Not tiered yet";
+  // Short facts, not a sentence: the company's tier, the title's tier, and the priority they make.
+  return [`Company tier ${c.company_tier}`, c.title_tier ? `Title tier ${c.title_tier}` : "No title tier"].join("  ·  ");
 }
 
 /** The quiet "Opt out" on the panel, its confirmation, and the call. `onDone` tells the list the person is now dropped. */
@@ -55,7 +55,7 @@ function OptOut({ c, onDone }: { c: PersonRow; onDone: () => void }) {
   };
   return (
     <>
-      <button className="textlink" type="button" onClick={() => setOpen(true)}>Opt out</button>
+      <button className="btn line small" type="button" onClick={() => setOpen(true)}>Opt out</button>
       {open && (
         <ConfirmDialog title={`Opt out ${who}?`} confirm={busy ? "Opting out…" : "Opt out"} cancel="Keep them" busy={busy} error={error} onConfirm={run} onClose={() => { if (!busy) setOpen(false); }}>
           <p>{who} comes off every outreach list and is never looked up again, at every event.</p>
@@ -70,12 +70,12 @@ const REPLY: Record<string, string> = { interested: "interested", meeting_reques
 const PAUSE: Record<string, string> = { meeting: "a meeting is booked", inbound: "they replied", waiting_for_rep: "waiting on a rep", colleague_replied: "a colleague replied", met_onsite: "met at the event", out_of_office: "out of office" };
 
 /** Where this person is in outreach, in one line: what happened last that matters most. */
-function outreachWords(c: PersonRow): string {
+function outreachWords(c: PersonRow, past = false): string {
   if (c.meeting === "held") return "Meeting held";
   if (c.meeting === "booked" || c.meeting === "rescheduled") return "Meeting booked";
   if (c.reply_code) return `Replied: ${REPLY[c.reply_code] ?? "replied"}`;
   const o = c.outreach;
-  if (!o) return c.drop_reason ? "Not in outreach" : "Not in outreach yet";
+  if (!o) return c.drop_reason || past ? "Not in outreach" : "Not in outreach yet";
   const by = o.channel === "linkedin" ? "on LinkedIn" : "by email";
   if (o.state === "enrolled") return `In a sequence ${by}`;
   if (o.state === "adding") return `Going into a sequence ${by}`;
@@ -83,20 +83,20 @@ function outreachWords(c: PersonRow): string {
   return `Out of outreach: ${o.cause ? gateWords(o.cause) : "removed"}`;
 }
 
-export function Person({ c, eventId, onClose, onChange }: { c: PersonRow; eventId?: string; onClose: () => void; onChange?: () => void }) {
+export function Person({ c, eventId, past = false, onClose, onChange }: { c: PersonRow; eventId?: string; past?: boolean; onClose: () => void; onChange?: () => void }) {
   const [optedOut, setOptedOut] = useState(false);
   const notes = c.flags.filter((f) => f !== "not_reviewed");
   const canOptOut = !c.drop_reason && !optedOut && Boolean(c.email || (c.full_name && c.company));
   const dropped = optedOut ? "opted_out" : c.drop_reason;
   return (
     <article className="panel" aria-label={c.full_name ?? "Person"} data-person={c.id}>
+      <button className="sheet-x panel-x" type="button" aria-label="Close" onClick={onClose}>&times;</button>
       <div className="col">
         <h2>{c.full_name ?? "No name on the row"}</h2>
-        <p style={{ fontSize: 16 }}>{c.title ?? "No title"}{c.company ? <>, <To to={eventId ? companyHref(eventId, c.company) : null}>{c.company}</To></> : ""}</p>
-        <p className="mute">{c.source === "prospect" ? "Found at the company, not on the attendee list." : "On the attendee list."}{c.employer && c.employer !== c.company ? ` Vendor says ${c.employer}.` : ""}</p>
+        <p style={{ fontSize: 16 }}>{c.title ? co(c.title) : "No title"}{c.company ? <>, <To to={eventId ? companyHref(eventId, c.company) : null}>{co(c.company)}</To></> : ""}</p>
+        {c.employer && c.employer !== c.company && <p className="mute">Vendor lists {co(c.employer)}</p>}
         {c.linkedin && <a className="mute to wrap-any" href={c.linkedin} target="_blank" rel="noopener noreferrer">{c.linkedin.replace(/^https?:\/\/(www\.)?/, "")}</a>}
         <div className="actions panel-acts">
-          <button className="btn line small" type="button" onClick={onClose}>Close</button>
           {canOptOut && <OptOut c={c} onDone={() => { setOptedOut(true); onChange?.(); }} />}
         </div>
       </div>
@@ -110,10 +110,12 @@ export function Person({ c, eventId, onClose, onChange }: { c: PersonRow; eventI
         </div>
       </div>
       <div className="col">
-        <p style={{ fontSize: 16 }}>{outreachWords(c)}</p>
-        <p className="mute wrap-any">{c.email ? `Email confirmed, ${c.email}` : "No email"}</p>
-        {c.last_verified_at && <p className="mute">Last verified {new Date(c.last_verified_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</p>}
-        {c.seen_at > 1 && <p className="mute">Seen at {c.seen_at} events</p>}
+        <p style={{ fontSize: 16 }}>{outreachWords(c, past)}</p>
+        <dl className="kv person-kv">
+          <div className="wide"><dt>Email</dt><dd className="wrap-any">{c.email ?? "None"}</dd></div>
+          {c.last_verified_at && <div><dt>Verified</dt><dd>{new Date(c.last_verified_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</dd></div>}
+          {c.seen_at > 1 && <div><dt>Events seen at</dt><dd>{c.seen_at}</dd></div>}
+        </dl>
         {notes.map((f) => <p key={f} className="mute">{FLAG_WORDS[f] ?? f.replace(/_/g, " ")}.</p>)}
         {dropped && <p className={`dropnote${optedOut ? " fresh" : ""}`}><i aria-hidden="true" />{dropWords(dropped)}{optedOut ? ", at every event" : ""}.</p>}
       </div>

@@ -27,6 +27,15 @@ const ZONES: Record<string, string> = {
   france: "Europe/Paris", germany: "Europe/Berlin", netherlands: "Europe/Amsterdam", italy: "Europe/Rome", singapore: "Asia/Singapore", japan: "Asia/Tokyo", india: "Asia/Kolkata", "united arab emirates": "Asia/Dubai", uae: "Asia/Dubai", australia: "Australia/Sydney",
 };
 export const zoneOf = (country: string | null | undefined) => ZONES[(country ?? "").trim().toLowerCase()] ?? null;
+/* Countries that span zones: the city decides. Checked against the venue before the country. */
+const CITY_ZONES: [RegExp, string][] = [
+  [/las vegas|los angeles|san francisco|san diego|san jose|seattle|portland|palm desert|palm springs|anaheim/i, "America/Los_Angeles"],
+  [/denver|salt lake/i, "America/Denver"], [/phoenix|scottsdale/i, "America/Phoenix"],
+  [/chicago|austin|dallas|houston|nashville|minneapolis|new orleans/i, "America/Chicago"],
+  [/vancouver/i, "America/Vancouver"], [/calgary/i, "America/Edmonton"], [/perth/i, "Australia/Perth"], [/brisbane/i, "Australia/Brisbane"],
+];
+/** The zone an event happens in: its city where the country spans several zones, else its country. */
+export const zoneAt = (venue: string | null | undefined, country: string | null | undefined) => CITY_ZONES.find(([re]) => re.test(venue ?? ""))?.[1] ?? zoneOf(country);
 
 /** The calendar day at `at` in the zone, YYYY-MM-DD. Unknown countries read UTC, and the screen says so. */
 export function localDay(at: Date, country: string | null | undefined) {

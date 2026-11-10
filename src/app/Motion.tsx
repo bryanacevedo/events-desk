@@ -7,19 +7,19 @@ import { Chevron, ExpandRow } from "./Patterns";
 import { Icon } from "./icons";
 import { PersonAvatar } from "./PersonAvatar";
 import { companyHref, personHref, To } from "./To";
-import { CODE_WORDS, MeetingRows, ObjectSheets, openObject, ReplyRows } from "./Objects";
+import { CODE_WORDS, dayIn, headIn, MeetingRows, meetTime, ObjectSheets, openObject, ReplyRows } from "./Objects";
 import { money, num, plural, shortDate } from "./words";
 import { isGtm } from "../shared/roles";
 
 interface Sender { address: string; role: "primary" | "spare"; daily_share: number; health: number | null }
 interface Sequence { id: string; name: string; channel: "email" | "linkedin"; priority: string; phase?: "pre" | "post"; zone_group?: string; adding?: number; connector: string; state: string; pause_reason: string | null; senders_needed: number | null; peak_daily: number | null; sender_status: "ok" | "short" | "not_visible" | null; sender_excluded: { address: string; reason: string }[]; enrolled: number; paused: number; senders: Sender[]; timing_note: string | null; external_id: string | null; checklist_at: string | null }
-interface Reply { id: string; connector?: string; thread_url?: string | null; code: string | null; doubtful: boolean; body: string | null; contact_id: string | null; full_name: string | null; company: string | null }
+interface Reply { id: string; connector?: string; thread_url?: string | null; code: string | null; doubtful: boolean; waiting?: boolean; body: string | null; contact_id: string | null; full_name: string | null; company: string | null }
 interface Meeting { id: string; contact_id?: string; status: string; scheduled_at: string; rep: string | null; full_name: string | null; company: string | null }
 interface Score { held_all: number; logged_outside: number; cost: { dollars_cents: number }; cost_per_held_cents: number | null; influence: { available: boolean; sourced: { n: number; cents: number }; influenced: { n: number; cents: number }; won: { n: number; cents: number } }; control: { available: boolean; met_accounts: number; met_with_pipeline: number; control_accounts: number; control_with_pipeline: number }; roi: { pipeline_per_dollar: number | null; cost_missing: string[] } }
 interface Overview {
   motion: string; capacity: { needed: number; healthy: number } | null;
-  card: { status: string; llm_cap: number; est_cents: number | null } | null;
-  sequences: Sequence[]; funnel: { kept: number; enrolled: number; sent: number; replied: number; booked: number; held: number } | null; owners: { status: string; n: number }[]; replies: Reply[]; meetings: Meeting[];
+  card: { status: string; llm_cap: number | null; est_cents: number | null } | null;
+  sequences: Sequence[]; funnel: { kept: number; enrolled: number; sent: number; replied: number; booked: number; held: number; held_all?: number } | null; owners: { status: string; n: number }[]; replies: Reply[]; meetings: Meeting[];
   captures: { id: string; contact_id?: string | null; full_name: string | null; company: string | null; rep: string; temperature?: string }[]; regions: { region: string; people: number; basis: string | null }[]; live_score: Score | null;
   post_event: { window: "before" | "during" | "after" | "closed"; last_day: string; last_press: string | null; started_at: string | null; started_by: string | null; groups: Record<string, number> } | null;
 }
@@ -32,7 +32,8 @@ const when = (iso: string) => new Date(iso).toLocaleString("en-GB", { weekday: "
 const FOLLOW_UP = [["scanned", "Scanned at the booth"], ["reached", "Reached before, no reply"], ["not_reached", "Not reached before"]] as const;
 /** Meeting and slot times in the reader's own clock. */
 const shortWhen = (iso: string) => new Date(iso).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
-const clockOf = (iso: string) => new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+const addDay = (ymd: string) => { const d = new Date(`${ymd}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + 1); return d.toISOString().slice(0, 10); };
+
 /** Opens one of the page's folds by its title and brings it into view: a figure that names a fold leads to it. */
 const openFold = (title: string) => {
   const d = [...document.querySelectorAll<HTMLDetailsElement>("section.motion details.fold")].find((x) => x.querySelector(".fold-t")?.textContent === title);
@@ -129,7 +130,7 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
   // What the event cost and returned is leadership's and GTM Engineering's view, as on Budget.
   const lead = isGtm(actor) || Boolean(needs?.approvers.includes(actor));
   const [o, setO] = useState<Overview | null>(null);
-  const [slots, setSlots] = useState<{ roster: { rep: string }[]; slots: { id: string; rep: string; starts_at: string; location: string; meeting_id: string | null }[] }>({ roster: [], slots: [] });
+  const [slots, setSlots] = useState<{ roster: { rep: string }[]; timezone?: string; slots: { id: string; rep: string; starts_at: string; location: string; meeting_id: string | null }[] }>({ roster: [], slots: [] });
   const [busy, setBusy] = useState(false), [error, setError] = useState(""), [note, setNote] = useState("");
   const [cap, setCap] = useState({ name: "", email: "", company: "", note: "", hot: false });
   const [slot, setSlot] = useState({ rep: "", day: "", from: "09:00", to: "17:00", minutes: 30, location: "Booth" });
@@ -153,9 +154,8 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
   const f = o.funnel, s = o.live_score, started = o.motion !== "none";
   const free = slots.slots.filter((x) => !x.meeting_id), roster = slots.roster.map((x) => x.rep);
   const booked = new Set(o.meetings.map((m) => m.contact_id).filter(Boolean) as string[]);
-  // Waiting on a rep means waiting: someone with a meeting booked has had their answer, and is in Meetings.
-  const hot = o.replies.filter((r) => (r.code === "interested" || r.code === "meeting_request" || r.code === "referral") && !(r.contact_id && booked.has(r.contact_id)));
-  const doubtful = o.replies.filter((r) => r.doubtful).length;
+  // Waiting on a rep means waiting: a reply a rep has answered, or someone with a meeting booked, is not. Same rule as Overview.
+  const hot = o.replies.filter((r) => r.waiting && (r.code === "interested" || r.code === "meeting_request" || r.code === "referral") && !(r.contact_id && booked.has(r.contact_id)));
   const sheet = openObject();
   const mine = o.owners.find((x) => x.status === "mine")?.n ?? 0;
   const missingRegions = o.regions.filter((r) => !r.basis);
@@ -173,7 +173,7 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
     <section className="motion" aria-label="Outreach" data-ready="1">
       <h2 className="sr-only">Outreach</h2>
       {((demo && !canFollowUp && !["closing", "scored"].includes(o.motion)) || (!demo && !started && (!o.card || o.card.status === "declined")) || canFollowUp) && <div className="m-head">
-        {demo && !canFollowUp && !["closing", "scored"].includes(o.motion) && <button className="btn small" disabled={busy} onClick={() => act("POST", `/api/demo/motion/${id}/advance`)}>{o.motion === "in_market" ? "Simulate replies" : "Next step"}</button>}
+        {demo && !canFollowUp && !["closing", "scored"].includes(o.motion) && <button className="btn line small" disabled={busy} onClick={() => act("POST", `/api/demo/motion/${id}/advance`)}>{o.motion === "in_market" ? "Simulate replies" : "Next step"}</button>}
         {!demo && !started && (!o.card || o.card.status === "declined") && <button className="btn small" disabled={busy} onClick={() => act("POST", `/api/events/${id}/motion/start`)}>Start outreach</button>}
         {canFollowUp && <button className="btn small" disabled={busy} onClick={() => act("POST", `/api/events/${id}/motion/sequences`, undefined, "The follow-up is set up. Each sequence waits for its launch checklist.")}>Start the follow-up</button>}
       </div>}
@@ -182,12 +182,12 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
 
       {(o.card?.status === "pending" || (!started && o.capacity)) && (
         <ul className="m-rows m-wide">
-          {o.card?.status === "pending" && <li><span>Reading replies, waiting on the uploader</span><b>Up to {plural(o.card.llm_cap, "AI call")}{o.card.est_cents !== null ? `, about ${money(o.card.est_cents)}` : ""}</b></li>}
+          {o.card?.status === "pending" && <li><span>Reading replies, waiting on the uploader</span><b>{o.card.llm_cap !== null ? <>Up to {plural(o.card.llm_cap, "AI call")}{o.card.est_cents !== null ? `, about ${money(o.card.est_cents)}` : ""}</> : "Waiting"}</b></li>}
           {!started && o.capacity && <li><span>Healthy inboxes</span><b>{o.capacity.healthy < o.capacity.needed ? <span className="fig over"><b>{o.capacity.needed - o.capacity.healthy}</b> short of {o.capacity.needed}</span> : `${o.capacity.healthy} for ${o.capacity.needed} needed`}</b></li>}
         </ul>
       )}
 
-      {pe && started && pe.window === "during" && <p className="m-line">The event is on. The follow-up can start the day after it ends, {shortDate(pe.last_day)}.</p>}
+      {pe && started && pe.window === "during" && <p className="m-line">Follow-up from {shortDate(addDay(pe.last_day))}</p>}
       {canFollowUp && (
         <section className="brief" aria-label="Follow-up after the event">
           <div>
@@ -196,11 +196,23 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
               {FOLLOW_UP.filter(([k]) => (g[k] ?? 0) > 0).map(([k, label]) => <Row key={k} label={label} n={g[k]!} of={followUp + withRep} />)}
               {withRep > 0 && <Row label="With a rep, not sequenced" n={withRep} of={followUp + withRep} tone="t3" />}
             </ul>
-            {pe!.last_press && <p className="m-line">Each group gets its own message. The button works until {shortDate(pe!.last_press)}.</p>}
+            {pe!.last_press && <p className="m-line">Start by {shortDate(pe!.last_press)}</p>}
           </div>
         </section>
       )}
-      {pe?.started_at && <p className="m-line">Follow-up started by {pe.started_by ?? "someone"} on {shortDate(pe.started_at.slice(0, 10))}</p>}
+      {pe?.started_at && (() => {
+        // When the follow-up went out and who pressed it: a row in the page's tray, the person on the left, the day on the right edge.
+        const day = pe.started_at.slice(0, 10), after = Math.round((Date.parse(day) - Date.parse(pe.last_day)) / 86_400_000);
+        return (
+          <div className="ob-tray m-started" aria-label="Follow-up">
+            <div className="ob-row ob-still">
+              <span className="ob-face"><PersonAvatar name={pe.started_by ?? "Events Desk"} size={36} /></span>
+              <span className="ob-who"><b>Follow-up started</b><span>{pe.started_by ?? "Events Desk"}</span></span>
+              <span className="m-started-at"><b>{shortDate(day)}</b><span>{after <= 0 ? "Last day of the event" : after === 1 ? "1 day after the event" : `${after} days after the event`}</span></span>
+            </div>
+          </div>
+        );
+      })()}
 
       {started && f && (
         <section className="brief" aria-label="Outreach in brief">
@@ -210,15 +222,15 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
               <Row label="In sequences" n={f.enrolled} of={f.kept} onOpen={() => openFold("Sequences")} />
               <Row label="Reached" n={f.sent} of={f.kept} />
               <Row label="Replied" n={f.replied} of={f.kept} onOpen={hot.length ? () => document.querySelector(".m-replies")?.scrollIntoView({ behavior: "smooth", block: "start" }) : undefined} />
-              <Row label="Meetings booked" onOpen={() => openFold("Meetings")} n={o.meetings.filter((m) => ["booked", "rescheduled", "held", "no_show"].includes(m.status)).length} of={f.kept} />
-              <Row label="Meetings held" n={s?.held_all ?? f.held} of={f.kept} onOpen={() => openFold("Meetings")} />
-              {mine > 0 && <Row label="Kept by account owners" n={mine} of={f.kept} tone="t3" />}
+              {/* Where meetings came from, then every meeting held: the same total as every other screen. */}
+              <Row label="Booked from a reply" onOpen={() => openFold("Meetings")} n={f.booked} of={f.kept} />
+              {(f.held_all ?? f.held) > f.held && <Row label="Met at the booth" n={(f.held_all ?? f.held) - f.held} of={f.kept} onOpen={() => openFold("Meetings")} />}
+              <Row label="Meetings held" n={f.held_all ?? f.held} of={f.kept} onOpen={() => openFold("Meetings")} />
+              {mine > 0 && <Row label="Held back by account owners" n={mine} of={f.kept} tone="t3" />}
             </ul>
           </div>
         </section>
       )}
-
-      {doubtful > 0 && <p className="m-line"><span className="fig over"><b>{doubtful}</b> {doubtful === 1 ? "reply" : "replies"} to read</span> in the cases above</p>}
 
       {hot.length > 0 && (
         <div className="m-group m-replies">
@@ -235,7 +247,6 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
         )}
         {started && missingRegions.length > 0 && (
           <Fold icon={<Icon.pin />} title="Who we may contact" peek={<span className="fig over"><b>{missingRegions.length}</b> regions to confirm</span>}>
-            <p className="mute small">Nobody in these regions is contacted until someone records the basis for it.</p>
             <div className="rg-tiles">{missingRegions.map((r) => (
               <div key={r.region} className="rg-tile">
                 <span className="rg-name">{r.region === "unknown" ? "Region unknown" : r.region[0].toUpperCase() + r.region.slice(1)}</span>
@@ -264,16 +275,16 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
         {started && roster.length > 0 && (
           <Fold icon={<Icon.seats />} title="Meeting slots" peek={free.length ? <>{num(free.length)} free</> : "None open"}>
             {free.length > 0 ? (
-              <div className="sl-days">{[...new Set(free.map((x) => x.starts_at.slice(0, 10)))].map((day) => (
+              <div className="sl-days">{[...new Set(free.map((x) => dayIn(x.starts_at, slots.timezone)))].map((day) => (
                 <div key={day} className="sl-day">
-                  <h4>{new Date(`${day}T12:00:00Z`).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}</h4>
-                  {[...new Set(free.filter((x) => x.starts_at.startsWith(day)).map((x) => x.rep))].map((rep) => {
-                    const mine = free.filter((x) => x.starts_at.startsWith(day) && x.rep === rep);
-                    return <p key={rep} className="sl-line"><span className="sl-rep"><PersonAvatar name={rep} size={24} />{rep}</span><span className="sl-times">{mine.map((x) => <span key={x.id}>{clockOf(x.starts_at)}</span>)}</span><span className="mute">{mine[0].location}</span></p>;
+                  <h4>{headIn(free.find((x) => dayIn(x.starts_at, slots.timezone) === day)!.starts_at, slots.timezone)}</h4>
+                  {[...new Set(free.filter((x) => dayIn(x.starts_at, slots.timezone) === day).map((x) => x.rep))].map((rep) => {
+                    const mine = free.filter((x) => dayIn(x.starts_at, slots.timezone) === day && x.rep === rep);
+                    return <p key={rep} className="sl-line"><span className="sl-rep"><PersonAvatar name={rep} size={24} />{rep}</span><span className="sl-times">{mine.map((x) => <span key={x.id}>{meetTime(x.starts_at, slots.timezone).clock}</span>)}</span><span className="mute">{mine[0].location}</span></p>;
                   })}
                 </div>
               ))}</div>
-            ) : <p className="mute">No free slots. Open some for the reps going.</p>}
+            ) : <p className="mute">No free slots.</p>}
             {slotForm ? (
               <form className="m-form" onSubmit={(e) => { e.preventDefault(); act("POST", `/api/events/${id}/motion/slots`, slot, "Slots opened."); setSlotForm(false); }}>
                 <label>Who<select value={slot.rep} onChange={(e) => setSlot({ ...slot, rep: e.target.value })}>{roster.map((x) => <option key={x}>{x}</option>)}</select></label>

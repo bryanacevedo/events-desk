@@ -229,3 +229,8 @@ export async function fuzzyListCases(db: Db, eventId: string, s: Settings) {
   });
   return opened;
 }
+
+/** Set by the server when the desk prices cards on its own: called whenever an event may have become ready for its next card. */
+let quoteHook: ((eventId: string) => Promise<void>) | null = null;
+export const setQuoteHook = (fn: ((eventId: string) => Promise<void>) | null) => { quoteHook = fn; };
+export const priceIfReady = async (eventId: string) => { if (quoteHook) await quoteHook(eventId).catch(() => undefined); };

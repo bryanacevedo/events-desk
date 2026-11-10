@@ -13,6 +13,8 @@ export function logoDomain(website: string | null | undefined): string | null {
 
 /** Domains whose favicon is a blank shape or too small to read; they get the initials tile. Checked by eye against the demo's events. */
 const POOR = new Set(["merchantriskcouncil.org", "finnosummit.com", "money2020.com"]);
+/** Reserved names (the demo's made-up companies) have no favicon; asking for one only logs a 404. */
+const RESERVED = /\.(example|test|invalid|localhost|local)$/;
 /** Google returns a 16px placeholder for unknown sites; anything that small is not a logo. */
 const MIN_PX = 24;
 
@@ -24,7 +26,7 @@ export const eventInitials = (name: string) => {
 export function EventLogo({ name, website, size = 28, className = "" }: { name: string; website?: string | null; size?: number; className?: string }) {
   const domain = logoDomain(website);
   const [failed, setFailed] = useState(false);
-  const usable = domain && !POOR.has(domain) && !failed;
+  const usable = domain && !POOR.has(domain) && !RESERVED.test(domain) && !failed;
   const px = `${size}px`;
   return (
     <span className={`logo${usable ? "" : " fallback"} ${className}`.trim()} style={{ width: px, height: px, fontSize: Math.round(size * 0.38) }} aria-hidden="true" data-domain={domain ?? undefined}>

@@ -2,7 +2,7 @@
    The rail and the v1 risks come from routes that already exist; this adds what happens after a list is delivered. */
 
 import type { Db } from "./db.ts";
-import { computeScorecard } from "./closeout.ts";
+import { computeScorecard, COST_CATEGORIES } from "./closeout.ts";
 import type { LifecycleDeps } from "./lifecycle-deps.ts";
 import { postEventState } from "./post-event.ts";
 
@@ -12,7 +12,7 @@ export interface DeliveredLately {
 }
 
 /** Something after delivery that needs a person, on one event. */
-export interface OutreachNeed { kind: "replies" | "follow_up" | "paused" | "meetings"; event_id: string; name: string; website: string | null; n: number; overdue: number; detail: string }
+export interface OutreachNeed { kind: "replies" | "follow_up" | "paused" | "meetings" | "costs"; event_id: string; name: string; website: string | null; n: number; overdue: number; detail: string }
 /** An event with outreach going: how far it has got. */
 export interface LiveRow { id: string; name: string; website: string | null; starts_on: string; motion: string; sheet_url: string | null; last_day: string; post_started_at: string | null; kept: number; sent: number; replied: number; held: number }
 /** An event's result so far: what it cost against the pipeline it made or moved. */
@@ -50,6 +50,13 @@ export async function overview(db: Db, deps?: LifecycleDeps): Promise<{ delivere
     if (e.meetings) needs.push({ ...base, kind: "meetings", n: e.meetings, overdue: 0, detail: "" });
   }
 
+  // Once an event closes, what it cost has to be whole before its return means anything: each category entered, or marked as none.
+  for (const e of await db.query<{ id: string; name: string; website: string | null; n: number }>(
+    `SELECT e.id, e.name, ${WEBSITE}, (SELECT count(*)::int FROM unnest($1::text[]) k WHERE NOT EXISTS (SELECT 1 FROM event_costs c WHERE c.event_id = e.id AND c.category = k)) AS n
+     FROM events e WHERE e.stage = 'delivered' AND e.parent_event_id IS NULL AND e.motion IN ('closing', 'scored') ORDER BY e.starts_on DESC`, [COST_CATEGORIES])) {
+    if (e.n) needs.push({ event_id: e.id, name: e.name, website: e.website, kind: "costs", n: e.n, overdue: 0, detail: "" });
+  }
+
   const live = await db.query<LiveRow>(
     `SELECT e.id, e.name, e.motion, e.sheet_url, e.starts_on::text AS starts_on, ${WEBSITE}, e.post_started_at::text AS post_started_at,
        coalesce((SELECT c.ends_on FROM catalog_events c WHERE c.id = e.catalog_id), e.ends_on, e.starts_on)::text AS last_day, f.kept, f.sent, f.replied, f.held_all AS held
@@ -60,7 +67,7 @@ export async function overview(db: Db, deps?: LifecycleDeps): Promise<{ delivere
   const scored = await db.query<{ id: string; name: string; website: string | null; motion: string; metrics: { held_all: number; cost: { dollars_cents: number }; influence: { sourced: { cents: number }; influenced: { cents: number } }; roi: { pipeline_per_dollar: number | null }; score: unknown } | null }>(
     `SELECT e.id, e.name, e.motion, ${WEBSITE},
        (SELECT s.metrics FROM scorecards s WHERE s.event_id = e.id ORDER BY s.window_days DESC LIMIT 1) AS metrics
-     FROM events e WHERE e.stage = 'delivered' AND e.parent_event_id IS NULL AND e.motion IN ('in_market', 'closing', 'scored') ORDER BY e.starts_on DESC LIMIT 4`);
+     FROM events e WHERE e.stage = 'delivered' AND e.parent_event_id IS NULL AND e.motion IN ('closing', 'scored') ORDER BY e.starts_on DESC LIMIT 4`);
   const results: ResultRow[] = [];
   for (const e of scored) {
     const m = e.metrics ?? await computeScorecard(db, deps, e.id, 30, { write: false }).catch(() => null);

@@ -3,6 +3,8 @@
    which meeting each came from, and what the team learned. Money is leadership's and GTM's, as on Budget; everyone sees the meetings,
    the comparison and the learning. Nothing here is computed on the page: it is the scorecard the desk wrote, or its live reading. */
 
+import { EventLogo } from "./EventLogo";
+import { companyDisplayName as co, dealDisplayName } from "../shared/names";
 import { useEffect, useState, type CSSProperties } from "react";
 import { get, send } from "./api";
 import { Link, useActor } from "./App";
@@ -14,7 +16,7 @@ import { objectHref, stamp } from "./Objects";
 import { PersonAvatar } from "./PersonAvatar";
 import { money, num, shortDate } from "./words";
 
-interface Deal { opportunity_id: string; account: string | null; name: string | null; stage: string | null; amount_cents: number; kind: "sourced" | "influenced"; won: boolean; meeting_id: string | null; met: string | null; meeting_at: string | null }
+interface Deal { opportunity_id: string; domain?: string | null; account: string | null; name: string | null; stage: string | null; amount_cents: number; kind: "sourced" | "influenced"; won: boolean; meeting_id: string | null; met: string | null; meeting_at: string | null }
 export interface Metrics {
   funnel: { kept: number; sent: number; replied: number; booked: number }; held_all: number;
   cost: { dollars_cents: number }; cost_per_held_cents: number | null;
@@ -52,7 +54,7 @@ export function Result({ eventId, eventName, motion, lastDay, live, scorecards, 
   const ratio = m.roi.pipeline_per_dollar, thin = m.held_all < MIN_HELD;
   const deals = m.influence.deals ?? [];
   const daysAfter = lastDay ? Math.max(0, Math.round((Date.now() - Date.parse(`${lastDay}T12:00:00Z`)) / 86_400_000)) : null;
-  const kicker = motion === "scored" && latest ? `Scored, day ${latest.window_days}` : daysAfter !== null ? `So far, day ${daysAfter}` : "So far";
+  const kicker = motion === "scored" && latest ? `Scored ${latest.window_days} days after the event` : daysAfter !== null ? `${daysAfter} ${daysAfter === 1 ? "day" : "days"} after the event` : "So far";
   const mine = debriefs.find((d) => d.author === actor && d.status === "waiting");
   const sentMine = debriefs.find((d) => d.author === actor && d.status === "answered");
   const toReview = lead ? debriefs.filter((d) => d.status === "answered") : [];
@@ -66,11 +68,11 @@ export function Result({ eventId, eventName, motion, lastDay, live, scorecards, 
         <div className="md-hello">
           <p>{kicker}</p>
           {lead && m.influence.available
-            ? <h2><b className={thin ? "thin" : undefined}>{ratio === null ? "None" : times(ratio)}</b><span>{money(m.influence.pipeline_cents)} in pipeline for {money(m.cost.dollars_cents)}{thin ? ", too few meetings to rank" : ""}</span></h2>
+            ? <h2><b className={thin ? "thin" : undefined} title={thin ? "Fewer than five held meetings" : undefined}>{ratio === null ? "None" : times(ratio)}</b><span>pipeline per dollar</span></h2>
             : <h2><b>{num(m.held_all)}</b><span>{m.held_all === 1 ? "meeting held" : "meetings held"}</span></h2>}
         </div>
         <div className="md-figs">
-          {lead ? <><p><b>{num(m.held_all)}</b><span>{m.held_all === 1 ? "meeting held" : "meetings held"}</span></p><p><b>{num(deals.length)}</b><span>{deals.length === 1 ? "deal" : "deals"}</span></p></>
+          {lead ? <><p><b>{money(m.influence.pipeline_cents)}</b><span>pipeline</span></p><p><b>{money(m.cost.dollars_cents)}</b><span>cost</span></p><p><b>{num(m.held_all)}</b><span>{m.held_all === 1 ? "meeting held" : "meetings held"}</span></p><p><b>{num(deals.length)}</b><span>{deals.length === 1 ? "deal" : "deals"}</span></p></>
             : <><p><b>{num(m.funnel.sent)}</b><span>reached</span></p><p><b>{num(m.funnel.replied)}</b><span>{m.funnel.replied === 1 ? "reply" : "replies"}</span></p></>}
         </div>
       </header>
@@ -81,13 +83,13 @@ export function Result({ eventId, eventName, motion, lastDay, live, scorecards, 
           <ul className="ob-tray">{deals.map((d, i) => {
             const row = (
               <>
-                <span className="ob-face"><PersonAvatar name={d.met ?? d.account ?? "Account"} size={36} /></span>
-                <span className="ob-who"><b>{d.account ?? "An account"}</b><span>{[d.name, d.stage].filter(Boolean).join(" · ")}</span></span>
+                <span className="ob-face"><EventLogo name={d.account ? co(d.account) : "Account"} website={d.domain ? `https://${d.domain}` : null} size={36} /></span>
+                <span className="ob-who"><b>{d.account ? co(d.account) : "An account"}</b><span>{[dealDisplayName(d.name, d.account), d.stage].filter(Boolean).join(" · ")}</span></span>
                 <span className="rs-amount"><b>{money(d.amount_cents)}</b><span>{d.won ? "Won" : d.kind === "sourced" ? "New pipeline" : "Moved forward"}</span></span>
                 <span className="ob-end"><span className="ob-when">{d.met ? `Met ${d.met.split(" ")[0]}${d.meeting_at ? `, ${stamp(d.meeting_at).split(",")[0]}` : ""}` : "Met"}</span>{d.meeting_id && <span className="ob-go">Open<svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h9M8.5 4l4 4-4 4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg></span>}</span>
               </>
             );
-            return <li key={d.opportunity_id} style={{ "--i": i } as CSSProperties}>{d.meeting_id ? <Link to={objectHref("meeting", d.meeting_id)} go={go} className="ob-row rs-deal" data-opens-sheet="">{row}</Link> : <div className="ob-row rs-deal">{row}</div>}</li>;
+            return <li key={d.opportunity_id} style={{ "--i": i } as CSSProperties}><Link to={objectHref("deal", `${eventId}|${d.opportunity_id}`)} go={go} className="ob-row rs-deal" data-opens-sheet="">{row}</Link></li>;
           })}</ul>
         </div>
       )}
@@ -95,27 +97,21 @@ export function Result({ eventId, eventName, motion, lastDay, live, scorecards, 
       <div className="rs-sec">
         <h3 className="rs-h">What we learned</h3>
         {themes.length > 0 ? (
-          <div className="rs-learned">{themes.map((t) => (
-            <section key={t}>
-              <h4>{THEME[t] ?? t}</h4>
-              <ul>{facts.filter((f) => f.theme === t).map((f, i) => (
-                <li key={i}><p>{f.fact}</p>{f.quote && <q>{f.quote}</q>}<span>{[f.author.split(" ")[0], f.account].filter(Boolean).join(" · ")}</span></li>
-              ))}</ul>
-            </section>
-          ))}</div>
-        ) : !mine && !toReview.length && <p className="m-line">{sentMine ? "Your notes are with leadership to review. Once accepted, they show here." : "Nothing written yet. Each rep who held a meeting is asked how it went, a few days after the event."}</p>}
+          <div className="rs-learned" style={{ "--cols": themes.length === 4 ? 2 : Math.min(themes.length, 3) } as CSSProperties}>{themes.map((t) => <Learned key={t} title={THEME[t] ?? t} facts={facts.filter((f) => f.theme === t)} />)}</div>
+        ) : !mine && !toReview.length && <p className="m-line">{sentMine ? null : "Nothing written yet."}</p>}
 
-        {debriefs.length > 0 && (
-          <ul className="rs-notes" aria-label="Who has written">{debriefs.map((d) => {
+        {/* Only what is still owed: accepted notes already carry their author's name above. */}
+        {debriefs.some((d) => d.status === "waiting" || d.status === "answered") && (
+          <ul className="rs-notes" aria-label="Notes still owed">{debriefs.filter((d) => d.status === "waiting" || d.status === "answered").map((d) => {
             const days = d.prompted_at ? Math.max(0, Math.round((Date.now() - Date.parse(d.prompted_at)) / 86_400_000)) : null;
-            const state = d.status === "accepted" ? "Accepted" : d.status === "rejected" ? "Left out" : d.status === "answered" ? "Written, waiting for review" : `Not written${days !== null ? `, asked ${days === 0 ? "today" : days === 1 ? "yesterday" : `${days} days ago`}` : ""}`;
+            const state = d.status === "answered" ? "Notes waiting for review" : `Notes not written${days !== null ? `, asked ${days === 0 ? "today" : days === 1 ? "yesterday" : `${days} days ago`}` : ""}`;
             return <li key={d.id} className={d.status === "waiting" ? "owed" : undefined}><PersonAvatar name={d.author} size={26} /><b>{d.author}</b><span>{state}</span></li>;
           })}</ul>
         )}
 
         {toReview.map((d) => (
           <article key={d.id} className="rs-review">
-            <p className="rs-review-k"><b>{d.author}</b> wrote{d.answered_at ? ` on ${shortDate(d.answered_at.slice(0, 10))}` : ""}. Accepted notes join what we learned.</p>
+            <p className="rs-review-k"><b>{d.author}</b>{d.answered_at ? `, ${shortDate(d.answered_at.slice(0, 10))}` : ""}</p>
             <p className="rs-review-body">{d.body}</p>
             <div className="ob-acts">
               <button className="btn small" disabled={busy} onClick={() => act(() => send("POST", `/api/motion/debriefs/${d.id}/review`, actor, { status: "accepted" }))}>Accept</button>
@@ -126,8 +122,8 @@ export function Result({ eventId, eventName, motion, lastDay, live, scorecards, 
 
         {mine && (
           <form className="rs-write" onSubmit={(e) => { e.preventDefault(); act(() => send("POST", `/api/motion/debriefs/${mine.id}/answer`, actor, { body: draft })); setDraft(""); }}>
-            <label><span>How was {eventName}? A few lines is plenty: who mattered, what they said, what you would do differently.</span>
-              <textarea className="input" rows={4} value={draft} onChange={(e) => setDraft(e.target.value)} required /></label>
+            <label><span>How was {eventName}?</span>
+              <textarea className="input" rows={4} placeholder="Who mattered, what they said, what you would do differently" value={draft} onChange={(e) => setDraft(e.target.value)} required /></label>
             <button className="btn small" disabled={busy || !draft.trim()}>Send</button>
           </form>
         )}
@@ -138,14 +134,12 @@ export function Result({ eventId, eventName, motion, lastDay, live, scorecards, 
 
 /** For leadership, in a fold below: why the verdict holds. Met against not met, where the pipeline came from, how it moved, and the costs still to enter. */
 export function ResultEvidence({ eventId, motion, lastDay, live, scorecards, onChange }: { eventId: string; motion: string; lastDay: string | null; live: Metrics | null; scorecards: { window_days: number; metrics: Metrics }[]; onChange: () => void }) {
-  const { actor } = useActor();
-  const [busy, setBusy] = useState(false), [cost, setCost] = useState({ category: "", amount: "" });
+  const { go } = useActor();
   const { m, written } = pickMetrics(motion, live, scorecards);
   if (!m) return null;
   const c = m.control, pipeline = Math.max(m.influence.pipeline_cents, 1);
-  const values = written.map((w) => w.metrics.influence.pipeline_cents), still = values.length > 1 && values.every((v) => v === values[0]);
+  const values = written.map((w) => w.metrics.influence.pipeline_cents);
   const next = lastDay ? WINDOWS.find((w) => !written.some((x) => x.window_days === w)) : undefined;
-  const add = async () => { setBusy(true); try { await send("POST", `/api/events/${eventId}/motion/costs`, actor, { category: cost.category || m.roi.cost_missing[0], amount_cents: Math.round(Number(cost.amount) * 100) }); setCost({ category: "", amount: "" }); onChange(); } finally { setBusy(false); } };
   const top = Math.max(1, ...values);
   const credits = Object.values((m.cost as { credits_by_step?: Record<string, number> }).credits_by_step ?? {}).reduce((n, x) => n + x, 0);
   return (
@@ -156,7 +150,7 @@ export function ResultEvidence({ eventId, motion, lastDay, live, scorecards, onC
             <h3>Accounts with pipeline</h3>
             <ul>
               <li className="brow"><span>Ones we met</span><i aria-hidden="true"><u className="t1" style={{ width: `${pct(c.met_with_pipeline, c.met_accounts)}%` }} /></i><b>{pct(c.met_with_pipeline, c.met_accounts)}%</b></li>
-              <li className="brow"><span>{c.basis === "holdout" ? "Ones held out at random" : "Ones on the list we never reached"}</span><i aria-hidden="true"><u className="t3" style={{ width: `${pct(c.control_with_pipeline, c.control_accounts)}%` }} /></i><b>{pct(c.control_with_pipeline, c.control_accounts)}%</b></li>
+              <li className="brow" title={c.basis === "holdout" ? "A random share of the list, never contacted, kept for comparison" : "Accounts on the list nobody contacted"}><span>{c.basis === "holdout" ? "Ones we left out on purpose" : "Ones we never reached"}</span><i aria-hidden="true"><u className="t3" style={{ width: `${pct(c.control_with_pipeline, c.control_accounts)}%` }} /></i><b>{pct(c.control_with_pipeline, c.control_accounts)}%</b></li>
             </ul>
           </div>
         )}
@@ -172,9 +166,7 @@ export function ResultEvidence({ eventId, motion, lastDay, live, scorecards, onC
         )}
       </div>
 
-      {written.length > 0 && (still
-        ? <p className="rs-line">Unchanged since day {written[0].window_days}.{next && lastDay ? ` Next reading, day ${next}, on ${shortDate(addDays(lastDay, next))}.` : ""}</p>
-        : (
+      {written.length > 0 && (
           <ol className="rs-steps">{WINDOWS.map((w, i) => {
             const s = written.find((x) => x.window_days === w);
             return (
@@ -185,20 +177,21 @@ export function ResultEvidence({ eventId, motion, lastDay, live, scorecards, onC
               </li>
             );
           })}</ol>
-        ))}
-
-      <dl className="sheet-facts rs-cost">
-        <div><dt>Cost</dt><dd>{money(m.cost.dollars_cents)}{m.cost_per_held_cents !== null ? `, ${money(m.cost_per_held_cents)} per meeting held` : ""}{credits > 0 ? `, plus ${num(credits)} prepaid data credits` : ""}</dd></div>
-        {m.roi.cost_missing.length > 0 && (
-          <div><dt>Not entered</dt><dd>
-            <form className="m-act" onSubmit={(e) => { e.preventDefault(); add(); }}>
-              <select aria-label="Cost" value={cost.category || m.roi.cost_missing[0]} onChange={(e) => setCost({ ...cost, category: e.target.value })}>{m.roi.cost_missing.map((x) => <option key={x} value={x}>{x === "rep_time" ? "Rep time" : x[0].toUpperCase() + x.slice(1)}</option>)}</select>
-              <input aria-label="US dollars" inputMode="decimal" placeholder="$" value={cost.amount} onChange={(e) => setCost({ ...cost, amount: e.target.value })} required />
-              <button className="btn small line" disabled={busy}>Add</button>
-            </form>
-          </dd></div>
         )}
-      </dl>
+
+      {/* The cost's lines live on the Cost tab; here only what the verdict rests on, and a way to finish it when lines are missing. */}
+      {m.cost_per_held_cents !== null && (
+        <div className="md-figs rs-figs">
+          <p><b>{money(m.cost_per_held_cents)}</b><span>per meeting held</span></p>
+        </div>
+      )}
+      {m.roi.cost_missing.length > 0 && (
+        <Link to={`/event/${eventId}#cost`} go={go} className="ob-link rs-cost-link">
+          <span className="ob-link-k">Costs to enter</span>
+          <span>{m.roi.cost_missing.length === 1 ? "1 line" : `${m.roi.cost_missing.length} lines`}</span>
+          <span className="ob-link-s">Enter<svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h9M8.5 4l4 4-4 4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
+        </Link>
+      )}
     </div>
   );
 }
@@ -225,6 +218,35 @@ export function ResultView({ id, name, onChange }: { id: string; name: string; o
         </div>
       )}
       <ObjectSheets changed={changed} />
+    </section>
+  );
+}
+
+/** One theme's learnings as a card: one learning at a time, with arrows and a count when the reps heard more than one. */
+function Learned({ title, facts }: { title: string; facts: { fact: string; quote: string; author: string; account: string | null }[] }) {
+  const [i, setI] = useState(0), [dir, setDir] = useState(1);
+  const n = facts.length;
+  const step = (d: number) => { setDir(d); setI((x) => (x + d + n) % n); };
+  return (
+    <section className="rs-learn" aria-roledescription="carousel" aria-label={title}>
+      <header>
+        <h4>{title}</h4>
+        {n > 1 && (
+          <span className="rs-learn-nav">
+            <i>{i + 1} of {n}</i>
+            <button type="button" aria-label={`Previous ${title.toLowerCase()} learning`} onClick={() => step(-1)}><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M13 8H4M7.5 4l-4 4 4 4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg></button>
+            <button type="button" aria-label={`Next ${title.toLowerCase()} learning`} onClick={() => step(1)}><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h9M8.5 4l4 4-4 4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg></button>
+          </span>
+        )}
+      </header>
+      {/* Every learning sits in the same cell and only the current one shows, so the card is as tall as its longest and nothing below moves. */}
+      <div className="rs-learn-stack">{facts.map((x, j) => (
+        <div className="rs-learn-body" key={j === i ? `on${i}` : j} aria-hidden={j !== i} style={{ "--from": `${dir * 18}px`, visibility: j === i ? undefined : "hidden" } as CSSProperties}>
+          <p>{x.fact}</p>
+          {x.quote && <q>{x.quote}</q>}
+          <span>{[x.author.split(" ")[0], x.account].filter(Boolean).join(" · ")}</span>
+        </div>
+      ))}</div>
     </section>
   );
 }

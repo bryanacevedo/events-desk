@@ -10,7 +10,7 @@ export const setDemoCalendar = (on: boolean) => { demoCalendar = on; };
 const windowOpen = (last: string, today: string) => demoCalendar || today <= addDays(last, POST_START_LATEST_DAYS);
 
 /** After delivery the steps that built the list fold into one, and the same bar carries on. One timeline for the whole life of the event. */
-export const AFTER: [string, string, string][] = [["none", "List ready", "Ready for outreach"], ["owners", "Owners", "With account owners"], ["sequencing", "Sequences", "Being set up"], ["in_market", "In market", "Live"], ["follow_up", "Follow-up", "Following up"], ["closing", "Closing", "Closing out"], ["scored", "Scored", ""]];
+export const AFTER: [string, string, string][] = [["none", "List ready", "Ready for outreach"], ["owners", "Owners", "With account owners"], ["sequencing", "Sequences", "Being set up"], ["in_market", "In market", "Live"], ["follow_up", "Follow-up", "Following up"], ["closing", "Closing", ""], ["scored", "Scored", ""]];
 
 /** Where a delivered event is. In market is the outreach before it; Follow-up is from the day after its last day until the wave ends (LIFECYCLE §5b). */
 export function afterStep(e: EventRow): { key: string; caption?: string } {
@@ -30,5 +30,7 @@ const STEP_WORDS: Record<string, string> = { none: "Outreach list ready", owners
 export function deliveredWords(e: EventRow): { words: string; waiting: boolean } {
   const s = afterStep(e);
   if (s.key === "follow_up" && !e.post_started_at) return { words: s.caption === "Not started" ? "Follow-up not started" : "Follow-up ready", waiting: s.caption !== "Not started" };
+  // A list that was never taken to outreach, on an event now over, is not still ready: it went unused.
+  if (s.key === "none" && e.last_day && new Date().toISOString().slice(0, 10) > e.last_day) return { words: "No outreach", waiting: false };
   return { words: STEP_WORDS[s.key] ?? STEP_WORDS.none, waiting: false };
 }

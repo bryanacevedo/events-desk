@@ -101,7 +101,7 @@ export function Seats({ go, search, requesting, preselect }: { go: (to: string) 
   const headroom = (id: string) => {
     const b = all.find((r) => r.event_id === id && r.status === "pending" && r.budget)?.budget;
     if (!b) return null;
-    return b.left_after < 0 ? <Flag cents={b.left_after} words={`over Q${b.quarter}`} over /> : <Flag cents={b.left_after} words={`left in Q${b.quarter} after one seat`} className="mute" />;
+    return b.left_after < 0 ? <Flag cents={b.left_after} words={`over Q${b.quarter} if approved`} over /> : <Flag cents={b.left_after} words={`left in Q${b.quarter} after one seat`} className="mute" />;
   };
 
   return (
@@ -109,7 +109,7 @@ export function Seats({ go, search, requesting, preselect }: { go: (to: string) 
       <header className="hero" data-ready="1">
         <div><h1>Seats</h1></div>
         <span className="spacer" />
-        <Link to="/seats?request=1" go={go} className="btn phone-only">Request seats</Link>
+        <Link to="/seats?request=1" go={go} className="btn phone-only">Request a seat</Link>
       </header>
 
       {requesting && <RequestSeats preselect={preselect} onDone={() => go(needs?.approvers.includes(actor) ? "/seats?mine=1&status=all" : "/my-day")} onClose={() => go("/seats")} />}
@@ -145,7 +145,7 @@ export function Seats({ go, search, requesting, preselect }: { go: (to: string) 
                       <span><b>{r.expected_meetings}</b><i>Meetings</i></span>
                       <span><b>{money(r.seat_price_cents)}</b><i>{r.price_is_estimate ? "Ticket est." : "Ticket"}</i></span>
                       <span>{r.travel_cents ? <><b>{money(r.travel_cents)}</b><i>Travel</i></> : null}</span>
-                      <span>{r.decide_by ? <><b>{shortDate(r.decide_by)}</b><i>Decide by</i></> : null}</span>
+                      <span>{r.decide_by ? <><b>{shortDate(r.decide_by)}</b><i>{r.decide_by < new Date().toISOString().slice(0, 10) && r.status === "pending" ? "Was due" : "Decide by"}</i></> : null}</span>
                     </span>
                   </>}
                   side={r.status === "pending" ? <Decide r={r} onDone={refresh} />

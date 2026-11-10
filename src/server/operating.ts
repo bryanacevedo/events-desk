@@ -1,5 +1,6 @@
 /* What keeps the after-delivery work honest while it runs: messages that cannot be lost, one place for alerts, proof each tool was heard from, a response clock on replies, and people met in person. */
 
+import { eventZone } from "./meetings.ts";
 import { DAY, LIVE_THREAD_HOLD_DAYS } from "../shared/policy.ts";
 import type { Db } from "./db.ts";
 import { welcomeRoom } from "./event-room.ts";
@@ -174,7 +175,7 @@ export async function captureOnsite(db: Db, deps: LifecycleDeps, eventId: string
     if (contact.domain && !scanOnly) {
       await addHold(q, { domain: contact.domain, person_id: contact.person_id, cause: "live_thread", cause_id: contact.id, expires_at: new Date(now.getTime() + LIVE_THREAD_HOLD_DAYS * DAY) });
       await addTouch(q, { domain: contact.domain, person_id: contact.person_id, contact_id: contact.id, event_id: eventId, kind: "met_onsite", reason: c.note ?? "", source: rep, dedup_key: `onsite:${capId}` });
-      if (c.met) await q("INSERT INTO meetings (id, event_id, contact_id, domain, external_key, status, scheduled_at, source, rep, outcome_at) VALUES ($1, $2, $3, $4, $5, 'held', $6, 'onsite', $7, $6)", [newId("mtg"), eventId, contact.id, contact.domain, `onsite:${capId}`, now.toISOString(), rep]);
+      if (c.met) await q("INSERT INTO meetings (id, event_id, contact_id, domain, external_key, status, scheduled_at, source, rep, outcome_at, timezone) VALUES ($1, $2, $3, $4, $5, 'held', $6, 'onsite', $7, $6, $8)", [newId("mtg"), eventId, contact.id, contact.domain, `onsite:${capId}`, now.toISOString(), rep, await eventZone(q, eventId)]);
     }
     await logActivity(q, eventId, rep, "onsite", `${rep} met ${name ?? email ?? "someone"}${c.company ? ` from ${c.company}` : ""}`);
     // Hot goes to the rep who had the conversation, the same day: a task in the CRM and a card in the event's channel. The person never goes into a sequence.

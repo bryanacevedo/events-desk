@@ -1,6 +1,7 @@
 /* Runs the paid stages. One job is one paid item. Each paid call is reserve,
    call, settle, because a transaction cannot wrap an external call. */
 
+import { priceIfReady } from "./research.ts";
 import { getSettingsNow } from "./approvals.ts";
 import { fuzzyListCases } from "./research.ts";
 import { dropAtCompany, dropContact, enqueue } from "./work.ts";
@@ -615,7 +616,7 @@ async function runEvent(db: Db, eventId: string, deps: Deps) {
       // The spread check warns before Approval 2. It blocks nothing; the Outreach card carries it too.
       const spread = await spreadFor(db.query, eventId, settings);
       await db.tx((q) => logActivity(q, eventId, SYSTEM, "spread", spread.warnings.length ? `Spread check: ${spread.warnings.map((w) => w.text).join(" ")}` : `Spread check: ${spread.counts.tier1} tier 1, ${spread.counts.tier2} tier 2, ${spread.counts.tier3} tier 3, ${spread.counts.unknown} Unknown. Nothing to warn about.`));
-    } else if (e.stage === "ready_for_review") return e.stage; // Waits for cases to be settled and the Outreach card to be approved.
+    } else if (e.stage === "ready_for_review") { await priceIfReady(eventId); return e.stage; } // Waits for cases to be settled and the Outreach card to be confirmed; the desk prices the card once nothing blocks it.
     else if (e.stage === "finding_people") {
       // Read again: startPeople may have set the phase after this pass began.
       const [{ phase }] = await db.query<{ phase: string | null }>("SELECT phase FROM events WHERE id = $1", [eventId]);

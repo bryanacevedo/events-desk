@@ -11,7 +11,7 @@ import { aiWork, cardBreakdown, CREDIT_VENDORS, creditWork, vendorOf, type Credi
 
 const NET = `coalesce(sum(CASE l.kind WHEN 'reserve' THEN l.amount WHEN 'release' THEN -l.amount ELSE 0 END), 0)::int`;
 
-export interface UsageQuery { year?: number; month?: number; q?: string; page?: number; size?: number }
+export interface UsageQuery { year?: number; month?: number; q?: string; page?: number; size?: number; when?: string; near?: boolean; sort?: string }
 interface LedgerRow { event_id: string; note: string; step: string | null; unit: string; n: number }
 
 /** Ledger rows of deleted events are read too (ledger_kept, notes already resolved), so a pool reads the same after an event is deleted. */
@@ -95,8 +95,8 @@ export async function usageView(db: Db, o: UsageQuery & { simulated: boolean }) 
   };
 
   // One row per event: use by vendor against what its approved cards allow, and AI dollars the same way.
-  const evRows = await db.query<{ event_id: string; name: string; starts_on: string }>(
-    `SELECT e.id AS event_id, e.name, e.starts_on::text AS starts_on FROM events e
+  const evRows = await db.query<{ event_id: string; name: string; starts_on: string; website: string | null }>(
+    `SELECT e.id AS event_id, e.name, e.starts_on::text AS starts_on, (SELECT c.website FROM catalog_events c WHERE c.id = e.catalog_id) AS website FROM events e
      WHERE e.parent_event_id IS NULL AND EXISTS (SELECT 1 FROM cost_cards k WHERE k.event_id = e.id AND k.status = 'approved') ORDER BY e.starts_on DESC, e.name`);
   // A top-up is not an event on this screen: what it spent shows on its parent's row, whether it merged or was stopped.
   const parentOf = new Map((await db.query<{ id: string; parent_event_id: string }>("SELECT id, parent_event_id FROM events WHERE parent_event_id IS NOT NULL")).map((r) => [r.id, r.parent_event_id]));
@@ -122,7 +122,14 @@ export async function usageView(db: Db, o: UsageQuery & { simulated: boolean }) 
       ai: { cents: Math.round(aiCentsOf(r.event_id) * 100) / 100, cap_cents: aiCap },
     };
   });
-  const size = Math.min(100, Math.max(5, o.size ?? 12)), pages = Math.max(1, Math.ceil(evAll.length / size)), page = Math.min(pages, Math.max(1, o.page ?? 1));
+  // Filters: coming or past, close to what was approved (four fifths of any cap), and the order.
+  const today = new Date().toISOString().slice(0, 10);
+  const share = (e: (typeof evAll)[number]) => Math.max(...CREDIT_VENDORS.map((v) => (e.credits[v].cap ? e.credits[v].used / e.credits[v].cap : 0)), e.ai.cap_cents ? e.ai.cents / e.ai.cap_cents : 0);
+  const kept = evAll
+    .filter((e) => (o.when === "coming" ? String(e.starts_on) >= today : o.when === "past" ? String(e.starts_on) < today : true))
+    .filter((e) => !o.near || share(e) >= 0.8)
+    .sort((a, b) => (o.sort === "used" ? share(b) - share(a) : 0));
+  const size = Math.min(100, Math.max(5, o.size ?? 12)), pages = Math.max(1, Math.ceil(kept.length / size)), page = Math.min(pages, Math.max(1, o.page ?? 1));
 
   // Per delivered person, over events that reached delivery: AI dollars and Apollo credits, kept apart.
   const [d] = await db.query<{ people: number }>("SELECT count(*)::int AS people FROM contacts c JOIN events e ON e.id = c.event_id WHERE e.stage = 'delivered' AND c.dropped_at IS NULL");
@@ -142,7 +149,7 @@ export async function usageView(db: Db, o: UsageQuery & { simulated: boolean }) 
   return {
     simulated: o.simulated, year, month,
     vendors, ai,
-    events: evAll.slice((page - 1) * size, page * size), total_events: evAll.length, page, pages,
+    events: kept.slice((page - 1) * size, page * size).map((e) => ({ ...e, share: Math.round(share(e) * 100) / 100 })), total_events: kept.length, page, pages,
     per_person: {
       people: d.people,
       ai_cents: d.people ? one(aiCentsOf(delivered) / d.people) : null,

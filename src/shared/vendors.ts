@@ -45,19 +45,21 @@ export const vendorWords = (name: string) => vendorOf(name) ?? bare(name).replac
 /** Plain words for what a credit paid for, by step. */
 const STEP_WORDS: Record<string, string> = {
   firmographics: "Company data", person_match: "Person match", reverse_lookup: "Company from email domain", discovery: "People search",
-  reveal: "Contact details", find: "Email search", waterfall: "Email waterfall", verify: "Email checks", catch_all_probe: "Email checks", linkedin: "LinkedIn profiles",
+  reveal: "Contact details", find: "Email search", waterfall: "Backup email search", verify: "Email checks", catch_all_probe: "Email checks", linkedin: "LinkedIn profiles",
+  successor_find: "Finding who replaced people who left", contact_create: "Adding contacts to the CRM",
 };
 export function creditWork(step: string | null | undefined, name?: string | null): string {
   if (step && STEP_WORDS[step]) return STEP_WORDS[step];
   const n = bare(name ?? step ?? "");
-  const guess: [RegExp, string][] = [[/verif|zerobounce/, "Email checks"], [/waterfall/, "Email waterfall"], [/finder|match/, "Email search"], [/linkedin/, "LinkedIn profiles"], [/firmo/, "Company data"], [/reveal/, "Contact details"], [/reverse/, "Company from email domain"], [/people_search|discovery|search/, "People search"]];
+  const guess: [RegExp, string][] = [[/verif|zerobounce/, "Email checks"], [/waterfall/, "Backup email search"], [/finder|match/, "Email search"], [/linkedin/, "LinkedIn profiles"], [/firmo/, "Company data"], [/reveal/, "Contact details"], [/reverse/, "Company from email domain"], [/people_search|discovery|search/, "People search"]];
   for (const [re, w] of guess) if (re.test(n)) return w;
   const s = n.replace(/_/g, " ").trim();
   return s ? s[0].toUpperCase() + s.slice(1) : "Other";
 }
 const AI_WORDS: Record<string, string> = {
   company_tier: "Tiering companies", second_look: "Second opinion on tiers", website_read: "Reading company websites", title_parse: "Reading job titles", title_tier: "Tiering job titles",
-  review: "Checking people for doubts", perspective: "Writing the Summary perspective", icp_compile: "Reading the ICP document", concierge: "Answering questions in Slack",
+  review: "Second look at people", perspective: "Writing the Summary", icp_compile: "Reading the ICP document", concierge: "Answering questions in Slack",
+  reply_classify: "Reading replies", debrief_extract: "Sorting notes from reps",
 };
 export function aiWork(step: string | null | undefined): string {
   const s = (step ?? "").trim();

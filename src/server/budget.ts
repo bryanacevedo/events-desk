@@ -59,22 +59,29 @@ export async function budgetQuarters(q: Db["query"], year: number): Promise<numb
   return [1, 2, 3, 4].map((n) => rows.find((r) => r.quarter === n)?.cents ?? 0);
 }
 
-export interface BudgetQuery { year: number; q?: string; page?: number; size?: number }
+export interface BudgetQuery { year: number; q?: string; page?: number; size?: number; quarter?: number; team?: string; region?: string; show?: string; sort?: string }
 
 export async function budgetView(db: Db, o: BudgetQuery) {
   const lines = (await seatLines(db.query)).filter((l) => l.year === o.year);
   const quarters = await budgetQuarters(db.query, o.year);
   const per = [1, 2, 3, 4].map((n) => ({ quarter: n, ...roll(lines.filter((l) => l.quarter === n), quarters?.[n - 1] ?? 0) }));
   const year = roll(lines, quarters ? quarters.reduce((a, b) => a + b, 0) : 0);
-  const events = new Map<string, { event_id: string; name: string; starts_on: string; quarter: number; seats: number; spent: number; committed: number; waiting: number; gone: boolean }>();
-  for (const l of lines) {
+  const events = new Map<string, { event_id: string; name: string; starts_on: string; quarter: number; seats: number; spent: number; committed: number; waiting: number; gone: boolean; website?: string | null }>();
+  // The table's filters narrow the events below; the year and the quarters above stay whole.
+  const shown = lines.filter((l) => (!o.quarter || l.quarter === o.quarter) && (!o.team || l.team === o.team) && (!o.region || l.region === o.region));
+  for (const l of shown) {
     const e = events.get(l.event_id) ?? { event_id: l.event_id, name: l.name, starts_on: l.starts_on, quarter: l.quarter, seats: 0, spent: 0, committed: 0, waiting: 0, gone: l.gone === true };
     if (l.status === "approved") e.seats++;
     e.spent += l.spent; e.committed += l.committed; e.waiting += l.waiting;
     events.set(l.event_id, e);
   }
   const needle = (o.q ?? "").trim().toLowerCase();
-  const all = [...events.values()].filter((e) => !needle || e.name.toLowerCase().includes(needle)).sort((a, b) => a.starts_on.localeCompare(b.starts_on) || a.name.localeCompare(b.name));
+  const sites = new Map((await db.query<{ id: string; website: string | null }>("SELECT e.id, c.website FROM events e LEFT JOIN catalog_events c ON c.id = e.catalog_id")).map((r) => [r.id, r.website]));
+  const all = [...events.values()]
+    .filter((e) => !needle || e.name.toLowerCase().includes(needle))
+    .filter((e) => (o.show === "waiting" ? e.waiting > 0 : o.show === "bought" ? e.spent > 0 : true))
+    .map((e) => ({ ...e, website: sites.get(e.event_id) ?? null }))
+    .sort((a, b) => (o.sort === "size" ? b.spent + b.committed + b.waiting - (a.spent + a.committed + a.waiting) : 0) || a.starts_on.localeCompare(b.starts_on) || a.name.localeCompare(b.name));
   const size = Math.min(100, Math.max(5, o.size ?? 15)), pages = Math.max(1, Math.ceil(all.length / size)), page = Math.min(pages, Math.max(1, o.page ?? 1));
   const by = (key: "team" | "region") => {
     const m = new Map<string, SeatLine[]>();
@@ -83,7 +90,7 @@ export async function budgetView(db: Db, o: BudgetQuery) {
   };
   const log = await db.query<{ actor: string; detail: string; created_at: string }>("SELECT actor, detail, created_at FROM budget_log WHERE year = $1 ORDER BY created_at DESC, id LIMIT 8", [o.year]);
   const years = [...new Set([...(await db.query<{ year: number }>("SELECT DISTINCT year FROM budget_quarters")).map((r) => r.year), ...(await seatLines(db.query)).map((l) => l.year)])].sort();
-  return { year: o.year, years, set: quarters !== null, quarters: per, totals: year, events: all.slice((page - 1) * size, page * size), total_events: all.length, page, pages, by_team: by("team"), by_region: by("region"), log };
+  return { teams: [...new Set(lines.map((l) => l.team))].sort(), regions: [...new Set(lines.map((l) => l.region))].sort(), year: o.year, years, set: quarters !== null, quarters: per, totals: year, events: all.slice((page - 1) * size, page * size), total_events: all.length, page, pages, by_team: by("team"), by_region: by("region"), log };
 }
 
 export class NotApprover extends Error {}
@@ -111,7 +118,7 @@ export async function recordTicket(db: Db, actor: string, requestId: string, amo
     if (!r) throw new RuleError("That seat request does not exist.");
     if (r.status !== "approved") throw new RuleError("Only an approved seat has a ticket to record.");
     await q("INSERT INTO ticket_purchases (seat_request_id, event_id, amount_cents, recorded_by) VALUES ($1, $2, $3, $4) ON CONFLICT (seat_request_id) DO UPDATE SET amount_cents = EXCLUDED.amount_cents, recorded_by = EXCLUDED.recorded_by, recorded_at = now()", [requestId, r.event_id, cents, actor]);
-    await logActivity(q, r.event_id, actor, "ticket", `Recorded ${r.requester}'s ticket at $${(cents / 100).toLocaleString("en-US", { maximumFractionDigits: 2 })}`);
+    await logActivity(q, r.event_id, actor, "ticket", `Recorded ${r.requester}'s ticket at $${(cents / 100).toLocaleString("en-US", cents % 100 ? { minimumFractionDigits: 2, maximumFractionDigits: 2 } : { maximumFractionDigits: 0 })}`);
     return { seat_request_id: requestId, amount_cents: cents };
   });
 }

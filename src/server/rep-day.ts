@@ -1,9 +1,11 @@
 /* A rep's view of the work, across every event: replies waiting on them, meetings with a brief for each, people they met, and the slots they have free. On a phone at the event as much as at a desk. */
 
 import type { Db } from "./db.ts";
+import type { Deal } from "./closeout.ts";
+import type { Crm, CrmOpportunity } from "./providers.ts";
 import { logActivity, newId, RuleError } from "./events.ts";
 import { nowOf, type LifecycleDeps } from "./lifecycle-deps.ts";
-import { bookMeeting } from "./meetings.ts";
+import { bookMeeting, eventZone } from "./meetings.ts";
 import { LAST_DAY_SQL } from "./motion.ts";
 
 const MIN = 60_000;
@@ -69,7 +71,29 @@ export async function repDay(db: Db, deps: LifecycleDeps, rep: string) {
     db.query(`SELECT s.id, s.event_id, e.name AS event, s.starts_at::text AS starts_at, s.location FROM meeting_slots s JOIN events e ON e.id = s.event_id WHERE s.rep = $1 AND s.meeting_id IS NULL AND s.starts_at > $2::timestamptz AND s.starts_at::date <= ${LAST_DAY_SQL} ORDER BY s.starts_at LIMIT 30`, [rep, now.toISOString()]),
   ]);
   const briefs = await Promise.all(meetings.map(async (m) => ({ ...m, brief: await prepBrief(db, m.id) })));
-  return { rep, replies, meetings: briefs, captures, slots };
+  // Notes the desk asked this rep for after an event, still unwritten.
+  const notes = await db.query(`SELECT d.id, d.event_id, e.name AS event, ${BRAND_SQL}, d.prompted_at::text AS prompted_at, (${LAST_DAY_SQL})::text AS last_day,
+      (SELECT count(*)::int FROM meetings m WHERE m.event_id = d.event_id AND m.rep = d.author AND m.status = 'held') AS held
+    FROM debriefs d JOIN events e ON e.id = d.event_id WHERE d.author = $1 AND d.status = 'waiting' ORDER BY d.prompted_at`, [rep]);
+  // Free slots read in the event's own zone, like the meetings beside them.
+  const zones = new Map<string, string>();
+  for (const id of new Set((slots as { id: string; event_id: string; event: string; starts_at: string; location: string }[]).map((s) => s.event_id))) zones.set(id, await eventZone((sql, args) => db.query(sql, args), id));
+  const zoned = (slots as { id: string; event_id: string; event: string; starts_at: string; location: string }[]).map((s) => ({ ...s, timezone: zones.get(s.event_id) ?? "UTC" }));
+  return { rep, replies, meetings: briefs, captures, slots: zoned, notes };
+}
+
+const BRAND_SQL = `(SELECT c.website FROM catalog_events c WHERE c.id = e.catalog_id) AS website, (SELECT c.brand_color FROM catalog_events c WHERE c.id = e.catalog_id) AS brand_color`;
+
+/** One owed debrief as its own thing: the event, what was asked, and who the rep met there, so the notes start from the people. Its author's, and leadership's and GTM's. */
+export async function debriefDetail(db: Db, debriefId: string) {
+  const [d] = await db.query<{ event_id: string; author: string }>(`SELECT d.id, d.event_id, d.author, d.status, d.body, d.prompted_at::text AS prompted_at, d.answered_at::text AS answered_at, e.name AS event, ${BRAND_SQL}, (${LAST_DAY_SQL})::text AS last_day
+    FROM debriefs d JOIN events e ON e.id = d.event_id WHERE d.id = $1`, [debriefId]);
+  if (!d) return null;
+  const met = await db.query(`SELECT m.id, k.full_name, co.name AS company, m.scheduled_at::text AS scheduled_at FROM meetings m JOIN contacts k ON k.id = m.contact_id JOIN companies co ON co.id = k.company_id
+    WHERE m.event_id = $1 AND m.rep = $2 AND m.status = 'held' ORDER BY m.scheduled_at`, [d.event_id, d.author]);
+  const walkups = await db.query(`SELECT c.id, c.full_name, c.company, c.note FROM onsite_captures c WHERE c.event_id = $1 AND c.rep = $2
+    AND NOT EXISTS (SELECT 1 FROM meetings m WHERE m.external_key = 'onsite:' || c.id AND m.status = 'held') ORDER BY c.captured_at`, [d.event_id, d.author]);
+  return { ...d, met, walkups };
 }
 
 const BRAND = `(SELECT c.website FROM catalog_events c WHERE c.id = e.catalog_id) AS website, (SELECT c.brand_color FROM catalog_events c WHERE c.id = e.catalog_id) AS brand_color`;
@@ -79,6 +103,26 @@ const pathOf = (db: Db, contactId: string, eventId: string) => db.query<{ kind: 
   `SELECT kind, channel, at::text AS at FROM touches WHERE contact_id = $1 AND event_id = $2 AND (kind IN ('sequence_add', 'send', 'meeting_booked', 'met_onsite', 'badge_scan') OR kind LIKE 'reply_%' OR kind LIKE 'meeting_%') ORDER BY at, kind LIMIT 40`, [contactId, eventId]);
 
 /** One reply as its own thing: who wrote it and what, where the thread lives, how long is left to answer, who they are, and what has happened since. */
+/** The account behind a reply, a meeting or a deal: its fit, size, owner and open deal, and the other people from it on this event,
+    each with where they stand (a meeting, a reply, met at the booth, reached, or only on the list). */
+export async function accountOf(db: Db, eventId: string, by: { contactId?: string | null; domain?: string | null; companyId?: string | null }, limit = 8) {
+  const [co] = await db.query<{ id: string; name: string; tier: number | null; industry: string | null; employees: string | null; owner: string | null; deal: string | null; website: string | null }>(
+    `SELECT co.id, co.name, co.tier, co.firmo->>'industry' AS industry, co.firmo->>'employees' AS employees, co.account_owner AS owner,
+            nullif(concat_ws(', ', co.deal_name, co.deal_stage), '') AS deal, co.primary_domain AS website
+     FROM companies co WHERE co.event_id = $1 AND ${by.companyId ? "co.id = $2" : by.contactId ? "co.id = (SELECT company_id FROM contacts WHERE id = $2)" : "co.primary_domain = $2"} LIMIT 1`, [eventId, by.companyId ?? by.contactId ?? by.domain]);
+  if (!co) return null;
+  const others = await db.query<{ id: string; full_name: string | null; title: string | null; state: string }>(
+    `SELECT k.id, k.full_name, k.title,
+            CASE WHEN EXISTS (SELECT 1 FROM meetings m WHERE m.contact_id = k.id AND m.event_id = k.event_id AND m.status IN ('booked', 'rescheduled', 'held')) THEN 'meeting'
+                 WHEN EXISTS (SELECT 1 FROM inbound_messages i WHERE i.contact_id = k.id AND i.event_id = k.event_id AND i.signal = 'reply') THEN 'replied'
+                 WHEN EXISTS (SELECT 1 FROM onsite_captures c WHERE c.contact_id = k.id AND c.event_id = k.event_id) THEN 'met'
+                 WHEN EXISTS (SELECT 1 FROM touches t WHERE t.contact_id = k.id AND t.event_id = k.event_id AND t.kind = 'send') THEN 'reached'
+                 ELSE 'listed' END AS state
+     FROM contacts k WHERE k.event_id = $1 AND k.company_id = $2 AND k.dropped_at IS NULL AND ($3::text IS NULL OR k.id <> $3)
+     ORDER BY k.full_name LIMIT ${Math.max(1, Math.min(200, limit))}`, [eventId, co.id, by.contactId ?? null]);
+  return { company_id: co.id, ...co, others };
+}
+
 export async function replyDetail(db: Db, replyId: string) {
   const [r] = await db.query<{ id: string; event_id: string; contact_id: string | null; handled_at: string | null }>(
     `SELECT m.id, m.event_id, e.name AS event, ${BRAND}, m.contact_id, k.full_name, k.title, co.name AS company, co.tier, co.tier_fact AS why,
@@ -87,9 +131,9 @@ export async function replyDetail(db: Db, replyId: string) {
      FROM inbound_messages m JOIN events e ON e.id = m.event_id LEFT JOIN contacts k ON k.id = m.contact_id LEFT JOIN companies co ON co.id = k.company_id
      WHERE m.id = $1 AND m.signal = 'reply'`, [replyId]);
   if (!r) return null;
-  const [meeting] = r.contact_id ? await db.query("SELECT id, status, scheduled_at::text AS scheduled_at, rep FROM meetings WHERE contact_id = $1 AND event_id = $2 ORDER BY scheduled_at DESC LIMIT 1", [r.contact_id, r.event_id]) : [];
+  const [meeting] = r.contact_id ? await db.query("SELECT id, status, scheduled_at::text AS scheduled_at, timezone, rep FROM meetings WHERE contact_id = $1 AND event_id = $2 ORDER BY scheduled_at DESC LIMIT 1", [r.contact_id, r.event_id]) : [];
   const path = r.contact_id ? await pathOf(db, r.contact_id, r.event_id) : [];
-  return { ...r, meeting: meeting ?? null, path };
+  return { ...r, meeting: meeting ?? null, path, account: await accountOf(db, r.event_id, { contactId: (r as { contact_id?: string | null }).contact_id }) };
 }
 
 /** One meeting as its own thing: when and with whom, the prep, the reply that led to it, and how it went. */
@@ -101,5 +145,25 @@ export async function meetingDetail(db: Db, meetingId: string) {
   if (!m) return null;
   const [reply] = m.contact_id ? await db.query("SELECT id, body, code, received_at::text AS received_at FROM inbound_messages WHERE contact_id = $1 AND event_id = $2 AND signal = 'reply' ORDER BY received_at DESC LIMIT 1", [m.contact_id, m.event_id]) : [];
   const path = m.contact_id ? await pathOf(db, m.contact_id, m.event_id) : [];
-  return { ...m, brief: await prepBrief(db, m.id), reply: reply ?? null, path };
+  return { ...m, brief: await prepBrief(db, m.id), reply: reply ?? null, path, deals: (await eventDeals(db, m.event_id)).filter((d) => d.meeting_id === m.id), account: await accountOf(db, m.event_id, { contactId: m.contact_id }) };
+}
+
+/** The deals credited to an event, from its latest written scorecard. Money: the route keeps them to leadership and GTM. */
+export async function eventDeals(db: Db, eventId: string) {
+  const [s] = await db.query<{ deals: Deal[] | null }>("SELECT metrics->'influence'->'deals' AS deals FROM scorecards WHERE event_id = $1 ORDER BY window_days DESC LIMIT 1", [eventId]);
+  return s?.deals ?? [];
+}
+
+/** One credited deal as its own thing: what it is, where it stands, the meeting it is credited to, and where it lives in the CRM. */
+export async function dealDetail(db: Db, eventId: string, opportunityId: string, live?: Deal[], crm?: Crm | null) {
+  const deal = (live ?? await eventDeals(db, eventId)).find((d) => d.opportunity_id === opportunityId);
+  if (!deal) return null;
+  // The CRM is the source of truth: when it is connected, the sheet shows the deal as it stands now, not as it was scored.
+  let now: CrmOpportunity | undefined;
+  if (crm?.opportunities && deal.domain) { try { now = (await crm.opportunities([{ ref: deal.domain, domain: deal.domain, name: deal.account }]))[deal.domain]?.find((o) => o.id === opportunityId); } catch { now = undefined; } }
+  const crmNow = now ? { stage: now.stage, amount_cents: now.amount_cents ?? deal.amount_cents, won: Boolean(now.is_won), url: now.url ?? deal.url ?? null, owner: now.owner ?? null, next_step: now.next_step ?? null, close_date: now.close_date ?? null, created_date: now.created_date, stage_history: now.stage_history, live: true } : { live: false };
+  const [e] = await db.query<{ name: string; website: string | null }>("SELECT e.name, (SELECT c.website FROM catalog_events c WHERE c.id = e.catalog_id) AS website FROM events e WHERE e.id = $1", [eventId]);
+  const meeting = deal.meeting_id ? (await meetingDetail(db, deal.meeting_id)) as unknown as { id: string; scheduled_at: string; full_name: string | null; rep: string | null; status: string } | null : null;
+  return { ...deal, ...crmNow, event_id: eventId, event: e?.name ?? "", website: e?.website ?? null, meeting: meeting ? { id: meeting.id, scheduled_at: meeting.scheduled_at, timezone: (meeting as { timezone?: string | null }).timezone ?? null, full_name: meeting.full_name, rep: meeting.rep, status: meeting.status } : null,
+    account_info: await accountOf(db, eventId, { domain: deal.domain }) };
 }

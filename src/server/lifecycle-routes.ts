@@ -3,13 +3,13 @@
 import type { Hono } from "hono";
 import type { Db } from "./db.ts";
 import { cleanNames, renderStep, type TemplateStep } from "../shared/template-check.ts";
-import { computeScorecard, recordEventCost, answerDebrief, droppedWhoDealt, learningTable, reviewDebrief, decideProposal } from "./closeout.ts";
+import { computeScorecard, recordEventCost, answerDebrief, droppedWhoDealt, learningTable, reviewDebrief, decideProposal, eventCost, clearEventCost } from "./closeout.ts";
 import { RuleError } from "./events.ts";
 import type { LifecycleDeps } from "./lifecycle-deps.ts";
 import type { FakeTool } from "./connectors/fake.ts";
 import { sameSecret } from "./connectors/types.ts";
 import { demoAdvance } from "./demo-run.ts";
-import { bookMeeting, confirmRelease, ingestCalendar, recordOutcome, type CalendarEvent } from "./meetings.ts";
+import { bookMeeting, confirmRelease, eventZone, ingestCalendar, recordOutcome, type CalendarEvent } from "./meetings.ts";
 import { requestMotionCard } from "./motion.ts";
 import { decideOwner } from "./owners.ts";
 import { ingestEvents, processInbound } from "./replies.ts";
@@ -17,9 +17,9 @@ import { drainOps, releaseSequence, approveTemplate, attachCampaign, confirmLaun
 import { regionOf, loadPeople } from "./gate.ts";
 import { recordConsent, recordPlacement, setDomainStatus } from "./sending.ts";
 import { captureOnsite, forgetPerson, markHandled } from "./operating.ts";
-import { addSlots, bookSlot, meetingDetail, prepBrief, repDay, replyDetail, roster } from "./rep-day.ts";
+import { addSlots, bookSlot, dealDetail, debriefDetail, meetingDetail, prepBrief, repDay, replyDetail, roster } from "./rep-day.ts";
 import { isGtm } from "../shared/roles.ts";
-import { isLead, MONEY_REFUSAL, withoutMoney } from "./money.ts";
+import { forRep, isLead, MONEY_REFUSAL, withoutMoney } from "./money.ts";
 import { MOTION_LABEL } from "../shared/motion.ts";
 import { pickSenders, planCapacity } from "../shared/sending.ts";
 import { nextStep, postEventState } from "./post-event.ts";
@@ -43,7 +43,7 @@ export async function motionOverview(db: Db, deps: LifecycleDeps, id: string) {
               FROM sequences s WHERE s.event_id = $1 ORDER BY s.channel, s.priority`, [id]),
     db.query("SELECT * FROM event_funnel WHERE event_id = $1", [id]),
     db.query<{ status: string; n: number }>("SELECT status, count(*)::int AS n FROM owner_decisions WHERE event_id = $1 GROUP BY status", [id]),
-    db.query(`SELECT m.id, m.channel, m.connector, m.thread_url, m.signal, m.code, m.doubtful, m.status, m.received_at::text AS received_at, m.body, k.id AS contact_id, k.full_name, co.name AS company FROM inbound_messages m LEFT JOIN contacts k ON k.id = m.contact_id LEFT JOIN companies co ON co.id = k.company_id WHERE m.event_id = $1 ORDER BY m.received_at DESC LIMIT 50`, [id]),
+    db.query(`SELECT m.id, m.channel, m.connector, m.thread_url, m.signal, m.code, m.doubtful, m.status, m.received_at::text AS received_at, m.body, (m.respond_by IS NOT NULL AND m.handled_at IS NULL) AS waiting, k.id AS contact_id, k.full_name, co.name AS company FROM inbound_messages m LEFT JOIN contacts k ON k.id = m.contact_id LEFT JOIN companies co ON co.id = k.company_id WHERE m.event_id = $1 ORDER BY m.received_at DESC LIMIT 50`, [id]),
     db.query(`SELECT m.id, m.contact_id, m.status, m.scheduled_at::text AS scheduled_at, m.timezone, m.rep, m.source, m.enrolled, k.full_name, co.name AS company FROM meetings m LEFT JOIN contacts k ON k.id = m.contact_id LEFT JOIN companies co ON co.id = k.company_id WHERE m.event_id = $1 ORDER BY m.scheduled_at`, [id]),
     db.query("SELECT window_days, metrics, created_at::text AS created_at FROM scorecards WHERE event_id = $1 ORDER BY window_days", [id]),
     db.query(`SELECT d.id, d.author, d.status, d.body, d.prompted_at::text AS prompted_at, d.answered_at::text AS answered_at, coalesce((SELECT json_agg(json_build_object('theme', f.theme, 'fact', f.fact, 'quote', f.quote, 'account', f.account)) FROM debrief_facts f WHERE f.debrief_id = d.id AND d.status = 'accepted'), '[]') AS facts FROM debriefs d WHERE d.event_id = $1`, [id]),
@@ -86,13 +86,27 @@ export function mountLifecycle(app: App, db: Db, deps: LifecycleDeps, opts: { ba
   // The simulator's one button. This route does not exist outside demo mode.
   if (opts.demoTools) app.post("/api/demo/motion/:id/advance", guarded(async (c) => demoAdvance(db, deps, opts.demoTools!, c.req.param("id"))));
 
-  app.get("/api/events/:id/next", async (c) => c.json({ next: await nextStep(db, deps, c.req.param("id")) }));
+  app.delete("/api/events/:id/costs/:category", guarded(async (c) => { if (!isLead(c.get("actor"))) throw new RuleError(MONEY_REFUSAL); await clearEventCost(db, c.req.param("id"), c.get("actor"), c.req.param("category")); return { cleared: true }; }));
+  app.get("/api/events/:id/cost", async (c) => (isLead(c.get("actor")) ? c.json(await eventCost(db, c.req.param("id"))) : bad(MONEY_REFUSAL, 403)));
+  app.get("/api/events/:id/next", async (c) => {
+    const id = c.req.param("id");
+    // How many decisions wait on each tab: the list's on People, everything about sending and answering on Outreach.
+    const [n] = await db.query<{ people: number; outreach: number }>(
+      `SELECT (SELECT count(*)::int FROM review_cases WHERE event_id = $1 AND status = 'open' AND kind <> 'reply_doubtful') AS people,
+         (SELECT count(*)::int FROM review_cases WHERE event_id = $1 AND status = 'open' AND kind = 'reply_doubtful')
+         + (SELECT count(DISTINCT i.contact_id)::int FROM inbound_messages i WHERE i.event_id = $1 AND i.code IN ('interested', 'meeting_request', 'referral')
+              AND i.respond_by IS NOT NULL AND i.handled_at IS NULL AND NOT EXISTS (SELECT 1 FROM meetings m WHERE m.contact_id = i.contact_id AND m.event_id = i.event_id AND m.status IN ('booked', 'rescheduled', 'held', 'no_show')))
+         + (SELECT count(*)::int FROM approvals WHERE event_id = $1 AND kind = 'motion' AND status = 'pending')
+         + (SELECT count(*)::int FROM sequences WHERE event_id = $1 AND state = 'draft' AND checklist_at IS NULL)
+         + (SELECT count(*)::int FROM meetings WHERE event_id = $1 AND status IN ('booked', 'rescheduled') AND outcome_at IS NULL AND scheduled_at < now()) AS outreach`, [id]);
+    return c.json({ next: await nextStep(db, deps, id), counts: n ?? { people: 0, outreach: 0 } });
+  });
   app.get("/api/events/:id/motion", async (c) => {
     const o = await motionOverview(db, deps, c.req.param("id"));
     if (!o) return bad("That event does not exist.", 404);
     if (isLead(c.get("actor"))) return c.json(o);
     // Anyone else gets the same event with every dollar taken out: the cost card's estimate, the live reading and the written scorecards.
-    return c.json({ ...o, card: o.card ? { ...(o.card as object), est_cents: null } : null, live_score: withoutMoney(o.live_score as never), scorecards: (o.scorecards as { metrics: never }[]).map((x) => ({ ...x, metrics: withoutMoney(x.metrics) })) });
+    return c.json({ ...o, card: o.card ? { ...forRep(o.card as object), llm_cap: null, est_cents: null } : null, live_score: withoutMoney(o.live_score as never), scorecards: (o.scorecards as { metrics: never }[]).map((x) => ({ ...x, metrics: withoutMoney(x.metrics) })) });
   });
   app.post("/api/events/:id/motion/start", guarded(async (c) => { const b = await body(c); return requestMotionCard(db, deps, c.req.param("id"), c.get("actor"), { purpose: b.purpose, verify_once: b.verify_once, write_leads: b.write_leads, holdout_percent: Number(b.holdout_percent ?? 0) }); }));
   app.post("/api/events/:id/motion/tools", guarded(async (c) => setTools(db, c.req.param("id"), c.get("actor"), (await body(c)).tools ?? {}, deps)));
@@ -118,11 +132,19 @@ export function mountLifecycle(app: App, db: Db, deps: LifecycleDeps, opts: { ba
   app.post("/api/motion/sequences/:sid/release", guarded(async (c) => releaseSequence(db, deps, c.req.param("sid"), c.get("actor"))));
   app.post("/api/motion/account-domains", guarded(async (c) => { if (!isGtm(c.get("actor"))) throw new RuleError("Company domains are GTM Engineering's to link."); const b = await body(c); await db.query("INSERT INTO account_domains (domain, canonical, how, added_by) VALUES ($1, $2, $3, $4) ON CONFLICT (domain) DO UPDATE SET canonical = $2, how = $3, added_by = $4", [String(b.domain).toLowerCase(), String(b.canonical).toLowerCase(), String(b.how ?? "person"), c.get("actor")]); }));
   app.get("/api/motion/my-day", async (c) => c.json(await repDay(db, deps, String(c.req.query("rep") ?? ""))));
-  app.get("/api/events/:id/motion/roster", async (c) => c.json({ roster: await roster(db, c.req.param("id")), slots: await db.query("SELECT s.id, s.rep, s.starts_at::text AS starts_at, s.location, s.meeting_id, k.full_name FROM meeting_slots s LEFT JOIN meetings m ON m.id = s.meeting_id LEFT JOIN contacts k ON k.id = m.contact_id WHERE s.event_id = $1 ORDER BY s.starts_at, s.rep", [c.req.param("id")]) }));
+  app.get("/api/events/:id/motion/roster", async (c) => c.json({ roster: await roster(db, c.req.param("id")), timezone: await eventZone((sql, args) => db.query(sql, args), c.req.param("id")), slots: await db.query("SELECT s.id, s.rep, s.starts_at::text AS starts_at, s.location, s.meeting_id, k.full_name FROM meeting_slots s LEFT JOIN meetings m ON m.id = s.meeting_id LEFT JOIN contacts k ON k.id = m.contact_id WHERE s.event_id = $1 ORDER BY s.starts_at, s.rep", [c.req.param("id")]) }));
   app.post("/api/events/:id/motion/slots", guarded(async (c) => { const b = await body(c); return addSlots(db, c.req.param("id"), c.get("actor"), { rep: String(b.rep ?? ""), day: String(b.day ?? ""), from: String(b.from ?? ""), to: String(b.to ?? ""), minutes: Number(b.minutes ?? 30), location: String(b.location ?? "") }); }));
   app.post("/api/motion/slots/:sid/book", guarded(async (c) => bookSlot(db, deps, c.req.param("sid"), String((await body(c)).contact_id ?? ""), c.get("actor"))));
   app.get("/api/motion/replies/:rid", async (c) => { const r = await replyDetail(db, c.req.param("rid")); return r ? c.json(r) : bad("That reply does not exist.", 404); });
-  app.get("/api/motion/meetings/:mid", async (c) => { const m = await meetingDetail(db, c.req.param("mid")); return m ? c.json(m) : bad("That meeting does not exist.", 404); });
+  app.get("/api/motion/meetings/:mid", async (c) => { const m = await meetingDetail(db, c.req.param("mid")); return m ? c.json(isLead(c.get("actor")) ? m : { ...m, deals: [] }) : bad("That meeting does not exist.", 404); });
+  // A credited deal: from the written scorecard, or the live reading while the event closes. Leadership's and GTM's only.
+  app.get("/api/events/:id/deals/:oid", async (c) => {
+    if (!isLead(c.get("actor"))) return bad(MONEY_REFUSAL, 403);
+    const id = c.req.param("id"), oid = c.req.param("oid");
+    let d = await dealDetail(db, id, oid, undefined, deps.crm);
+    if (!d) d = await dealDetail(db, id, oid, (await computeScorecard(db, deps, id, 30, { write: false }).catch(() => null))?.influence.deals ?? [], deps.crm);
+    return d ? c.json(d) : bad("That deal is not credited to this event.", 404);
+  });
   app.get("/api/motion/meetings/:mid/brief", async (c) => { const b = await prepBrief(db, c.req.param("mid")); return b ? c.json(b) : bad("That meeting does not exist.", 404); });
   app.post("/api/motion/stop", guarded(async (c) => stopAllSending(db, deps, c.get("actor"), String((await body(c)).reason ?? "No reason given"))));
   app.post("/api/motion/restart", guarded(async (c) => restartSending(db, c.get("actor"))));
@@ -131,6 +153,11 @@ export function mountLifecycle(app: App, db: Db, deps: LifecycleDeps, opts: { ba
   app.post("/api/motion/meetings/:mid/outcome", guarded(async (c) => recordOutcome(db, deps, c.req.param("mid"), (await body(c)).status, c.get("actor"))));
   app.post("/api/motion/meetings/:mid/release", guarded(async (c) => confirmRelease(db, deps, c.req.param("mid"), c.get("actor"))));
   app.post("/api/motion/owners/:did", guarded(async (c) => decideOwner(db, deps, c.req.param("did"), c.get("actor"), (await body(c)).status)));
+  app.get("/api/motion/debriefs/:did", async (c) => {
+    const d = await debriefDetail(db, c.req.param("did"));
+    if (!d) return bad("That debrief does not exist.", 404);
+    return d.author === c.get("actor") || isLead(c.get("actor")) ? c.json(d) : bad(`These notes are ${d.author}'s.`, 403);
+  });
   app.post("/api/motion/debriefs/:did/answer", guarded(async (c) => answerDebrief(db, c.req.param("did"), c.get("actor"), String((await body(c)).body ?? ""))));
   // Leadership or GTM Engineering decides what joins "what we learned", and never on their own notes.
   app.post("/api/motion/debriefs/:did/review", guarded(async (c) => { if (!isLead(c.get("actor"))) throw new RuleError("Debriefs are reviewed by leadership or GTM Engineering."); return reviewDebrief(db, c.req.param("did"), c.get("actor"), (await body(c)).status); }));

@@ -14,6 +14,7 @@
   --line-2: #C9D2CC;
   --green: #1F5D3F;
   --green-2: #174A32;
+  --blue: #2C5A8C;
   --sand: #E9DFCB;
   --sand-2: #C9D2CC;
   --orange: #D1501C;
@@ -322,7 +323,7 @@ details summary::-webkit-details-marker { display: none; }
 .choice.on { box-shadow: inset 0 0 0 2px var(--ink); }
 .choice:hover { box-shadow: inset 0 0 0 2px var(--mute); }
 .then { color: var(--mute); max-width: 72ch; }
-.settled { display: grid; max-width: 860px; }
+.settled { display: grid; max-width: none; }
 .settled li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; padding: 10px 0; border-top: 1px solid var(--line); }
 .settled li:last-child { border-bottom: 1px solid var(--line); }
 
@@ -567,7 +568,8 @@ details summary::-webkit-details-marker { display: none; }
 .cgname { font-weight: 500; font-size: 16px; }
 .cfacts { display: grid; gap: 8px; }
 .cacts { display: flex; flex-wrap: wrap; gap: 8px; align-content: start; min-width: 0; }
-.choice.sug { box-shadow: inset 0 0 0 2px var(--green); }
+.choice.sug { background: var(--green); color: #FFFFFF; box-shadow: none; }
+.choice.sug:hover { background: var(--green-2, #174A32); box-shadow: none; }
 .choice:disabled { opacity: 0.6; cursor: default; }
 .sugmark { font-size: 12px; color: var(--green); font-weight: 400; }
 .cdomain { display: flex; gap: 8px; width: 100%; }
@@ -643,9 +645,9 @@ button.chevbtn:hover { background: var(--well); color: var(--ink); }
 
 .seat-who { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .acting { grid-template-columns: auto auto minmax(0, 1fr); }
-.tl-req { display: inline-flex; align-items: center; height: 30px; padding: 0 12px; border-radius: 15px; box-shadow: inset 0 0 0 1.5px var(--line-2); font: 500 13px/1 var(--sans); color: var(--mute); white-space: nowrap; }
+.tl-req { display: inline-flex; align-items: center; height: 30px; padding: 0 14px; border-radius: 15px; background: rgba(21, 35, 27, 0.065); font: 500 13px/1 var(--sans); color: var(--ink); white-space: nowrap; transition: background 150ms ease; }
 .tl-today-tag.start { transform: none; margin-left: -1px; border-radius: 0 9px 9px 0; }
-.tl-row.listed:hover .tl-req { background: var(--well); color: var(--ink); }
+.tl-row.listed:hover .tl-req { background: rgba(21, 35, 27, 0.12); }
 .tl-row.listed:hover .name { text-decoration: none; }
 .tl-empty { padding: 24px 0; }
 .sheet .addform { background: none; padding: 0; max-width: none; }
@@ -1261,7 +1263,7 @@ select:not([multiple]) {
 .story-sys { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--well); }
 
 .cost-figs { display: flex; flex-wrap: wrap; gap: 12px 56px; padding: 6px 22px 20px 50px; animation: rise 240ms var(--ease) backwards; }
-.cost-figs p { display: grid; gap: 1px; }
+.cost-figs p { display: grid; gap: 1px; justify-items: center; text-align: center; }
 .cost-figs b { font: 500 30px/34px var(--display); color: var(--ink); }
 .cost-figs span { font-size: 13px; line-height: 18px; color: var(--mute); }
 .costs { padding: 16px 0 20px; margin: 0 22px 0 50px; border-top: 1px solid var(--line); }
@@ -1279,8 +1281,8 @@ select:not([multiple]) {
 /* ---------------------------------------------------- delivered, in brief */
 
 .delivered-lead { display: flex; align-items: center; justify-content: space-between; gap: 20px 40px; flex-wrap: wrap; max-width: 1100px; padding: 24px 28px; border-radius: 20px; background: var(--well); }
-.reach { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px 40px; }
-.reach p { display: grid; gap: 2px; }
+.reach { display: flex; flex-wrap: wrap; align-items: last baseline; gap: 14px 40px; }
+.reach p { display: grid; gap: 2px; justify-items: center; text-align: center; }
 .reach b { font: 500 24px/28px var(--display); color: var(--ink); }
 .reach span { font-size: 13px; line-height: 17px; color: var(--mute); }
 .reach-n b { font-size: 48px; line-height: 50px; color: var(--green); }
@@ -1669,7 +1671,7 @@ body.dlg-open { overflow: hidden; }
 .paid-x b { font: 600 22px/1 var(--display); color: var(--ink); }
 
 /* A prospect was found at the company, not on the attendee list: one quiet word before the title says so. */
-.psrc { color: var(--ink); font-weight: 500; }
+.psrc { font-weight: 600; } .psrc.attendee { color: var(--green); } .psrc.prospect { color: var(--blue); }
 .psrc::after { content: "·"; margin: 0 6px; color: var(--mute); font-weight: 400; }
 /* In the people and company tables the search takes whatever room the filters leave, so the bar stays one line. */
 .plist .filters .search { flex: 1 1 220px; width: auto; min-width: 200px; max-width: 360px; }
@@ -1701,7 +1703,7 @@ body.dlg-open { overflow: hidden; }
 .md-hello p { margin: 0 0 6px; font-size: 15px; color: var(--mute); }
 .md-hello h1 { margin: 0; font: 500 36px/42px var(--display); color: var(--ink); }
 .md-figs { display: flex; gap: 32px; }
-.md-figs p { display: grid; gap: 4px; margin: 0; }
+.md-figs p { display: grid; gap: 4px; margin: 0; justify-items: center; text-align: center; }
 .md-figs b { font: 500 44px/1 var(--display); color: var(--ink); }
 .md-figs span { font-size: 13px; line-height: 16px; color: var(--mute); }
 .md-figs .zero b { color: var(--line-2); }
@@ -1961,7 +1963,8 @@ a.ob-event:hover { background: var(--line); } a.ob-event:hover .logo { transform
 .rs-steps li > span:last-child { font-size: 12px; color: var(--mute); }
 @keyframes grow { from { transform: scaleY(0); } }
 
-.rs-deal { grid-template-columns: auto minmax(160px, 1fr) auto auto; }
+.rs-deal { grid-template-columns: auto minmax(160px, 1fr) 128px 190px; }
+.rs-deal .ob-end { justify-items: end; min-width: 0; }
 .rs-amount { display: grid; justify-items: end; min-width: 120px; }
 .rs-amount b { font: 500 18px/22px var(--display); font-variant-numeric: tabular-nums; }
 .rs-amount span { font-size: 12px; line-height: 16px; color: var(--mute); }
@@ -2019,3 +2022,317 @@ div.rs-deal:hover { transform: none; box-shadow: none; }
 .tl-row.past .tl-dot, .tl-row.past .tl-dot.ok { top: 10px; width: 2px; height: 16px; background: var(--mute); opacity: 1; }
 .paid-x.thin b { color: var(--mute); }
 .u { text-decoration: none; }
+.rs-passed { grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 14px 28px; }
+.rs-passed .rs-amount { min-width: 56px; }
+.rs-passed:hover { transform: none; box-shadow: none; }
+.rs-passed:hover .ob-face { transform: none; }
+.rs-figs { gap: 28px; } .rs-figs b { font-size: 28px; } .rs-figs span { max-width: 18ch; }
+.rs-three .brow { grid-template-columns: minmax(0, 1fr) 80px 64px; }
+.brow.thin span, .brow.thin b { color: var(--mute); }
+.ob-figs { gap: 28px; } .ob-figs b { font-size: 26px; }
+.ob-path li.ours span { font-weight: 600; }
+.ob-deal-facts > div { grid-template-columns: 130px minmax(0, 1fr); }
+.ob-account { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 12px; margin-bottom: 4px; }
+.ob-account div { display: grid; min-width: 0; } .ob-account b { font-weight: 500; font-size: 16px; } .ob-account span { font-size: 13px; color: var(--mute); }
+.ob-account-figs { margin: 6px 0 4px; } .ob-account-figs b { font-size: 20px; }
+.ob-people { margin-top: 8px; } .ob-person { grid-template-columns: auto minmax(0, 1fr) auto; min-height: 52px; }
+/* A row of figures in a header: equal space between them, their labels on the verdict label's baseline, one size under the verdict. */
+.rs-hero .md-figs { display: flex; flex-wrap: wrap; justify-content: flex-end; column-gap: 56px; row-gap: 16px; align-items: flex-end; }
+.rs-hero .md-figs b { font-size: 32px; line-height: 1.1; }
+.rs-hero { align-items: last baseline; }
+.rs-hero .md-figs { align-items: last baseline; column-gap: 48px; }
+.rs-hero .md-figs span { font-size: 14px; line-height: 20px; }
+.views-panel { min-height: 100vh; }
+.m-group { max-width: none; }
+.acting select { width: auto; max-width: none; }
+@media (max-width: 760px) {
+  .tl-row .name, .tl-name b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+  .rs-event .rs-amount, .rs-passed .rs-amount { min-width: 0; }
+  .results, .result { min-width: 0; overflow-x: hidden; }
+}
+.ob-back { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px 0 8px; border: 0; border-radius: var(--r-pill); background: var(--well); color: var(--ink); font: 500 14px/1 var(--sans); cursor: pointer; transition: background 200ms var(--ease); }
+.ob-back svg { transform: rotate(180deg); transition: transform 240ms var(--ease); }
+.ob-back:hover { background: var(--line); } .ob-back:hover svg { transform: rotate(180deg) translateX(3px); }
+a.to.btn { flex-shrink: 0; align-self: flex-start; white-space: nowrap; display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 20px; margin: 0; border-radius: var(--r-pill); color: #FFFFFF; background: var(--green); background-image: none; line-height: 1; -webkit-box-decoration-break: slice; box-decoration-break: slice; }
+a.to.btn:hover { background: var(--green-2); }
+a.to.btn svg { transition: transform 200ms var(--ease); } a.to.btn:hover svg { transform: translateX(3px); }
+/* A buyer's own words: an opening mark in green says someone is talking; their reply sits in a speech bubble. */
+.ob-row .ob-said::before { content: "\201C"; color: var(--green); font: 600 22px/0 var(--display); position: relative; top: 5px; margin-right: 3px; }
+.ob-row .ob-said::after { content: none; }
+.ob-qmark { font: 600 34px/1 var(--display); color: var(--green); height: 20px; margin-top: -2px; transition: transform 260ms var(--ease); }
+.ob-link:hover .ob-qmark { transform: translateY(-2px) rotate(-6deg); }
+.ob-msg { position: relative; border-radius: 22px 22px 22px 6px; }
+.ob-msg .ob-body::before { content: "\201C"; display: block; height: 22px; margin: 0 0 4px -2px; font: 600 48px/1 var(--display); color: var(--green); }
+/* A buyer's words inside a case: the same green mark as everywhere else. */
+.kv dd.said { font: 400 16px/24px var(--display); color: var(--ink); }
+.kv dd.said::before { content: "\201C"; color: var(--green); font: 600 22px/0 var(--display); position: relative; top: 5px; margin-right: 3px; }
+/* Tabs carry how many decisions wait in each, like the menu does. */
+.seg.views button .n { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; margin-left: 8px; border-radius: 10px; background: var(--orange); color: #FFFFFF; font: 600 12px/1 var(--sans); }
+.panel { position: relative; }
+.panel-x { position: absolute; top: 14px; right: 14px; background: #FFFFFF; } .panel-x:hover { background: var(--line); }
+/* The event sheet's story: figures in a row, then short trays of what they are made of. */
+.sheet-figs { margin: 20px 0 4px; justify-content: flex-start; column-gap: 40px; row-gap: 14px; flex-wrap: wrap; }
+.sheet-sec { margin-top: 24px; animation: rise 360ms var(--ease) 120ms backwards; }
+.sheet-sec h3 { display: flex; gap: 8px; align-items: baseline; margin: 0 0 10px; font: 500 15px/20px var(--sans); color: var(--ink); }
+.sheet-sec h3 span { color: var(--mute); font-weight: 400; }
+.sheet-row { grid-template-columns: auto minmax(0, 1fr) auto; min-height: 56px; }
+.sheet-amt { display: inline-flex; align-items: center; gap: 10px; font: 500 16px/20px var(--display); font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; }
+.sheet-amt svg { color: var(--mute); transition: transform 200ms var(--ease); } .sheet-row:hover .sheet-amt svg { transform: translateX(3px); color: var(--ink); }
+.sheet-when { font: 400 14px/20px var(--sans); color: var(--mute); }
+.sheet-learned { display: grid; gap: 14px; }
+.sheet-learned p { display: grid; gap: 4px; margin: 0; font: 400 16px/24px var(--display); color: var(--ink); }
+.sheet-learned p span { font: 400 13px/18px var(--sans); color: var(--mute); }
+/* A meeting's time where it happens, and how soon. */
+.ob-time { display: grid; justify-items: end; gap: 2px; }
+.ob-time b { font: 500 15px/20px var(--sans); color: var(--ink); font-variant-numeric: tabular-nums; }
+.ob-time span { font-size: 12px; line-height: 16px; color: var(--mute); } .ob-time span.soon { color: var(--ink); font-weight: 600; }
+/* Owed notes and the sheet that takes them. */
+.ob-note { grid-template-columns: auto minmax(0, 1fr) auto; }
+.ob-note .ob-face .logo { transition: transform 280ms var(--ease); } .ob-note:hover .ob-face .logo { transform: scale(1.1) rotate(-6deg); }
+.ob-sec h3 { margin: 0 0 10px; font: 500 15px/20px var(--sans); color: var(--ink); }
+.ob-still { cursor: default; } .ob-still:hover { transform: none; box-shadow: none; }
+.ob-own { white-space: normal; color: var(--mute); }
+.ob-notes { display: grid; gap: 12px; }
+.ob-notes textarea { width: 100%; min-height: 168px; padding: 16px 18px; border: 0; border-radius: 22px 22px 22px 6px; background: var(--well); font: 400 17px/26px var(--display); color: var(--ink); resize: vertical; }
+.ob-notes textarea:focus { outline: 2px solid var(--green); outline-offset: 2px; }
+.person-kv { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 6px; } .person-kv .wide { grid-column: 1 / -1; }
+/* A settled case: what it was about, the answer, and who gave it. */
+ul.settled > li.st-group { display: block; padding: 0; border: 0; margin-top: 18px; }
+.st-group h4 { display: flex; gap: 8px; align-items: baseline; margin: 0 0 6px; font: 500 15px/20px var(--sans); color: var(--ink); }
+.st-group h4 span { color: var(--mute); font-weight: 400; }
+.st-group ul { display: grid; margin: 0; padding: 0; list-style: none; }
+.st-group ul li { display: grid; grid-template-columns: minmax(0, 1fr) 220px 130px; align-items: center; gap: 16px; min-height: 44px; padding: 6px 4px; border-top: 1px solid var(--line); }
+.st-group ul li:last-child { border-bottom: 1px solid var(--line); }
+.st-what { min-width: 0; font-size: 15px; line-height: 20px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.st-answer { font-size: 14px; color: var(--ink); }
+.st-by { display: inline-flex; align-items: center; gap: 8px; justify-self: end; font-size: 13px; color: var(--mute); }
+@media (max-width: 760px) { .st-group ul li { grid-template-columns: minmax(0, 1fr) auto; } .st-answer { grid-column: 1; grid-row: 2; color: var(--mute); } .st-by { grid-row: 1 / span 2; grid-column: 2; } }
+/* Usage by event: one row per event, a meter per vendor. */
+.use-row { grid-template-columns: auto minmax(180px, 1.3fr) repeat(3, minmax(120px, 1fr)); gap: 24px; min-height: 68px; }
+.use-m { display: grid; gap: 3px; min-width: 0; }
+.use-k { font-size: 12px; line-height: 16px; color: var(--mute); }
+.use-v { font-size: 14px; line-height: 20px; font-variant-numeric: tabular-nums; white-space: nowrap; } .use-v b { font-weight: 500; color: var(--ink); } .use-v i { font-style: normal; color: var(--mute); }
+.use-bar { display: block; height: 3px; border-radius: 2px; background: var(--line); overflow: hidden; }
+.use-bar u { display: block; height: 100%; background: var(--green); border-radius: 2px; transform-origin: left; animation: draw 700ms var(--ease) backwards; }
+.use-m.near .use-bar u { background: var(--orange); }
+.use-m.none .use-v { color: var(--line-2); }
+@media (max-width: 760px) { .use-row { grid-template-columns: auto minmax(0, 1fr); } .use-m { grid-column: 2; } }
+/* Budget by event: logo, name, quarter and seats, the event's spend as a bar on one shared scale, and its total. */
+.bud-row { grid-template-columns: auto minmax(180px, 1.3fr) 80px minmax(140px, 1.6fr) 150px; gap: 24px; min-height: 68px; }
+.bud-row .bbar { height: 8px; }
+.bud-q, .bud-t { display: grid; gap: 2px; } .bud-t { justify-items: end; }
+.bud-q b, .bud-t b { font: 500 15px/20px var(--sans); color: var(--ink); font-variant-numeric: tabular-nums; }
+.bud-q span, .bud-t span { font-size: 12px; line-height: 16px; color: var(--mute); }
+@media (max-width: 760px) { .bud-row { grid-template-columns: auto minmax(0, 1fr) auto; } .bud-row .bbar, .bud-q { display: none; } }
+/* Budget and Usage tables run the page's full width, and their filters sit on one line beside a search that gives way first. */
+.btable { max-width: none; }
+.btable .filters { flex-wrap: wrap; gap: 10px 12px; }
+.btable .filters .search { flex: 1 1 200px; width: auto; min-width: 180px; max-width: 320px; }
+.btable .filters .filter select { width: auto; }
+.use-head { display: grid; grid-template-columns: 36px minmax(180px, 1.3fr) repeat(3, minmax(120px, 1fr)); gap: 24px; padding: 0 16px 0 10px; margin: 4px 6px -4px; font-size: 12px; line-height: 16px; color: var(--mute); }
+.use-row .use-k { display: none; }
+@media (max-width: 760px) { .use-head { display: none; } .use-row .use-k { display: block; } }
+.lately li.opens { cursor: pointer; }
+/* An event's share of its quarter's ticket budget: the track is the quarter, the fill is this event. */
+.bud-share { display: grid; grid-template-columns: minmax(0, 1fr) 96px; align-items: center; gap: 14px; }
+.bud-share-bar { display: block; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.bud-share-bar u { display: block; height: 100%; border-radius: 3px; background: var(--green); animation: draw 700ms var(--ease) backwards; }
+.bud-share-bar u.over { background: var(--orange); }
+.bud-share-n { font-size: 13px; color: var(--mute); white-space: nowrap; } .bud-share-n b { font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums; }
+/* A buyer's words in what we learned carry the same green mark as a reply. */
+.rs-learned q { quotes: none; color: var(--ink); font-family: var(--display); }
+.rs-learned q::before { content: "\201C"; color: var(--green); font: 600 20px/0 var(--display); position: relative; top: 4px; margin-right: 3px; }
+.md-figs .owed b { color: var(--mute); }
+.cost-credits { margin-top: 28px; }
+.cost-credits .costs { padding: 12px 0 0; margin: 0; }
+@media (max-width: 760px) {
+  /* Five tabs fit by scrolling inside their strip, never by widening the page. */
+  .seg.views { max-width: 100%; overflow-x: auto; scrollbar-width: none; } .seg.views::-webkit-scrollbar { display: none; }
+  .seg.views button { flex: none; padding-left: 12px; padding-right: 12px; }
+  /* A hero's figures sit in two even columns under the verdict. */
+  .rs-hero .md-figs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); justify-content: stretch; gap: 18px 16px; }
+}
+/* The cost ledger: one line per kind of cost, its share of the total as a hairline, the amount, and what you can do with it. */
+.cost-lines { margin-top: 20px; }
+.cl-row { grid-template-columns: minmax(180px, 1.2fr) minmax(120px, 1.6fr) 120px 130px; gap: 24px; min-height: 60px; padding-left: 18px; cursor: default; }
+div.cl-row[role="button"] { cursor: pointer; }
+.cl-what { display: grid; min-width: 0; } .cl-what b { font-weight: 500; font-size: 15px; line-height: 20px; color: var(--ink); }
+.cl-what span { font-size: 13px; line-height: 18px; color: var(--mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cl-bar { display: block; height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
+.cl-bar u { display: block; height: 100%; border-radius: 2px; background: var(--green); animation: draw 700ms var(--ease) backwards; }
+.cl-amt { justify-self: end; font: 500 16px/20px var(--display); color: var(--ink); font-variant-numeric: tabular-nums; } .cl-amt.none { color: var(--mute); font-weight: 400; }
+.cl-act { display: inline-flex; justify-content: flex-end; align-items: center; gap: 10px; }
+.cl-row .ob-go { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--mute); transition: color 160ms ease, transform 240ms var(--ease); }
+.cl-row:hover .ob-go { color: var(--ink); transform: translateX(2px); }
+.cl-empty .cl-what b { color: var(--mute); }
+.cl-edit { grid-template-columns: minmax(140px, 0.8fr) 150px minmax(160px, 1.4fr) auto; background: #FFFFFF; box-shadow: 0 0 0 1.5px var(--green); }
+.cl-in { display: inline-flex; align-items: center; gap: 4px; height: 40px; padding: 0 12px; border-radius: 10px; background: var(--well); }
+.cl-in i { font-style: normal; color: var(--mute); }
+.cl-in input, .cl-note input { width: 100%; border: 0; background: transparent; font: 500 15px/20px var(--sans); color: var(--ink); outline: none; }
+.cl-note { display: flex; align-items: center; height: 40px; padding: 0 12px; border-radius: 10px; background: var(--well); }
+.cl-x { width: 36px; height: 36px; font-size: 20px; }
+@media (max-width: 760px) {
+  .cl-row { grid-template-columns: minmax(0, 1fr) auto; row-gap: 8px; }
+  .cl-row .cl-bar { grid-column: 1 / -1; grid-row: 2; }
+  .cl-row .cl-act { grid-column: 1 / -1; justify-content: flex-start; }
+  .cl-edit { grid-template-columns: 1fr; }
+}
+.cl-share { display: grid; grid-template-columns: minmax(0, 1fr) 40px; align-items: center; gap: 12px; }
+.cl-share i { font-style: normal; font-size: 13px; color: var(--mute); text-align: right; font-variant-numeric: tabular-nums; }
+/* An empty line says it can be added without a hover; a filled one shows Edit on hover, like every row. */
+.cl-empty .ob-go { opacity: 1; transform: none; color: var(--ink); }
+.cl-row:not(.cl-empty) .ob-go { opacity: 0; } .cl-row:not(.cl-empty):hover .ob-go, .cl-row:not(.cl-empty):focus-visible .ob-go { opacity: 1; }
+.rs-cost-link { margin-top: 16px; }
+/* One right edge for every cost line. */
+.cl-row:not(.cl-edit) { grid-template-columns: minmax(180px, 1.2fr) minmax(140px, 1.8fr) 170px; }
+.cl-end { display: grid; justify-items: end; align-items: center; justify-self: end; }
+.cl-swap > * { grid-area: 1 / 1; transition: opacity 160ms ease-out, transform 240ms var(--ease); }
+.cl-swap .ob-go { opacity: 0; transform: translateX(10px); }
+.cl-row:hover .cl-swap .cl-amt, .cl-row:focus-visible .cl-swap .cl-amt { opacity: 0; transform: translateX(-10px); }
+.cl-row:hover .cl-swap .ob-go, .cl-row:focus-visible .cl-swap .ob-go { opacity: 1; transform: none; }
+.cl-add { display: inline-flex; gap: 14px; }
+.cl-add .ob-go { opacity: 1; transform: none; color: var(--ink); }
+.cl-row .cl-amt { justify-self: end; }
+@media (max-width: 760px) { .cl-row:not(.cl-edit) { grid-template-columns: minmax(0, 1fr) auto; } .cl-row:not(.cl-edit) .cl-share { grid-column: 1 / -1; grid-row: 2; } }
+.cost-lines .cl-row { padding-right: 26px; }
+/* The ledger's text starts and ends where the hero's does; the share sits next to its amount. */
+.cost-lines .cl-row { padding-left: 25px; padding-right: 22px; }
+.cl-row:not(.cl-edit) { grid-template-columns: minmax(180px, 1.2fr) minmax(140px, 1.8fr) 124px; }
+.cost-credits { padding: 0 28px; }
+.cost-lines .cl-row { padding-right: 26px; }
+.cost-credits { padding: 0 32px; }
+/* The cost ledger on a phone: name and amount on one line, the share under them; credits in one column. Last, so it wins. */
+@media (max-width: 760px) {
+  .cost-lines .cl-row:not(.cl-edit) { grid-template-columns: minmax(0, 1fr) auto; row-gap: 8px; padding-left: 16px; padding-right: 16px; }
+  .cl-row:not(.cl-edit) .cl-what { grid-column: 1; grid-row: 1; }
+  .cl-row:not(.cl-edit) .cl-end { grid-column: 2; grid-row: 1; }
+  .cl-row:not(.cl-edit) .cl-share { grid-column: 1 / -1; grid-row: 2; }
+  .cl-row:not(.cl-edit) > span:empty { display: none; }
+  .cost-lines .cl-edit { grid-template-columns: 1fr; padding-left: 16px; padding-right: 16px; }
+  .cost-credits { padding: 0 4px; }
+  .cost-credits .costs { grid-template-columns: 1fr; }
+}
+@media (max-width: 760px) { .cl-share .cl-bar { grid-column: auto; grid-row: auto; } }
+.kv dd.said { padding: 12px 16px; border-radius: 18px 18px 18px 6px; background: #FFFFFF; box-shadow: inset 0 0 0 1px var(--line); }
+.rs-fig { display: grid; justify-items: end; min-width: 96px; } .rs-fig b { font: 500 17px/22px var(--display); color: var(--ink); font-variant-numeric: tabular-nums; } .rs-fig span { font-size: 12px; line-height: 16px; color: var(--mute); }
+.rs-fig.thin b { color: var(--mute); }
+/* Cases run the page's width; their answers sit in one calm row, the suggested one in green. */
+.cases { max-width: none; }
+.crow .cacts { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 8px; align-content: flex-start; }
+.story-figs { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
+.story-figs > span:first-child { color: var(--ink); margin-right: 2px; }
+.story-figs > span:not(:first-child) { color: var(--mute); font-size: 13px; } .story-figs b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+/* A name that does not fit ends in an ellipsis, never mid-letter: the link itself carries the truncation. */
+.lately .name a, .who-text .name a { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 760px) {
+  /* Every small link on a phone is a 44px target: padding grows the tap area, a matching negative margin keeps the layout. */
+  .crumbs a, .pmail a, .ebanner a, .lately .name a, .who-text .name a { padding-top: 11px; padding-bottom: 11px; margin-top: -11px; margin-bottom: -11px; }
+  .crumbs a, .pmail a, .ebanner a { display: inline-block; }
+  /* Segmented switches scroll inside themselves rather than cut their last option. */
+  .seg { max-width: 100%; overflow-x: auto; scrollbar-width: none; } .seg::-webkit-scrollbar { display: none; } .seg > button { flex: none; }
+}
+.cl-x { width: 44px; height: 44px; }
+/* On a phone the cost hero's second figure sits on the left edge under the total, like every other block. */
+@media (max-width: 760px) { .cost-view .rs-hero .md-figs { display: flex; justify-content: flex-start; } }
+.sheet-more { margin-top: 8px; }
+.brief > div:only-child { grid-column: 1 / -1; }
+.m-fact { display: flex; gap: 10px; align-items: baseline; } .m-fact span { color: var(--mute); } .m-fact b { font-weight: 500; color: var(--ink); }
+/* The runway says what it counts: steps done of five, at its start. */
+.tl-steps { color: var(--mute); font-weight: 400; }
+/* Secondary buttons are a soft filled pill, never an outlined box: a tint of the ink, so they read on white and on the grey wells alike.
+   The green pill stays the main action. */
+.btn.line { background: rgba(21, 35, 27, 0.065); box-shadow: none; color: var(--ink); }
+.btn.line:hover:not(:disabled) { background: rgba(21, 35, 27, 0.11); }
+.choice { background: rgba(21, 35, 27, 0.065); box-shadow: none; }
+.choice:hover { background: rgba(21, 35, 27, 0.11); box-shadow: none; }
+.choice.on { background: var(--ink); color: #FFFFFF; box-shadow: none; }
+/* A company's panel: who it is and what we know on the left, its people on the right. */
+.copanel { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); margin: 6px 0 10px; }
+.copanel .ob-account { display: flex; align-items: center; gap: 12px; } .copanel .ob-account b { display: block; font: 500 20px/26px var(--display); }
+.copanel-why { font-size: 14px; line-height: 21px; }
+.copanel-people h3 { display: flex; gap: 8px; align-items: baseline; margin: 0 0 8px; font: 500 15px/20px var(--sans); } .copanel-people h3 span { color: var(--mute); font-weight: 400; }
+button.corow { width: 100%; text-align: left; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; }
+.pco-link { cursor: pointer; } .pco-link:hover { color: var(--green); }
+@media (max-width: 760px) { .copanel { grid-template-columns: 1fr; } }
+/* What we learned: a card per theme; with several learnings, arrows slide through them one at a time. */
+.rs-learn { display: grid; align-content: start; gap: 10px; padding: 16px 18px; border-radius: 12px; background: var(--ground); overflow: hidden; animation: rise 340ms var(--ease) 160ms backwards; }
+.rs-learn header { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 28px; }
+.rs-learn h4 { margin: 0; font: 500 13px/18px var(--sans); color: var(--mute); }
+.rs-learn-nav { display: inline-flex; align-items: center; gap: 4px; }
+.rs-learn-nav i { font-style: normal; font-size: 12px; color: var(--mute); margin-right: 4px; font-variant-numeric: tabular-nums; }
+.rs-learn-nav button { display: inline-grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: 50%; background: rgba(21, 35, 27, 0.065); color: var(--ink); cursor: pointer; transition: background 150ms ease, transform 150ms ease; }
+.rs-learn-nav button:hover { background: rgba(21, 35, 27, 0.12); } .rs-learn-nav button:active { transform: scale(0.94); }
+.rs-learn-body { display: grid; gap: 4px; animation: learnIn 320ms var(--ease) both; }
+.rs-learn-body p { margin: 0; font: 400 16px/23px var(--display); color: var(--ink); }
+.rs-learn-body q { font-size: 14px; line-height: 20px; quotes: none; color: var(--ink); font-family: var(--display); }
+.rs-learn-body q::before { content: "\201C"; color: var(--green); font: 600 20px/0 var(--display); position: relative; top: 4px; margin-right: 3px; }
+.rs-learn-body > span { font-size: 12px; color: var(--mute); }
+@keyframes learnIn { from { opacity: 0; transform: translateX(var(--from, 18px)); } to { opacity: 1; transform: none; } }
+@media (pointer: coarse) { .rs-learn-nav button { width: 44px; height: 44px; } }
+/* Budget rows on a phone: name and amount on the first line, the share of the quarter and the seats under them, all ending on one right edge. */
+@media (max-width: 760px) {
+  .bud-row { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "face who t" "face share q"; column-gap: 14px; row-gap: 8px; align-items: center; }
+  .bud-row > .ob-face { grid-area: face; align-self: start; } .bud-row > .ob-who { grid-area: who; } .bud-row > .bud-t { grid-area: t; }
+  .bud-row > .bud-share { grid-area: share; display: grid; grid-template-columns: minmax(0, 1fr) auto; } .bud-row .bud-share-bar { display: block; }
+  .bud-row > .bud-q { grid-area: q; display: flex; gap: 4px; align-items: baseline; justify-content: flex-end; }
+}
+/* Phone: every tap target reaches 44px. Text links grow an invisible band above and below (padding, cancelled by margin) so the
+   line they sit in does not move; the hover wash stays on the text. Rows and segments get the height or width outright. */
+@media (pointer: coarse), (max-width: 760px) {
+  a.to:not(.btn), h2.display a { padding-block: 11px; margin-block: -11px; background-clip: content-box; }
+  a.to.ob-event { padding-block: 9px; margin-block: -9px; }
+  .brief .brow { min-height: 44px; }
+  .seg button { min-width: 44px; }
+  .check input { width: 22px; height: 22px; margin: 11px 0; }
+}
+/* Learnings: two by two for four themes, never one card alone on a row; each card keeps its height while paging. */
+.rs-learned { grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr)); }
+@media (max-width: 760px) { .rs-learned { grid-template-columns: minmax(0, 1fr); } }
+.rs-learn-stack { display: grid; } .rs-learn-stack > .rs-learn-body { grid-area: 1 / 1; }
+.rs-learn-body[aria-hidden="true"] { animation: none; }
+/* Sheet figures on a phone: a figure never breaks inside itself ("Tier 1" stays one line); a long word figure takes its own line. */
+@media (max-width: 760px) {
+  .ob-figs { flex-wrap: wrap; column-gap: 24px; row-gap: 14px; }
+  .ob-figs b { white-space: nowrap; font-size: 22px; }
+  .ob-figs p { flex: 0 0 auto; max-width: 100%; }
+  .ob-figs p b:not(:only-child) { overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+}
+/* Outreach: the funnel and the waiting replies share the page's left and right edges with the folds under them. */
+.motion > .brief, .motion > .m-group { padding: 0; max-width: none; }
+/* The stage under way: the same size and baseline as its neighbours, set apart by weight and ink; its bar is flat orange, no sweep. */
+@media (min-width: 761px) { .stages .now .st-label { font: 600 14px/18px var(--sans); color: var(--ink); } }
+.stages .now .st-bar i::after { display: none; }
+.stages.running .now .st-bar i { animation: fill 420ms var(--ease) backwards, breathe 1.6s ease-in-out 900ms infinite; }
+@keyframes breathe { 50% { opacity: 0.55; } }
+/* Details: the date, place and people read as plain facts with a quiet icon, on the page's own left edge; the folds under them run the full width. */
+.efacts { padding: 22px 0 6px; }
+.efacts dt { width: 20px; height: 20px; margin-top: 1px; border-radius: 0; background: none; }
+.efacts > div:hover dt { transform: none; }
+section.more[aria-label="More"] { max-width: none; }
+/* Phone: the event's tabs fit the width, none cut at the edge. */
+@media (max-width: 760px) {
+  .seg.views { width: 100%; display: flex; overflow: visible; }
+  .seg.views button { flex: 1 1 auto; padding-left: 6px; padding-right: 6px; font-size: 14px; min-width: 0; }
+  .seg.views button .n { margin-left: 5px; min-width: 18px; height: 18px; padding: 0 5px; font-size: 11px; }
+}
+/* Acting as: the words over the picker, so a full name fits ("Dan Whitlock", "GTM Team"), never cut. */
+.acting { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "face words" "face pick"; row-gap: 2px; column-gap: 10px; }
+.acting > :first-child { grid-area: face; }
+.acting > span { grid-area: words; font-size: 12px; line-height: 16px; }
+.acting > select { grid-area: pick; height: 32px; }
+/* Budget filters: one line on a wide screen, the search giving way so the order picker is not left alone underneath. */
+@media (min-width: 1360px) {
+  .filters:has(#bq) { flex-wrap: nowrap; gap: 10px; }
+  .filters:has(#bq) > form { flex: 1 1 160px; min-width: 140px; }
+  .filters:has(#bq) .search { width: 100%; }
+  .filters:has(#bq) .filter select { max-width: 170px; }
+}
+/* Usage: the pools share the right edge of the event list and lookups under them. */
+.pools { max-width: none; }
+/* A date near the right edge sits inside its bar: it gets the page ground behind it, so the track stops before the words. */
+.tl-end.flip { padding: 0 8px; margin-right: 6px; border-radius: 9px; background: var(--ground); }
+/* Outreach: the follow-up's start as a row like every other on the page. */
+.m-started .ob-row { grid-template-columns: auto minmax(0, 1fr) auto; }
+.m-started-at { display: grid; gap: 2px; justify-items: end; text-align: right; }
+.m-started-at b { font: 500 15px/20px var(--sans); color: var(--ink); font-variant-numeric: tabular-nums; }
+.m-started-at span { font-size: 12px; line-height: 16px; color: var(--mute); }

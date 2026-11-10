@@ -342,7 +342,8 @@ describe("the model writes the perspective, and code checks it", () => {
     expect(await reserve(db, r.id, "llm", 1, "x", "perspective")).toBeNull();
     // And the API hands the same line to the screen.
     const app = createApp(db, { demo: true });
-    const body = await (await app.request(`/api/events/${r.id}`)).json() as { card: { lines: Record<string, number> } };
+    // The card's AI calls are leadership's and GTM's to read.
+    const body = await (await app.request(`/api/events/${r.id}`, { headers: { "x-actor": "GTM Team" } })).json() as { card: { lines: Record<string, number> } };
     expect(body.card.lines.perspective_llm).toBe(2);
   });
 });

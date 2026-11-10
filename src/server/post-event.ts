@@ -130,8 +130,9 @@ export interface NextStep { text: string; tab: "outreach" | "people" | "details"
 /** The one thing on a delivered event that needs a person now, or null. Cheap counts, in the order a person should take them. */
 export async function nextStep(db: Db, deps: LifecycleDeps, eventId: string): Promise<NextStep | null> {
   const now = nowOf(deps).toISOString();
-  const [c] = await db.query<{ cases: number; card: number; replies: number; drafts: number; meetings: number; motion: string }>(
-    `SELECT (SELECT count(*)::int FROM review_cases WHERE event_id = $1 AND status = 'open') AS cases,
+  const [c] = await db.query<{ cases: number; reply_cases: number; card: number; replies: number; drafts: number; meetings: number; motion: string }>(
+    `SELECT (SELECT count(*)::int FROM review_cases WHERE event_id = $1 AND status = 'open' AND kind <> 'reply_doubtful') AS cases,
+       (SELECT count(*)::int FROM review_cases WHERE event_id = $1 AND status = 'open' AND kind = 'reply_doubtful') AS reply_cases,
        (SELECT count(*)::int FROM approvals WHERE event_id = $1 AND kind = 'motion' AND status = 'pending') AS card,
        (SELECT count(*)::int FROM inbound_messages WHERE event_id = $1 AND respond_by IS NOT NULL AND handled_at IS NULL) AS replies,
        (SELECT count(*)::int FROM sequences WHERE event_id = $1 AND state = 'draft' AND checklist_at IS NULL) AS drafts,

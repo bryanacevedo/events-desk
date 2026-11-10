@@ -140,7 +140,7 @@ export function Events({ go, sheetId, requesting, preselect, search }: { go: (to
         <div><h1>Events</h1></div>
         <span className="spacer" />
         {canAdd && <Link to={withParam("add", "1")} go={go} className="btn line small tl-add">Add event</Link>}
-        <Link to={withParam("request", "1")} go={go} className="btn phone-only">Request seats</Link>
+        <Link to={withParam("request", "1")} go={go} className="btn phone-only">Request a seat</Link>
       </header>
 
       {requesting && <RequestSeats preselect={preselect} onDone={() => go(needs?.approvers.includes(actor) ? "/seats?mine=1&status=all" : "/my-day")} onClose={() => go(keepQuery())} />}
@@ -189,7 +189,7 @@ export function Events({ go, sheetId, requesting, preselect, search }: { go: (to
                 <div className="tl-name"><p className="name">{r.name}</p><p className="small mute">{r.place}</p></div>
                 {r.c
                   ? <p className="tl-state none"><span className="tl-req">Request a seat</span></p>
-                  : <p className={`tl-state ${s.tone}`}><i className="tl-sign" aria-hidden="true" /><span className="tl-words"><b>{s.words}</b>{s.who && <span>{s.who}</span>}</span></p>}
+                  : <p className={`tl-state ${s.tone}`}><span className="tl-words"><b>{s.words}</b>{s.who && <span>{s.who}</span>}</span></p>}
                 <div className="tl-track">
                   {runway && (
                     <div className={`tl-bar ${s.tone}`} style={{ left: `${Math.min(todayX, x1)}%`, width: `${Math.max(0, x1 - todayX)}%` }} role="img" aria-label={`${done} of 5 steps done`}>

@@ -148,7 +148,7 @@ describe("approvals", () => {
     expect(card.credits_cap).toBeGreaterThan(0);
     await decideApproval(db, { approvalId: await pending(), actor: MAYA, decision: "approve" });
     expect(await stage()).toBe("tiering");
-    await expect(patchSettings(db, id, MAYA, { contacts_per_company: 1 })).rejects.toThrow(/locked/);
+    await expect(patchSettings(db, id, MAYA, { contacts_per_company: 1 })).rejects.toThrow(/fixed once a cost card is confirmed/);
   });
   it("declining the card returns to mapped so it can be re-quoted lower", async () => {
     await toQuoted();

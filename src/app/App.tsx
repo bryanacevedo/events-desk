@@ -1,6 +1,7 @@
 /* Shell and router. A persistent sidebar on desktop, a tab bar on phones. Overview (home), Events,
    Seats, Settings, and the full event page. The acting person is a sidebar choice in every mode. There is no login: it is self-asserted. */
 
+import { ObjectSheets } from "./Objects";
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { get } from "./api";
 import { Events } from "./Events";
@@ -45,7 +46,8 @@ export function usePath() {
     return () => removeEventListener("popstate", on);
   }, []);
   // pushState does not announce a new #view, so a link to another view of the page already open says so itself.
-  const go = (raw: string) => { const to = canonical(raw); history.pushState(null, "", to); setPath(to); if (to.includes("#")) window.dispatchEvent(new HashChangeEvent("hashchange")); if (!to.includes("?event=")) scrollTo(0, 0); };
+  // A new page starts at its top. Opening, switching or closing a side sheet keeps the same page and the reader's place on it.
+  const go = (raw: string) => { const to = canonical(raw); const samePage = to.split(/[?#]/)[0] === location.pathname; history.pushState(null, "", to); setPath(to); if (to.includes("#")) window.dispatchEvent(new HashChangeEvent("hashchange")); if (!samePage) scrollTo(0, 0); };
   return [path, go] as const;
 }
 
@@ -73,24 +75,26 @@ export function App() {
   const [demo, setDemo] = useState<boolean | null>(null);
   const [needs, setNeeds] = useState<Needs | null>(null);
   const refresh = useCallback(async () => { setNeeds(await loadNeeds()); }, []);
-  const pathname = path.split("?")[0];
+  // The hash is a view inside a page (#result, #people): it never changes which page this is.
+  const [beforeHash] = path.split("#");
+  const pathname = beforeHash.split("?")[0];
   useEffect(() => { get<{ demo: boolean }>("/api/health").then((h) => setDemo(Boolean(h?.demo))); }, []);
   useEffect(() => { refresh(); }, [pathname, refresh]);
   // How many people are waiting on whoever is acting, across events.
   const [waiting, setWaiting] = useState(0), [dayHas, setDayHas] = useState(false);
-  useEffect(() => { get<{ replies: unknown[]; meetings: unknown[]; captures: unknown[] }>(`/api/motion/my-day?rep=${encodeURIComponent(actor)}`).then((d) => { setWaiting(d?.replies.length ?? 0); setDayHas(Boolean(d && (d.replies.length || d.meetings.length || d.captures.length))); }); }, [actor, pathname]);
+  useEffect(() => { get<{ replies: unknown[]; meetings: unknown[]; captures: unknown[]; notes?: unknown[] }>(`/api/motion/my-day?rep=${encodeURIComponent(actor)}`).then((d) => { setWaiting((d?.replies.length ?? 0) + (d?.notes?.length ?? 0)); setDayHas(Boolean(d && (d.replies.length || d.meetings.length || d.captures.length || d.notes?.length))); }); }, [actor, pathname]);
 
-  const search = new URLSearchParams(path.split("?")[1] ?? "");
+  const search = new URLSearchParams(beforeHash.split("?")[1] ?? "");
   const eventId = pathname.match(/^\/event\/([^/]+)/)?.[1];
   const place = placeOf(pathname);
   const count = needs?.approvals.length ?? 0;
-  // Seats is where leadership decides seat requests. Everyone else follows their own requests on My day, so the tab is only in the approvers' menu.
+  // Seats is where leadership decides seat requests; GTM Engineering sees the same queue. Reps follow their own requests on My day.
   // Budget and Usage are company spend: leadership's and GTM Engineering's, not an SDR's day.
   setDemoCalendar(Boolean(demo));
   const approver = Boolean(needs?.approvers.includes(actor)), lead = approver || isGtm(actor);
   // My day is the rep's page: replies, meetings, people met. Leadership's day is the seat queue on Overview and Seats, so an empty My day stays out of their menu.
   const showDay = !lead || dayHas;
-  const navAt = ["overview", ...(showDay ? ["myday"] : []), "events", ...(approver ? ["seats"] : []), ...(lead ? ["budget", "results", "usage"] : [])].indexOf(place);
+  const navAt = ["overview", ...(showDay ? ["myday"] : []), "events", ...(lead ? ["seats"] : []), ...(lead ? ["budget", "results", "usage"] : [])].indexOf(place);
   if (demo === null) return null;
 
   const item = (to: string, p: Place, label: string, icon: ReactNode, cls: string, badge?: number) => (
@@ -110,14 +114,14 @@ export function App() {
             {item("/", "overview", "Overview", <Icon.overview />, "navitem")}
             {showDay && item("/my-day", "myday", "My day", <Icon.calendar />, "navitem", waiting)}
             {item("/events", "events", "Events", <Icon.events />, "navitem")}
-            {approver && item("/seats", "seats", "Seats", <Icon.seats />, "navitem", count)}
+            {lead && item("/seats", "seats", "Seats", <Icon.seats />, "navitem", approver ? count : 0)}
             {lead && item("/budget", "budget", "Budget", <Icon.budget />, "navitem")}
             {lead && item("/results", "results", "Results", <Icon.results />, "navitem")}
             {lead && item("/usage", "usage", "Usage", <Icon.usage />, "navitem")}
           </div>
           <span className="spacer" />
           <div className="side-foot">
-            <Link to="/events?request=1" go={go} className="btn side-cta">Request seats</Link>
+            <Link to="/events?request=1" go={go} className="btn side-cta">Request a seat</Link>
             {isGtm(actor) && item("/settings", "settings", "Settings", <Icon.settings />, "navitem")}
             <label className="acting"><PersonAvatar name={actor} size={28} /><span>Acting as</span>
               <select value={actor} onChange={pick}>{PEOPLE.map((p) => <option key={p}>{p}</option>)}</select>
@@ -134,10 +138,12 @@ export function App() {
           </header>
           {place === "overview" && <Overview go={go} sheetId={search.get("event")} />}
           {place === "events" && <Events go={go} sheetId={search.get("event")} requesting={search.get("request") === "1"} preselect={search.get("catalog")} search={search} />}
-          {place === "seats" && <Seats go={go} search={search} requesting={search.get("request") === "1"} preselect={search.get("catalog")} />}
+          {place === "seats" && (lead ? <Seats go={go} search={search} requesting={search.get("request") === "1"} preselect={search.get("catalog")} /> : <p className="md-clear">Seats are for leadership and GTM Engineering.</p>)}
           {place === "budget" && (lead ? <Budget go={go} search={search} /> : <p className="md-clear">Budget is for leadership and GTM Engineering.</p>)}
           {place === "results" && (lead ? <Results go={go} /> : <p className="md-clear">Results are for leadership and GTM Engineering.</p>)}
           {place === "usage" && (lead ? <Usage go={go} search={search} /> : <p className="md-clear">Usage is for leadership and GTM Engineering.</p>)}
+          {/* A reply, meeting or deal opened from an event sheet opens over whichever page the sheet was on. The event page and My day draw their own. */}
+          {!["event", "myday"].includes(place) && <ObjectSheets />}
           {place === "myday" && <MyDay />}
           {place === "more" && <More go={go} showDay={approver && showDay} />}
           {place === "settings" && <Settings go={go} compileId={search.get("compile")} section={search.get("section")} />}
@@ -147,7 +153,7 @@ export function App() {
         <nav className="tabs" aria-label="Events Desk">
           {item("/", "overview", "Overview", <Icon.overview />, "tab")}
           {item("/events", "events", "Events", <Icon.events />, "tab")}
-          {approver ? item("/seats", "seats", "Seats", <Icon.seats />, "tab", count) : showDay && item("/my-day", "myday", "My day", <Icon.calendar />, "tab", waiting)}
+          {lead ? item("/seats", "seats", "Seats", <Icon.seats />, "tab", approver ? count : 0) : showDay && item("/my-day", "myday", "My day", <Icon.calendar />, "tab", waiting)}
           {lead && item("/budget", "budget", "Budget", <Icon.budget />, "tab")}
           {/* More holds Usage and Settings, which are leadership's and GTM's. For anyone else it would be an empty page. */}
           {lead && <Link to="/more" go={go} className="tab" aria-current={["more", "usage", "settings"].includes(place) ? "page" : undefined}><span className="ico"><Icon.more /></span><span className="lbl">More</span></Link>}

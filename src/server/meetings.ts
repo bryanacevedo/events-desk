@@ -1,5 +1,6 @@
 /* Meetings (docs/LIFECYCLE.md, section 8). Booking stops everyone at the domain and is kept. Cancelled or no-show releases the hold only after a rep confirms. */
 
+import { zoneAt } from "../shared/motion.ts";
 import { AFTER_OUTCOME_HOLD_DAYS, DAY, MEETING_HOLD_DAYS } from "../shared/policy.ts";
 import type { Db } from "./db.ts";
 import { scheduleResume, stopDomain } from "./enroll-ops.ts";
@@ -17,6 +18,12 @@ export type MeetingStatus = (typeof MEETING_STATUSES)[number];
 export interface MeetingInput { contact_id: string; scheduled_at: string; timezone?: string; source: "reply" | "sheet" | "calendar" | "manual"; rep?: string | null; external_key?: string; status?: "proposed" | "booked" }
 
 /** Books a meeting, or moves one already known under this key. The event credited is the one whose sequence sent last. */
+/** The zone an event happens in, from its venue and country (or its catalog entry's), UTC when neither says. */
+export async function eventZone(q: <T>(sql: string, args?: unknown[]) => Promise<T[]>, eventId: string): Promise<string> {
+  const [p] = await q<{ venue: string | null; country: string | null }>("SELECT coalesce(nullif(e.venue, ''), c.city) AS venue, coalesce(e.country, c.country) AS country FROM events e LEFT JOIN catalog_events c ON c.id = e.catalog_id WHERE e.id = $1", [eventId]);
+  return zoneAt(p?.venue, p?.country) ?? "UTC";
+}
+
 export async function bookMeeting(db: Db, deps: LifecycleDeps, m: MeetingInput, actor: string) {
   const now = nowOf(deps);
   if (Number.isNaN(Date.parse(m.scheduled_at))) throw new RuleError("That is not a date and time.");
@@ -30,8 +37,10 @@ export async function bookMeeting(db: Db, deps: LifecycleDeps, m: MeetingInput, 
     const [before] = await q<{ id: string; scheduled_at: string }>("SELECT id, scheduled_at::text AS scheduled_at FROM meetings WHERE external_key = $1 FOR UPDATE", [key]);
     const moved = before && Date.parse(before.scheduled_at) !== Date.parse(m.scheduled_at);
     const id = before?.id ?? newId("mtg");
-    if (before) await q("UPDATE meetings SET scheduled_at = $2, timezone = $3, status = CASE WHEN $4 THEN 'rescheduled' ELSE status END, rep = coalesce($5, rep) WHERE id = $1", [id, m.scheduled_at, m.timezone ?? "UTC", moved, m.rep ?? null]);
-    else await q("INSERT INTO meetings (id, event_id, contact_id, domain, external_key, status, scheduled_at, timezone, source, rep, enrolled) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)", [id, eventId, k.id, k.domain, key, m.status ?? "booked", m.scheduled_at, m.timezone ?? "UTC", m.source, m.rep ?? null, Boolean(en)]);
+    // A meeting booked without a zone is at its event, in the event's zone.
+    const zone = m.timezone ?? await eventZone(q, eventId);
+    if (before) await q("UPDATE meetings SET scheduled_at = $2, timezone = $3, status = CASE WHEN $4 THEN 'rescheduled' ELSE status END, rep = coalesce($5, rep) WHERE id = $1", [id, m.scheduled_at, zone, moved, m.rep ?? null]);
+    else await q("INSERT INTO meetings (id, event_id, contact_id, domain, external_key, status, scheduled_at, timezone, source, rep, enrolled) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)", [id, eventId, k.id, k.domain, key, m.status ?? "booked", m.scheduled_at, zone, m.source, m.rep ?? null, Boolean(en)]);
     // Everyone at the domain stops, kept and never deleted. Thirty days after the meeting the hold runs out on its own if nobody says what happened.
     await stopDomain(q, k.domain, "pause", "meeting", id);
     await addHold(q, { domain: k.domain, cause: "meeting", cause_id: id, expires_at: new Date(Date.parse(m.scheduled_at) + MEETING_HOLD_DAYS * DAY) });

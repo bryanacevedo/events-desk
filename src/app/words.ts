@@ -60,7 +60,7 @@ export function stageSentence(e: EventRow, s: Settings | null): string {
   switch (e.stage) {
     case "requested": return `Waiting on ${who} to decide ${plural(e.seat_count, "seat request")}.`;
     case "approved": return "Add the attendee list.";
-    case "mapped": return e.flow === "two_card" ? "Attendees in. Ask for the Research card." : "Attendees in. Ask for the cost card.";
+    case "mapped": return "Attendees in";
     case "quoted": return e.flow === "two_card" ? "Ready to run research." : "Ready to run.";
     case "tiering": return "Sorting companies and titles.";
     case "enriching": return "Finding and checking emails.";
@@ -81,15 +81,15 @@ export const DROP_WORDS: Record<string, string> = {
   no_company: "No company on the row",
   excluded_company: "On the never-contact companies",
   existing_customer: "Already a customer",
-  low_tier: "Low priority, so never looked up",
+  low_tier: "Low priority",
   tiering_failed: "Could not be sorted into a tier",
   no_contacts_found: "Nobody found at the company",
   no_people_found: "Nobody found at the company",
   no_email_found: "No email found",
   not_deliverable: "Email does not deliver",
   email_unconfirmed: "Email could not be confirmed",
-  catch_all_unconfirmed: "Catch-all domain, address unconfirmed",
-  employment_unconfirmed: "Could not confirm they still work there",
+  catch_all_unconfirmed: "Catch-all domain",
+  employment_unconfirmed: "Employer not confirmed",
   opted_out: "Opted out",
   crm_unsubscribed: "Unsubscribed in Salesforce",
   crm_do_not_contact: "Do not contact in Salesforce",
@@ -105,6 +105,8 @@ export const dropWords = (r: string) => DROP_WORDS[r] ?? r.replace(/_/g, " ");
 /** The kinds of case, as a group heading. Blocking kinds hold up the Outreach card; the rest can wait until the list is out. */
 export const CASE_WORDS: Record<string, string> = {
   ambiguous_identity: "Which company",
+  owner_unreachable: "Owner couldn't be asked",
+  reply_doubtful: "Reply to read",
   company_not_found: "Company not found",
   unknown_tier: "Which tier",
   second_look_disagreement: "Two looks, two tiers",

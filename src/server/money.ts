@@ -22,3 +22,11 @@ export function withoutMoney<T extends Scorecard | null | undefined>(m: T): T {
     past: { held_per_thousand: null, pipeline_per_dollar: null },
   } as T;
 }
+
+/** Any value with every key that holds dollars, or AI calls priced by the call, taken out at every depth. Counts of people,
+    companies and data credits stay. */
+export function forRep<T>(o: T): T {
+  if (Array.isArray(o)) return o.map(forRep) as T;
+  if (o && typeof o === "object") return Object.fromEntries(Object.entries(o).filter(([k]) => !/cents|llm/.test(k)).map(([k, v]) => [k, forRep(v)])) as T;
+  return o;
+}

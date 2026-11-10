@@ -34,6 +34,16 @@ describe("budget", () => {
     expect((await db.query("SELECT 1 FROM ticket_purchases")).length).toBe(1);
   });
 
+  it("the table's filters narrow the events, through the route the page calls, and the year's totals stay whole", async () => {
+    const a = await ask(MAYA, "q1"); await ask(ANA, "q2"); await approve(a.id);
+    const app = createApp(db, { demo: true });
+    const read = async (qs: string) => (await (await app.request(`/api/budget?year=2027${qs}`, { headers: as(DAN) })).json()) as { total_events: number; events: { quarter: number }[]; totals: { waiting: number } };
+    expect((await read("")).total_events).toBe(2);
+    expect((await read("&quarter=2")).events.map((e) => e.quarter)).toEqual([2]);
+    expect((await read("&show=waiting")).total_events).toBe(1);
+    expect((await read("&quarter=2")).totals.waiting).toBe((await read("")).totals.waiting);
+  });
+
   it("puts a seat in the quarter its event starts, and a year by its start date", async () => {
     await ask(MAYA, "q1"); await ask(MAYA, "q2"); await ask(MAYA, "y26");
     const v = await view();

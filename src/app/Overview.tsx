@@ -45,9 +45,9 @@ function Track({ e, tone, cases }: { e: EventRow; tone: string; cases: number })
   );
 }
 
-/** What a row at risk puts on its right edge: how many conflicts, or how long until the doors open. */
+/** What a row at risk puts on its right edge: how many cases, or how long until the doors open. */
 function riskSide(i: NeedItem, e?: EventRow): { text: string; soon: boolean } {
-  if (i.kind === "case") return { text: plural(i.caseCount ?? 0, "conflict"), soon: false };
+  if (i.kind === "case") return { text: plural(i.caseCount ?? 0, "case"), soon: false };
   if (!e) return { text: "", soon: false };
   const n = daysTo(e.starts_on);
   if (n === 0) return { text: "Today", soon: true };
@@ -56,13 +56,13 @@ function riskSide(i: NeedItem, e?: EventRow): { text: string; soon: boolean } {
 }
 
 /** After delivery, what needs someone: a reply goes cold fastest, then the follow-up's window, then sending that stopped, then meetings nobody recorded. */
-const NEED_GROUPS: [OutreachNeed["kind"], string, string][] = [["replies", "Replies waiting on a rep", "Answer"], ["follow_up", "Follow-up ready to start", "Start"], ["paused", "Sequences paused", "See why"], ["meetings", "Meetings to record", "Record"]];
-const STEP_WORDS: Record<string, string> = { owners: "With account owners", sequencing: "Setting up sequences", in_market: "In market", follow_up: "Following up", closing: "Closing", scored: "Scored" };
+const NEED_GROUPS: [OutreachNeed["kind"], string, string][] = [["replies", "Replies waiting on a rep", "Answer"], ["follow_up", "Follow-up ready", "Start"], ["paused", "Sequences paused", "See why"], ["meetings", "Meetings to record", "Record"], ["costs", "Costs to enter", "Enter"]];
 
 function needSide(i: OutreachNeed): { text: string; soon: boolean } {
   if (i.kind === "replies") return i.overdue ? { text: `${i.overdue} late`, soon: true } : { text: plural(i.n, "reply", "replies"), soon: false };
   if (i.kind === "follow_up") return { text: i.detail ? `until ${shortDate(i.detail.replace("until ", ""))}` : "Ready", soon: true };
   if (i.kind === "paused") return { text: plural(i.n, "paused", "paused"), soon: false };
+  if (i.kind === "costs") return { text: plural(i.n, "line"), soon: false };
   return { text: plural(i.n, "meeting"), soon: false };
 }
 
@@ -70,9 +70,9 @@ function needSide(i: OutreachNeed): { text: string; soon: boolean } {
 const GROUPS: [string, (i: NeedItem) => boolean][] = [
   ["No attendee list", (i) => i.kind === "soon" || (i.kind === "step" && i.fix === "Add the attendee list")],
   ["Paused", (i) => i.kind === "paused"],
-  ["Conflicts to settle", (i) => i.kind === "case"],
-  ["Ready to run", (i) => i.kind === "step" && i.fix === "Review cost and run"],
-  ["Cost card not asked for", (i) => i.kind === "step" && i.fix === "Ask for the card"],
+  ["Cases to settle", (i) => i.kind === "case"],
+  ["Ready to run", (i) => i.kind === "step" && i.fix === "Review and run"],
+  ["Not priced yet", (i) => i.kind === "step" && i.fix === "Price it"],
 ];
 
 /** The card leans toward the mouse and a soft light follows it. Mouse only; touch and reduced motion stay still. */
@@ -167,7 +167,7 @@ export function Overview({ go, sheetId }: { go: (to: string) => void; sheetId: s
             );
           })}
           {firstUpcoming === -1 && <div className="c-today end" ref={todayMark}><span>Today</span></div>}
-          {!all.length && <p className="mute">No events yet. <Link to="/events?request=1" go={go} className="to">Request seats</Link> to start one.</p>}
+          {!all.length && <p className="mute">No events yet. <Link to="/events?request=1" go={go} className="to">Request a seat</Link> to start one.</p>}
         </div>
       </section>
 
@@ -180,12 +180,12 @@ export function Overview({ go, sheetId }: { go: (to: string) => void; sheetId: s
             const open = openGroups[kind];
             return (
               <div className="tray" key={kind}>
-                <h3><b>{title}</b><span>{items.reduce((n, i) => n + i.n, 0)}</span></h3>
+                <h3><b>{title}</b>{/* Every count here is of events, like the header's; each row says how many replies, lines or meetings it holds. */}<span>{items.length}</span></h3>
                 {(open ? items : items.slice(0, 3)).map((i) => {
                   const e = byId.get(i.event_id);
                   const side = needSide(i);
                   return (
-                    <Link to={`/event/${i.event_id}#outreach`} go={go} className="risk" key={`${kind}:${i.event_id}`}>
+                    <Link to={kind === "costs" ? `/event/${i.event_id}#cost` : `/?event=${i.event_id}`} go={go} className="risk" key={`${kind}:${i.event_id}`} data-opens-sheet={kind === "costs" ? undefined : ""} data-row={`${kind}:${i.event_id}`}>
                       <EventLogo name={i.name} website={i.website} size={34} />
                       <span className="who-text"><b>{i.name}</b>{e && <span className="small mute">{[shortDate(e.starts_on), city(e.venue)].filter(Boolean).join(" · ")}</span>}</span>
                       <span className="risk-end">
@@ -248,11 +248,11 @@ export function Overview({ go, sheetId }: { go: (to: string) => void; sheetId: s
                     const step = afterStep({ ...r, stage: "delivered" } as unknown as EventRow);
                     const started = r.motion !== "none";
                     return (
-                      <li key={r.id}>
+                      <li key={r.id} className="opens" data-opens-sheet="" onClick={(ev) => { if (!(ev.target as HTMLElement).closest("a, button")) go(`/?event=${r.id}`); }}>
                         <EventLogo name={r.name} website={r.website} size={34} />
-                        <div className="who-text"><p className="name"><Link to={`/event/${r.id}`} go={go} title={r.name}>{r.name.replace(/\s+20\d\d$/, "")}</Link></p><p className="small mute">{started ? STEP_WORDS[step.key] ?? "In market" : "List ready"}</p></div>
+                        <div className="who-text"><p className="name"><Link to={`/?event=${r.id}`} go={go} title={r.name} data-opens-sheet="">{r.name}</Link></p><p className="small mute">{deliveredWords({ ...r, stage: "delivered" } as unknown as EventRow).words}</p></div>
                         {started
-                          ? <p className="abc" aria-label={`${r.sent} reached, ${r.replied} replied, ${r.held} meetings held`}><span className={r.sent ? "" : "zero"}><i>reached</i>{num(r.sent)}</span><span className={r.replied ? "" : "zero"}><i>replied</i>{num(r.replied)}</span><span className={`a${r.held ? "" : " zero"}`}><i>meetings</i>{num(r.held)}</span></p>
+                          ? <p className="abc" aria-label={`${r.sent} reached, ${r.replied} replies, ${r.held} meetings held`}><span className={r.sent ? "" : "zero"}><i>reached</i>{num(r.sent)}</span><span className={r.replied ? "" : "zero"}><i>replies</i>{num(r.replied)}</span><span className={`a${r.held ? "" : " zero"}`}><i>meetings</i>{num(r.held)}</span></p>
                           : <p className="abc"><span><i>to reach</i>{num(r.kept)}</span></p>}
                         {!started && r.sheet_url ? <SheetButton href={r.sheet_url} compact label={`Open the outreach sheet for ${r.name}`} /> : <span />}
                       </li>
@@ -264,14 +264,14 @@ export function Overview({ go, sheetId }: { go: (to: string) => void; sheetId: s
           </section>
 
           {ov && ov.results.length > 0 && (needs.approvers.includes(actor) || isGtm(actor)) && (
-            <section className="ov" aria-label="Did it pay?">
-              <div className="ov-h"><h2 className="display">Did it pay?</h2></div>
+            <section className="ov" aria-label="Pipeline per dollar">
+              <div className="ov-h"><h2 className="display">Pipeline per dollar</h2></div>
               <div className="tray">
                 <ul className="lately paid">
                   {ov.results.map((r) => (
-                    <li key={r.id}>
+                    <li key={r.id} className="opens" data-opens-sheet="" onClick={(ev) => { if (!(ev.target as HTMLElement).closest("a, button")) go(`/?event=${r.id}`); }}>
                       <EventLogo name={r.name} website={r.website} size={34} />
-                      <div className="who-text"><p className="name"><Link to={`/event/${r.id}#${["closing", "scored"].includes(r.motion) ? "result" : "outreach"}`} go={go} title={r.name}>{r.name.replace(/\s+20\d\d$/, "")}</Link></p><p className="small mute">{money(r.pipeline_cents)} pipeline for {money(r.cost_cents)}{r.final ? "" : ", so far"}</p></div>
+                      <div className="who-text"><p className="name"><Link to={`/?event=${r.id}`} go={go} title={r.name} data-opens-sheet="">{r.name}</Link></p><p className="small mute">{`${money(r.pipeline_cents)} pipeline  ·  ${money(r.cost_cents)} cost`}</p></div>
                       <p className={`paid-x${r.scored ? "" : " thin"}`}>{r.per_dollar !== null ? <><b>{r.per_dollar.toFixed(1)}</b>x</> : <span className="mute">no cost yet</span>}</p>
                     </li>
                   ))}

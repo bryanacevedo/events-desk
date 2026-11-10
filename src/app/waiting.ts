@@ -46,8 +46,8 @@ export async function loadNeeds(): Promise<Needs> {
     const n = daysTo(e.starts_on);
     if (e.stage === "approved" && n >= 0 && n <= 30) items.push({ id: `soon:${e.id}`, kind: "soon", holder: e.requested_by, eventId: e.id, eventName: e.name, what: `${e.name} is ${n === 0 ? "today" : `in ${plural(n, "day")}`} and has no attendee list.`, fix: "Add the attendee list" });
     else if (e.stage === "approved") items.push({ id: `step:${e.id}`, kind: "step", holder: e.requested_by, eventId: e.id, eventName: e.name, what: `${e.name} has no attendee list.`, fix: "Add the attendee list" });
-    if (e.stage === "quoted") items.push({ id: `run:${e.id}`, kind: "step", holder: e.uploaded_by ?? e.requested_by, eventId: e.id, eventName: e.name, what: `${e.name} is ready to run.`, fix: "Review cost and run" });
-    if (e.stage === "mapped") items.push({ id: `step:${e.id}`, kind: "step", holder: e.requested_by, eventId: e.id, eventName: e.name, what: `${e.name} has attendees in; no cost card yet.`, fix: "Ask for the card" });
+    if (e.stage === "quoted") items.push({ id: `run:${e.id}`, kind: "step", holder: e.uploaded_by ?? e.requested_by, eventId: e.id, eventName: e.name, what: `${e.name} is ready to run.`, fix: "Review and run" });
+    if (e.stage === "mapped") items.push({ id: `step:${e.id}`, kind: "step", holder: e.requested_by, eventId: e.id, eventName: e.name, what: `${e.name} has attendees in; its card is not priced yet.`, fix: "Price it" });
     if (e.stage === "paused") items.push({ id: `paused:${e.id}`, kind: "paused", holder: "Anyone", eventId: e.id, eventName: e.name, what: `${e.name} is paused. The latest activity says why.`, fix: "Resume it" });
   }
   const reviewable = events.filter((e) => e.stage === "delivered" || e.stage === "ready_for_review");

@@ -196,7 +196,7 @@ export async function processInbound(db: Db, deps: LifecycleDeps, limit = 200) {
         const c = await classify(db, deps, m.event_id, typed);
         modelCode = c.code; referredName = c.referred ?? null;
         if (c.same_person === false && !keyword) doubt = "it may have been written by someone else";
-        if (keyword) { if (c.code && c.code !== "unsubscribe") doubt = "the words say unsubscribe and the model read it otherwise"; }
+        if (keyword) { if (c.code && c.code !== "unsubscribe") doubt = "it says unsubscribe, the AI read it differently"; }
         else if (c.refused) doubt = "the Motion card ran out";
         else if (!c.code) doubt = "the model's answer could not be used";
         else if (c.code === "other") doubt = "it fits no category";

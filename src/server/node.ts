@@ -124,7 +124,7 @@ if (!demoMotionReady) void (async () => {
   } catch (e) { console.error("demo motion", (e as Error).message); }
   demoMotionReady = true;
 })();
-const api = createApp(db, { lifecycle, demoTools: demoSetup?.tools, writeKey: mode.demo ? undefined : process.env.WRITE_KEY, demo: mode.demo, publicDemo: mode.demo && process.env.PUBLIC_DEMO === "1", kick, slack, sheets: deps.sheets, llm: deps.llm, dns: mode.liveSpend ? systemDns : exampleDns, crm: deps.crm });
+const api = createApp(db, { autoQuote: true, lifecycle, demoTools: demoSetup?.tools, writeKey: mode.demo ? undefined : process.env.WRITE_KEY, demo: mode.demo, publicDemo: mode.demo && process.env.PUBLIC_DEMO === "1", kick, slack, sheets: deps.sheets, llm: deps.llm, dns: mode.liveSpend ? systemDns : exampleDns, crm: deps.crm });
 // Write-back to the CRM runs here and never from a run, so a failed write cannot touch a delivery. A CRM that cannot write (noCrm) makes this do nothing.
 if (mayRun && canWrite(deps.crm)) {
   const sweep = () => { void drainQuietly(db, deps.crm); };
@@ -140,6 +140,8 @@ if (mayRun && lifecycle && !mode.demo) {
 }
 if (existsSync(join(root, "dist"))) {
   api.use("/*", serveStatic({ root: "./dist" }));
+  // The page itself is never cached, so a new build reaches the browser on the next load; its hashed assets can be.
+  api.get("*", async (c, next) => { await next(); c.header("Cache-Control", "no-cache"); });
   api.get("*", serveStatic({ path: "./dist/index.html" }));
 }
 
