@@ -5,7 +5,7 @@ import type { Db } from "./db.ts";
 import { CrmDown, askPeople, crmConnected, preSendCheck } from "./crm-checks.ts";
 import type { AddContact, Connector, SequenceState } from "./connectors/types.ts";
 import { logActivity, newId, RuleError } from "./events.ts";
-import { stopContacts } from "./enroll-ops.ts";
+import { stopContacts, stopDomain } from "./enroll-ops.ts";
 import { runGate } from "./gate.ts";
 import { DESK, nowOf, type LifecycleDeps } from "./lifecycle-deps.ts";
 import { moveMotion } from "./motion-state.ts";
@@ -143,8 +143,9 @@ const namesOf = cleanNames;
 /** Carries out what the rows say is owed to the tools. A tool that fails leaves the row owed, and a later sweep finishes it. */
 export async function drainOps(db: Db, deps: LifecycleDeps, eventId: string | null = null) {
   const now = nowOf(deps);
-  const rows = await db.query<{ id: string; event_id: string; contact_id: string; sequence_id: string; channel: Channel; external_contact_id: string | null; pending_op: "add" | "pause" | "resume" | "remove"; state: string; connector: string; ext: string | null; seq_state: SequenceState }>(
-    `SELECT n.id, n.event_id, n.contact_id, n.sequence_id, n.channel, n.external_contact_id, n.pending_op, n.state, s.connector, s.external_id AS ext, s.state AS seq_state
+  const rows = await db.query<{ id: string; event_id: string; contact_id: string; sequence_id: string; channel: Channel; external_contact_id: string | null; pending_op: "add" | "pause" | "resume" | "remove"; state: string; connector: string; ext: string | null; seq_state: SequenceState; released_by: string | null; in_tool: number }>(
+    `SELECT n.id, n.event_id, n.contact_id, n.sequence_id, n.channel, n.external_contact_id, n.pending_op, n.state, s.connector, s.external_id AS ext, s.state AS seq_state, s.released_by,
+            (SELECT count(*)::int FROM enrollments x WHERE x.sequence_id = s.id AND x.external_contact_id IS NOT NULL) AS in_tool
      FROM enrollments n JOIN sequences s ON s.id = n.sequence_id WHERE n.pending_op IS NOT NULL AND ($1::text IS NULL OR n.event_id = $1) AND (n.retry_after IS NULL OR n.retry_after <= $2::timestamptz)
      ORDER BY CASE n.pending_op WHEN 'remove' THEN 0 WHEN 'pause' THEN 1 ELSE 2 END, n.id`, [eventId, now.toISOString()]);
   const out = { done: 0, failed: 0 };
@@ -176,10 +177,14 @@ export async function drainOps(db: Db, deps: LifecycleDeps, eventId: string | nu
       out.done++;
     } catch (e) { out.failed++; console.error("sequence op", r.pending_op, r.id, (e as Error).message); }
   }
-  for (const [sequenceId, group] of adds) {
-    const c = deps.connectors[group[0].connector];
-    const ext = group[0].ext!;
-    if (!c.capabilities.addsWhileDraft && group[0].seq_state !== "active") continue;
+  for (const [sequenceId, all] of adds) {
+    const c = deps.connectors[all[0].connector];
+    const ext = all[0].ext!;
+    if (!c.capabilities.addsWhileDraft && all[0].seq_state !== "active") continue;
+    // A real tool's first send is small and watched. The rest wait until a person has looked and released them.
+    const room = !c.simulated && deps.firstCohort && !all[0].released_by ? Math.max(0, deps.firstCohort - all[0].in_tool) : all.length;
+    const group = all.slice(0, room);
+    if (!group.length) continue;
     try {
       const people = await db.query<Person & { contact_id: string }>("SELECT k.id, k.priority, k.full_name, k.title, k.email, k.linkedin, co.name AS company, co.primary_domain AS domain, k.verify_1, k.person_id FROM contacts k JOIN companies co ON co.id = k.company_id WHERE k.id = ANY($1::text[])", [group.map((g) => g.contact_id)]);
       const crmIds = new Map<string, string>();
@@ -247,6 +252,14 @@ export async function calendarSweep(db: Db, deps: LifecycleDeps) {
   }
   if (ended) await drainOps(db, deps);
   return { ended };
+}
+
+/** After looking at the first cohort, a person lets the rest go. */
+export async function releaseSequence(db: Db, deps: LifecycleDeps, sequenceId: string, actor: string) {
+  const rows = await db.query<{ event_id: string; name: string }>("UPDATE sequences SET released_by = $2 WHERE id = $1 AND released_by IS NULL RETURNING event_id, name", [sequenceId, actor]);
+  if (!rows.length) throw new RuleError("That sequence is already released.");
+  await logActivity(db.query, rows[0].event_id, actor, "sequence", `Released the rest of ${rows[0].name} after the first cohort`);
+  await drainOps(db, deps, rows[0].event_id);
 }
 
 /** A person gives a sequence the campaign it runs on, in a tool that cannot make one. One campaign, one sequence. */
@@ -323,8 +336,21 @@ export async function flagSweep(db: Db, deps: LifecycleDeps) {
   try { checked = await preSendCheck(db, rows.map((r) => r.contact_id), deps.crm); }
   catch (e) { if (e instanceof CrmDown) return { removed: 0, crm_down: true }; throw e; }
   await db.tx(async (q) => { for (const b of checked.blocked) await stopContacts(q, [b.id], "remove", `flag:${b.reason}`); });
-  if (checked.blocked.length) await drainOps(db, deps);
-  return { removed: checked.blocked.length };
+  // A deal that reached a late stage since launch: the account's owner should be talking to them, not a sequence.
+  let paused = 0;
+  if (crmConnected(deps.crm)) {
+    const late = (await import("./later-cases.ts")).DEFAULT_LATE_STAGES;
+    const accounts = await db.query<{ domain: string; company: string; event_id: string }>("SELECT DISTINCT ON (n.domain) n.domain, co.name AS company, n.event_id FROM enrollments n JOIN contacts k ON k.id = n.contact_id JOIN companies co ON co.id = k.company_id WHERE n.state = 'enrolled' LIMIT 200");
+    for (const a of accounts) {
+      let info;
+      try { info = deps.crm.lookupByDomain ? await deps.crm.lookupByDomain(a.domain, a.company, nowOf(deps).toISOString().slice(0, 10)) : null; } catch { break; }
+      if (!info?.deal_stage || !late.includes(info.deal_stage.toLowerCase())) continue;
+      await db.tx(async (q) => { await stopDomain(q, a.domain, "pause", "new_late_deal", null); await logActivity(q, a.event_id, DESK, "sequence", `${a.company} now has a ${info.deal_stage} deal, so its people were paused for the owner`); });
+      paused++;
+    }
+  }
+  if (checked.blocked.length || paused) await drainOps(db, deps);
+  return { removed: checked.blocked.length, paused };
 }
 
 /** Puts paused people back whose time has come, each through the gate. A failure stays paused, and says why in the gate log. */

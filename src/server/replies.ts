@@ -161,7 +161,7 @@ export async function applyReplyAnswer(q: Q, inboundId: string, code: string, ac
 }
 
 /** One paid call on the Motion card. Null when the card has run out or the answer cannot be used. */
-async function classify(db: Db, deps: LifecycleDeps, eventId: string, body: string): Promise<{ code: ReplyCode | null; refused: boolean }> {
+async function classify(db: Db, deps: LifecycleDeps, eventId: string, body: string): Promise<{ code: ReplyCode | null; refused: boolean; referred?: string | null; same_person?: boolean }> {
   const res = await reserve(db, eventId, "llm", 1, "reply_classify");
   if (!res) return { code: null, refused: true };
   const prompt = fill("reply_classify", { codes: REPLY_CODES.join(", "), reply: body.slice(0, 4000).replaceAll("REPLY>>>", "REPLY") });
@@ -169,8 +169,10 @@ async function classify(db: Db, deps: LifecycleDeps, eventId: string, body: stri
     const out = await deps.llm.complete("reply_classify", prompt);
     await settle(db, res, 1);
     await db.query("INSERT INTO llm_calls (id, event_id, step, prompt_hash, model, input_tokens, output_tokens, output) VALUES ($1, $2, 'reply_classify', $3, $4, $5, $6, $7)", [newId("llm"), eventId, promptHash("reply_classify", deps.llm.model), out.model ?? deps.llm.model, out.input_tokens, out.output_tokens, out.text.slice(0, 2000)]);
-    const v = parseJson(out.text) as { code?: unknown } | null;
-    return { code: REPLY_CODES.includes(v?.code as ReplyCode) ? (v!.code as ReplyCode) : null, refused: false };
+    const v = parseJson(out.text) as { code?: unknown; referred?: unknown; same_person?: unknown } | null;
+    // A name counts only if it is in the reply word for word.
+    const referred = typeof v?.referred === "string" && v.referred.trim() && body.includes(v.referred.trim()) ? v.referred.trim().slice(0, 120) : null;
+    return { code: REPLY_CODES.includes(v?.code as ReplyCode) ? (v!.code as ReplyCode) : null, refused: false, referred, same_person: v?.same_person !== false };
   } catch { await settle(db, res, 1); return { code: null, refused: false }; }
 }
 
@@ -189,23 +191,26 @@ export async function processInbound(db: Db, deps: LifecycleDeps, limit = 200) {
     const reading = { ...m, body: typed };
     const keyword = !provider && matchesUnsubscribe(typed);
     let code: ReplyCode | null = provider ?? (keyword ? "unsubscribe" : null);
-    let modelCode: ReplyCode | null = null, doubt: string | null = null;
+    let modelCode: ReplyCode | null = null, doubt: string | null = null, referredName: string | null = null;
     if (!provider) {
       if (!typed) doubt = m.body?.trim() ? "nothing is left once the quoted text is removed" : "this tool sends no reply text";
       else {
         const c = await classify(db, deps, m.event_id, typed);
-        modelCode = c.code;
+        modelCode = c.code; referredName = c.referred ?? null;
+        if (c.same_person === false && !keyword) doubt = "it may have been written by someone else";
         if (keyword) { if (c.code && c.code !== "unsubscribe") doubt = "the words say unsubscribe and the model read it otherwise"; }
         else if (c.refused) doubt = "the Motion card ran out";
         else if (!c.code) doubt = "the model's answer could not be used";
         else if (c.code === "other") doubt = "it fits no category";
-        else code = c.code;
+        else if (!doubt) code = c.code;
       }
     }
     const p = await who(db.query, m);
     await db.tx(async (q) => {
       const [cur] = await q<{ status: string }>("SELECT status FROM inbound_messages WHERE id = $1 FOR UPDATE", [m.id]);
       if (cur.status !== "received") return;
+      // A name pointed to with any other answer still reaches a person.
+      if (referredName && code !== "referral") await openLifecycleCase(q, { eventId: m.event_id, kind: "referral", contactId: m.contact_id, companyId: p.company_id, summary: `${p.full_name ?? "Someone"} at ${p.company} pointed us to ${referredName}.`, facts: [{ reply: typed, named: referredName }], suggested: "added", payload: { named: referredName } });
       if (code) await applyCode(q, reading, p, code, { modelOnly: !provider && !keyword, actor: DESK, now, crm: deps.crm });
       if (doubt) { await openDoubt(q, m, p, doubt); out.doubtful++; await logActivity(q, m.event_id, DESK, "reply", `A reply needs a person: ${doubt}`); }
       await q("UPDATE inbound_messages SET status = 'done', code = $2, model_code = $3, code_matched = $4, lease_until = NULL WHERE id = $1", [m.id, code, modelCode, Boolean(provider || keyword)]);

@@ -131,6 +131,7 @@ export async function applySendSettings(db: Db, deps: LifecycleDeps, sequenceId:
   let hash: string | null = null;
   if (c.pushCopy) { const [t] = await db.query<{ steps: TemplateStep[] }>("SELECT t.steps FROM sequence_templates t JOIN sequences q ON q.template_id = t.id WHERE q.id = $1", [s.id]); await c.pushCopy(s.external_id, t.steps); hash = copyHash(t.steps); }
   await db.query("UPDATE sequences SET settings_ok = $2, copy_hash = $3 WHERE id = $1", [s.id, ok, hash]);
+  if (deps.webhookBase && c.registerWebhooks) { await c.registerWebhooks(s.external_id, `${deps.webhookBase.replace(/\/$/, "")}/hooks/sequencer/${c.name}`); await db.query("UPDATE sequences SET hooks_at = now() WHERE id = $1", [s.id]); }
   return { ok, want };
 }
 

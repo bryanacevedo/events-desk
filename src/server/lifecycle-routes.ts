@@ -12,7 +12,7 @@ import { bookMeeting, confirmRelease, ingestCalendar, recordOutcome, type Calend
 import { requestMotionCard } from "./motion.ts";
 import { decideOwner } from "./owners.ts";
 import { ingestEvents, processInbound } from "./replies.ts";
-import { approveTemplate, attachCampaign, confirmLaunchChecklist, createDrafts, recordLegalBasis, restartSending, resumePerson, setTools, stopAllSending } from "./sequences.ts";
+import { releaseSequence, approveTemplate, attachCampaign, confirmLaunchChecklist, createDrafts, recordLegalBasis, restartSending, resumePerson, setTools, stopAllSending } from "./sequences.ts";
 import { regionOf, loadPeople } from "./gate.ts";
 import { recordConsent, recordPlacement, setDomainStatus } from "./sending.ts";
 import { captureOnsite, forgetPerson, markHandled } from "./operating.ts";
@@ -88,6 +88,8 @@ export function mountLifecycle(app: App, db: Db, deps: LifecycleDeps, opts: { ba
     const rows = await db.query<{ full_name: string | null; title: string | null; company: string }>("SELECT k.full_name, k.title, co.name AS company FROM enrollments n JOIN contacts k ON k.id = n.contact_id JOIN companies co ON co.id = k.company_id WHERE n.sequence_id = $1 AND n.state <> 'removed' ORDER BY n.id LIMIT 3", [c.req.param("sid")]);
     return c.json({ name: s.name, previews: rows.map((r) => ({ person: r.full_name, steps: s.steps.map((st) => renderStep(st, { ...cleanNames(r.full_name), company: r.company, title: r.title, event: s.event })) })) });
   });
+  app.post("/api/motion/sequences/:sid/release", guarded(async (c) => releaseSequence(db, deps, c.req.param("sid"), c.get("actor"))));
+  app.post("/api/motion/account-domains", guarded(async (c) => { if (!isGtm(c.get("actor"))) throw new RuleError("Company domains are GTM Engineering's to link."); const b = await body(c); await db.query("INSERT INTO account_domains (domain, canonical, how, added_by) VALUES ($1, $2, $3, $4) ON CONFLICT (domain) DO UPDATE SET canonical = $2, how = $3, added_by = $4", [String(b.domain).toLowerCase(), String(b.canonical).toLowerCase(), String(b.how ?? "person"), c.get("actor")]); }));
   app.post("/api/motion/stop", guarded(async (c) => stopAllSending(db, deps, c.get("actor"), String((await body(c)).reason ?? "No reason given"))));
   app.post("/api/motion/restart", guarded(async (c) => restartSending(db, c.get("actor"))));
   app.post("/api/events/:id/motion/contacts/:cid/resume", guarded(async (c) => resumePerson(db, deps, c.req.param("id"), c.req.param("cid"), c.get("actor"))));

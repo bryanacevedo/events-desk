@@ -52,6 +52,8 @@ export interface Connector {
   /** Puts the approved words in the tool, and reads back what is there, so an edit made in the tool is caught at launch. */
   pushCopy?(sequenceId: string, steps: TemplateStep[]): Promise<void>;
   readCopy?(sequenceId: string): Promise<TemplateStep[] | null>;
+  /** Points the tool's webhooks at the desk. Safe to call again. Absent: the desk polls. */
+  registerWebhooks?(sequenceId: string, url: string): Promise<void>;
   /** The tool's own guidance on the lowest health it should send from. */
   healthFloor?: number;
   listTemplates(): Promise<{ id: string; name: string }[]>;

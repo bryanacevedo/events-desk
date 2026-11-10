@@ -27,6 +27,10 @@ export interface LifecycleDeps {
   mailAuth?: MailAuth;
   /** True when a placement test tool is in use: a domain with no recent passing test is not used. */
   placementRequired?: boolean;
+  /** Where tools send their webhooks: the desk's public address plus /hooks/sequencer/<tool>. Absent, the desk polls. */
+  webhookBase?: string;
+  /** On a real tool, the first this many people in each sequence go out, and the rest wait for a person to look and release them. */
+  firstCohort?: number;
   /** The company's own mail domains. Cold outreach never goes out from these. */
   primaryDomains?: string[];
 }

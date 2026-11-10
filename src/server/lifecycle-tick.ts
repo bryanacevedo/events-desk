@@ -5,7 +5,7 @@ import { closeOut } from "./motion.ts";
 import { drainQuietly } from "./crm-outbox.ts";
 import { extractDebriefs, integrityCheck, proposeEdits, sendDebriefPrompts, writeScorecards } from "./closeout.ts";
 import { nowOf, type LifecycleDeps } from "./lifecycle-deps.ts";
-import { meetingReminders } from "./meetings.ts";
+import { ingestCrmMeetings, meetingReminders } from "./meetings.ts";
 import { openOwnerDecisions, ownerSweep, sendOwnerCards } from "./owners.ts";
 import { ingestEvents, processInbound } from "./replies.ts";
 import { bounceWatch, calendarSweep, drainOps, flagSweep, observeSequences, pauseSequenceById, resumeDue } from "./sequences.ts";
@@ -52,6 +52,7 @@ export async function lifecycleTick(db: Db, deps: LifecycleDeps, opts: { flags?:
   await quietly("bounces", () => bounceWatch(db, deps));
   await quietly("senders", () => senderSweep(db, deps, (id, reason) => pauseSequenceById(db, deps, id, reason)));
   await quietly("reminders", () => meetingReminders(db, deps));
+  await quietly("crm meetings", () => ingestCrmMeetings(db, deps));
   await quietly("debrief", () => sendDebriefPrompts(db, deps));
   await quietly("extract", () => extractDebriefs(db, deps));
   await quietly("close", () => closeOut(db, deps));

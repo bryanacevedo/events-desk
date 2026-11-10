@@ -27,10 +27,13 @@ export const addHold = (q: Q, h: HoldInput) => q(
 export const releaseHold = (q: Q, cause: string, causeId: string, actor: string) =>
   q("UPDATE holds SET released_at = now(), released_by = $3 WHERE cause = $1 AND cause_id = $2 AND released_at IS NULL", [cause, causeId, actor]);
 
-/** Holds that apply to this person on this event now. */
+/** Every domain that is the same company as this one. */
+export const SAME_COMPANY = `(SELECT d FROM (SELECT $1::text AS d UNION SELECT domain FROM account_domains WHERE canonical = (SELECT coalesce((SELECT canonical FROM account_domains WHERE domain = $1), $1)) UNION SELECT canonical FROM account_domains WHERE domain = $1) x)`;
+
+/** Holds that apply to this person on this event now, at any of the company's domains. */
 export const activeHolds = (q: Q, a: { domain: string; person_id: string | null; event_id: string; now: Date }) => q<{ id: string; cause: string; expires_at: string }>(
   `SELECT id, cause, expires_at::text AS expires_at FROM holds
-   WHERE domain = $1 AND released_at IS NULL AND expires_at > $4::timestamptz
+   WHERE domain IN ${SAME_COMPANY} AND released_at IS NULL AND expires_at > $4::timestamptz
      AND (person_id IS NULL OR person_id = $2) AND (event_id IS NULL OR event_id = $3)
    ORDER BY expires_at DESC`, [a.domain, a.person_id, a.event_id, a.now.toISOString()]);
 

@@ -1,6 +1,7 @@
 /* Stopping and starting people. These only write rows: the call to the tool happens later, from `pending_op`, so a stop is durable the moment its transaction commits and a tool that is down cannot lose it. */
 
 import type { Db } from "./db.ts";
+import { SAME_COMPANY } from "./touches.ts";
 
 type Q = Db["query"];
 export type StopOp = "pause" | "remove";
@@ -33,7 +34,7 @@ export const stopContacts = async (q: Q, contactIds: string[], op: StopOp, cause
 /** Everyone at a domain. `eventId` limits it to that event. */
 export async function stopDomain(q: Q, domain: string, op: StopOp, cause: string, causeId: string | null, eventId: string | null = null) {
   const rows = await q<{ id: string; state: string; external_contact_id: string | null }>(
-    "SELECT id, state, external_contact_id FROM enrollments WHERE domain = $1 AND state <> 'removed' AND ($2::text IS NULL OR event_id = $2)", [domain, eventId]);
+    `SELECT id, state, external_contact_id FROM enrollments WHERE domain IN ${SAME_COMPANY} AND state <> 'removed' AND ($2::text IS NULL OR event_id = $2)`, [domain, eventId]);
   return applyStop(q, rows, op, cause, causeId);
 }
 

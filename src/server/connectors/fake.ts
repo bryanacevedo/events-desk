@@ -31,6 +31,7 @@ export function fakeInstantly(): FakeTool {
   const t = base("instantly", "1", "0", "2") as any;
   const f = wrap(t, (m, p, q, b) => {
     let x: RegExpMatchArray | null;
+    if (p.endsWith("/webhooks")) { if (m === "POST") (t.hooks ??= []).push(b); return json({ items: (t.hooks ?? []).map((h: any) => ({ ...h, target_hook_url: h.target_hook_url })) }); }
     if (m === "GET" && p.endsWith("/accounts")) return json({ items: t.senders });
     if (m === "PATCH" && (x = p.match(/\/campaigns\/([^/]+)$/))) { if (b.email_list) t.assigned.set(x[1], b.email_list); else (t.settings ??= new Map()).set(x[1], { ...(t.settings?.get(x[1]) ?? {}), ...b }); return json({}); }
     if (m === "GET" && p.endsWith("/campaigns")) return json({ items: [...t.seqs.values()].map((s: any) => ({ id: s.id, name: s.name })) });
@@ -60,6 +61,8 @@ export function fakeInstantly(): FakeTool {
 export function fakeHeyreach(): FakeTool {
   const t = base("heyreach", "IN_PROGRESS", "DRAFT", "PAUSED") as any;
   const f = wrap(t, (m, p, q, b) => {
+    if (p.endsWith("/webhooks/GetAllWebhooks")) return json({ items: t.hooks ?? [] });
+    if (p.endsWith("/webhooks/CreateWebhook")) { (t.hooks ??= []).push(b); return json({}); }
     if (p.endsWith("/li_account/GetAll")) return json({ items: t.senders });
     if (p.endsWith("/campaign/GetAll")) return json({ items: [...t.seqs.values()].map((s: any) => ({ id: s.id, name: s.name })) });
     if (p.endsWith("/campaign/GetById")) return json({ status: t.seqs.get(q.get("campaignId")).status });
@@ -90,6 +93,7 @@ export function fakeSmartlead(): FakeTool {
   const leads = new Map<string, string>();
   const f = wrap(t, (m, p, q, b) => {
     let x: RegExpMatchArray | null;
+    if ((x = p.match(/\/campaigns\/([^/]+)\/webhooks$/))) { if (m === "POST") (t.hooks ??= []).push(b); return json(t.hooks ?? []); }
     if (m === "GET" && p.endsWith("/email-accounts/")) return json(t.senders);
     if ((x = p.match(/\/email-accounts\/([^/]+)\/warmup-stats$/))) return json(t.senders.find((a: any) => String(a.id) === x![1])?.stats ?? {});
     if (m === "POST" && (x = p.match(/\/campaigns\/([^/]+)\/email-accounts$/))) { t.assigned.set(x[1], b.email_account_ids); return json({}); }

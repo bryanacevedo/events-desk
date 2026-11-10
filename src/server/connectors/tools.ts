@@ -37,6 +37,11 @@ export function instantly(o: Opts): Connector {
       return (j.items ?? []).map((a: any): SenderInfo => ({ warmup_on: a.warmup_status === undefined ? null : a.warmup_status === 1, id: a.email, address: a.email, domain: String(a.email).split("@")[1], channel: "email", active: a.status === 1, daily_limit: a.daily_limit ?? null, health: a.stat_warmup_score ?? a.warmup_score ?? null, warm_days: a.warmup_status === 0 ? 0 : daysSince(a.timestamp_warmup_start), bounce_rate: null, spam_rate: null }));
     },
     async assignSenders(id, senders) { await api("PATCH", `/campaigns/${id}`, { body: { email_list: senders.map((s) => s.address) } }); },
+    async registerWebhooks(id, url) {
+      const have = await api("GET", "/webhooks", { query: { limit: 100 } });
+      if ((have.items ?? []).some((w: any) => w.target_hook_url === url && w.campaign === id)) return;
+      await api("POST", "/webhooks", { body: { target_hook_url: url, campaign: id, event_type: "all_events", headers: { "x-desk-secret": o.webhookSecret } } });
+    },
     async pushCopy(id, steps) { await api("PATCH", `/campaigns/${id}`, { body: { sequences: [{ steps: steps.map((s, i) => ({ type: "email", delay: i ? s.day - steps[i - 1].day : 0, variants: [{ subject: toInstantly(s.subject ?? ""), body: toInstantly(s.body) }] })) }] } }); },
     async readCopy(id) {
       const j = await api("GET", `/campaigns/${id}`), st = j.sequences?.[0]?.steps;
@@ -103,6 +108,12 @@ export function heyreach(o: Opts): Connector {
     name: "heyreach", channels: ["linkedin"],
     capabilities: { createsSequences: false, pause: "remove-only", events: "both", replyBodies: true, needsCrmRecord: false, observesLaunch: true, addsWhileDraft: false, reportsStops: true, appliesSettings: false },
     // Which accounts run a campaign is set by a person in HeyReach, so there is no assignSenders. The desk names the ones to attach.
+    async registerWebhooks(id, url) {
+      const target = `${url}?secret=${encodeURIComponent(o.webhookSecret)}`;
+      const have = await api("POST", "/webhooks/GetAllWebhooks", { body: { offset: 0, limit: 100 } });
+      if ((have.items ?? []).some((w: any) => w.webhookUrl === target && (w.campaignIds ?? []).includes(Number(id)))) return;
+      await api("POST", "/webhooks/CreateWebhook", { body: { webhookName: `Events Desk ${id}`, webhookUrl: target, eventType: "MESSAGE_REPLY_RECEIVED", campaignIds: [Number(id)] } });
+    },
     async listSenders() {
       const j = await api("POST", "/li_account/GetAll", { body: { offset: 0, limit: 100 } });
       return (j.items ?? []).map((a: any): SenderInfo => ({ id: String(a.id), address: a.emailAddress ?? a.profileUrl ?? String(a.id), domain: "linkedin.com", channel: "linkedin", active: a.isActive !== false && a.authIsValid !== false, daily_limit: null, health: a.authIsValid === false ? 0 : 100, warm_days: null, bounce_rate: null, spam_rate: null }));
@@ -174,6 +185,11 @@ export function smartlead(o: Opts): Connector {
       return out;
     },
     async assignSenders(id, senders) { await api("POST", `/campaigns/${id}/email-accounts`, { body: { email_account_ids: senders.map((s) => Number(s.id)) } }); },
+    async registerWebhooks(id, url) {
+      const have = await api("GET", `/campaigns/${id}/webhooks`);
+      if ((Array.isArray(have) ? have : []).some((w: any) => w.webhook_url === url)) return;
+      await api("POST", `/campaigns/${id}/webhooks`, { body: { id: null, name: "Events Desk", webhook_url: url, event_types: ["EMAIL_REPLY", "EMAIL_BOUNCE", "LEAD_UNSUBSCRIBED", "EMAIL_SENT"], categories: [] } });
+    },
     async pushCopy(id, steps) { await api("POST", `/campaigns/${id}/sequences`, { body: { sequences: steps.map((s, i) => ({ seq_number: i + 1, seq_delay_details: { delay_in_days: i ? s.day - steps[i - 1].day : 0 }, subject: s.subject ?? "", email_body: s.body })) } }); },
     async readCopy(id) {
       const j = await api("GET", `/campaigns/${id}/sequences`);

@@ -93,6 +93,24 @@ export async function meetingReminders(db: Db, deps: LifecycleDeps) {
   return { sent };
 }
 
+/** Meetings logged only in the CRM still set a hold and count. One per person, not one per attendee row. */
+export async function ingestCrmMeetings(db: Db, deps: LifecycleDeps) {
+  if (!deps.crm?.meetings) return { booked: 0 };
+  const since = new Date(nowOf(deps).getTime() - 7 * DAY).toISOString();
+  const rows = await deps.crm.meetings(since);
+  const seen = new Set<string>();
+  const out = { booked: 0 };
+  for (const m of rows) {
+    const key = `${m.id}:${m.email.toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const r = await ingestCalendar(db, deps, [{ id: `crm:${key}`, attendee_email: m.email, start: m.start, timezone: m.timezone ?? "UTC", cancelled: m.status === "cancelled", organizer: m.organizer }]);
+    if (m.status === "held" && r.booked) { const [mt] = await db.query<{ id: string }>("SELECT id FROM meetings WHERE external_key = $1", [`cal:crm:${key}`]); if (mt) await recordOutcome(db, deps, mt.id, "held", "CRM"); }
+    out.booked += r.booked;
+  }
+  return out;
+}
+
 /** The `Calendar` seam: a booking system says what changed. Keyed by its own id, so a reschedule updates the row. */
 export interface CalendarEvent { id: string; attendee_email: string; start: string; timezone: string; cancelled?: boolean; organizer?: string | null }
 export async function ingestCalendar(db: Db, deps: LifecycleDeps, events: CalendarEvent[]) {

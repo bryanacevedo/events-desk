@@ -113,6 +113,16 @@ CREATE INDEX attribution_event ON attribution_claims (event_id);
 
 ALTER TABLE events ADD COLUMN holdout_percent integer NOT NULL DEFAULT 0 CHECK (holdout_percent >= 0 AND holdout_percent <= 50);
 
+-- One company, several mail domains: aliases, legacy domains, subdomains. Holds and stops reach all of them.
+CREATE TABLE account_domains (
+  domain     text PRIMARY KEY,
+  canonical  text NOT NULL,
+  how        text NOT NULL,
+  added_by   text NOT NULL,
+  added_at   timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX account_domains_canonical ON account_domains (canonical);
+
 -- Consent recorded per rep before their LinkedIn account sends anything.
 CREATE TABLE sender_consents (
   connector  text NOT NULL,

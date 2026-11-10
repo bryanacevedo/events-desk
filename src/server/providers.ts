@@ -314,6 +314,8 @@ export interface Crm {
   findTaskByKey?(key: string): Promise<{ id: string } | null>;
   createTask?(a: { record: CrmRecord; subject: string; body: string; due: string; key: string }): Promise<{ id: string }>;
   createLead?(a: { email: string; full_name: string | null; company: string; domain: string | null; key: string }): Promise<{ id: string }>;
+  /** Meetings logged in the CRM since a moment, one row per meeting and attendee. */
+  meetings?(since: string): Promise<{ id: string; email: string; start: string; timezone: string | null; organizer: string | null; status: "booked" | "held" | "cancelled" }[]>;
   /** Opportunities on each account, by `ref`. */
   opportunities?(accounts: CrmAccountQuery[]): Promise<Record<string, CrmOpportunity[]>>;
 }
@@ -383,7 +385,9 @@ export const mockLlm: Llm = {
       out = { ...base, segment: null, company_type: null, fact: original };
     } else if (step === "reply_classify") {
       const reply = prompt.slice(prompt.lastIndexOf("<<<REPLY") + 8, prompt.lastIndexOf("REPLY>>>")).toLowerCase();
-      out = { code: /out of (the )?office|away until/.test(reply) ? "out_of_office" : /left the company|no longer (with|at)/.test(reply) ? "departed" : /wrong person/.test(reply) ? "wrong_person" : /speak to|talk to my colleague/.test(reply) ? "referral" : /not interested|no thanks/.test(reply) ? "not_interested" : /next (year|quarter)|not now|bad time/.test(reply) ? "not_now" : /(book|meet|call|calendar|tuesday|wednesday|thursday)/.test(reply) ? "meeting_request" : /interested|tell me more|sounds good/.test(reply) ? "interested" : "other" };
+      const ref = prompt.slice(prompt.lastIndexOf("<<<REPLY") + 8, prompt.lastIndexOf("REPLY>>>")).match(/(?:talk to|speak to|contact|reach out to) ([A-Z][a-z]+ [A-Z][a-z]+)/);
+      const extra = { referred: ref ? ref[1] : null, same_person: !/on behalf of|assistant to|i am .{0,20}assistant/.test(reply) };
+      out = { ...extra, code: /out of (the )?office|away until/.test(reply) ? "out_of_office" : /left the company|no longer (with|at)/.test(reply) ? "departed" : /wrong person/.test(reply) ? "wrong_person" : /speak to|talk to my colleague/.test(reply) ? "referral" : /not interested|no thanks/.test(reply) ? "not_interested" : /next (year|quarter)|not now|bad time/.test(reply) ? "not_now" : /(book|meet|call|calendar|tuesday|wednesday|thursday)/.test(reply) ? "meeting_request" : /interested|tell me more|sounds good/.test(reply) ? "interested" : "other" };
     } else if (step === "debrief_extract") {
       const notes = prompt.slice(prompt.lastIndexOf("<<<NOTES") + 8, prompt.lastIndexOf("NOTES>>>")).trim();
       const first = notes.split(/[.\n]/)[0]?.trim() ?? "";
