@@ -12,7 +12,7 @@ export function logoDomain(website: string | null | undefined): string | null {
 }
 
 /** Domains whose favicon is a blank shape or too small to read; they get the initials tile. Checked by eye against the demo's events. */
-const POOR = new Set(["merchantriskcouncil.org", "finnosummit.com", "money2020.com"]);
+const POOR = new Set(["merchantriskcouncil.org", "finnosummit.com", "money2020.com", "asiatechxsg.com"]);
 /** Reserved names (the demo's made-up companies) have no favicon; asking for one only logs a 404. */
 const RESERVED = /\.(example|test|invalid|localhost|local)$/;
 /** Google returns a 16px placeholder for unknown sites; anything that small is not a logo. */
