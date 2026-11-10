@@ -273,6 +273,8 @@ export async function seedDemoStages(db: Db, deps: LifecycleDeps, tools: Record<
     if (stage === "sequencing") { for (let k = 0; k < 3 && (await motion(id)).motion !== "sequencing"; k++) await demoAdvance(db, deps, tools, id); await demoAdvance(db, deps, tools, id, { pressFollowUp: true }); continue; }
     // A finished event had its list settled before outreach, as a team would: every open case answered the way the desk suggested.
     const settle = async () => {
+      // Every reply that came in is read first, so a case it opens is settled here, not left for the server's first pass after boot.
+      await processInbound(db, deps, 5000);
       for (const c of await db.query<{ id: string; suggested: string | null }>("SELECT id, suggested FROM review_cases WHERE event_id = $1 AND status = 'open'", [id])) {
         try { await answerCase(db, id, c.id, (await currentUploader(db.query, id))?.uploaded_by ?? "Maya Ortiz", c.suggested ?? "dismiss"); } catch { /* a case its answer no longer fits stays open */ }
       }
@@ -284,6 +286,17 @@ export async function seedDemoStages(db: Db, deps: LifecycleDeps, tools: Record<
   }
   // The calendar ends what has run its course: a follow-up wave 24 days after its event, anything of a scored event.
   await calendarSweep(db, deps);
+  // Last: nothing unread is left behind, and a finished event has nothing open. A live event keeps what it has, as a real one would.
+  await processInbound(db, deps, 5000);
+  for (const [id, stage] of DEMO_STAGES) {
+    if (stage !== "closing" && stage !== "scored") continue;
+    // A reply set aside is answered as a person would read it: one that says unsubscribe is an opt-out; otherwise the model's own reading stands.
+    for (const c of await db.query<{ id: string; suggested: string | null; kind: string; summary: string; model_code: string | null }>(
+      `SELECT r.id, r.suggested, r.kind, r.summary, (SELECT i.model_code FROM inbound_messages i WHERE i.id = r.payload->>'inbound_id') AS model_code FROM review_cases r WHERE r.event_id = $1 AND r.status = 'open'`, [id])) {
+      const answer = c.suggested ?? (c.kind === "reply_doubtful" ? (/unsubscribe/i.test(c.summary) ? "unsubscribe" : c.model_code && c.model_code !== "other" ? c.model_code : "not_interested") : "dismiss");
+      try { await answerCase(db, id, c.id, (await currentUploader(db.query, id))?.uploaded_by ?? "Maya Ortiz", answer); } catch { /* left open */ }
+    }
+  }
   await redateDemo(db);
   await seedDemoDebriefs(db);
   // NRF's costs are all in, as a scored event's should be; Shoptalk, still closing, has lines left for Overview to ask about.
@@ -439,6 +452,9 @@ export async function redateDemo(db: Db) {
   // And a meeting's own step sits at the meeting.
   await db.query(`UPDATE touches t SET at = m.scheduled_at + interval '45 minutes' FROM meetings m, events e WHERE e.id = t.event_id AND m.contact_id = t.contact_id AND m.event_id = t.event_id
     AND e.starts_on::date <= current_date AND NOT (${past}) AND t.kind LIKE 'meeting_%' AND t.kind <> 'meeting_booked'`);
+  // A booth meeting is the booth conversation: same moment, the event's own zone, on every event, finished or not.
+  await db.query("UPDATE meetings m SET scheduled_at = c.captured_at, outcome_at = CASE WHEN m.outcome_at IS NULL THEN NULL ELSE c.captured_at + interval '30 minutes' END FROM onsite_captures c WHERE m.external_key = 'onsite:' || c.id");
+  await db.query("UPDATE touches t SET at = c.captured_at FROM onsite_captures c WHERE t.contact_id = c.contact_id AND t.event_id = c.event_id AND t.kind IN ('met_onsite', 'badge_scan')");
   // Last, so every date reads in order whatever moved above it.
   // An event still following up: its follow-up was added the day after it closed, sent over the days after, answered after that, never later than now.
   const LIVE = "e.starts_on::date <= current_date AND NOT (" + past + ")";

@@ -1,5 +1,6 @@
 /* The sending layer (docs/LIFECYCLE.md, section 5a): how many inboxes each sequence needs, the healthiest ones to use, proof they land in the inbox, and watching them while the sequence runs. A sequence that does not have enough healthy senders does not go out. */
 
+import { eventZone } from "./meetings.ts";
 import { DAY } from "../shared/policy.ts";
 import type { Db } from "./db.ts";
 import type { Connector, SendSettings } from "./connectors/types.ts";
@@ -113,9 +114,9 @@ export async function planSenders(db: Db, deps: LifecycleDeps, sequenceId: strin
   await db.tx(async (q) => {
     await q("UPDATE sequence_senders SET dropped_at = $2, drop_reason = 'replanned' WHERE sequence_id = $1 AND dropped_at IS NULL", [s.id, now.toISOString()]);
     for (const p of pick.picked) await q(
-      `INSERT INTO sequence_senders (sequence_id, sender_id, address, domain, role, daily_share, health_at_pick, picked_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       ON CONFLICT (sequence_id, sender_id) DO UPDATE SET role = EXCLUDED.role, daily_share = EXCLUDED.daily_share, health_at_pick = EXCLUDED.health_at_pick, picked_at = EXCLUDED.picked_at, dropped_at = NULL, drop_reason = NULL`,
-      [s.id, p.sender.id, p.sender.address, p.sender.domain, p.role, p.share, p.sender.health, now.toISOString()]);
+      `INSERT INTO sequence_senders (sequence_id, sender_id, address, domain, role, daily_share, health_at_pick, picked_at, display_name) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       ON CONFLICT (sequence_id, sender_id) DO UPDATE SET display_name = EXCLUDED.display_name, role = EXCLUDED.role, daily_share = EXCLUDED.daily_share, health_at_pick = EXCLUDED.health_at_pick, picked_at = EXCLUDED.picked_at, dropped_at = NULL, drop_reason = NULL`,
+      [s.id, p.sender.id, p.sender.address, p.sender.domain, p.role, p.share, p.sender.health, now.toISOString(), p.sender.name ?? null]);
     await q("UPDATE sequences SET senders_needed = $2, peak_daily = $3, sender_status = $4, sender_excluded = $5::jsonb WHERE id = $1", [s.id, plan.needed, plan.peak_daily, status, JSON.stringify(excluded.slice(0, 200))]);
     await logActivity(q, s.event_id, actor, "sending", status === "ok" ? `${s.name} needs ${plan.needed} ${s.channel === "email" ? "inboxes" : "senders"} on its busiest day (${plan.peak_daily} sends). The healthiest ${pick.picked.filter((p) => p.role === "primary").length} were chosen, with ${pick.picked.filter((p) => p.role === "spare").length} spare.` : `${s.name} is ${pick.short_by} short of the ${plan.needed} healthy senders it needs.`);
   });
@@ -127,10 +128,10 @@ const WINDOW = { from: "09:00", to: "17:00", days: [1, 2, 3, 4, 5] };
 
 /** Sets the window, tracking and stop-on-reply instead of inheriting them. A tool that will not take them leaves them to the launch checklist. */
 export async function applySendSettings(db: Db, deps: LifecycleDeps, sequenceId: string) {
-  const [s] = await db.query<{ id: string; connector: string; external_id: string | null; zone_group: ZoneGroup; country: string | null; peak_daily: number | null }>("SELECT s.id, s.connector, s.external_id, s.zone_group, e.country, s.peak_daily FROM sequences s JOIN events e ON e.id = s.event_id WHERE s.id = $1", [sequenceId]);
+  const [s] = await db.query<{ id: string; event_id: string; connector: string; external_id: string | null; zone_group: ZoneGroup; peak_daily: number | null }>("SELECT s.id, s.event_id, s.connector, s.external_id, s.zone_group, s.peak_daily FROM sequences s WHERE s.id = $1", [sequenceId]);
   const c = deps.connectors[s.connector];
   if (!c?.applySettings || !s.external_id) return null;
-  const want = settingsFor(s.zone_group, s.country, s.peak_daily ?? 0);
+  const want = settingsFor(s.zone_group, await eventZone((sql, args) => db.query(sql, args), s.event_id), s.peak_daily ?? 0);
   await c.applySettings(s.external_id, want);
   const got = await c.readSettings!(s.external_id);
   const ok = sameSettings(got, want);
@@ -149,8 +150,9 @@ export function sameSettings(got: SendSettings | null | undefined, want: SendSet
     && got.stop_on_reply === want.stop_on_reply && got.track_opens === want.track_opens && got.track_links === want.track_links && got.daily_limit === want.daily_limit;
 }
 
-export const settingsFor = (zone: ZoneGroup, country: string | null, daily: number): SendSettings => ({
-  timezone: zone === "event" ? zoneOf(country) ?? "UTC" : GROUP_ZONE[zone], ...WINDOW, stop_on_reply: true, track_opens: false, track_links: false, daily_limit: daily,
+/** `eventTz` is the event's own zone (its city, then its country; `eventZone`). Every new sequence sends on it (docs/SEQUENCES-VIEW.md §8). */
+export const settingsFor = (zone: ZoneGroup, eventTz: string, daily: number): SendSettings => ({
+  timezone: zone === "event" ? eventTz : GROUP_ZONE[zone], ...WINDOW, stop_on_reply: true, track_opens: false, track_links: false, daily_limit: daily,
 });
 
 /** At launch the tool is read again: a setting someone changed since is caught here. */
@@ -160,7 +162,7 @@ export async function settingsConfirmed(db: Db, deps: LifecycleDeps, c: Connecto
   const [e] = await db.query<{ country: string | null; peak_daily: number | null; copy_hash: string | null }>("SELECT e.country, q.peak_daily, q.copy_hash FROM sequences q JOIN events e ON e.id = q.event_id WHERE q.id = $1", [s.id]);
   // The words that go out are the words a person approved.
   if (c.readCopy && e.copy_hash) { const live = await c.readCopy(s.external_id!); if (!live || copyHash(live) !== e.copy_hash) return false; }
-  return sameSettings(await c.readSettings(s.external_id!), settingsFor(s.zone_group, e.country, e.peak_daily ?? 0));
+  return sameSettings(await c.readSettings(s.external_id!), settingsFor(s.zone_group, await eventZone((sql, args) => db.query(sql, args), s.event_id), e.peak_daily ?? 0));
 }
 
 /** True when the sequence may go out. A sequence that is short pauses instead of running on unhealthy senders. */

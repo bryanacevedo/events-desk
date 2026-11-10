@@ -27,7 +27,7 @@ export const DEFAULT_SENDING_RULES: SendingRules = {
   max_bounce_rate: 0.02, max_spam_rate: 0.003, max_per_domain: 4, placement_max_age_days: 7, min_inbox_rate: 0.8,
 };
 
-export interface SenderInfo { warmup_on?: boolean | null; id: string; address: string; domain: string; channel: Channel; active: boolean; daily_limit: number | null; health: number | null; warm_days: number | null; bounce_rate: number | null; spam_rate: number | null }
+export interface SenderInfo { warmup_on?: boolean | null; /** Whose account it is, as the tool names it. */ name?: string | null; id: string; address: string; domain: string; channel: Channel; active: boolean; daily_limit: number | null; health: number | null; warm_days: number | null; bounce_rate: number | null; spam_rate: number | null }
 
 /** The busiest day of the sequence: first touches go out over `launchDays`, and each later step lands on top of them. */
 export function peakDailySends(people: number, stepDays: number[], launchDays: number) {

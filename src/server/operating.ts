@@ -166,15 +166,19 @@ export async function captureOnsite(db: Db, deps: LifecycleDeps, eventId: string
     const capId = newId("cap");
     await q("INSERT INTO onsite_captures (id, event_id, contact_id, full_name, email, linkedin, company, title, note, temperature, rep, source, captured_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)",
       [capId, eventId, contact.id, name, email, linkedin, c.company ?? null, c.title ?? null, (c.note ?? "").slice(0, 4000), c.temperature ?? "warm", rep, c.source ?? "quick_add", now.toISOString()]);
-    // A badge scan is not a conversation: it changes the follow-up, it does not hand the person to a rep. A hot one is a conversation worth having today.
+    // Anyone the team saw at the booth is the rep's, a badge scan included (Bryan, 2026-11-10, docs/SEQUENCES-VIEW.md §8): out of every
+    // sequence, the account held while the rep follows up, and a scan gets a task for the rep who scanned them. No automated follow-up.
     const hot = c.temperature === "hot";
     const scanOnly = c.source === "badge_scan" && !c.met && !hot;
     if (scanOnly) await q("UPDATE contacts SET followup_tier = 'scanned' WHERE id = $1", [contact.id]);
-    else await stopContacts(q, [contact.id], "pause", "met_onsite", capId);
-    if (contact.domain && scanOnly) await addTouch(q, { domain: contact.domain, person_id: contact.person_id, contact_id: contact.id, event_id: eventId, kind: "badge_scan", source: rep, dedup_key: `onsite:${capId}` });
-    if (contact.domain && !scanOnly) {
+    await stopContacts(q, [contact.id], "pause", "met_onsite", capId);
+    if (scanOnly && canWrite(deps.crm) && email) {
+      const [known] = await q<{ full_name: string | null }>("SELECT full_name FROM contacts WHERE id = $1", [contact.id]);
+      await queueCreate(q, "task", `scan:${capId}`, contact.person_id, { email, full_name: name, company: c.company ?? null, domain: contact.domain, event_id: eventId, subject: `Badge scanned at the booth: ${name ?? known?.full_name ?? email}`, body: c.note ?? "", due: now.toISOString().slice(0, 10), owner: rep });
+    }
+    if (contact.domain) {
       await addHold(q, { domain: contact.domain, person_id: contact.person_id, cause: "live_thread", cause_id: contact.id, expires_at: new Date(now.getTime() + LIVE_THREAD_HOLD_DAYS * DAY) });
-      await addTouch(q, { domain: contact.domain, person_id: contact.person_id, contact_id: contact.id, event_id: eventId, kind: "met_onsite", reason: c.note ?? "", source: rep, dedup_key: `onsite:${capId}` });
+      await addTouch(q, { domain: contact.domain, person_id: contact.person_id, contact_id: contact.id, event_id: eventId, kind: scanOnly ? "badge_scan" : "met_onsite", reason: c.note ?? "", source: rep, dedup_key: `onsite:${capId}` });
       if (c.met) await q("INSERT INTO meetings (id, event_id, contact_id, domain, external_key, status, scheduled_at, source, rep, outcome_at, timezone) VALUES ($1, $2, $3, $4, $5, 'held', $6, 'onsite', $7, $6, $8)", [newId("mtg"), eventId, contact.id, contact.domain, `onsite:${capId}`, now.toISOString(), rep, await eventZone(q, eventId)]);
     }
     await logActivity(q, eventId, rep, "onsite", `${rep} met ${name ?? email ?? "someone"}${c.company ? ` from ${c.company}` : ""}`);

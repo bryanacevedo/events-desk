@@ -15,8 +15,8 @@ type Q = Db["query"];
 /** After the event, what happened there decides the follow-up, more than the tier did. In this order: a person is in the first that fits. */
 export const POST_GROUPS = ["met", "hot", "replied", "scanned", "reached", "not_reached"] as const;
 export type PostGroup = (typeof POST_GROUPS)[number];
-/** The groups that get a sequence. The others belong to a rep. */
-export const SEQUENCED_GROUPS: PostGroup[] = ["scanned", "reached", "not_reached"];
+/** Only the people the desk did not hear from before or at the event are sequenced after it; everyone it heard from, a badge scan included, is a rep's. */
+export const SEQUENCED_GROUPS: PostGroup[] = ["reached", "not_reached"];
 export const GROUP_WORDS: Record<PostGroup, string> = {
   met: "met a rep or had a meeting", hot: "hot scans, already with a rep", replied: "replied before the event",
   scanned: "scanned at the booth", reached: "reached before, no reply", not_reached: "not reached before",

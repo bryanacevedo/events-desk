@@ -71,18 +71,21 @@ describe("who goes in, by what happened at the event", () => {
     expect((await postGroups(db.query, h.id)).get(contact_id)).toBe("scanned");
   });
 
-  it("starts the follow-up the day after: groups get their own sequences, and nobody a rep has goes in", async () => {
+  it("starts the follow-up the day after: one sequence per audience, and nobody the desk heard from goes in, a badge scan included", async () => {
     const h = await threeDay("2027-02-02T12:00:00Z");
     const [ana, cleo, dan] = await Promise.all(["Ana Ruiz", "Cleo Park", "Dan Ito"].map((n) => personAt(db, h.id, n)));
     await captureOnsite(db, h.deps, h.id, "Rep A", { email: cleo.email, source: "badge_scan" });
     await captureOnsite(db, h.deps, h.id, "Rep A", { email: dan.email, met: true });
-    await approveTemplate(db, "GTM", { name: "Scanned", channel: "email", phase: "post", audience: "scanned", steps: [{ day: 0, subject: "Thanks for stopping by", body: "Hi {{first_name}}" }], external_id: h.email.newSeq("tpl_s") });
     h.time.set("2027-02-04T12:00:00Z"); await fresh(h);
     await createDrafts(db, h.deps, h.id, MAYA);
     const rows = await sequenced(db, h.id, "email");
-    expect(rows.find((r) => r.contact_id === cleo.id)).toMatchObject({ priority: "scanned", template: "Scanned" });
-    expect(rows.find((r) => r.contact_id === ana.id)).toMatchObject({ priority: "not_reached", template: "Post email" });
+    // Ana was not reached before: she goes into the attendees' follow-up, on the general post-event template.
+    expect(rows.find((r) => r.contact_id === ana.id)).toMatchObject({ priority: "attendees", template: "Post email" });
+    // A badge scan and a booth conversation are both a rep's: neither is sequenced (docs/SEQUENCES-VIEW.md §8).
+    expect(rows.some((r) => r.contact_id === cleo.id)).toBe(false);
     expect(rows.some((r) => r.contact_id === dan.id)).toBe(false);
+    const seqs = await db.query<{ priority: string; zone_group: string }>("SELECT DISTINCT priority, zone_group FROM sequences WHERE event_id = $1 AND phase = 'post'", [h.id]);
+    expect(seqs.every((x) => ["attendees", "prospects"].includes(x.priority) && x.zone_group === "event")).toBe(true);
     expect((await db.query<{ post_started_by: string }>("SELECT post_started_by FROM events WHERE id = $1", [h.id]))[0].post_started_by).toBe(MAYA);
   });
 });

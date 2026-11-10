@@ -37,7 +37,7 @@ export function instantly(o: Opts): Connector {
     healthFloor: 90,
     async listSenders() {
       const j = await api("GET", "/accounts", { query: { limit: 100 } });
-      return (j.items ?? []).map((a: any): SenderInfo => ({ warmup_on: a.warmup_status === undefined ? null : a.warmup_status === 1, id: a.email, address: a.email, domain: String(a.email).split("@")[1], channel: "email", active: a.status === 1, daily_limit: a.daily_limit ?? null, health: a.stat_warmup_score ?? a.warmup_score ?? null, warm_days: a.warmup_status === 0 ? 0 : daysSince(a.timestamp_warmup_start), bounce_rate: null, spam_rate: null }));
+      return (j.items ?? []).map((a: any): SenderInfo => ({ warmup_on: a.warmup_status === undefined ? null : a.warmup_status === 1, name: [a.first_name, a.last_name].filter(Boolean).join(" ") || null, id: a.email, address: a.email, domain: String(a.email).split("@")[1], channel: "email", active: a.status === 1, daily_limit: a.daily_limit ?? null, health: a.stat_warmup_score ?? a.warmup_score ?? null, warm_days: a.warmup_status === 0 ? 0 : daysSince(a.timestamp_warmup_start), bounce_rate: null, spam_rate: null }));
     },
     async assignSenders(id, senders) { await api("PATCH", `/campaigns/${id}`, { body: { email_list: senders.map((s) => s.address) } }); },
     async registerWebhooks(id, url) {
@@ -124,7 +124,7 @@ export function heyreach(o: Opts): Connector {
     },
     async listSenders() {
       const j = await api("POST", "/li_account/GetAll", { body: { offset: 0, limit: 100 } });
-      return (j.items ?? []).map((a: any): SenderInfo => ({ id: String(a.id), address: a.emailAddress ?? a.profileUrl ?? String(a.id), domain: "linkedin.com", channel: "linkedin", active: a.isActive !== false && a.authIsValid !== false, daily_limit: null, health: a.authIsValid === false ? 0 : 100, warm_days: null, bounce_rate: null, spam_rate: null }));
+      return (j.items ?? []).map((a: any): SenderInfo => ({ /* firstName and lastName: field names from HeyReach's docs, not yet seen on a real account. */ name: [a.firstName, a.lastName].filter(Boolean).join(" ") || null, id: String(a.id), address: a.emailAddress ?? a.profileUrl ?? String(a.id), domain: "linkedin.com", channel: "linkedin", active: a.isActive !== false && a.authIsValid !== false, daily_limit: null, health: a.authIsValid === false ? 0 : 100, warm_days: null, bounce_rate: null, spam_rate: null }));
     },
     async listTemplates() { const j = await api("POST", "/campaign/GetAll", { body: { offset: 0, limit: 100 } }); return (j.items ?? []).map((c: any) => ({ id: String(c.id), name: c.name })); },
     async ensureContact(p) { if (!p.linkedin) throw new Error("HeyReach needs a LinkedIn profile."); return p.linkedin; },

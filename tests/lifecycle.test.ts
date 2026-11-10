@@ -371,16 +371,18 @@ describe("the calendar", () => {
     expect((await db.query<{ state: string }>("SELECT state FROM sequences WHERE id = $1", [e.id]))[0].state).toBe("archived");
   });
 
-  it("splits sequences by the recipient's part of the world, with a window set in that zone", async () => {
+  it("makes one sequence per audience and channel, whatever part of the world people are in, sending on the event's own zone", async () => {
     const h = await deliveredInMotion(db);
     await db.query("UPDATE contacts SET person_location = 'Boston, United States' WHERE full_name = 'Ana Ruiz'");
     await db.query("UPDATE contacts SET person_location = 'Madrid, Spain' WHERE full_name = 'Dan Ito'");
     await recordLegalBasis(db, h.id, MAYA, "united states", "Legitimate interest");
+    await db.query("UPDATE events SET country = 'Portugal' WHERE id = $1", [h.id]);
     await createDrafts(db, h.deps, h.id, MAYA);
-    const rows = await db.query<{ zone_group: string; external_id: string }>("SELECT zone_group, external_id FROM sequences WHERE event_id = $1 AND channel = 'email' ORDER BY zone_group", [h.id]);
-    expect(rows.map((r) => r.zone_group)).toEqual(["americas", "emea", "event"]);
-    const tz = (await h.email.connector.readSettings!(rows[0].external_id))!;
-    expect(tz).toMatchObject({ timezone: "America/New_York", from: "09:00", to: "17:00", stop_on_reply: true, track_opens: false, track_links: false });
+    const rows = await db.query<{ priority: string; zone_group: string; external_id: string }>("SELECT priority, zone_group, external_id FROM sequences WHERE event_id = $1 AND channel = 'email'", [h.id]);
+    expect(rows.map((r) => [r.priority, r.zone_group])).toEqual([["attendees", "event"]]);
+    const set = (await h.email.connector.readSettings!(rows[0].external_id))!;
+    expect(set).toMatchObject({ from: "09:00", to: "17:00", stop_on_reply: true, track_opens: false, track_links: false });
+    expect(set.timezone).toBe("Europe/Lisbon");
   });
 });
 

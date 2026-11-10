@@ -28,7 +28,7 @@ export const heldOut = (domain: string, percent: number) => percent > 0 && parse
 export const STRICT_REGIONS = ["germany", "canada"];
 
 interface SeqRow { id: string; event_id: string; connector: string; channel: Channel; priority: string; phase: "pre" | "post"; zone_group: ZoneGroup; template_id: string; external_id: string | null; name: string; state: SequenceState; launched_at: string | null; pause_owed: boolean; settings_ok: boolean | null; checklist_at: string | null }
-interface Person { followup_tier?: string | null; location: string | null; country: string | null; id: string; priority: string; full_name: string | null; title: string | null; email: string | null; linkedin: string | null; company: string; domain: string; verify_1: string | null; person_id: string | null }
+interface Person { source?: string; followup_tier?: string | null; location: string | null; country: string | null; id: string; priority: string; full_name: string | null; title: string | null; email: string | null; linkedin: string | null; company: string; domain: string; verify_1: string | null; person_id: string | null }
 
 const toolFor = (deps: LifecycleDeps, name: string): Connector => {
   const c = deps.connectors[name];
@@ -114,19 +114,22 @@ export async function createDrafts(db: Db, deps: LifecycleDeps, eventId: string,
   const phase = window === "before" ? "pre" : "post";
   const groups = phase === "post" ? await postGroups(db.query, eventId) : null;
   const people = (await db.query<Person>(
-    `SELECT k.id, k.priority, k.full_name, k.title, k.email, k.linkedin, co.name AS company, co.primary_domain AS domain, k.verify_1, k.person_id, k.person_location AS location, co.firmo->>'country' AS country, k.followup_tier
-     FROM contacts k JOIN companies co ON co.id = k.company_id WHERE k.event_id = $1 AND k.dropped_at IS NULL AND (k.priority IS NOT NULL OR ($2 AND k.followup_tier = 'scanned')) AND co.primary_domain IS NOT NULL ORDER BY k.id`, [eventId, phase === "post"]))
-    // After the event, what happened there decides the sequence: each person goes by their group, and the groups a rep has are not sequenced.
-    .flatMap((p) => { if (!groups) return [p]; const g = groups.get(p.id); return g && SEQUENCED_GROUPS.includes(g) ? [{ ...p, priority: g }] : []; });
+    `SELECT k.id, k.priority, k.full_name, k.title, k.email, k.linkedin, co.name AS company, co.primary_domain AS domain, k.verify_1, k.person_id, k.person_location AS location, co.firmo->>'country' AS country, k.followup_tier, k.source
+     FROM contacts k JOIN companies co ON co.id = k.company_id WHERE k.event_id = $1 AND k.dropped_at IS NULL AND k.priority IS NOT NULL AND k.source IN ('attendee', 'prospect') AND co.primary_domain IS NOT NULL ORDER BY k.priority, k.id`, [eventId]))
+    // After the event, only the people the desk did not hear from before or at it are sequenced (reached, no reply; not reached). Everyone else is a rep's.
+    .filter((p) => { if (!groups) return true; const g = groups.get(p.id); return Boolean(g && SEQUENCED_GROUPS.includes(g)); });
   const summary = { added: 0, refused: {} as Record<string, number> };
   for (const channel of channels) {
     const tool = e.tools[channel]!;
     const reachable = people.filter((p) => (channel === "email" ? p.email && p.verify_1 : p.linkedin));
-    const zoneOfPerson = (p: Person) => zoneGroupOf(p.location) === "event" ? zoneGroupOf(p.country) : zoneGroupOf(p.location);
-    for (const [priority, zone] of [...new Set(reachable.map((p) => `${p.priority}|${zoneOfPerson(p)}`))].sort().map((k) => k.split("|") as [string, ZoneGroup])) {
+    // Four audiences, two channels (docs/SEQUENCES-VIEW.md §8): a sequence is an audience, attendees or prospects, sending on the event's own zone.
+    // Priority orders who goes in first; it no longer makes a sequence. The sequence's `priority` column holds the audience.
+    const audienceOf = (p: Person) => (p.source === "prospect" ? "prospects" : "attendees");
+    const zoneOfPerson = (_p: Person): ZoneGroup => "event";
+    for (const [priority, zone] of [...new Set(reachable.map((p) => `${audienceOf(p)}|${zoneOfPerson(p)}`))].sort().map((k) => k.split("|") as [string, ZoneGroup])) {
       // Already in, or taken out for a reason that holds (a no, an opt-out, a bounce, a gate refusal): either way, not added again by this press.
       const inIt = new Set((await db.query<{ contact_id: string }>("SELECT contact_id FROM enrollments WHERE contact_id = ANY($1::text[]) AND event_id = $2 AND channel = $3 AND (state <> 'removed' OR NOT (coalesce(cause, '') = ANY($4::text[])))", [reachable.map((p) => p.id), eventId, channel, RETURNABLE_CAUSES])).map((r) => r.contact_id));
-      const fresh = reachable.filter((p) => p.priority === priority && zoneOfPerson(p) === zone && !inIt.has(p.id) && !heldOut(p.domain, e.holdout_percent));
+      const fresh = reachable.filter((p) => audienceOf(p) === priority && zoneOfPerson(p) === zone && !inIt.has(p.id) && !heldOut(p.domain, e.holdout_percent));
       const results = await runGate(db, deps, eventId, fresh.map((p) => p.id), channel, "add");
       for (const r of results) if (!r.passed) summary.refused[r.reason!] = (summary.refused[r.reason!] ?? 0) + 1;
       // A sequence nobody can go into is not made.
@@ -167,7 +170,7 @@ export async function drainOps(db: Db, deps: LifecycleDeps, eventId: string | nu
     `SELECT n.id, n.event_id, n.contact_id, n.sequence_id, n.channel, n.external_contact_id, n.pending_op, n.state, n.added_at::text AS added_at, s.connector, s.external_id AS ext, s.state AS seq_state, s.released_by,
             (SELECT count(*)::int FROM enrollments x WHERE x.sequence_id = s.id AND x.external_contact_id IS NOT NULL) AS in_tool
      FROM enrollments n JOIN sequences s ON s.id = n.sequence_id WHERE n.pending_op IS NOT NULL AND ($1::text IS NULL OR n.event_id = $1) AND (n.retry_after IS NULL OR n.retry_after <= $2::timestamptz)
-     ORDER BY CASE n.pending_op WHEN 'remove' THEN 0 WHEN 'pause' THEN 1 ELSE 2 END, n.id`, [eventId, now.toISOString()]);
+     ORDER BY CASE n.pending_op WHEN 'remove' THEN 0 WHEN 'pause' THEN 1 ELSE 2 END, (SELECT k.priority FROM contacts k WHERE k.id = n.contact_id) NULLS LAST, n.id`, [eventId, now.toISOString()]);
   const out = { done: 0, failed: 0 };
   const adds = new Map<string, typeof rows>();
   const stopped = await sendingStopped(db.query);

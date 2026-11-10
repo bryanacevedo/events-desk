@@ -7,7 +7,7 @@ import { Chevron, ExpandRow } from "./Patterns";
 import { Icon } from "./icons";
 import { PersonAvatar } from "./PersonAvatar";
 import { companyHref, personHref, To } from "./To";
-import { CODE_WORDS, dayIn, headIn, MeetingRows, meetTime, objectHref, ObjectSheets, openObject, ReplyRows } from "./Objects";
+import { CODE_WORDS, dayIn, headIn, MeetingRows, meetTime, objectHref, ObjectSheets, openObject, ReplyRows, SeqName } from "./Objects";
 import { money, num, plural, shortDate } from "./words";
 import { isGtm } from "../shared/roles";
 
@@ -29,7 +29,8 @@ const TOOL_NAME: Record<string, string> = { instantly: "Instantly", heyreach: "H
 const CODE: Record<string, string> = { interested: "interested", meeting_request: "wants a meeting", referral: "pointed us to someone" };
 const REASON: Record<string, string> = { not_connected: "Not connected", health_unknown: "Health not reported", low_health: "Health too low", still_warming: "Still warming up", high_bounce: "Bounces too high", high_spam: "Spam too high", fully_booked: "Used by other sequences", domain_full: "Domain has enough", no_auth: "Domain not set up to send", failed_placement: "Landing in spam", stale_placement: "Not tested lately", not_tested: "Not tested", warmup_off: "Warmup off", burned: "Domain resting", primary_domain: "Company's own domain", no_consent: "Rep has not agreed" };
 const when = (iso: string) => new Date(iso).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "UTC" });
-const FOLLOW_UP = [["scanned", "Scanned at the booth"], ["reached", "Reached before, no reply"], ["not_reached", "Not reached before"]] as const;
+/** Who goes into the follow-up: only the people the desk did not hear from (docs/SEQUENCES-VIEW.md §8). A badge scan is a rep's, like anyone met. */
+const FOLLOW_UP = [["reached", "Reached before, no reply"], ["not_reached", "Not reached before"]] as const;
 /** Meeting and slot times in the reader's own clock. */
 const shortWhen = (iso: string) => new Date(iso).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 const addDay = (ymd: string) => { const d = new Date(`${ymd}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + 1); return d.toISOString().slice(0, 10); };
@@ -58,7 +59,6 @@ export function Fold({ icon, title, peek, children }: { icon: React.ReactNode; t
   return <details className="fold"><summary>{icon}<span className="fold-t">{title}</span><span className="fold-peek">{peek}</span><Chevron /></summary><div className="m-fold">{children}</div></details>;
 }
 
-const REGION: Record<string, string> = { americas: "Americas", emea: "EMEA", apac: "APAC", event: "Event's region" };
 const peopleIn = (s: Sequence) => s.enrolled + s.paused + (s.adding ?? 0);
 
 /** One region's sequence, opened from its cell: its state, its sending accounts, and what it still needs before it goes out. */
@@ -73,7 +73,7 @@ function SequenceDetail({ s, act, busy }: { s: Sequence; act: Act; busy: boolean
   return (
     <div className="sq-detail">
       <header>
-        <b>{REGION[s.zone_group ?? "event"] ?? s.zone_group}</b>
+        <b><SeqName s={s} /></b>
         <span className="mute">{STATE[s.state] ?? s.state} · {plural(peopleIn(s), "person", "people")}{s.peak_daily !== null ? ` · ${num(s.peak_daily)} on the busiest day` : ""}</span>
         {short > 0 && <span className="fig over"><b>{short}</b> {words} short</span>}
         {action}
@@ -101,8 +101,9 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
   const showMeetings = (v: keyof typeof MEET_VIEWS) => { setMeetView(v); requestAnimationFrame(() => openFold("Meetings")); };
   const [seqs, setSeqs] = useState<SeqList | null>(null);
   const load = async () => {
-    setO(await get<Overview>(`/api/events/${id}/motion`));
-    setSeqs(await get<SeqList>(`/api/events/${id}/sequences`));
+    // The tab and its sequences arrive together, so the Sequences fold never shows empty while its rows load.
+    const [ov, sq] = await Promise.all([get<Overview>(`/api/events/${id}/motion`), get<SeqList>(`/api/events/${id}/sequences`)]);
+    setSeqs(sq); setO(ov);
     const r = await get<typeof slots>(`/api/events/${id}/motion/roster`);
     if (r) { setSlots(r); setSlot((x) => (x.rep ? x : { ...x, rep: r.roster[0]?.rep ?? "" })); }
   };
@@ -131,7 +132,7 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
   // After the event: the follow-up, by what happened there. A rep has the people who met someone, were hot at the booth, or replied.
   const pe = o.post_event, g = pe?.groups ?? {};
   const canFollowUp = Boolean(pe && pe.window === "after" && !pe.started_at && ["sequencing", "in_market"].includes(o.motion));
-  const withRep = (g.met ?? 0) + (g.hot ?? 0) + (g.replied ?? 0);
+  const withRep = (g.met ?? 0) + (g.hot ?? 0) + (g.replied ?? 0) + (g.scanned ?? 0);
   const followUp = FOLLOW_UP.reduce((n, [k]) => n + (g[k] ?? 0), 0);
 
   return (
@@ -263,7 +264,7 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
           </Fold>
         )}
         {started && (
-          <Fold icon={<Icon.people />} title="Met at the event" peek={o.captures.length ? num(o.captures.length) : undefined}>
+          <Fold icon={<Icon.people />} title="Met at the booth" peek={o.captures.length ? num(o.captures.length) : undefined}>
             {o.captures.length > 0 && <ul className="mc-list">{o.captures.slice(0, 24).map((c) => (
               <li key={c.id} className={c.temperature === "hot" ? "hot" : undefined}>
                 <PersonAvatar name={c.full_name ?? "Someone"} size={30} />
@@ -299,7 +300,7 @@ function RepliesFold({ replies, open }: { replies: Reply[]; open: string | null 
   const AUTO = ["out_of_office", "bounced", "unsubscribe", "wrong_person", "departed"];
   const real = new Set(replies.filter((r) => !AUTO.includes(r.code ?? "")).map((r) => r.contact_id ?? r.id)).size, auto = replies.filter((r) => AUTO.includes(r.code ?? "")).length;
   return (
-    <Fold icon={<Icon.reply />} title="Replies" peek={<>{num(real)} replied{auto > 0 && <i>{num(auto)} out of office, bounced or opted out</i>}</>}>
+    <Fold icon={<Icon.reply />} title="Replies" peek={<>{auto > 0 && <>{num(auto)} other</>}<i>{num(real)} replied</i></>}>
       {codes.length > 1 && (
         <div className="seg rp-codes" role="group" aria-label="What they said">
           <button type="button" aria-pressed={!code} onClick={() => setCode("")}>All<span>{replies.length}</span></button>
@@ -341,7 +342,6 @@ function Started({ seqs, followUp }: { seqs: SeqList; followUp: { at: string; by
 }
 
 const SEQ_STATE_WORD: Record<string, string> = { active: "Live", paused: "Paused", archived: "Ended", draft: "Draft" };
-const GROUP_WORD: Record<string, string> = { scanned: "Scanned at the booth", reached: "Reached before", not_reached: "Not reached before" };
 
 /** The sequences, before the event and after it, one row each: what it is, how many are in it, how many it reached and how many replied. A row opens the sequence. */
 function SequenceLanes({ list, eventId }: { list: SeqList; eventId: string }) {
@@ -364,11 +364,10 @@ function SequenceLanes({ list, eventId }: { list: SeqList; eventId: string }) {
             return (
               <li key={s.id} style={{ "--i": i } as React.CSSProperties}>
                 <a href={objectHref("sequence", `${eventId}|${s.id}`)} className="ob-row sq-row" data-opens-sheet="" onClick={(ev) => { ev.preventDefault(); go(objectHref("sequence", `${eventId}|${s.id}`)); }}>
-                  <span className="ob-who"><b>{s.channel === "linkedin" ? "LinkedIn" : "Email"}{s.zone_group ? `, ${REGION[s.zone_group] ?? s.zone_group}` : ""}</b><span>{[GROUP_WORD[s.priority] ?? (s.priority.length === 1 ? `Priority ${s.priority}` : null), SEQ_STATE_WORD[s.state] ?? s.state].filter(Boolean).join(" · ")}</span></span>
+                  <span className="ob-who"><b><SeqName s={s} /></b><span>{SEQ_STATE_WORD[s.state] ?? s.state}</span></span>
                   <span className="sq-fig"><b>{num(s.people)}</b><span>added</span></span>
                   <span className="sq-fig"><b>{reach === null ? "None" : num(reach)}</b><span>{reach === null ? "not reported" : s.channel === "linkedin" && s.invites !== null ? "invited" : "reached"}</span></span>
                   <span className="sq-fig"><b>{s.replied === null ? "None" : num(s.replied)}</b><span>{s.replied === null ? "not reported" : "replied"}</span></span>
-                  <span className="ob-go">Open<svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h9M8.5 4l4 4-4 4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
                 </a>
               </li>
             );
@@ -378,3 +377,4 @@ function SequenceLanes({ list, eventId }: { list: SeqList; eventId: string }) {
     </div>
   );
 }
+

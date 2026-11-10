@@ -67,7 +67,33 @@ The per-step sends add up to the sequence's messages sent, not to "reached". Seq
 
 ### 7. One naming convention (Bryan, 2026-11-10)
 
-A sequence has one name, the same in the desk and in the sequencer's campaign list: `Desk | <YYYY-MM> <event> | <Before or Follow-up> | <Email or LinkedIn> | <audience> | <region> | <desk id>`, for example `Desk | 2026-03 Shoptalk Spring 2026 | Before | Email | Priority A | Americas | 6ab154`. "Desk" first lets a team filter every desk-made campaign in the tool; the start month next sorts them in event order; every part is always present and in this order and case; the last six characters of the desk's id end it, since the desk finds its campaign again by this name after a crash. ASCII only, at most 120 characters, the event name shortening first. Audience words: Priority A/B/C, Scanned at booth, Reached before, Not reached before. Region words: Americas, EMEA, APAC, Event region. Code: `src/shared/sequence-name.ts`; tests: `tests/sequence-name.test.ts`. Sequences made before this keep their name.
+A sequence has one name, the same in the desk and in the sequencer's own list: `Desk | <YYYY-MM> <event> | <Before or Follow-up> | <Email or LinkedIn> | <audience> | <desk id>`, for example `Desk | 2026-03 Shoptalk Spring 2026 | Before | Email | Attendees | 6ab154` (a region part appears only on sequences made before §8). "Desk" first lets a team filter every desk-made campaign in the tool; the start month next sorts them in event order; every part is always present and in this order and case; the last six characters of the desk's id end it, since the desk finds its campaign again by this name after a crash. ASCII only, at most 120 characters, the event name shortening first. Audience words: Attendees, Prospects (older: Priority A/B/C, Scanned at booth, Reached before, Not reached before). Code: `src/shared/sequence-name.ts`; tests: `tests/sequence-name.test.ts`. Sequences made before this keep their name.
+
+### 8. Four audiences, two channels: eight sequences an event (Bryan, 2026-11-10)
+
+Bryan: "cut those sequences... why did you think it was a good idea to run a sequence per region?" The desk split people by priority (A, B) and by region (Americas, EMEA, APAC, the event's own) before the event, and by what happened (scanned at the booth, reached, not reached) after it, on each channel: up to twenty sequences an event. He set the model:
+
+| | Email | LinkedIn |
+|---|---|---|
+| Before the event, attendees | 1 | 1 |
+| Before the event, prospects | 1 | 1 |
+| After the event, attendees we did not hear from | 1 | 1 |
+| After the event, prospects we did not hear from | 1 | 1 |
+
+All eight belong to the event's one Salesforce campaign (the CRM trail already names it after the event). The screens say "sequence"; "campaign" is the CRM's word, and the tool's own word stays inside the tool.
+
+- **Audience is the person's source:** `attendee` (on the attendee list) or `prospect` (found at an attending company). It replaces priority as the sequence's key (`sequences.priority` holds `attendees` or `prospects`, so the unique key and every reader of the column stay as they are).
+- **Priority still matters, inside a sequence:** the people query and the batch sent to the tool are ordered A before B, so a first cohort takes A first. A sequence is never capped by senders (a short one pauses whole), so order matters only for that first batch. It no longer makes a sequence of its own.
+- **After the event, "did not hear from" means** the post-event groups `reached` (reached before, no reply) and `not_reached`. Everyone the desk heard from before or at the event is a rep's, never sequenced: met, hot at the booth, replied, and scanned at the booth. **A badge scan now hands the person to the rep who scanned them** (Bryan's call after review: a scan used to change only the follow-up): paused in every sequence, the account held, and with a CRM connected a task for that rep. Walk-ups (`source = 'onsite'`) are in no sequence; they were captured by a rep.
+- **One follow-up per audience** holds reached and not-reached people together, so its copy assumes neither that the person attended nor that we wrote before.
+- **One send window, the event's time zone** (`zone_group` is always `event`), found from its city, then its country (`eventZone`); UTC only when it has neither. Attendees are travelling to it; someone far from it gets mail outside their hours. Region stays where the law needs it: the legal basis is recorded per region and the gate excludes any region without one, unchanged.
+- **Templates:** a template's audience becomes `attendees`, `prospects` or `all`, settable when it is approved (`POST /api/motion/templates`, `audience`). An older template written for a priority (A, B) or a group (`scanned`, `reached`, `not_reached`) no longer matches, so the general one (`all`) is used.
+- **The name** (§7) drops its region part (kept only on sequences made before this): `Desk | 2026-03 Shoptalk Spring 2026 | Before | Email | Attendees | 6ab154`.
+- **Screens:** a row and its sheet say channel and audience ("Email, attendees"). The After-the-event brief on the Outreach tab shows who goes into the follow-up (reached, not reached) and who is with a rep (met, hot, replied, scanned), by audience.
+- **Existing data:** sequences already made keep their shape and name; only new ones are made this way, so an event set up before could hold both shapes until its old ones end. No event has run live; the demo is rebuilt this way.
+- Goldfish-reviewed 2026-11-10 (9 Major, 2 Nit), every finding answered here. Built the same day: `src/server/sequences.ts` (`createDrafts`), `src/server/post-event.ts`, `src/server/operating.ts` (badge scan), `src/server/sending.ts`, tests in `tests/sequence-data.test.ts`, `tests/post-event.test.ts`, `tests/rep-day.test.ts`, `tests/lifecycle.test.ts`.
+
+Tests: an event with attendees and prospects on both channels gets at most eight sequences; a person goes by source, not priority or region; A is added before B under a cap; after the event, met, hot, replied and scanned people are in no sequence; every sequence sends on the event's time zone; the name has no region.
 
 ## Unchanged
 

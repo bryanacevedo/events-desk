@@ -80,9 +80,10 @@ export async function sequenceDetail(db: Db, deps: LifecycleDeps, eventId: strin
     `SELECT m.id, m.code, m.body, m.received_at::text AS received_at, k.full_name, co.name AS company, m.contact_id, m.step FROM inbound_messages m
        LEFT JOIN contacts k ON k.id = m.contact_id LEFT JOIN companies co ON co.id = k.company_id
      WHERE m.sequence_id = $1 AND m.signal = 'reply' ORDER BY m.received_at DESC LIMIT 100`, [sequenceId]);
-  const senders = await db.query<{ sender: string; sends: number; bounces: number }>(
-    `SELECT sender, count(*) FILTER (WHERE kind = 'send')::int AS sends, count(*) FILTER (WHERE kind = 'bounce')::int AS bounces
-     FROM touches WHERE sequence_id = $1 AND sender IS NOT NULL GROUP BY sender ORDER BY sends DESC, sender`, [sequenceId]);
+  const senders = await db.query<{ sender: string; name: string | null; sends: number; bounces: number }>(
+    `SELECT t.sender, (SELECT x.display_name FROM sequence_senders x WHERE x.sequence_id = $1 AND x.address = t.sender LIMIT 1) AS name,
+            count(*) FILTER (WHERE t.kind = 'send')::int AS sends, count(*) FILTER (WHERE t.kind = 'bounce')::int AS bounces
+     FROM touches t WHERE t.sequence_id = $1 AND t.sender IS NOT NULL GROUP BY t.sender ORDER BY sends DESC, t.sender`, [sequenceId]);
   const days = await db.query<{ day: string; n: number }>(
     "SELECT (at AT TIME ZONE 'UTC')::date::text AS day, count(*)::int AS n FROM touches WHERE sequence_id = $1 AND kind = 'send' GROUP BY 1 ORDER BY 1", [sequenceId]);
   const [unplaced] = await db.query<{ sends: number; replies: number }>(
@@ -95,9 +96,14 @@ export async function sequenceDetail(db: Db, deps: LifecycleDeps, eventId: strin
             (SELECT count(*)::int FROM touches t WHERE t.contact_id = n.contact_id AND t.sequence_id = n.sequence_id AND t.kind = 'send') AS sent,
             EXISTS (SELECT 1 FROM touches t WHERE t.contact_id = n.contact_id AND t.sequence_id = n.sequence_id AND t.kind = 'accepted') AS accepted
      FROM enrollments n JOIN contacts k ON k.id = n.contact_id LEFT JOIN companies co ON co.id = k.company_id WHERE n.sequence_id = $1 ORDER BY k.full_name`, [sequenceId]);
+  // The cadence it runs: its template's steps, each with the day it goes and its words. LinkedIn's first step is the connection request.
+  const [tpl] = await db.query<{ steps: { day: number; subject?: string | null; body: string }[] }>("SELECT t.steps FROM sequence_templates t JOIN sequences s ON s.template_id = t.id WHERE s.id = $1", [sequenceId]);
+  const [msg] = await db.query<{ n: number }>("SELECT count(*)::int AS n FROM touches WHERE sequence_id = $1 AND kind = 'send' AND action = 'message'", [sequenceId]);
   const sends = rep.has("send") || rep.has("invite");
   return {
     ...head,
+    cadence: (tpl?.steps ?? []).map((x, i) => ({ step: i + 1, day: x.day, subject: x.subject ?? null, body: x.body })),
+    linkedin_messages: head.channel === "linkedin" && rep.has("send") ? msg.n : null,
     people_in: people,
     reports: [...rep],
     event: { name: last?.name ?? "", website: last?.website ?? null, starts_on: last?.starts_on ?? null, last_day: last?.last_day ?? null },

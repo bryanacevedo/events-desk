@@ -120,7 +120,7 @@ describe("the per-sequence read", () => {
     expect(d.messages_sent).toBe(2);
     expect(d.steps!.reduce((x, s) => x + s.sent, 0)).toBe(d.messages_sent);
     expect(d.steps!.find((s) => s.step === 2)!.replied).toBe(1);
-    expect(d.senders).toEqual([{ sender: "s0@send.example", sends: 2, bounces: 0 }]);
+    expect(d.senders).toEqual([{ sender: "s0@send.example", name: null, sends: 2, bounces: 0 }]);
     // HeyReach gives no step: no ladder rather than an empty one.
     expect((await sequenceDetail(db, h.deps, h.id, l.id))!.steps).toBeNull();
     const rep = await createApp(db, { demo: true, lifecycle: h.deps }).request(`/api/events/${h.id}/sequences/${e.id}`, { headers: { "x-actor": encodeURIComponent(MAYA) } });
@@ -135,5 +135,20 @@ describe("the per-sequence read", () => {
     const [s] = (await sequenceList(db, h.deps, h.id)).filter((x) => x.id === e.id);
     expect(s.reached).toBeNull();
     expect(s.replied).toBeNull();
+  });
+});
+
+describe("four audiences, two channels", () => {
+  it("makes a sequence per audience and channel, at most eight an event, every one on the event's zone", async () => {
+    const h = await deliveredInMotion(db);
+    await db.query("UPDATE contacts SET source = 'prospect' WHERE event_id = $1 AND full_name = 'Dan Ito'", [h.id]);
+    await createDrafts(db, h.deps, h.id, MAYA);
+    const seqs = await db.query<{ channel: string; priority: string; phase: string; zone_group: string; name: string }>("SELECT channel, priority, phase, zone_group, name FROM sequences WHERE event_id = $1 ORDER BY channel, priority", [h.id]);
+    expect(seqs.length).toBeLessThanOrEqual(8);
+    expect(new Set(seqs.map((s) => s.priority))).toEqual(new Set(["attendees", "prospects"]));
+    expect(seqs.every((s) => s.zone_group === "event" && s.phase === "pre" && /\| (Attendees|Prospects) \|/.test(s.name))).toBe(true);
+    const dan = await personAt(db, h.id, "Dan Ito");
+    const where = await db.query<{ priority: string }>("SELECT s.priority FROM enrollments n JOIN sequences s ON s.id = n.sequence_id WHERE n.contact_id = $1", [dan.id]);
+    expect(where.every((w) => w.priority === "prospects")).toBe(true);
   });
 });

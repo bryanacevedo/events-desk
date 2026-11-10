@@ -30,7 +30,9 @@ export function useSheet(close: () => void) {
   useEffect(() => {
     const prev = document.activeElement as HTMLElement | null;
     const prevRow = prev?.getAttribute("data-row") ?? null;
-    ref.current?.querySelector<HTMLElement>("[data-close]")?.focus();
+    // Focus goes into the sheet itself, not onto its close button: a keyboard user starts inside it (Tab reaches the close), and
+    // a mouse user does not see a focus ring on the close the moment the sheet opens.
+    if (ref.current) { ref.current.setAttribute("tabindex", "-1"); ref.current.focus({ preventScroll: true }); }
     document.body.classList.add("sheet-open");
     const onDown = (e: MouseEvent) => {
       const t = e.target as HTMLElement;

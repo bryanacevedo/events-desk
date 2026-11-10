@@ -128,13 +128,13 @@ export async function replyDetail(db: Db, replyId: string) {
     `SELECT m.id, m.event_id, e.name AS event, ${BRAND}, m.contact_id, k.full_name, k.title, co.name AS company, co.tier, co.tier_fact AS why,
             co.firmo->>'industry' AS industry, co.firmo->>'employees' AS employees, co.account_owner AS owner, nullif(concat_ws(', ', co.deal_name, co.deal_stage), '') AS deal,
             m.code, m.body, m.channel, m.connector, m.thread_url, m.received_at::text AS received_at, m.respond_by::text AS respond_by, m.owner AS rep, m.handled_at::text AS handled_at,
-            m.sequence_id, m.step, s.channel AS seq_channel, s.phase AS seq_phase, s.zone_group AS seq_zone
+            m.sequence_id, m.step, s.channel AS seq_channel, s.phase AS seq_phase, s.priority AS seq_audience, s.zone_group AS seq_zone
      FROM inbound_messages m JOIN events e ON e.id = m.event_id LEFT JOIN contacts k ON k.id = m.contact_id LEFT JOIN companies co ON co.id = k.company_id LEFT JOIN sequences s ON s.id = m.sequence_id
      WHERE m.id = $1 AND m.signal = 'reply'`, [replyId]);
   if (!r) return null;
   const [meeting] = r.contact_id ? await db.query("SELECT id, status, scheduled_at::text AS scheduled_at, timezone, rep FROM meetings WHERE contact_id = $1 AND event_id = $2 ORDER BY scheduled_at DESC LIMIT 1", [r.contact_id, r.event_id]) : [];
   const path = r.contact_id ? await pathOf(db, r.contact_id, r.event_id) : [];
-  return { ...r, meeting: meeting ?? null, path, account: await accountOf(db, r.event_id, { contactId: (r as { contact_id?: string | null }).contact_id }) };
+  return { ...r, meeting: meeting ?? null, path, timezone: await eventZone((sql, args) => db.query(sql, args), r.event_id), account: await accountOf(db, r.event_id, { contactId: (r as { contact_id?: string | null }).contact_id }) };
 }
 
 /** One meeting as its own thing: when and with whom, the prep, the reply that led to it, and how it went. */
@@ -176,7 +176,7 @@ async function touchpoints(db: Db, eventId: string, contactIds: string[]) {
     `SELECT m.id, m.contact_id, k.full_name, m.status, m.scheduled_at::text AS scheduled_at, m.timezone, m.rep, m.source FROM meetings m LEFT JOIN contacts k ON k.id = m.contact_id
      WHERE m.event_id = $1 AND m.contact_id = ANY($2) ORDER BY m.scheduled_at DESC`, [eventId, contactIds]);
   const replies = await db.query(
-    `SELECT i.id, i.contact_id, k.full_name, i.code, i.body, i.received_at::text AS received_at, i.sequence_id, s.name AS sequence, s.channel, s.phase, i.step
+    `SELECT i.id, i.contact_id, k.full_name, i.code, i.body, i.received_at::text AS received_at, i.sequence_id, s.name AS sequence, s.channel, s.phase, s.priority AS audience, i.step
      FROM inbound_messages i LEFT JOIN contacts k ON k.id = i.contact_id LEFT JOIN sequences s ON s.id = i.sequence_id
      WHERE i.contact_id = ANY($2) AND i.signal = 'reply' AND (i.event_id = $1 OR s.event_id = $1) ORDER BY i.received_at DESC LIMIT 50`, [eventId, contactIds]);
   return { meetings, replies };
@@ -194,13 +194,13 @@ export async function personDetail(db: Db, contactId: string) {
   if (!p) return null;
   const { meetings, replies } = await touchpoints(db, p.event_id, [contactId]);
   const sequences = await db.query(
-    `SELECT s.id, s.name, s.channel, s.phase, s.zone_group, n.state, n.cause,
+    `SELECT s.id, s.name, s.channel, s.phase, s.priority, s.zone_group, n.state, n.cause,
             (SELECT count(*)::int FROM touches t WHERE t.contact_id = n.contact_id AND t.sequence_id = s.id AND t.kind = 'send') AS sent,
             (SELECT max(t.step) FROM touches t WHERE t.contact_id = n.contact_id AND t.sequence_id = s.id AND t.kind = 'send') AS last_step,
             EXISTS (SELECT 1 FROM touches t WHERE t.contact_id = n.contact_id AND t.sequence_id = s.id AND t.kind = 'accepted') AS accepted
      FROM enrollments n JOIN sequences s ON s.id = n.sequence_id WHERE n.contact_id = $1 ORDER BY s.phase DESC, s.channel`, [contactId]);
   const met = await db.query("SELECT id, rep, note, temperature, captured_at::text AS captured_at FROM onsite_captures WHERE contact_id = $1 ORDER BY captured_at DESC", [contactId]);
-  return { ...p, meetings, replies, sequences, met, path: await pathOf(db, contactId, p.event_id), account: await accountOf(db, p.event_id, { contactId }) };
+  return { ...p, meetings, replies, sequences, met, path: await pathOf(db, contactId, p.event_id), timezone: await eventZone((sql, args) => db.query(sql, args), p.event_id), account: await accountOf(db, p.event_id, { contactId }) };
 }
 
 /** A company's meetings and replies on an event, for its sheet: who at it met us and who wrote back. */

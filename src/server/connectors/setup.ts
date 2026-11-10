@@ -5,7 +5,9 @@ import { FAKES, type FakeTool } from "./fake.ts";
 import { apollo, heyreach, instantly, smartlead } from "./tools.ts";
 import type { Connector } from "./types.ts";
 
-export const SIM_SENDERS = (n: number, domains: string[]) => Array.from({ length: n }, (_, i) => ({ email: `outreach${i + 1}@${domains[i % domains.length]}`, status: 1, daily_limit: 40, stat_warmup_score: 99 - (i % 9), timestamp_warmup_start: "2026-08-01T00:00:00Z" }));
+/** The demo's reps, who own its inboxes and LinkedIn accounts. */
+const REPS = ["Maya Ortiz", "Priya Nair", "Tomas Berg", "Camille Laurent", "Jonas Weber", "Leo Marsh"];
+export const SIM_SENDERS = (n: number, domains: string[]) => Array.from({ length: n }, (_, i) => ({ email: `${REPS[i % REPS.length].split(" ")[0].toLowerCase()}${i >= REPS.length ? Math.floor(i / REPS.length) + 1 : ""}@${domains[i % domains.length]}`, first_name: REPS[i % REPS.length].split(" ")[0], last_name: REPS[i % REPS.length].split(" ")[1], status: 1, daily_limit: 40, stat_warmup_score: 99 - (i % 9), timestamp_warmup_start: "2026-08-01T00:00:00Z" }));
 
 const INSTANTLY_STATE: Record<string, string> = { draft: "0", active: "1", paused: "2", archived: "3" };
 const HEYREACH_STATE: Record<string, string> = { draft: "DRAFT", active: "IN_PROGRESS", paused: "PAUSED", archived: "FINISHED" };
@@ -14,7 +16,7 @@ const HEYREACH_STATE: Record<string, string> = { draft: "DRAFT", active: "IN_PRO
 export async function demoConnectors(db: Db): Promise<{ connectors: Record<string, Connector>; tools: Record<string, FakeTool> }> {
   const email = FAKES.instantly(), li = FAKES.heyreach();
   email.senders = SIM_SENDERS(24, ["orrery-mail.example", "orrery-send.example", "tryorrery.example", "getorrery.example", "orreryhq.example", "meetorrery.example"]);
-  li.senders = Array.from({ length: 6 }, (_, i) => ({ id: i + 1, profileUrl: `https://www.linkedin.com/in/orrery-rep-${i + 1}`, isActive: true, authIsValid: true }));
+  li.senders = REPS.map((r, i) => ({ id: i + 1, firstName: r.split(" ")[0], lastName: r.split(" ")[1], profileUrl: `https://www.linkedin.com/in/${r.toLowerCase().replace(/ /g, "-")}-orrery`, isActive: true, authIsValid: true }));
   email.connector.simulated = true; li.connector.simulated = true;
   const rows = await db.query<{ connector: string; external_id: string; state: string; name: string; id: string }>("SELECT connector, external_id, state, name, id FROM sequences WHERE external_id IS NOT NULL");
   for (const s of rows) {

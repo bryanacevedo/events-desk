@@ -83,7 +83,7 @@ Connector {
 - **One contract test suite every connector must pass**, run against a scripted fake of each tool. Adding a tool means writing one file and passing the suite. Connectors built: **Instantly and HeyReach** first, simulated in the demo and labeled, then Smartlead, Apollo and Gong. None is proven until a real account runs it.
 - **Channel choice.** Email needs a verified address. LinkedIn needs a profile. Someone with only a LinkedIn profile goes LinkedIn-only, and someone with only an email goes email-only.
 - Templates are approved once in Settings, versioned, per channel, and labeled **pre-event** or **post-event**. An event uses pre-event until its first day and post-event after.
-- The uploader presses one button to create draft sequences per priority and channel. Pressing again adds only people not yet added: this is how late registrations join, and owner say runs first for any account new to the event.
+- The uploader presses one button to create draft sequences: one per audience (attendees, prospects) and channel, before the event and again after it, sending on the event's own zone (eight at most; `docs/SEQUENCES-VIEW.md` §8). Priority orders who goes in first. Pressing again adds only people not yet added: this is how late registrations join, and owner say runs first for any account new to the event.
 
 **The gate runs at every moment someone could be contacted: at adding, at launch, and at every resume.** Per person, per channel:
 
@@ -133,17 +133,17 @@ Status: built on `v2`, 2026-11-09, in `src/server/post-event.ts`, tested in `tes
 | Met | A meeting at this event (any status), an on-site meeting, or a quick-add capture | Nothing automated. A rep has them. |
 | Hot | A capture marked hot | At capture time: a task in the CRM and a card in the event's channel for the rep who had the conversation, the same day. Never sequenced. |
 | Replied | Replied to anything for this event, other than an out-of-office or a bounce | Nothing automated. The reply flow and a rep have them. |
-| Scanned | A badge scan, including walk-ups who were never on the list | The `scanned` post-event template |
-| Reached | Sent at least one pre-event step for this event | The `reached` template |
-| Not reached | Everyone else kept on the list | The `not_reached` template |
+| Scanned | A badge scan, including walk-ups who were never on the list | Nothing automated. The rep who scanned them has them: paused everywhere, the account held, a CRM task for that rep (Bryan, 2026-11-10). |
+| Reached | Sent at least one pre-event step for this event | The follow-up sequence for their audience |
+| Not reached | Everyone else kept on the list | The same follow-up sequence |
 
-Each group falls back to the general post-event template when it has none of its own. Copy for "not reached" should not assume the person came: the list is registrants, and nothing tells the desk who attended unless they were scanned. The gate still runs for everyone: a walk-up with an email nobody verified does not go in by email, a person at a company with a meeting is held by that meeting, and a no or an opt-out keeps them out.
+Reached and not reached share one follow-up per audience, so its copy assumes neither that the person came nor that they had heard from us: the list is registrants, and nothing tells the desk who attended unless they were scanned. A template written for an audience (`attendees`, `prospects`) wins over the general one; older templates written for a group or a priority are no longer matched. the list is registrants, and nothing tells the desk who attended unless they were scanned. The gate still runs for everyone: a walk-up with an email nobody verified does not go in by email, a person at a company with a meeting is held by that meeting, and a no or an opt-out keeps them out.
 
 **Who can come back.** Ending a sequence on the calendar relabels only people who were simply in it, or paused only for an out-of-office. Anyone paused for anything else keeps their own reason (a meeting, a reply, a booth conversation), so they cannot slip into the follow-up. Found by the review: before this, the event starting relabeled everyone, which would have put someone who said "interested" before the event into the wave.
 
 **How long.** A post-event template's last step comes at most 10 days after its first, checked when it is approved. Post-event sequences end 24 days after the last day, so one started on the last allowed day finishes, and at scoring at the latest. The event moving to closing at day 14 no longer cuts them short. A draft that never got a campaign in its tool ends on the same calendar.
 
-**Same rules as every sequence:** the gate at add, launch and resume, sender sizing and health, the launch checklist, the first cohort, the CRM trail. Post-event sequences are keyed by channel, group and zone (the group lives in the `priority` column), where pre-event ones are keyed by channel, priority and zone.
+**Same rules as every sequence:** the gate at add, launch and resume, sender sizing and health, the launch checklist, the first cohort, the CRM trail. Every sequence is keyed by channel, audience (in the `priority` column: `attendees` or `prospects`) and phase, with zone always `event`. Sequences made before this keep their old keys.
 
 **Not built:** a hand-off at the end of the wave (nurture is the CRM's), and telling attendees from registrants beyond badge scans.
 

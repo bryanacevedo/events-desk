@@ -9,7 +9,7 @@ import { listSummary } from "../src/server/uploads.ts";
 import { nextStep } from "../src/server/post-event.ts";
 import { approveTemplate, createDrafts } from "../src/server/sequences.ts";
 import { freshDb } from "./helpers.ts";
-import { clock, deliveredInMotion, enrollmentStates, MAYA, personAt } from "./lifecycle-harness.ts";
+import { clock, deliveredInMotion, enrollmentStates, fakeCrm, MAYA, personAt } from "./lifecycle-harness.ts";
 
 let db: Db;
 beforeEach(async () => { db = await freshDb(); });
@@ -48,20 +48,27 @@ describe("a rep's day", () => {
 });
 
 describe("after the event", () => {
-  it("a badge scan does not stop anyone: it gets the scanned follow-up, from its own template", async () => {
+  it("a badge scan hands the person to the rep who scanned them: out of every sequence, the account held, a task for the rep", async () => {
     const h = await deliveredInMotion(db, { time: clock("2027-01-05T12:00:00Z") });
     await db.query("UPDATE events SET starts_on = '2027-01-01' WHERE id = $1", [h.id]);
     const ana = await personAt(db, h.id, "Ana Ruiz");
     await captureOnsite(db, h.deps, h.id, "Rep A", { email: ana.email, source: "badge_scan" });
     expect((await db.query<{ followup_tier: string }>("SELECT followup_tier FROM contacts WHERE id = $1", [ana.id]))[0].followup_tier).toBe("scanned");
-    await approveTemplate(db, "GTM", { name: "Scanned", channel: "email", phase: "post", audience: "scanned", steps: [{ day: 0, subject: "Thanks for stopping by", body: "Hi {{first_name}}" }], external_id: h.email.newSeq("tpl_scan") });
     await createDrafts(db, h.deps, h.id, MAYA);
-    const [s] = await db.query<{ priority: string; template: string }>("SELECT s.priority, t.name AS template FROM sequences s JOIN sequence_templates t ON t.id = s.template_id JOIN enrollments n ON n.sequence_id = s.id WHERE n.contact_id = $1 AND s.channel = 'email'", [ana.id]);
-    expect(s).toEqual({ priority: "scanned", template: "Scanned" });
+    expect(await db.query("SELECT 1 FROM enrollments WHERE contact_id = $1 AND state <> 'removed' AND state <> 'paused'", [ana.id])).toHaveLength(0);
+    expect((await db.query("SELECT 1 FROM holds WHERE domain = (SELECT co.primary_domain FROM contacts k JOIN companies co ON co.id = k.company_id WHERE k.id = $1) AND cause = 'live_thread'", [ana.id])).length).toBeGreaterThan(0);
+    // Someone the desk did not hear from still gets the follow-up, by audience.
     const ben = await personAt(db, h.id, "Ben Ode");
-    const [b] = await db.query<{ template: string }>("SELECT t.name AS template FROM sequences s JOIN sequence_templates t ON t.id = s.template_id JOIN enrollments n ON n.sequence_id = s.id WHERE n.contact_id = $1 AND s.channel = 'email'", [ben.id]);
-    expect(b.template).toBe("Post email");
-    expect((await enrollmentStates(db, ana.id)).some((x) => x.state === "paused")).toBe(false);
+    const [b] = await db.query<{ priority: string; template: string }>("SELECT s.priority, t.name AS template FROM sequences s JOIN sequence_templates t ON t.id = s.template_id JOIN enrollments n ON n.sequence_id = s.id WHERE n.contact_id = $1 AND s.channel = 'email'", [ben.id]);
+    expect(b).toEqual({ priority: "attendees", template: "Post email" });
+  });
+
+  it("with a CRM, a badge scan leaves a task for the rep who scanned them", async () => {
+    const h = await deliveredInMotion(db, { crm: fakeCrm({ write: async () => {} }), time: clock("2027-01-05T12:00:00Z") });
+    const ana = await personAt(db, h.id, "Ana Ruiz");
+    await captureOnsite(db, h.deps, h.id, "Rep A", { email: ana.email, source: "badge_scan" });
+    expect((await db.query<{ payload: { subject: string; owner: string } }>("SELECT payload FROM crm_outbox WHERE desk_key LIKE 'scan:%'")).map((x) => [x.payload.owner, /Badge scanned/.test(x.payload.subject)])).toEqual([["Rep A", true]]);
+    expect((await enrollmentStates(db, ana.id)).every((x) => x.state !== "enrolled")).toBe(true);
   });
 
   it("someone met keeps their rep, and no automated follow-up", async () => {
