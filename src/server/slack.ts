@@ -24,6 +24,8 @@ export interface SlackConfig {
   channel: string;
   /** Where problems that belong to no one event go. Defaults to `channel`. */
   opsChannel?: string;
+  /** Leadership only: seat requests and seat approvals. Defaults to `channel`. Never an event channel, where everyone is. */
+  seatsChannel?: string;
   approvers: string[];
   /** Person name to Slack user ID. A cost card is confirmed by the person who uploaded the list, and in live mode the Slack user is the only proof of who that is. Required for LIVE_SPEND=1. */
   userMap?: Record<string, string>;
@@ -64,9 +66,12 @@ async function slackCall(cfg: SlackConfig, method: string, payload: unknown) {
 }
 
 /** Posts a card to the channel. When Slack refuses it or cannot be reached, the event's activity says so, because a card that never arrived has no button for anyone to press. */
-async function postCard(db: Db, cfg: SlackConfig, eventId: string, what: string, payload: unknown) {
+async function postCard(db: Db, cfg: SlackConfig, eventId: string, what: string, payload: { channel: string | null } & Record<string, unknown>) {
   let why = "";
-  try { const j = await slackCall(cfg, "chat.postMessage", payload); if (!j.ok) why = j.error ?? "unknown error"; }
+  try {
+    if (!payload.channel) why = "the event's channel could not be opened";
+    else { const j = await slackCall(cfg, "chat.postMessage", payload); if (!j.ok) why = j.error ?? "unknown error"; }
+  }
   catch (e) { why = (e as Error).message; }
   if (why) await logActivity(db.query, eventId, "Events Desk", "slack", `The Slack card for ${what} did not post (${why}). Nobody can press its button. Fix Slack, then send the card again from the event.`);
 }
@@ -90,7 +95,7 @@ export async function actorFor(db: Db, cfg: SlackConfig, approvalId: string, sla
   return who.name;
 }
 
-/** Posts one approval to the channel with its two buttons. A cost card is addressed to the uploader. */
+/** Posts one approval with its two buttons: a seat approval to the seats channel, a cost card to the event's channel addressed to the uploader. */
 export async function postApproval(db: Db, cfg: SlackConfig, approvalId: string) {
   const [a] = await db.query<{ id: string; event_id: string; kind: string; requested_by: string; name: string; seat_count: number; seat_price_cents: number; credits_cap: number | null; llm_cap: number | null; step_caps: any; lines: any; rates: any }>(
     `SELECT a.id, a.event_id, a.kind, a.requested_by, e.name, e.seat_count, e.seat_price_cents, k.credits_cap, k.llm_cap, k.step_caps, k.lines, k.rates - 'credit_cents' AS rates
@@ -102,8 +107,10 @@ export async function postApproval(db: Db, cfg: SlackConfig, approvalId: string)
   const text = a.kind === "seats"
     ? `<@${a.requested_by}> asks for seats at *${esc(a.name)}*\n${facts}`
     : `<@${(await cardRecipient(db, cfg, a.event_id)).slackId}> you uploaded the attendee list for *${esc(a.name)}*. Confirm the cost card before the paid steps run.\n${facts}`;
+  // Seats are leadership's, in their own channel. A cost card belongs with the SDRs working the event, in its channel, with the uploader invited.
+  const channel = a.kind === "seats" ? cfg.seatsChannel ?? cfg.channel : await eventChannel(db, cfg, a.event_id, [(await cardRecipient(db, cfg, a.event_id)).slackId]);
   await postCard(db, cfg, a.event_id, a.kind === "seats" ? "a seat approval" : "a cost card", {
-    channel: cfg.channel, text,
+    channel, text,
     blocks: [
       { type: "section", text: { type: "mrkdwn", text } },
       { type: "actions", elements: [
@@ -114,14 +121,14 @@ export async function postApproval(db: Db, cfg: SlackConfig, approvalId: string)
   });
 }
 
-/** One seat request to the channel: who, which event, the goal and why, with Approve and Decline. */
+/** One seat request to the seats channel, for leadership: who, which event, the goal and why, with Approve and Decline. */
 export async function postSeatRequest(db: Db, cfg: SlackConfig, requestId: string) {
   const [r] = await db.query<{ id: string; event_id: string; requester: string; name: string; team: string; role: string; goal: keyof typeof GOALS; why_event: string; why_you: string; expected_meetings: number; seat_price_cents: number }>(
     "SELECT r.id, r.event_id, r.requester, e.name, r.team, r.role, r.goal, r.why_event, r.why_you, r.expected_meetings, e.seat_price_cents FROM seat_requests r JOIN events e ON e.id = r.event_id WHERE r.id = $1", [requestId]);
   if (!r) return;
   const text = `*${esc(r.requester)}* (${esc(r.role)}, ${esc(r.team)}) asks for a seat at *${esc(r.name)}*, ${dollars(r.seat_price_cents)}\n*Goal:* ${GOALS[r.goal] ?? r.goal}, about ${r.expected_meetings} meetings\n*Why this event:* ${esc(r.why_event)}\n*Why them:* ${esc(r.why_you)}`;
   await postCard(db, cfg, r.event_id, `${r.requester}'s seat request`, {
-    channel: cfg.channel, text,
+    channel: cfg.seatsChannel ?? cfg.channel, text,
     blocks: [
       { type: "section", text: { type: "mrkdwn", text } },
       { type: "actions", elements: [
@@ -157,16 +164,33 @@ const addressed = (m: CardMessage, mention: string[]): CardMessage => !mention.l
   blocks: [{ type: "context", elements: [{ type: "mrkdwn", text: `For ${mention.map((id) => `<@${id}>`).join(", ")}` }] }, ...(m.blocks ?? [])],
 };
 
-export function slackNotifier(cfg: SlackConfig): Notifier {
-  /** Opens a public channel for the event. A name already taken gets the event's id on the end, so two events never share a channel. */
-  async function open(room: EventRoom) {
-    for (const suffix of ["", `-${room.event_id.slice(-6).toLowerCase()}`]) {
-      const j = await slackCall(cfg, "conversations.create", { name: eventChannelName(room.name, suffix), is_private: false }) as { ok: boolean; error?: string; channel?: { id: string } };
-      if (j.ok && j.channel) return j.channel.id;
-      if (j.error !== "name_taken") return null;
-    }
-    return null;
+/** Opens a public channel for the event. A name already taken gets the event's id on the end, so two events never share a channel. */
+async function openChannel(cfg: SlackConfig, room: EventRoom) {
+  for (const suffix of ["", `-${room.event_id.slice(-6).toLowerCase()}`]) {
+    const j = await slackCall(cfg, "conversations.create", { name: eventChannelName(room.name, suffix), is_private: false }) as { ok: boolean; error?: string; channel?: { id: string } };
+    if (j.ok && j.channel) return j.channel.id;
+    if (j.error !== "name_taken") return null;
   }
+  return null;
+}
+
+/** The event's channel, opened and stored the first time, with these people invited. Null when Slack would not open it. */
+export async function eventChannel(db: Db, cfg: SlackConfig, eventId: string, invite: string[] = []) {
+  const [e] = await db.query<{ name: string; slack_channel: string | null }>("SELECT name, slack_channel FROM events WHERE id = $1", [eventId]);
+  if (!e) return null;
+  let channel = e.slack_channel;
+  if (!channel) {
+    channel = await openChannel(cfg, { event_id: eventId, name: e.name, channel: null });
+    if (!channel) return null;
+    const [kept] = await db.query<{ slack_channel: string }>("UPDATE events SET slack_channel = coalesce(slack_channel, $2) WHERE id = $1 RETURNING slack_channel", [eventId, channel]);
+    channel = kept.slack_channel;
+  }
+  if (invite.length) await slackCall(cfg, "conversations.invite", { channel, users: invite.join(",") });
+  return channel;
+}
+
+export function slackNotifier(cfg: SlackConfig): Notifier {
+  const open = (room: EventRoom) => openChannel(cfg, room);
   return {
     async post(room, m, mention = []) {
       const channel = room.channel ?? await open(room);

@@ -75,8 +75,8 @@ describe("Slack routes", () => {
   let calls: { url: string; body: any }[];
   const NOW = 2_000_000_000;
   const cfg = (): SlackConfig => ({
-    signingSecret: "secret", botToken: "t", channel: "C1", approvers: ["UAPPROVER"], now: () => NOW,
-    fetch: (async (u: string, i: RequestInit) => { calls.push({ url: String(u), body: JSON.parse(i.body as string) }); return respond({ ok: true }); }) as typeof fetch,
+    signingSecret: "secret", botToken: "t", channel: "C1", seatsChannel: "CSEATS", approvers: ["UAPPROVER"], now: () => NOW,
+    fetch: (async (u: string, i: RequestInit) => { calls.push({ url: String(u), body: JSON.parse(i.body as string) }); return respond(String(u).endsWith("conversations.create") ? { ok: true, channel: { id: "CEVT" } } : { ok: true }); }) as typeof fetch,
   });
   const post = (path: string, body: string, ts = NOW, bad = false) => app.request(path, { method: "POST", body, headers: {
     "x-slack-request-timestamp": String(ts), "x-slack-signature": bad ? "v0=nope" : `v0=${createHmac("sha256", "secret").update(`v0:${ts}:${body}`).digest("hex")}`,
@@ -130,6 +130,8 @@ describe("Slack routes", () => {
     const { postSeatRequest } = await import("../src/server/slack.ts");
     const made = await requestSeat(db, "UREQUESTER", parseSeatRequest("UREQUESTER", { catalog_id: "c1", team: "Sales", role: "SDR", goal: "partners", why_event: "Partners run their pipeline through this event.", why_you: "I manage the partner accounts in the region.", expected_meetings: 5 }), { approvers: ["UAPPROVER"] });
     await postSeatRequest(db, cfg(), made.id);
+    expect(calls.at(-1)!.body.channel).toBe("CSEATS");
+    expect(calls.some((c) => c.url.includes("conversations."))).toBe(false);
     const text = String(calls.at(-1)!.body.text);
     expect(text).toMatch(/Goal:\* Partners/);
     expect(text).toMatch(/Why this event:\* Partners run their pipeline/);
@@ -164,7 +166,7 @@ describe("Slack cost cards go to the uploader, and only their Slack user can con
   const csv = "Company Name,First Name,Last Name,Job Title,Work Email\nAcme,A,B,VP Sales,a@acme.example\n";
   const cfg = (userMap: Record<string, string>): SlackConfig => ({
     signingSecret: "secret", botToken: "t", channel: "C1", approvers: ["UAPPROVER"], userMap, now: () => NOW,
-    fetch: (async (u: string, i: RequestInit) => { calls.push({ url: String(u), body: JSON.parse(i.body as string) }); return respond({ ok: true }); }) as typeof fetch,
+    fetch: (async (u: string, i: RequestInit) => { calls.push({ url: String(u), body: JSON.parse(i.body as string) }); return respond(String(u).endsWith("conversations.create") ? { ok: true, channel: { id: "CEVT" } } : { ok: true }); }) as typeof fetch,
   });
   const post = (body: string) => app.request("/slack/interactions", { method: "POST", body, headers: {
     "x-slack-request-timestamp": String(NOW), "x-slack-signature": `v0=${createHmac("sha256", "secret").update(`v0:${NOW}:${body}`).digest("hex")}`,
@@ -191,6 +193,9 @@ describe("Slack cost cards go to the uploader, and only their Slack user can con
     expect((await quote()).status).toBe(200);
     const msg = calls.find((c) => c.url.includes("chat.postMessage"))!.body;
     expect(msg.text).toContain("<@UMAYA>");
+    // It goes to the event's own channel, where the SDRs are, with the uploader invited. Not the leadership channel.
+    expect(msg.channel).toBe("CEVT");
+    expect(calls.find((c) => c.url.includes("conversations.invite"))!.body).toEqual({ channel: "CEVT", users: "UMAYA" });
     expect(JSON.stringify(msg.blocks)).toContain("Confirm");
     // An approver who did not upload, and the person who requested the seats, are refused; nothing runs.
     await click("approve", "UAPPROVER");

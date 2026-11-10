@@ -73,7 +73,7 @@ const deps: Deps = mode.liveSpend
 // Google only in live mode. Bad Google settings stop the start here, not at the first delivery.
 try { deps.sheets = sheetsFor(mode.liveSpend, env); } catch (e) { console.error((e as Error).message); process.exit(1); }
 const slack = mode.liveSpend
-  ? { signingSecret: env.SLACK_SIGNING_SECRET, botToken: env.SLACK_BOT_TOKEN, channel: env.SLACK_APPROVALS_CHANNEL, opsChannel: env.SLACK_OPS_CHANNEL || undefined, approvers: env.APPROVER_SLACK_IDS.split(",").map((s) => s.trim()), userMap: parseUserMap(env.SLACK_USER_MAP), llm: deps.llm }
+  ? { signingSecret: env.SLACK_SIGNING_SECRET, botToken: env.SLACK_BOT_TOKEN, channel: env.SLACK_APPROVALS_CHANNEL, opsChannel: env.SLACK_OPS_CHANNEL || undefined, seatsChannel: env.SLACK_SEATS_CHANNEL || undefined, approvers: env.APPROVER_SLACK_IDS.split(",").map((s) => s.trim()), userMap: parseUserMap(env.SLACK_USER_MAP), llm: deps.llm }
   : undefined;
 // A real database with spend off must never run mock vendors: that would write fake emails into real events.
 const mayRun = mode.liveSpend || !url;
