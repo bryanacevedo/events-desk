@@ -11,6 +11,7 @@ import { get, send, type Card, type CompanyRow, type EventPayload, type Page, ty
 import { Link, useActor } from "./App";
 import { Cases, openCases } from "./Cases";
 import { Motion } from "./Motion";
+import { To } from "./To";
 import { Chevron, FileButton, ShowMore, SheetButton } from "./Patterns";
 import { isGtm } from "../shared/roles";
 import { Person } from "./Person";
@@ -418,10 +419,11 @@ function Pager({ total, offset, limit, onPage }: { total: number; offset: number
 
 /** The people on the list: searched, filtered and paged on the server. A row opens the person. */
 function PeopleTable({ id, hasPriorities, reloadKey }: { id: string; hasPriorities: boolean; reloadKey: number }) {
-  const [f, setF] = useUrlState(["q", "p", "t", "s", "src", "page"], { s: "kept" });
+  const [f, setF] = useUrlState(["q", "p", "t", "s", "src", "page", "person"], { s: "kept" });
   const [typed, setTyped] = useState(f.q);
   const [page, setPage] = useState<Page<PersonRow> | null>(null);
-  const [open, setOpen] = useState<string | null>(null);
+  // A link to a person (?person=…) opens their panel on arrival.
+  const [open, setOpen] = useState<string | null>(f.person || null);
   // An opt-out from the panel changes the row under it; the list reloads once the panel closes, so the panel can first say what happened.
   const [stale, setStale] = useState(0);
   const dirty = useRef(false);
@@ -465,7 +467,7 @@ function PeopleTable({ id, hasPriorities, reloadKey }: { id: string; hasPrioriti
               <span className="pprio" aria-label={c.priority ? `Priority ${c.priority}` : undefined}>{c.priority ?? ""}</span>
               <span className={`pmail${c.drop_reason ? " orange" : c.email ? "" : " mute"}`}>{c.drop_reason ? dropWords(c.drop_reason) : c.email ?? "No email"}</span>
             </button>
-            {open === c.id && <Person c={c} onClose={close} onChange={() => { dirty.current = true; }} />}
+            {open === c.id && <Person c={c} eventId={id} onClose={close} onChange={() => { dirty.current = true; }} />}
           </li>
         ))}
       </ul>
@@ -519,7 +521,7 @@ function CompaniesTable({ id, reloadKey }: { id: string; reloadKey: number }) {
               <span className={`tdot t${r.tier ?? "u"}`} aria-hidden="true" />
               <span className="pname"><b>{r.name}</b><span className="mute">{[r.industry, r.employees ? `${num(Number(r.employees))} people` : null, r.country].filter(Boolean).join(", ") || r.primary_domain || ""}</span></span>
               <span className="pco"><span>{status(r)}</span>{r.tier_fact && <span className="mute">{r.tier_fact}</span>}</span>
-              <span className="pmail mute">{r.people === r.rows_total ? plural(r.people, "person", "people") : `${r.people} of ${r.rows_total} kept`}</span>
+              <span className="pmail mute">{r.people > 0 ? <To to={`/event/${id}?q=${encodeURIComponent(r.name)}#people`} className="u">{r.people === r.rows_total ? plural(r.people, "person", "people") : `${r.people} of ${r.rows_total} kept`}</To> : r.people === r.rows_total ? plural(r.people, "person", "people") : `${r.people} of ${r.rows_total} kept`}</span>
             </div>
           </li>
         ))}

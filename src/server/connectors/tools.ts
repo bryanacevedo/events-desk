@@ -3,6 +3,9 @@
 import type { SenderInfo } from "../../shared/sending.ts";
 import { chunks, client, sameSecret, type AddContact, type AddResult, type Connector, type Fetch, type PersonForTool, type SequenceState, type ToolEvent, type WebhookRequest } from "./types.ts";
 
+/** Instantly gives no link to one conversation in what the desk stores, so a reply opens its shared inbox, the Unibox, where the rep finds the thread. */
+const INSTANTLY_INBOX = "https://app.instantly.ai/app/unibox";
+
 interface Opts { apiKey: string; webhookSecret: string; fetch?: Fetch }
 const need = (p: PersonForTool) => p.email?.toLowerCase() ?? null;
 const daysSince = (t: unknown) => (typeof t === "string" && !Number.isNaN(Date.parse(t)) ? Math.floor((Date.now() - Date.parse(t)) / 86_400_000) : null);
@@ -18,7 +21,7 @@ function instantlyEvent(w: any): ToolEvent | null {
   const signal = ({ reply_received: "reply", email_bounced: "bounce", lead_unsubscribed: "unsubscribe", email_sent: "send" } as const)[w?.event_type as string];
   if (!signal || !w.lead_email) return null;
   const id = String(w.email_id ?? w.id ?? `${w.event_type}:${w.lead_email}:${w.timestamp}`);
-  return { provider_message_id: `${signal}:${id}`, signal, channel: "email", sequence_external_id: w.campaign_id ?? w.campaign ?? null, email: String(w.lead_email).toLowerCase(), linkedin: null, external_contact_id: null, body: w.reply_text ?? w.reply_text_snippet ?? null, at: w.timestamp ?? new Date().toISOString(), sender: w.email_account ?? null, step: typeof w.step === "number" ? w.step : null, hard: w.bounce_type ? w.bounce_type === "hard" : undefined };
+  return { provider_message_id: `${signal}:${id}`, signal, channel: "email", sequence_external_id: w.campaign_id ?? w.campaign ?? null, email: String(w.lead_email).toLowerCase(), linkedin: null, external_contact_id: null, body: w.reply_text ?? w.reply_text_snippet ?? null, at: w.timestamp ?? new Date().toISOString(), thread_url: INSTANTLY_INBOX, sender: w.email_account ?? null, step: typeof w.step === "number" ? w.step : null, hard: w.bounce_type ? w.bounce_type === "hard" : undefined };
 }
 
 export function instantly(o: Opts): Connector {
@@ -83,7 +86,7 @@ export function instantly(o: Opts): Connector {
       for (const campaign_id of sequenceIds) {
         const j = await api("GET", "/emails", { query: { campaign_id, email_type: "received", min_timestamp_created: since, limit: 100 } });
         if (!Array.isArray(j.items)) throw new Error("Instantly's answer had no list in it.");
-        for (const m of j.items) out.push({ provider_message_id: `reply:${m.id}`, signal: "reply", channel: "email", sequence_external_id: campaign_id, email: String(m.lead ?? m.from_address_email).toLowerCase(), linkedin: null, external_contact_id: null, body: m.body?.text ?? m.content_preview ?? null, at: m.timestamp_email ?? m.timestamp_created });
+        for (const m of j.items) out.push({ provider_message_id: `reply:${m.id}`, signal: "reply", channel: "email", sequence_external_id: campaign_id, email: String(m.lead ?? m.from_address_email).toLowerCase(), linkedin: null, external_contact_id: null, body: m.body?.text ?? m.content_preview ?? null, at: m.timestamp_email ?? m.timestamp_created, thread_url: INSTANTLY_INBOX });
       }
       return out;
     },
@@ -151,7 +154,7 @@ export function heyreach(o: Opts): Connector {
       const theirs = (Array.isArray(b.recent_messages) ? b.recent_messages : []).filter((m: any) => m?.is_reply === true);
       const last = theirs.at(-1);
       const at = last?.timestamp ?? b.timestamp ?? new Date().toISOString();
-      return [{ provider_message_id: `reply:${b.conversation_id}:${last?.timestamp ?? theirs.length}`, signal: "reply", channel: "linkedin", sequence_external_id: b.campaign?.id ? String(b.campaign.id) : null, email: b.lead.custom_email ? String(b.lead.custom_email).toLowerCase() : null, linkedin: b.lead.profile_url, external_contact_id: b.lead.profile_url, body: last?.message ?? null, at }];
+      return [{ provider_message_id: `reply:${b.conversation_id}:${last?.timestamp ?? theirs.length}`, signal: "reply", channel: "linkedin", sequence_external_id: b.campaign?.id ? String(b.campaign.id) : null, email: b.lead.custom_email ? String(b.lead.custom_email).toLowerCase() : null, linkedin: b.lead.profile_url, external_contact_id: b.lead.profile_url, body: last?.message ?? null, at, thread_url: b.campaign?.id && b.conversation_id ? `https://app.heyreach.io/app/inbox/${b.campaign.id}/${b.conversation_id}` : "https://app.heyreach.io/app/inbox" }];
     },
   };
 }
@@ -164,7 +167,7 @@ function smartleadEvent(b: any): ToolEvent | null {
   const signal = ({ EMAIL_REPLY: "reply", EMAIL_BOUNCE: "bounce", LEAD_UNSUBSCRIBED: "unsubscribe", EMAIL_SENT: "send" } as const)[b?.event_type as string];
   const email = b?.to_email ?? b?.sl_email_lead_email ?? b?.lead_email;
   if (!signal || !email) return null;
-  return { provider_message_id: `${signal}:${b.stats_id ?? b.message_id ?? `${email}:${b.time_replied ?? b.event_timestamp}`}`, signal, channel: "email", sequence_external_id: b.campaign_id ? String(b.campaign_id) : null, email: String(email).toLowerCase(), linkedin: null, external_contact_id: b.sl_email_lead_id ? String(b.sl_email_lead_id) : null, body: b.reply_message?.text ?? b.reply_body ?? null, at: b.time_replied ?? b.event_timestamp ?? new Date().toISOString() };
+  return { provider_message_id: `${signal}:${b.stats_id ?? b.message_id ?? `${email}:${b.time_replied ?? b.event_timestamp}`}`, signal, channel: "email", sequence_external_id: b.campaign_id ? String(b.campaign_id) : null, email: String(email).toLowerCase(), linkedin: null, external_contact_id: b.sl_email_lead_id ? String(b.sl_email_lead_id) : null, body: b.reply_message?.text ?? b.reply_body ?? null, at: b.time_replied ?? b.event_timestamp ?? new Date().toISOString(), thread_url: "https://app.smartlead.ai/app/master-inbox" };
 }
 
 export function smartlead(o: Opts): Connector {

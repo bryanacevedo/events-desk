@@ -9,6 +9,7 @@ import { send, type PersonRow } from "./api";
 import { ConfirmDialog } from "./Patterns";
 import { dropWords } from "./words";
 import { gateWords } from "../shared/gate-words";
+import { companyHref, To } from "./To";
 
 const GRID: Record<1 | 2 | 3, Record<1 | 2 | 3, "A" | "B" | "C">> = { 1: { 1: "A", 2: "B", 3: "C" }, 2: { 1: "B", 2: "C", 3: "C" }, 3: { 1: "C", 2: "C", 3: "C" } };
 
@@ -82,7 +83,7 @@ function outreachWords(c: PersonRow): string {
   return `Out of outreach: ${o.cause ? gateWords(o.cause) : "removed"}`;
 }
 
-export function Person({ c, onClose, onChange }: { c: PersonRow; onClose: () => void; onChange?: () => void }) {
+export function Person({ c, eventId, onClose, onChange }: { c: PersonRow; eventId?: string; onClose: () => void; onChange?: () => void }) {
   const [optedOut, setOptedOut] = useState(false);
   const notes = c.flags.filter((f) => f !== "not_reviewed");
   const canOptOut = !c.drop_reason && !optedOut && Boolean(c.email || (c.full_name && c.company));
@@ -91,7 +92,7 @@ export function Person({ c, onClose, onChange }: { c: PersonRow; onClose: () => 
     <article className="panel" aria-label={c.full_name ?? "Person"} data-person={c.id}>
       <div className="col">
         <h2>{c.full_name ?? "No name on the row"}</h2>
-        <p style={{ fontSize: 16 }}>{[c.title, c.company].filter(Boolean).join(", ") || "No title or company"}</p>
+        <p style={{ fontSize: 16 }}>{c.title ?? "No title"}{c.company ? <>, <To to={eventId ? companyHref(eventId, c.company) : null} className="u">{c.company}</To></> : ""}</p>
         <p className="mute">{c.source === "prospect" ? "Found at the company, not on the attendee list." : "On the attendee list."}{c.employer && c.employer !== c.company ? ` Vendor says ${c.employer}.` : ""}</p>
         {c.linkedin && <a className="mute u wrap-any" href={c.linkedin} target="_blank" rel="noopener noreferrer">{c.linkedin.replace(/^https?:\/\/(www\.)?/, "")}</a>}
         <div className="actions panel-acts">

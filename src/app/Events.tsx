@@ -14,7 +14,7 @@ import { RequestSeats } from "./RequestForm";
 import { SideSheet } from "./SideSheet";
 import { holderWords, stepAt, type Needs } from "./waiting";
 import { city, countdown, daysTo, firstName, isRunning, plural, shortDate, todayYmd } from "./words";
-import { deliveredWords } from "./stages";
+import { afterStep, deliveredWords } from "./stages";
 
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const noon = (s: string) => new Date(`${s.slice(0, 10)}T12:00:00`);
@@ -28,7 +28,8 @@ const REGIONS: [string, string, string[]][] = [
 const regionOf = (country: string) => REGIONS.find((r) => r[2].includes(country))?.[0] ?? "other";
 const TIMES = { coming: "Coming", past: "Past", all: "All" } as const;
 type TimeKey = keyof typeof TIMES;
-const STATES = { wait: "Needs someone", run: "Running", ready: "Delivered", ended: "Ended", listed: "Not requested" } as const;
+/** The states an event can be in, in the order of its life: the same steps as its header. */
+const STATES = { wait: "Needs someone", run: "Building the list", ready: "List ready", market: "In outreach", followup: "Following up", closed: "Closed", ended: "Declined", listed: "Not requested" } as const;
 type StateKey = keyof typeof STATES;
 /** Far dates are compressed: a day near today takes more room than a day next spring. */
 const POW = 0.6;
@@ -42,16 +43,20 @@ function stateOf(r: Row, today: string, needs: Needs): State {
   if (!e) return { key: "listed", words: "Not requested", who: null, tone: "none" };
   const past = r.ends_on < today;
   const owner = firstName(e.uploaded_by ?? e.requested_by);
-  if (isRunning(e.stage)) return { key: "run", words: "Running", who: null, tone: "run" };
+  if (isRunning(e.stage)) return { key: "run", words: "Building the list", who: null, tone: "run" };
   switch (e.stage) {
     case "requested": { const n = needs.requests.filter((q) => q.event_id === e.id && q.status === "pending").length; return { key: "wait", words: n > 1 ? `${n} seats waiting` : "Seat waiting", who: holderWords(needs.approvers), tone: "wait" }; }
     case "approved": return { key: "wait", words: "No attendee list", who: owner, tone: "wait" };
     case "mapped": case "quoted": return { key: "wait", words: "Ready to run", who: owner, tone: "wait" };
     case "ready_for_review": { const n = needs.items.find((i) => i.kind === "case" && i.eventId === e.id)?.caseCount; return { key: "wait", words: n ? `${plural(n, "case")} to settle` : "Cases to settle", who: null, tone: "wait" }; }
     case "paused": return { key: "wait", words: "Paused", who: null, tone: "wait" };
-    case "delivered": { const w = deliveredWords(e); return { key: w.waiting ? "wait" : "ready", words: w.words, who: w.waiting ? owner : null, tone: w.waiting ? "wait" : "ok" }; }
-    case "declined": return { key: "ended", words: "Ended", who: null, tone: "off" };
-    default: return { key: "run", words: "Running", who: null, tone: "run" };
+    case "delivered": {
+      const w = deliveredWords(e), step = afterStep(e).key;
+      const key: StateKey = w.waiting ? "wait" : step === "none" ? "ready" : step === "follow_up" ? "followup" : step === "closing" || step === "scored" ? "closed" : "market";
+      return { key, words: w.words, who: w.waiting ? owner : null, tone: w.waiting ? "wait" : "ok" };
+    }
+    case "declined": return { key: "ended", words: "Declined", who: null, tone: "off" };
+    default: return { key: "run", words: "Building the list", who: null, tone: "run" };
   }
 }
 

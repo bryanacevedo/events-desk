@@ -45,8 +45,8 @@ export async function ingestEvents(db: Db, deps: LifecycleDeps, connector: Conne
     await db.tx(async (q) => {
       const eventId = c ? (await creditedEvent(q, { contact_id: c.contact_id, person_id: c.person_id, domain: c.domain })) ?? c.event_id : null;
       const id = newId("inb");
-      const ins = await q(`INSERT INTO inbound_messages (id, connector, provider_message_id, event_id, contact_id, channel, signal, body, received_at, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) ON CONFLICT (connector, provider_message_id) DO NOTHING RETURNING id`,
-        [id, connector.name, e.provider_message_id, eventId, c?.contact_id ?? null, e.channel, e.signal, e.body ? e.body.slice(0, BODY_MAX) : null, e.at, c ? "received" : "unmatched"]);
+      const ins = await q(`INSERT INTO inbound_messages (id, connector, provider_message_id, event_id, contact_id, channel, signal, body, received_at, status, thread_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) ON CONFLICT (connector, provider_message_id) DO NOTHING RETURNING id`,
+        [id, connector.name, e.provider_message_id, eventId, c?.contact_id ?? null, e.channel, e.signal, e.body ? e.body.slice(0, BODY_MAX) : null, e.at, c ? "received" : "unmatched", e.thread_url ?? null]);
       if (!ins.length) { out.duplicates++; return; }
       out.new++;
       if (!c) {

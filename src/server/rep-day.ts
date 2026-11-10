@@ -59,10 +59,10 @@ export async function prepBrief(db: Db, meetingId: string): Promise<Brief | null
 export async function repDay(db: Db, deps: LifecycleDeps, rep: string) {
   const now = nowOf(deps);
   const [replies, meetings, captures, slots] = await Promise.all([
-    db.query(`SELECT m.id, m.event_id, e.name AS event, k.id AS contact_id, k.full_name, co.name AS company, m.code, m.body, m.respond_by::text AS respond_by, (SELECT c.website FROM catalog_events c WHERE c.id = e.catalog_id) AS website, (SELECT c.brand_color FROM catalog_events c WHERE c.id = e.catalog_id) AS brand_color
+    db.query(`SELECT m.id, m.event_id, e.name AS event, k.id AS contact_id, k.full_name, co.name AS company, m.code, m.body, m.respond_by::text AS respond_by, m.connector, m.thread_url, (SELECT c.website FROM catalog_events c WHERE c.id = e.catalog_id) AS website, (SELECT c.brand_color FROM catalog_events c WHERE c.id = e.catalog_id) AS brand_color
               FROM inbound_messages m JOIN contacts k ON k.id = m.contact_id JOIN companies co ON co.id = k.company_id JOIN events e ON e.id = m.event_id
               WHERE m.owner = $1 AND m.handled_at IS NULL AND m.respond_by IS NOT NULL ORDER BY m.respond_by`, [rep]),
-    db.query<{ id: string }>(`SELECT m.id, m.event_id, e.name AS event, m.status, m.scheduled_at::text AS scheduled_at, m.timezone, k.full_name, co.name AS company, s.location, (SELECT c.website FROM catalog_events c WHERE c.id = e.catalog_id) AS website, (SELECT c.brand_color FROM catalog_events c WHERE c.id = e.catalog_id) AS brand_color
+    db.query<{ id: string }>(`SELECT m.id, m.event_id, k.id AS contact_id, e.name AS event, m.status, m.scheduled_at::text AS scheduled_at, m.timezone, k.full_name, co.name AS company, s.location, (SELECT c.website FROM catalog_events c WHERE c.id = e.catalog_id) AS website, (SELECT c.brand_color FROM catalog_events c WHERE c.id = e.catalog_id) AS brand_color
               FROM meetings m JOIN contacts k ON k.id = m.contact_id JOIN companies co ON co.id = k.company_id JOIN events e ON e.id = m.event_id LEFT JOIN meeting_slots s ON s.meeting_id = m.id
               WHERE m.rep = $1 AND m.status IN ('booked', 'rescheduled') AND m.scheduled_at > $2::timestamptz - interval '1 day' ORDER BY m.scheduled_at LIMIT 50`, [rep, now.toISOString()]),
     db.query(`SELECT c.id, c.event_id, c.full_name, c.company, c.note, c.temperature, c.captured_at::text AS captured_at FROM onsite_captures c WHERE c.rep = $1 ORDER BY c.captured_at DESC LIMIT 20`, [rep]),

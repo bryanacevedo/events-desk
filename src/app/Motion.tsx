@@ -6,23 +6,25 @@ import { useActor } from "./App";
 import { Chevron, ExpandRow } from "./Patterns";
 import { Icon } from "./icons";
 import { PersonAvatar } from "./PersonAvatar";
+import { companyHref, personHref, To } from "./To";
 import { money, num, plural, shortDate } from "./words";
 import { isGtm } from "../shared/roles";
 
 interface Sender { address: string; role: "primary" | "spare"; daily_share: number; health: number | null }
 interface Sequence { id: string; name: string; channel: "email" | "linkedin"; priority: string; phase?: "pre" | "post"; zone_group?: string; adding?: number; connector: string; state: string; pause_reason: string | null; senders_needed: number | null; peak_daily: number | null; sender_status: "ok" | "short" | "not_visible" | null; sender_excluded: { address: string; reason: string }[]; enrolled: number; paused: number; senders: Sender[]; timing_note: string | null; external_id: string | null; checklist_at: string | null }
-interface Reply { id: string; code: string | null; doubtful: boolean; body: string | null; contact_id: string | null; full_name: string | null; company: string | null }
+interface Reply { id: string; connector?: string; thread_url?: string | null; code: string | null; doubtful: boolean; body: string | null; contact_id: string | null; full_name: string | null; company: string | null }
 interface Meeting { id: string; contact_id?: string; status: string; scheduled_at: string; rep: string | null; full_name: string | null; company: string | null }
 interface Score { held_all: number; logged_outside: number; cost: { dollars_cents: number }; cost_per_held_cents: number | null; influence: { available: boolean; sourced: { n: number; cents: number }; influenced: { n: number; cents: number }; won: { n: number; cents: number } }; control: { available: boolean; met_accounts: number; met_with_pipeline: number; control_accounts: number; control_with_pipeline: number }; roi: { pipeline_per_dollar: number | null; cost_missing: string[] } }
 interface Overview {
   motion: string; capacity: { needed: number; healthy: number } | null;
   card: { status: string; llm_cap: number; est_cents: number } | null;
   sequences: Sequence[]; funnel: { kept: number; enrolled: number; sent: number; replied: number; booked: number; held: number } | null; owners: { status: string; n: number }[]; replies: Reply[]; meetings: Meeting[];
-  captures: { id: string; full_name: string | null; company: string | null; rep: string; temperature?: string }[]; regions: { region: string; people: number; basis: string | null }[]; live_score: Score | null;
+  captures: { id: string; contact_id?: string | null; full_name: string | null; company: string | null; rep: string; temperature?: string }[]; regions: { region: string; people: number; basis: string | null }[]; live_score: Score | null;
   post_event: { window: "before" | "during" | "after" | "closed"; last_day: string; last_press: string | null; started_at: string | null; started_by: string | null; groups: Record<string, number> } | null;
 }
 type Act = (m: "POST", p: string, b?: unknown, say?: string) => void;
 
+const TOOL_NAME: Record<string, string> = { instantly: "Instantly", heyreach: "HeyReach", smartlead: "Smartlead", apollo: "Apollo" };
 const CODE: Record<string, string> = { interested: "interested", meeting_request: "wants a meeting", referral: "pointed us to someone" };
 const REASON: Record<string, string> = { not_connected: "Not connected", health_unknown: "Health not reported", low_health: "Health too low", still_warming: "Still warming up", high_bounce: "Bounces too high", high_spam: "Spam too high", fully_booked: "Used by other sequences", domain_full: "Domain has enough", no_auth: "Domain not set up to send", failed_placement: "Landing in spam", stale_placement: "Not tested lately", not_tested: "Not tested", warmup_off: "Warmup off", burned: "Domain resting", primary_domain: "Company's own domain", no_consent: "Rep has not agreed" };
 const when = (iso: string) => new Date(iso).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "UTC" });
@@ -30,11 +32,16 @@ const FOLLOW_UP = [["scanned", "Scanned at the booth"], ["reached", "Reached bef
 /** Meeting and slot times in the reader's own clock. */
 const shortWhen = (iso: string) => new Date(iso).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 const clockOf = (iso: string) => new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+/** Opens one of the page's folds by its title and brings it into view: a figure that names a fold leads to it. */
+const openFold = (title: string) => {
+  const d = [...document.querySelectorAll<HTMLDetailsElement>("section.motion details.fold")].find((x) => x.querySelector(".fold-t")?.textContent === title);
+  if (d) { d.open = true; d.scrollIntoView({ behavior: "smooth", block: "start" }); }
+};
 const STATE: Record<string, string> = { active: "Live", paused: "Paused", archived: "Ended", draft: "Draft" };
 
 /** The brief's row: what it is, a thin bar for how much, the number. */
-function Row({ label, n, of, tone = "t1", shown }: { label: string; n: number; of: number; tone?: string; shown?: string }) {
-  return <li className="brow"><span>{label}</span><i aria-hidden="true"><u className={tone} style={{ width: `${of > 0 ? Math.min(100, (100 * n) / of) : 0}%` }} /></i><b>{shown ?? num(n)}</b></li>;
+function Row({ label, n, of, tone = "t1", shown, onOpen }: { label: string; n: number; of: number; tone?: string; shown?: string; onOpen?: () => void }) {
+  return <li className={`brow${onOpen ? " opens" : ""}`} onClick={onOpen} role={onOpen ? "button" : undefined} tabIndex={onOpen ? 0 : undefined} onKeyDown={onOpen ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(); } } : undefined}><span>{label}</span><i aria-hidden="true"><u className={tone} style={{ width: `${of > 0 ? Math.min(100, (100 * n) / of) : 0}%` }} /></i><b>{shown ?? num(n)}</b></li>;
 }
 
 function Fold({ icon, title, peek, children }: { icon: React.ReactNode; title: string; peek?: React.ReactNode; children: React.ReactNode }) {
@@ -197,11 +204,11 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
           <div>
             <h3>People<span>{num(f.kept)}</span></h3>
             <ul>
-              <Row label="In sequences" n={f.enrolled} of={f.kept} />
+              <Row label="In sequences" n={f.enrolled} of={f.kept} onOpen={() => openFold("Sequences")} />
               <Row label="Reached" n={f.sent} of={f.kept} />
-              <Row label="Replied" n={f.replied} of={f.kept} />
-              <Row label="Meetings booked" n={o.meetings.filter((m) => ["booked", "rescheduled", "held", "no_show"].includes(m.status)).length} of={f.kept} />
-              <Row label="Meetings held" n={s?.held_all ?? f.held} of={f.kept} />
+              <Row label="Replied" n={f.replied} of={f.kept} onOpen={hot.length ? () => document.querySelector(".m-replies")?.scrollIntoView({ behavior: "smooth", block: "start" }) : undefined} />
+              <Row label="Meetings booked" onOpen={() => openFold("Meetings")} n={o.meetings.filter((m) => ["booked", "rescheduled", "held", "no_show"].includes(m.status)).length} of={f.kept} />
+              <Row label="Meetings held" n={s?.held_all ?? f.held} of={f.kept} onOpen={() => openFold("Meetings")} />
               {mine > 0 && <Row label="Kept by account owners" n={mine} of={f.kept} tone="t3" />}
             </ul>
           </div>
@@ -233,7 +240,7 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
       {doubtful > 0 && <p className="m-line"><span className="fig over"><b>{doubtful}</b> {doubtful === 1 ? "reply" : "replies"} to read</span> in the cases above</p>}
 
       {hot.length > 0 && (
-        <div className="m-group">
+        <div className="m-group m-replies">
           <h3>Waiting on a rep<span className="mute"> · {hot.length}</span></h3>
           {/* The same shape as My day: the newest four as cards with a face and their words, the rest one line each. */}
           <div className="md-cards">{hot.slice(0, 4).map((r) => {
@@ -241,11 +248,12 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
             return (
               <article key={r.id} className={`md-card${r.code === "meeting_request" ? " urgent" : ""}`}>
                 <header>
-                  <PersonAvatar name={r.full_name ?? "Someone"} size={40} />
-                  <div><b>{r.full_name ?? "Someone"}</b><span>{r.company} · {CODE[r.code ?? ""] ?? "replied"}</span></div>
+                  <To to={r.contact_id ? personHref(id, r.contact_id, r.full_name) : null} label={`Open ${r.full_name ?? "this person"}`}><PersonAvatar name={r.full_name ?? "Someone"} size={40} /></To>
+                  <div><To to={r.contact_id ? personHref(id, r.contact_id, r.full_name) : null}><b>{r.full_name ?? "Someone"}</b></To><span><To to={r.company ? companyHref(id, r.company) : null}>{r.company}</To> · {CODE[r.code ?? ""] ?? "replied"}</span></div>
                 </header>
                 {r.body && <blockquote>{r.body}</blockquote>}
                 <footer>
+                  {r.thread_url && <a className="btn small line" href={r.thread_url} target="_blank" rel="noopener noreferrer">Open in {TOOL_NAME[r.connector ?? ""] ?? "the tool"}</a>}
                   {r.contact_id && booked.has(r.contact_id) ? <span className="md-by"><i aria-hidden="true" />Meeting booked</span>
                     : bookable ? (
                       <form className="m-act" onSubmit={(e) => { e.preventDefault(); const sel = (e.currentTarget.elements.namedItem("slot") as HTMLSelectElement).value; act("POST", `/api/motion/slots/${sel}/book`, { contact_id: r.contact_id }, "Booked."); }}>
@@ -263,10 +271,10 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
               <ul>{hot.slice(4, 40).map((r) => (
                 <li key={r.id}>
                   <PersonAvatar name={r.full_name ?? "Someone"} size={30} />
-                  <span className="md-rest-who"><b>{r.full_name ?? "Someone"}</b><span>{r.company}</span></span>
+                  <span className="md-rest-who"><To to={r.contact_id ? personHref(id, r.contact_id, r.full_name) : null}><b>{r.full_name ?? "Someone"}</b></To><span><To to={r.company ? companyHref(id, r.company) : null}>{r.company}</To></span></span>
                   <q>{r.body ?? (CODE[r.code ?? ""] ?? "replied")}</q>
                   <span className="md-by"><i aria-hidden="true" />{CODE[r.code ?? ""] ?? "replied"}</span>
-                  <span />
+                  {r.thread_url ? <a className="btn small line" href={r.thread_url} target="_blank" rel="noopener noreferrer" aria-label={`Open in ${TOOL_NAME[r.connector ?? ""] ?? "the tool"}`}>Open</a> : <span />}
                 </li>
               ))}</ul>
             </div>
@@ -304,7 +312,7 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
                     <ul>{rows.slice(0, 20).map((m) => (
                       <li key={m.id}>
                         <PersonAvatar name={m.full_name ?? "Someone"} size={30} />
-                        <span className="mt-who"><b>{m.full_name ?? "Someone"}</b><span>{m.company}{m.rep ? ` · with ${m.rep.split(" ")[0]}` : ""}</span></span>
+                        <span className="mt-who"><To to={m.contact_id ? personHref(id, m.contact_id, m.full_name) : null}><b>{m.full_name ?? "Someone"}</b></To><span><To to={m.company ? companyHref(id, m.company) : null}>{m.company}</To>{m.rep ? ` · with ${m.rep.split(" ")[0]}` : ""}</span></span>
                         <span className="mt-when">{shortWhen(m.scheduled_at)}{m.status === "no_show" ? " · no-show" : m.status === "cancelled" ? " · cancelled" : ""}</span>
                       </li>
                     ))}</ul>
@@ -344,7 +352,7 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
             {o.captures.length > 0 && <ul className="mc-list">{o.captures.slice(0, 24).map((c) => (
               <li key={c.id} className={c.temperature === "hot" ? "hot" : undefined}>
                 <PersonAvatar name={c.full_name ?? "Someone"} size={30} />
-                <span className="mt-who"><b>{c.full_name ?? "Someone"}</b><span>{c.company ?? "Company not given"}</span></span>
+                <span className="mt-who"><To to={c.contact_id ? personHref(id, c.contact_id, c.full_name) : null}><b>{c.full_name ?? "Someone"}</b></To><span>{c.company ? <To to={companyHref(id, c.company)}>{c.company}</To> : "Company not given"}</span></span>
                 <span className="mc-rep">{c.temperature === "hot" && <i aria-hidden="true" />}{c.temperature === "hot" ? "Hot · " : ""}met by {c.rep.split(" ")[0]}</span>
               </li>
             ))}</ul>}

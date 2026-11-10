@@ -33,7 +33,7 @@ export interface PersonForTool { ref: string; email: string | null; linkedin: st
 export interface AddContact extends PersonForTool { external_id: string }
 export interface AddResult { ref: string; ok: boolean; external_id?: string; reason?: string; retry_after_minutes?: number }
 export type EventSignal = "send" | "reply" | "bounce" | "unsubscribe";
-export interface ToolEvent { sender?: string | null; step?: number | null; hard?: boolean; provider_message_id: string; signal: EventSignal; channel: Channel; sequence_external_id: string | null; email: string | null; linkedin: string | null; external_contact_id: string | null; body: string | null; at: string }
+export interface ToolEvent { /** Where the rep answers it: the conversation in the tool's inbox. */ thread_url?: string | null; sender?: string | null; step?: number | null; hard?: boolean; provider_message_id: string; signal: EventSignal; channel: Channel; sequence_external_id: string | null; email: string | null; linkedin: string | null; external_contact_id: string | null; body: string | null; at: string }
 export interface WebhookRequest { headers: Record<string, string | undefined>; query: Record<string, string | undefined>; body: unknown }
 
 export interface Connector {

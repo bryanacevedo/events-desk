@@ -31,7 +31,7 @@ export async function motionOverview(db: Db, deps: LifecycleDeps, id: string) {
   const [e] = await db.query<{ motion: keyof typeof MOTION_LABEL; tools: Record<string, string>; stage: string; verify_once: boolean; write_leads: boolean; outreach_started_by: string | null }>("SELECT motion, tools, stage, verify_once, write_leads, outreach_started_by FROM events WHERE id = $1", [id]);
   if (!e) return null;
   const [captures, unplaced, sequences, funnel, owners, replies, meetings, scorecards, debriefs, card, bases, cases] = await Promise.all([
-    db.query("SELECT id, full_name, email, company, title, note, temperature, rep, source, captured_at::text AS captured_at FROM onsite_captures WHERE event_id = $1 ORDER BY captured_at DESC LIMIT 100", [id]),
+    db.query("SELECT id, contact_id, full_name, email, company, title, note, temperature, rep, source, captured_at::text AS captured_at FROM onsite_captures WHERE event_id = $1 ORDER BY captured_at DESC LIMIT 100", [id]),
     db.query("SELECT id, connector, channel, body, received_at::text AS received_at FROM inbound_messages WHERE status = 'unmatched' ORDER BY received_at DESC LIMIT 20"),
     db.query(`SELECT s.id, s.name, s.channel, s.priority, s.phase, s.zone_group, s.connector, s.state, s.launched_at::text AS launched_at, s.pause_reason, s.senders_needed, s.peak_daily, s.sender_status, s.sender_excluded, s.timing_note, s.external_id, s.checklist_at::text AS checklist_at,
                 (SELECT count(*)::int FROM enrollments n WHERE n.sequence_id = s.id AND n.state = 'enrolled') AS enrolled,
@@ -42,7 +42,7 @@ export async function motionOverview(db: Db, deps: LifecycleDeps, id: string) {
               FROM sequences s WHERE s.event_id = $1 ORDER BY s.channel, s.priority`, [id]),
     db.query("SELECT * FROM event_funnel WHERE event_id = $1", [id]),
     db.query<{ status: string; n: number }>("SELECT status, count(*)::int AS n FROM owner_decisions WHERE event_id = $1 GROUP BY status", [id]),
-    db.query(`SELECT m.id, m.channel, m.signal, m.code, m.doubtful, m.status, m.received_at::text AS received_at, m.body, k.id AS contact_id, k.full_name, co.name AS company FROM inbound_messages m LEFT JOIN contacts k ON k.id = m.contact_id LEFT JOIN companies co ON co.id = k.company_id WHERE m.event_id = $1 ORDER BY m.received_at DESC LIMIT 50`, [id]),
+    db.query(`SELECT m.id, m.channel, m.connector, m.thread_url, m.signal, m.code, m.doubtful, m.status, m.received_at::text AS received_at, m.body, k.id AS contact_id, k.full_name, co.name AS company FROM inbound_messages m LEFT JOIN contacts k ON k.id = m.contact_id LEFT JOIN companies co ON co.id = k.company_id WHERE m.event_id = $1 ORDER BY m.received_at DESC LIMIT 50`, [id]),
     db.query(`SELECT m.id, m.contact_id, m.status, m.scheduled_at::text AS scheduled_at, m.timezone, m.rep, m.source, m.enrolled, k.full_name, co.name AS company FROM meetings m LEFT JOIN contacts k ON k.id = m.contact_id LEFT JOIN companies co ON co.id = k.company_id WHERE m.event_id = $1 ORDER BY m.scheduled_at`, [id]),
     db.query("SELECT window_days, metrics, created_at::text AS created_at FROM scorecards WHERE event_id = $1 ORDER BY window_days", [id]),
     db.query(`SELECT d.id, d.author, d.status, d.body, d.answered_at::text AS answered_at, coalesce((SELECT json_agg(json_build_object('theme', f.theme, 'fact', f.fact, 'quote', f.quote, 'account', f.account)) FROM debrief_facts f WHERE f.debrief_id = d.id AND d.status = 'accepted'), '[]') AS facts FROM debriefs d WHERE d.event_id = $1`, [id]),

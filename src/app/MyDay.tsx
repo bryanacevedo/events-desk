@@ -9,12 +9,13 @@ import { EventLogo } from "./EventLogo";
 import { Icon } from "./icons";
 import { Chevron } from "./Patterns";
 import { PersonAvatar } from "./PersonAvatar";
+import { companyHref, eventHref, personHref, To } from "./To";
 import { plural } from "./words";
 
 interface Brief { person: string; title: string | null; company: string; tier: number | null; why: string | null; industry: string | null; employees: string | null; owner: string | null; deal: string | null; said: string | null; met_note: string | null }
 interface Day {
-  replies: { id: string; event: string; website: string | null; brand_color: string | null; full_name: string | null; company: string; code: string | null; body: string | null; respond_by: string }[];
-  meetings: { id: string; event: string; website: string | null; brand_color: string | null; scheduled_at: string; full_name: string | null; company: string; location: string | null; brief: Brief | null }[];
+  replies: { id: string; event_id: string; contact_id: string; connector?: string; thread_url?: string | null; event: string; website: string | null; brand_color: string | null; full_name: string | null; company: string; code: string | null; body: string | null; respond_by: string }[];
+  meetings: { id: string; event_id: string; contact_id: string; event: string; website: string | null; brand_color: string | null; scheduled_at: string; full_name: string | null; company: string; location: string | null; brief: Brief | null }[];
   captures: { id: string; full_name: string | null; company: string | null; note: string; temperature: string }[];
   slots: { id: string; event: string; starts_at: string; location: string }[];
 }
@@ -32,6 +33,7 @@ function answerBy(iso: string): { text: string; urgent: boolean } {
 }
 /** The most urgent replies get a card; the rest are one line each, so thirteen replies still read at a glance. */
 const CARDS = 4;
+const TOOL_NAME: Record<string, string> = { instantly: "Instantly", heyreach: "HeyReach", smartlead: "Smartlead", apollo: "Apollo" };
 const CODE: Record<string, string> = { interested: "is interested", meeting_request: "wants a meeting", referral: "pointed us to someone" };
 const greeting = () => { const h = new Date().getHours(); return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening"; };
 
@@ -65,14 +67,17 @@ export function MyDay() {
             return (
               <article key={r.id} className={`md-card${by.urgent ? " urgent" : ""}`} style={{ "--brand": r.brand_color ?? "#1F5D3F" } as CSSProperties}>
                 <header>
-                  <PersonAvatar name={r.full_name ?? "Someone"} size={40} />
-                  <div><b>{r.full_name ?? "Someone"}</b><span>{r.company} · {CODE[r.code ?? ""] ?? "replied"}</span></div>
-                  <EventLogo name={r.event} website={r.website} size={28} />
+                  <To to={personHref(r.event_id, r.contact_id, r.full_name)} label={`Open ${r.full_name ?? "this person"}`}><PersonAvatar name={r.full_name ?? "Someone"} size={40} /></To>
+                  <div><To to={personHref(r.event_id, r.contact_id, r.full_name)}><b>{r.full_name ?? "Someone"}</b></To><span><To to={companyHref(r.event_id, r.company)}>{r.company}</To> · {CODE[r.code ?? ""] ?? "replied"}</span></div>
+                  <To to={eventHref(r.event_id, "outreach")} label={`Open ${r.event}`}><EventLogo name={r.event} website={r.website} size={28} /></To>
                 </header>
                 {r.body && <blockquote>{r.body}</blockquote>}
                 <footer>
                   <span className="md-by"><i aria-hidden="true" />{by.text}</span>
-                  <button className="btn small" disabled={busy} onClick={() => handled(r.id)}>Answered</button>
+                  <span className="md-acts">
+                    {r.thread_url && <a className="btn small line" href={r.thread_url} target="_blank" rel="noopener noreferrer">Open in {TOOL_NAME[r.connector ?? ""] ?? "the tool"}</a>}
+                    <button className="btn small" disabled={busy} onClick={() => handled(r.id)}>Answered</button>
+                  </span>
                 </footer>
               </article>
             );
@@ -85,10 +90,10 @@ export function MyDay() {
                 return (
                   <li key={r.id} className={by.urgent ? "urgent" : undefined}>
                     <PersonAvatar name={r.full_name ?? "Someone"} size={30} />
-                    <span className="md-rest-who"><b>{r.full_name ?? "Someone"}</b><span>{r.company}</span></span>
+                    <span className="md-rest-who"><To to={personHref(r.event_id, r.contact_id, r.full_name)}><b>{r.full_name ?? "Someone"}</b></To><span><To to={companyHref(r.event_id, r.company)}>{r.company}</To></span></span>
                     <q>{r.body ?? (CODE[r.code ?? ""] ?? "replied")}</q>
                     <span className="md-by"><i aria-hidden="true" />{by.text}</span>
-                    <button className="btn small line" disabled={busy} onClick={() => handled(r.id)}>Answered</button>
+                    <span className="md-acts">{r.thread_url && <a className="btn small line" href={r.thread_url} target="_blank" rel="noopener noreferrer" aria-label={`Open in ${TOOL_NAME[r.connector ?? ""] ?? "the tool"}`}>Open</a>}<button className="btn small line" disabled={busy} onClick={() => handled(r.id)}>Answered</button></span>
                   </li>
                 );
               })}</ul>
@@ -112,6 +117,7 @@ export function MyDay() {
                     <span className="md-who"><b>{m.full_name ?? "Someone"}</b><span>{[m.company, m.location].filter(Boolean).join(" · ")}</span></span>
                     <span className="md-prep">Prep<Chevron /></span>
                   </summary>
+                  <p className="md-links"><To to={personHref(m.event_id, m.contact_id, m.full_name)} className="u">Open {m.full_name ?? "their"} record</To><To to={companyHref(m.event_id, m.company)} className="u">{m.company}</To><To to={eventHref(m.event_id, "outreach")} className="u">{m.event}</To></p>
                   {m.brief && <dl className="md-brief">
                     {m.brief.said && <div className="said"><dt>They wrote</dt><dd>“{m.brief.said}”</dd></div>}
                     {m.brief.title && <div><dt>Role</dt><dd>{m.brief.title}</dd></div>}

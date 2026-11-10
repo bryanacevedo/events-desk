@@ -110,7 +110,7 @@ export async function demoAdvance(db: Db, deps: LifecycleDeps, tools: Record<str
       add(p.connector, { ...base, provider_message_id: `send:${p.contact_id}:${p.channel}`, signal: "send", body: null, sender: null, step: 0 });
       if (p.channel !== "email") continue;
       let r = u(`reply|${p.contact_id}`);
-      for (const x of REPLIES) { if (r < x.share) { add(p.connector, { ...base, provider_message_id: `reply:${p.contact_id}`, signal: x.signal ?? "reply", body: x.body || null }); break; } r -= x.share; }
+      for (const x of REPLIES) { if (r < x.share) { add(p.connector, { ...base, provider_message_id: `reply:${p.contact_id}`, signal: x.signal ?? "reply", body: x.body || null, thread_url: p.connector === "heyreach" ? "https://app.heyreach.io/app/inbox" : "https://app.instantly.ai/app/unibox" }); break; } r -= x.share; }
     }
     for (const [name, events] of by) await ingestEvents(db, deps, deps.connectors[name], events);
     await processInbound(db, deps, 2000);

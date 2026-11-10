@@ -20,8 +20,8 @@ import { isGtm } from "../shared/roles";
 import { setDemoCalendar } from "./stages";
 
 export const PEOPLE = PERSONAS.map((p) => p.name);
-interface Ctx { actor: string; demo: boolean; needs: Needs | null; refresh: () => Promise<void> }
-const AppCtx = createContext<Ctx>({ actor: PEOPLE[0], demo: false, needs: null, refresh: async () => {} });
+interface Ctx { actor: string; demo: boolean; needs: Needs | null; refresh: () => Promise<void>; go: (to: string) => void }
+const AppCtx = createContext<Ctx>({ actor: PEOPLE[0], demo: false, needs: null, refresh: async () => {}, go: (to) => { location.href = to; } });
 export const useActor = () => useContext(AppCtx);
 
 function storedActor() { try { const a = localStorage.getItem("actor"); return a && PEOPLE.includes(a) ? a : PEOPLE[0]; } catch { return PEOPLE[0]; } }
@@ -98,7 +98,7 @@ export function App() {
   const pick = (ev: { target: { value: string } }) => { setActor(ev.target.value); rememberActor(ev.target.value); };
 
   return (
-    <AppCtx.Provider value={{ actor, demo, needs, refresh }}>
+    <AppCtx.Provider value={{ actor, demo, needs, refresh, go }}>
       <div className="app">
         <nav className="side" aria-label="Events Desk">
           <Link to="/" go={go} className="brand"><Mark /><span>Events Desk</span></Link>

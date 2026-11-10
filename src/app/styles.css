@@ -1827,3 +1827,13 @@ body.dlg-open { overflow: hidden; }
 /* People view: the list's brief sits under its figures with room to breathe. */
 .delivered-lead + .brief { margin-top: 40px; }
 .seg.list-by { justify-self: start; align-self: start; width: max-content; margin-top: 8px; }
+.md-acts { display: inline-flex; gap: 8px; align-items: center; }
+
+/* A name, a face or a company that leads somewhere: no chrome, an underline on hover. */
+a.to { color: inherit; text-decoration: none; }
+a.to:hover b, a.to:hover > span:first-child, a.to.u:hover { text-decoration: underline; text-underline-offset: 3px; }
+a.to:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; border-radius: 6px; }
+/* A brief row that leads to the fold it counts. */
+.brow.opens { cursor: pointer; }
+.brow.opens:hover span { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+.md-links { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0; padding: 4px 20px 0; font-size: 13px; }
