@@ -94,3 +94,23 @@ Real events from `samples/real-events.json`. Everything else is fictional (peopl
 5. Budget and Usage.
 
 Before starting, read the code as it stands: an earlier agent stopped partway through round 1. Do not touch src/server pipeline, tiering, research, or evals files; another agent owns them.
+
+## From the build conversation (2026-11-08 to 11-09)
+
+Bryan's pointers that shaped the app as it looks now. Read these before any new screen.
+
+- Events Desk has its own look. It is not the backlog's, and it never borrows another project's bones.
+- It must feel made by a person. A good interface gives the useful data and leaves people room to think; it does not lay out every number and relation it has.
+- Plain words, no technical jargon. Stage names say what is going on.
+- Real things where they exist: real event logos, people avatars.
+- Events must not blend together: the event header carries the event's own look.
+- One timeline for an event's whole life, in the header. A section never repeats the stage in a second bar.
+- Overview cards stay light: no trailing to-do line inside a card.
+- Dropdowns: one chevron, the same inset, everywhere.
+- No lock icons. No random tags. Nothing that looks left behind by accident.
+- Forms that start something big (Request seats) open in a floating sheet, not on top of the page.
+- Formatting is checked to the cell: nothing cut off, every column fits its header.
+- Settings and every new screen are brought up to the level of the rest of the app, with the mistakes already corrected elsewhere left corrected.
+- More decoration is not better: if an addition makes a place noisier, take it out.
+- Long is a failure: a screen or a message that reads long gets cut.
+- New sections are built from the shared parts: the brief's bar rows, rows that open with a chevron, folds, figures in set form ("4 costs to add").

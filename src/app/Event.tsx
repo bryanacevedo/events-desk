@@ -57,7 +57,9 @@ export function useEvent(id: string): EventState {
   let note = "";
   if (data) {
     const e = data.event, who = firstName(uploaderOf(data)), card = pendingCard(data);
-    if (e.stage === "delivered") note = `Outreach list ready. ${plural(data.list.people, "person", "people")} to reach${open.length ? `, ${open.length} to settle` : ""}.`;
+    const MOTION_NOTE: Record<string, string> = { owners: "Account owners are deciding.", sequencing: "Sequences are being set up.", in_market: "In market.", closing: "Closing out.", scored: "Scored." };
+    if (e.stage === "delivered" && e.motion && MOTION_NOTE[e.motion]) note = `${MOTION_NOTE[e.motion]}${open.length ? ` ${open.length} to settle.` : ""}`;
+    else if (e.stage === "delivered") note = `Outreach list ready. ${plural(data.list.people, "person", "people")} to reach${open.length ? `, ${open.length} to settle` : ""}.`;
     else if (e.stage === "quoted") note = `${card?.kind === "research" ? "Research card" : "Cost card"} waiting on ${who}.`;
     else if (e.stage === "ready_for_review") note = card ? `Companies researched. Waiting on ${who} to verify and find contacts.` : (data.open_cases ?? 0) > 0 ? `Research done. ${plural(data.open_cases ?? 0, "case")} to settle before verifying contacts.` : "Research done. Ready for the Outreach card.";
     else note = stageSentence(e, data.settings);

@@ -76,7 +76,7 @@ export function App() {
   const eventId = pathname.match(/^\/event\/([^/]+)/)?.[1];
   const place = placeOf(pathname);
   const count = needs?.approvals.length ?? 0;
-  const navAt = ["overview", "events", "seats", "budget", "myday", "usage"].indexOf(place);
+  const navAt = ["overview", "events", "seats", "budget", "usage"].indexOf(place);
   if (demo === null) return null;
 
   const item = (to: string, p: Place, label: string, icon: ReactNode, cls: string, badge?: number) => (
@@ -97,7 +97,6 @@ export function App() {
             {item("/events", "events", "Events", <Icon.events />, "navitem")}
             {item("/seats", "seats", "Seats", <Icon.seats />, "navitem", count)}
             {item("/budget", "budget", "Budget", <Icon.budget />, "navitem")}
-            {item("/my-day", "myday", "My day", <Icon.overview />, "navitem")}
             {item("/usage", "usage", "Usage", <Icon.usage />, "navitem")}
           </div>
           <span className="spacer" />
