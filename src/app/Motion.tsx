@@ -144,7 +144,13 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
   const [o, setO] = useState<Overview | null>(null);
   const [busy, setBusy] = useState(false), [error, setError] = useState(""), [note, setNote] = useState("");
   const [cap, setCap] = useState({ name: "", email: "", company: "", note: "" });
-  const load = async () => setO(await get<Overview>(`/api/events/${id}/motion`));
+  const [slots, setSlots] = useState<{ roster: { rep: string }[]; slots: { id: string; rep: string; starts_at: string; location: string; meeting_id: string | null }[] }>({ roster: [], slots: [] });
+  const [slot, setSlot] = useState({ rep: "", day: "", from: "09:00", to: "17:00", minutes: 30, location: "Booth" });
+  const load = async () => {
+    setO(await get<Overview>(`/api/events/${id}/motion`));
+    const r = await get<typeof slots>(`/api/events/${id}/motion/roster`);
+    if (r) { setSlots(r); setSlot((x) => (x.rep ? x : { ...x, rep: r.roster[0]?.rep ?? "" })); }
+  };
   useEffect(() => { load(); }, [id]);
   const act = async (m: "POST", p: string, b?: unknown, say = "") => {
     setBusy(true); setError(""); setNote("");
@@ -159,6 +165,8 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
   const start = o.motion === "none" && (!o.card || o.card.status === "declined");
   const pending = o.card?.status === "pending" ? o.card : null;
   const hot = o.replies.filter((r) => r.code === "interested" || r.code === "meeting_request");
+  const roster = slots.roster.map((x) => x.rep), free = slots.slots.filter((x) => !x.meeting_id);
+  const booked = new Set(o.meetings.map((m) => (m as Meeting & { contact_id?: string }).contact_id).filter(Boolean) as string[]);
   const headline = o.motion === "none" ? "This list is ready for outreach." : o.motion === "owners" ? "Account owners are deciding." : o.motion === "sequencing" ? "Sequences are being set up." : o.motion === "in_market" ? "This event is in market." : o.motion === "closing" ? "This event is closing out." : "This event is scored.";
   return (
     <section className="motion" aria-label="After delivery" data-ready="1">
@@ -180,7 +188,25 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
 
       {o.motion === "sequencing" && o.regions.some((r) => !r.basis) && <section className="m-sec"><h3>Who may we contact?</h3><p className="small mute">Anyone in a region with no recorded basis stays out. Your call, not legal advice.</p><ul className="m-regions">{o.regions.filter((r) => !r.basis).map((r) => <li key={r.region}><span>{r.region}</span><span className="mute">{plural(r.people, "person", "people")}</span><button className="btn small line" disabled={busy} onClick={() => act("POST", `/api/events/${id}/motion/legal-basis`, { region: r.region, basis: "Legitimate interest" })}>Record basis</button></li>)}</ul></section>}
 
-      {hot.length > 0 && <section className="m-sec"><h3>Waiting on a rep</h3><ul className="m-replies">{hot.slice(0, 8).map((r) => <li key={r.id}><div><b>{r.full_name ?? "Someone"}</b><span className="mute"> {r.company}</span></div><span className="m-code">{CODE[r.code ?? ""] ?? "Replied"}</span>{r.body && <blockquote>{r.body}</blockquote>}</li>)}</ul></section>}
+      {hot.length > 0 && <section className="m-sec"><h3>Waiting on a rep</h3><ul className="m-replies">{hot.slice(0, 8).map((r) => (
+        <li key={r.id}><div><b>{r.full_name ?? "Someone"}</b><span className="mute"> {r.company}</span></div><span className="m-code">{CODE[r.code ?? ""] ?? "Replied"}</span>{r.body && <blockquote>{r.body}</blockquote>}
+          {free.length > 0 && r.contact_id && !booked.has(r.contact_id) && <form className="m-inline" onSubmit={(e) => { e.preventDefault(); const sel = (e.currentTarget.elements.namedItem("slot") as HTMLSelectElement).value; act("POST", `/api/motion/slots/${sel}/book`, { contact_id: r.contact_id }, "Booked. Everyone at that company is paused while the meeting stands."); }}>
+            <label>Book a slot<select name="slot">{free.slice(0, 40).map((x) => <option key={x.id} value={x.id}>{x.rep}, {new Date(x.starts_at).toLocaleString("en-GB", { weekday: "short", hour: "2-digit", minute: "2-digit", timeZone: "UTC" })} UTC, {x.location}</option>)}</select></label>
+            <button className="btn small" disabled={busy}>Book</button>
+          </form>}
+        </li>))}</ul></section>}
+
+      {o.motion !== "none" && roster.length > 0 && <details className="m-more big"><summary>Meeting slots at the event{free.length ? `, ${free.length} free` : ""}</summary>
+        <p className="small mute">Slots belong to people with an approved seat. One meeting per slot, and a rep's slots never overlap.</p>
+        <form className="m-capture" onSubmit={(e) => { e.preventDefault(); act("POST", `/api/events/${id}/motion/slots`, slot, "Slots opened."); }}>
+          <label>Who<select value={slot.rep} onChange={(e) => setSlot({ ...slot, rep: e.target.value })}>{roster.map((x) => <option key={x}>{x}</option>)}</select></label>
+          <label>Day<input type="date" value={slot.day} onChange={(e) => setSlot({ ...slot, day: e.target.value })} required /></label>
+          <label>From<input type="time" value={slot.from} onChange={(e) => setSlot({ ...slot, from: e.target.value })} /></label>
+          <label>To<input type="time" value={slot.to} onChange={(e) => setSlot({ ...slot, to: e.target.value })} /></label>
+          <label>Where<input value={slot.location} onChange={(e) => setSlot({ ...slot, location: e.target.value })} /></label>
+          <button className="btn small" disabled={busy}>Open slots</button>
+        </form>
+      </details>}
 
       {o.live_score && <Roi s={o.live_score} eventId={id} busy={busy} act={act} />}
 

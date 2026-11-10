@@ -1680,3 +1680,5 @@ body.dlg-open { overflow: hidden; }
 .brief-card dt { font-size: 12px; line-height: 16px; color: var(--mute); }
 .brief-card dd { font-size: 14px; line-height: 20px; overflow-wrap: anywhere; }
 @media (max-width: 760px) { .briefs { grid-template-columns: minmax(0, 1fr); } }
+.m-capture select, .m-inline select { height: 40px; border: 1px solid var(--line-2); border-radius: 8px; padding: 0 10px; background: var(--ground); color: var(--ink); font-size: 15px; }
+.m-replies .m-inline { grid-column: 1 / -1; }
