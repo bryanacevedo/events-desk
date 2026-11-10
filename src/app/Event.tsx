@@ -403,7 +403,7 @@ function ListBrief({ d }: { d: EventPayload }) {
       )}
       {d.list.dropped.length > 0 && (
         <div>
-          <h3>Left off the list<span>{num(left)}</span></h3>
+          <h3>Excluded from outreach<span>{num(left)}</span></h3>
           <ul>{reasons.map((r) => <BriefRow key={r.reason} label={dropWords(r.reason)} n={r.n} of={left} tone="t3" />)}</ul>
           {d.list.dropped.length > 5 && <ShowMore open={all} n={d.list.dropped.length} noun="reasons" onClick={() => setAll(!all)} />}
         </div>
