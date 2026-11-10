@@ -14,6 +14,7 @@ interface Capture { id: string; full_name: string | null; company: string | null
 interface Funds { sourced: { n: number; cents: number }; influenced: { n: number; cents: number }; won: { n: number; cents: number }; available: boolean; stale: number }
 interface Score { funnel: { kept: number; enrolled: number; sent: number; replied: number; booked: number; held: number }; logged_outside: number; held_all: number; cost: { tickets_cents: number; travel_cents: number; ai_cents: number; other_cents: number; dollars_cents: number }; cost_per_held_cents: number | null; influence: Funds; control: { available: boolean; met_accounts: number; met_with_pipeline: number; control_accounts: number; control_with_pipeline: number }; roi: { pipeline_per_dollar: number | null; won_per_dollar: number | null; cost_missing: string[] }; score: { held_per_thousand: number } | null; past: { held_per_thousand: number | null } }
 interface Overview {
+  capacity: { needed: number; healthy: number } | null;
   motion: string; label: string; simulated: boolean; tools: Record<string, string>; poll_minutes: number; crm_connected: boolean; open_cases: number;
   connectors: { name: string; channels: string[]; simulated: boolean }[];
   card: { id: string; status: string; approval_id: string | null; llm_cap: number; credits_cap: number; est_cents: number; lines: { people: number; companies: number } } | null;
@@ -177,6 +178,7 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
       {note && <p className="m-note" role="status">{note}</p>}
       {error && <p className="error" role="alert">{error}</p>}
 
+      {o.capacity && o.motion === "none" && <p className={`m-line${o.capacity.healthy < o.capacity.needed ? " warn" : ""}`}><b>Inboxes:</b> about {plural(o.capacity.needed, "healthy inbox", "healthy inboxes")} needed on the busiest day, {o.capacity.healthy} available now.{o.capacity.healthy < o.capacity.needed && " New inboxes take two weeks or more to warm up, so add them now."}</p>}
       {start && !demo && <div className="m-do"><p>The desk will ask account owners first, then set up sequences. Nothing is sent until a person launches it.</p><button className="btn" disabled={busy} onClick={() => act("POST", `/api/events/${id}/motion/start`)}>Start outreach</button></div>}
       {pending && <div className="m-do"><p><b>Motion card.</b> At most {plural(pending.llm_cap, "AI call")} to read replies and debriefs, about {usd(pending.est_cents)}, for {plural(pending.lines.people, "person", "people")} at {plural(pending.lines.companies, "company", "companies")}.</p>{pending.approval_id && !demo && <p className="mute small">Waiting in Slack for the person who uploaded the list.</p>}</div>}
 

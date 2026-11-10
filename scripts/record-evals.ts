@@ -7,6 +7,8 @@ import { connectConcierge } from "../src/concierge/agent.ts";
 import { anthropicLlm } from "../src/server/anthropic.ts";
 import { migrate, pglite } from "../src/server/db.ts";
 import { fill, promptHash, type Step } from "../src/server/prompts.ts";
+import { REPLY_CODES } from "../src/shared/motion.ts";
+import { cleanReply } from "../src/shared/reply-clean.ts";
 import { VendorError } from "../src/server/providers.ts";
 import { planEvalRun } from "../src/evals/limits.ts";
 import { loadTitleDev, loadTitleHoldout, titlePrompt } from "../src/evals/title-tier.ts";
@@ -42,6 +44,8 @@ const steps: [Step, Item[] | (() => Item[])][] = [
   ["title_parse", [...loadTitleDev(), ...loadTitleHoldout()].map((it) => ({ id: it.id, prompt: titlePrompt(it) }))],
   ["title_tier", list.titles.map((t: { id: string; title: string }) => ({ id: t.id, prompt: fill("title_tier", { targets: settings.target_titles.join(", "), input: `Title: ${t.title}` }) }))],
   ["review", list.contacts.map((c: { id: string; name: string; title: string; company: string; email: string }) => ({ id: c.id, prompt: fill("review", { input: `Name: ${c.name}\nTitle: ${c.title}\nCompany: ${c.company}\nEmail: ${c.email}` }) }))],
+  // Reply reading: what the person typed, after cleaning, is what the model sees in production.
+  ["reply_classify", ["dev", "holdout", "injection"].flatMap((k) => JSON.parse(readFileSync(`evals/reply-classify.${k}.json`, "utf8")).items).map((it: { id: string; reply: string }) => ({ id: it.id, prompt: fill("reply_classify", { codes: REPLY_CODES.join(", "), reply: cleanReply(it.reply) || it.reply }) }))],
   ["concierge", list.questions.map((q: { id: string; question: string }) => ({ id: q.id, prompt: fill("concierge", { tools, input: `Event: evt_eval\nQuestion: ${q.question}` }) }))],
 ];
 

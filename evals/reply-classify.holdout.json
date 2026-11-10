@@ -1,0 +1,185 @@
+{
+ "note": "Frozen. Looked at to decide, never to tune.",
+ "items": [
+  {
+   "id": "hold01",
+   "set": "hold",
+   "code": "interested",
+   "reply": "Saw your message after the conference. Can you share a case study?"
+  },
+  {
+   "id": "hold02",
+   "set": "hold",
+   "code": "interested",
+   "reply": "Definitely worth a look. What integrations do you support?"
+  },
+  {
+   "id": "hold03",
+   "set": "hold",
+   "code": "interested",
+   "reply": "Yes please, send over details."
+  },
+  {
+   "id": "hold04",
+   "set": "hold",
+   "code": "meeting_request",
+   "reply": "Let's set up a call. How about Monday at 10?"
+  },
+  {
+   "id": "hold05",
+   "set": "hold",
+   "code": "meeting_request",
+   "reply": "Book something with me for next week, any afternoon."
+  },
+  {
+   "id": "hold06",
+   "set": "hold",
+   "code": "meeting_request",
+   "reply": "Can we meet at the event? I'll be at the coffee bar at 3."
+  },
+  {
+   "id": "hold07",
+   "set": "hold",
+   "code": "referral",
+   "reply": "Not me, but my teammate Sam Lee handles vendor evaluations."
+  },
+  {
+   "id": "hold08",
+   "set": "hold",
+   "code": "referral",
+   "reply": "Please contact our VP of Engineering, Ines Moreau, about this."
+  },
+  {
+   "id": "hold09",
+   "set": "hold",
+   "code": "not_now",
+   "reply": "We're focused on other projects this half. Reach out in the fall."
+  },
+  {
+   "id": "hold10",
+   "set": "hold",
+   "code": "not_now",
+   "reply": "Timing isn't right, we just went through procurement for a similar tool."
+  },
+  {
+   "id": "hold11",
+   "set": "hold",
+   "code": "not_interested",
+   "reply": "Not interested, thank you."
+  },
+  {
+   "id": "hold12",
+   "set": "hold",
+   "code": "not_interested",
+   "reply": "We don't need this. Please don't contact me about it again."
+  },
+  {
+   "id": "hold13",
+   "set": "hold",
+   "code": "out_of_office",
+   "reply": "Out of office through Friday. I'll respond on my return."
+  },
+  {
+   "id": "hold14",
+   "set": "hold",
+   "code": "out_of_office",
+   "reply": "I'm currently on vacation and will be back on the 15th."
+  },
+  {
+   "id": "hold15",
+   "set": "hold",
+   "code": "unsubscribe",
+   "reply": "Remove me."
+  },
+  {
+   "id": "hold16",
+   "set": "hold",
+   "code": "unsubscribe",
+   "reply": "Please unsubscribe me from these emails."
+  },
+  {
+   "id": "hold17",
+   "set": "hold",
+   "code": "unsubscribe",
+   "reply": "Opt out."
+  },
+  {
+   "id": "hold18",
+   "set": "hold",
+   "code": "bounced",
+   "reply": "Undeliverable: the recipient's mailbox is full and can't accept messages now."
+  },
+  {
+   "id": "hold19",
+   "set": "hold",
+   "code": "bounced",
+   "reply": "Address not found. Your message wasn't delivered because the address couldn't be found."
+  },
+  {
+   "id": "hold20",
+   "set": "hold",
+   "code": "wrong_person",
+   "reply": "I'm not the person you're looking for. Wrong email."
+  },
+  {
+   "id": "hold21",
+   "set": "hold",
+   "code": "departed",
+   "reply": "Hi, I left the company in October. Best of luck."
+  },
+  {
+   "id": "hold22",
+   "set": "hold",
+   "code": "departed",
+   "reply": "This person is no longer with the organization."
+  },
+  {
+   "id": "hold23",
+   "set": "hold",
+   "code": "other",
+   "reply": "Is this spam?"
+  },
+  {
+   "id": "hold24",
+   "set": "hold",
+   "code": "other",
+   "reply": "Received."
+  },
+  {
+   "id": "hold25",
+   "set": "hold",
+   "code": "interested",
+   "reply": "Good timing actually. We're evaluating options this month."
+  },
+  {
+   "id": "hold26",
+   "set": "hold",
+   "code": "not_now",
+   "reply": "Ping me again in January."
+  },
+  {
+   "id": "hold27",
+   "set": "hold",
+   "code": "referral",
+   "reply": "Talk to Ravi Patel on our partnerships team, he owns this."
+  },
+  {
+   "id": "hold28",
+   "set": "hold",
+   "code": "not_interested",
+   "reply": "We're happy with our current provider, no thanks."
+  },
+  {
+   "id": "hold29",
+   "set": "hold",
+   "code": "meeting_request",
+   "reply": "Happy to meet, send me a few times that work."
+  },
+  {
+   "id": "hold30",
+   "set": "hold",
+   "code": "out_of_office",
+   "reply": "Automatic reply: I am out of the office with no access to email until next Tuesday."
+  }
+ ]
+}

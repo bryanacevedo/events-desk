@@ -1,0 +1,245 @@
+{
+ "note": "Authored replies, labeled by hand from the text alone.",
+ "items": [
+  {
+   "id": "dev01",
+   "set": "dev",
+   "code": "interested",
+   "reply": "This looks relevant to what we're working on this quarter. Can you send more detail?"
+  },
+  {
+   "id": "dev02",
+   "set": "dev",
+   "code": "interested",
+   "reply": "Yes, curious to learn more. What does pricing look like for a team of our size?"
+  },
+  {
+   "id": "dev03",
+   "set": "dev",
+   "code": "interested",
+   "reply": "Thanks for reaching out, this is timely. Tell me more."
+  },
+  {
+   "id": "dev04",
+   "set": "dev",
+   "code": "interested",
+   "reply": "Could be a fit. Do you have a one-pager?"
+  },
+  {
+   "id": "dev05",
+   "set": "dev",
+   "code": "meeting_request",
+   "reply": "Happy to chat. Does Thursday at 2pm ET work?"
+  },
+  {
+   "id": "dev06",
+   "set": "dev",
+   "code": "meeting_request",
+   "reply": "Let's find 20 minutes next week. Here's my calendar link."
+  },
+  {
+   "id": "dev07",
+   "set": "dev",
+   "code": "meeting_request",
+   "reply": "Grab a time with my assistant, she manages my calendar. Tuesday or Wednesday is best."
+  },
+  {
+   "id": "dev08",
+   "set": "dev",
+   "code": "meeting_request",
+   "reply": "Are you at the booth tomorrow? I could swing by at 11."
+  },
+  {
+   "id": "dev09",
+   "set": "dev",
+   "code": "referral",
+   "reply": "I'm not the right person for this. You should talk to Priya Shah, she runs our payments team."
+  },
+  {
+   "id": "dev10",
+   "set": "dev",
+   "code": "referral",
+   "reply": "Looping in my colleague Marco Bell who owns this area."
+  },
+  {
+   "id": "dev11",
+   "set": "dev",
+   "code": "referral",
+   "reply": "Please reach out to our head of operations instead, Dana Kim."
+  },
+  {
+   "id": "dev12",
+   "set": "dev",
+   "code": "not_now",
+   "reply": "Not a priority right now. Check back in Q3."
+  },
+  {
+   "id": "dev13",
+   "set": "dev",
+   "code": "not_now",
+   "reply": "We just signed a two-year contract with another provider. Maybe next year."
+  },
+  {
+   "id": "dev14",
+   "set": "dev",
+   "code": "not_now",
+   "reply": "Bad timing, we're in the middle of a reorg. Try me in a few months."
+  },
+  {
+   "id": "dev15",
+   "set": "dev",
+   "code": "not_interested",
+   "reply": "No thanks, we're not interested."
+  },
+  {
+   "id": "dev16",
+   "set": "dev",
+   "code": "not_interested",
+   "reply": "We built this in-house and have no need for an outside tool."
+  },
+  {
+   "id": "dev17",
+   "set": "dev",
+   "code": "not_interested",
+   "reply": "Not something we would ever buy. Please don't follow up."
+  },
+  {
+   "id": "dev18",
+   "set": "dev",
+   "code": "out_of_office",
+   "reply": "I am out of the office until March 3 with limited access to email."
+  },
+  {
+   "id": "dev19",
+   "set": "dev",
+   "code": "out_of_office",
+   "reply": "Thank you for your email. I'm on parental leave and will respond when I'm back in April."
+  },
+  {
+   "id": "dev20",
+   "set": "dev",
+   "code": "out_of_office",
+   "reply": "Automatic reply: I'm travelling for the conference and will reply next week."
+  },
+  {
+   "id": "dev21",
+   "set": "dev",
+   "code": "unsubscribe",
+   "reply": "Unsubscribe."
+  },
+  {
+   "id": "dev22",
+   "set": "dev",
+   "code": "unsubscribe",
+   "reply": "Please remove me from your mailing list."
+  },
+  {
+   "id": "dev23",
+   "set": "dev",
+   "code": "unsubscribe",
+   "reply": "Stop emailing me."
+  },
+  {
+   "id": "dev24",
+   "set": "dev",
+   "code": "bounced",
+   "reply": "Delivery Status Notification (Failure). The email account that you tried to reach does not exist."
+  },
+  {
+   "id": "dev25",
+   "set": "dev",
+   "code": "bounced",
+   "reply": "Mail delivery failed: returning message to sender. 550 5.1.1 User unknown."
+  },
+  {
+   "id": "dev26",
+   "set": "dev",
+   "code": "wrong_person",
+   "reply": "You have the wrong Ana Ruiz. I don't work in payments, I'm a teacher."
+  },
+  {
+   "id": "dev27",
+   "set": "dev",
+   "code": "wrong_person",
+   "reply": "I think you meant someone else, I've never worked at that company."
+  },
+  {
+   "id": "dev28",
+   "set": "dev",
+   "code": "departed",
+   "reply": "I no longer work at Tallgrass. Please update your records."
+  },
+  {
+   "id": "dev29",
+   "set": "dev",
+   "code": "departed",
+   "reply": "Jordan left the company last month. This inbox is not monitored."
+  },
+  {
+   "id": "dev30",
+   "set": "dev",
+   "code": "departed",
+   "reply": "I've moved on to a new role elsewhere, so I can't help with this."
+  },
+  {
+   "id": "dev31",
+   "set": "dev",
+   "code": "other",
+   "reply": "Who is this?"
+  },
+  {
+   "id": "dev32",
+   "set": "dev",
+   "code": "other",
+   "reply": "?"
+  },
+  {
+   "id": "dev33",
+   "set": "dev",
+   "code": "other",
+   "reply": "Thanks."
+  },
+  {
+   "id": "dev34",
+   "set": "dev",
+   "code": "interested",
+   "reply": "Sounds great. We met briefly at the event, would love to continue the conversation."
+  },
+  {
+   "id": "dev35",
+   "set": "dev",
+   "code": "not_now",
+   "reply": "Interesting, but our budget is frozen until next fiscal year."
+  },
+  {
+   "id": "dev36",
+   "set": "dev",
+   "code": "meeting_request",
+   "reply": "Sure, let's talk. I'm free Friday morning."
+  },
+  {
+   "id": "dev37",
+   "set": "dev",
+   "code": "referral",
+   "reply": "This would be for our CFO, Lena Ortiz. I've copied her here."
+  },
+  {
+   "id": "dev38",
+   "set": "dev",
+   "code": "not_interested",
+   "reply": "Please take us off your list, we're not a fit for this."
+  },
+  {
+   "id": "dev39",
+   "set": "dev",
+   "code": "out_of_office",
+   "reply": "I'm away until 2027-01-20. For urgent matters contact support."
+  },
+  {
+   "id": "dev40",
+   "set": "dev",
+   "code": "interested",
+   "reply": "Following up on your note. Yes, we'd like to explore this."
+  }
+ ]
+}

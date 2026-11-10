@@ -19,6 +19,7 @@ import { captureOnsite, forgetPerson, markHandled } from "./operating.ts";
 import { addSlots, bookSlot, prepBrief, repDay, roster } from "./rep-day.ts";
 import { isGtm } from "../shared/roles.ts";
 import { MOTION_LABEL } from "../shared/motion.ts";
+import { pickSenders, planCapacity } from "../shared/sending.ts";
 
 type App = Hono<{ Variables: { actor: string } }>;
 
@@ -45,6 +46,16 @@ export async function motionOverview(db: Db, deps: LifecycleDeps, id: string) {
     db.query<{ n: number }>("SELECT count(*)::int AS n FROM review_cases WHERE event_id = $1 AND status = 'open' AND NOT blocking", [id]),
   ]);
   const kept = await db.query<{ id: string }>("SELECT id FROM contacts WHERE event_id = $1 AND dropped_at IS NULL AND priority IS NOT NULL", [id]);
+  // Before anything starts: roughly how many healthy inboxes this list will need, against how many the tool has. Capacity takes weeks to build, so it is said early.
+  let capacity: { needed: number; healthy: number } | null = null;
+  const mail = Object.values(deps.connectors).find((c) => c.channels.includes("email") && c.listSenders);
+  if (e.motion === "none" && mail?.listSenders) {
+    try {
+      const plan = planCapacity(kept.length, [0, 3, 7], "email");
+      const usable = pickSenders(await mail.listSenders(), { ...plan, peak_daily: 1e9 }, {}).picked.length;
+      capacity = { needed: plan.needed, healthy: usable };
+    } catch { capacity = null; }
+  }
   const people = kept.length ? await loadPeople(db, id, kept.map((k) => k.id)) : [];
   const counts = new Map<string, number>();
   for (const p of people) counts.set(regionOf(p), (counts.get(regionOf(p)) ?? 0) + 1);
@@ -52,7 +63,7 @@ export async function motionOverview(db: Db, deps: LifecycleDeps, id: string) {
     motion: e.motion, label: MOTION_LABEL[e.motion], stage: e.stage, tools: e.tools, verify_once: e.verify_once, write_leads: e.write_leads, started_by: e.outreach_started_by,
     connectors: Object.values(deps.connectors).map((c) => ({ name: c.name, channels: c.channels, simulated: Boolean(c.simulated), capabilities: c.capabilities })),
     poll_minutes: deps.pollMinutes ?? 5, crm_connected: Boolean(deps.crm?.connected),
-    captures, unplaced, card: card[0] ?? null, sequences, simulated: Object.values(deps.connectors).some((c) => c.simulated), live_score: (funnel[0] as { enrolled?: number; held_all?: number })?.enrolled || (funnel[0] as { held_all?: number })?.held_all ? await computeScorecard(db, deps, id, 30) : null, funnel: funnel[0] ?? null, owners, replies, meetings, scorecards, debriefs, open_cases: cases[0].n,
+    capacity, captures, unplaced, card: card[0] ?? null, sequences, simulated: Object.values(deps.connectors).some((c) => c.simulated), live_score: (funnel[0] as { enrolled?: number; held_all?: number })?.enrolled || (funnel[0] as { held_all?: number })?.held_all ? await computeScorecard(db, deps, id, 30) : null, funnel: funnel[0] ?? null, owners, replies, meetings, scorecards, debriefs, open_cases: cases[0].n,
     regions: [...counts].sort((a, b) => b[1] - a[1]).map(([region, people]) => ({ region, people, basis: bases.find((b) => b.region === region)?.basis ?? null, recorded_by: bases.find((b) => b.region === region)?.recorded_by ?? null })),
   };
 }
