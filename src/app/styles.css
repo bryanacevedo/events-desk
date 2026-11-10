@@ -1837,3 +1837,11 @@ a.to:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; borde
 .brow.opens { cursor: pointer; }
 .brow.opens:hover span { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
 .md-links { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0; padding: 4px 20px 0; font-size: 13px; }
+/* My day's folds use the same rows as Outreach. */
+.myday .fold > :not(summary) { padding: 4px 18px 18px 50px; }
+.md-met li { grid-template-columns: auto minmax(160px, 0.8fr) minmax(0, 1.2fr); }
+.md-note { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.md-note i { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--orange); }
+.md-plain { display: grid; margin: 0; padding: 0; list-style: none; }
+.md-plain li { display: flex; justify-content: space-between; gap: 16px; align-items: center; min-height: 48px; border-top: 1px solid var(--line); font-size: 14px; }
+@media (max-width: 760px) { .myday .fold > :not(summary) { padding: 4px 4px 14px; } .md-met li { grid-template-columns: auto minmax(0, 1fr); } .md-note { grid-column: 2; white-space: normal; } }

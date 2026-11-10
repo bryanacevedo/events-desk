@@ -16,7 +16,7 @@ interface Brief { person: string; title: string | null; company: string; tier: n
 interface Day {
   replies: { id: string; event_id: string; contact_id: string; connector?: string; thread_url?: string | null; event: string; website: string | null; brand_color: string | null; full_name: string | null; company: string; code: string | null; body: string | null; respond_by: string }[];
   meetings: { id: string; event_id: string; contact_id: string; event: string; website: string | null; brand_color: string | null; scheduled_at: string; full_name: string | null; company: string; location: string | null; brief: Brief | null }[];
-  captures: { id: string; full_name: string | null; company: string | null; note: string; temperature: string }[];
+  captures: { id: string; event_id: string; contact_id: string | null; event: string; full_name: string | null; company: string | null; note: string; temperature: string }[];
   slots: { id: string; event: string; starts_at: string; location: string }[];
 }
 
@@ -141,19 +141,41 @@ export function MyDay() {
           {d.slots.length > 0 && (
             <details className="fold">
               <summary><Icon.calendar /><span className="fold-t">Free slots</span><span className="fold-peek">{plural(d.slots.length, "slot")}<i>next {when(d.slots[0].starts_at)}</i></span><Chevron /></summary>
-              <ul className="m-senders">{d.slots.slice(0, 12).map((s) => <li key={s.id}><span>{when(s.starts_at)}</span><b>{s.location} · {s.event}</b></li>)}</ul>
+              <div className="sl-days">{[...new Set(d.slots.map((x) => dayKey(new Date(x.starts_at))))].map((day) => {
+                const mine = d.slots.filter((x) => dayKey(new Date(x.starts_at)) === day);
+                return (
+                  <div key={day} className="sl-day">
+                    <h4>{new Date(mine[0].starts_at).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}</h4>
+                    <p className="sl-line"><span className="sl-rep">{mine[0].event}</span><span className="sl-times">{mine.map((x) => <span key={x.id}>{clock(x.starts_at)}</span>)}</span><span className="mute">{mine[0].location}</span></p>
+                  </div>
+                );
+              })}</div>
             </details>
           )}
           {d.captures.length > 0 && (
             <details className="fold">
               <summary><Icon.people /><span className="fold-t">People you met</span><span className="fold-peek">{d.captures.length}</span><Chevron /></summary>
-              <ul className="m-senders">{d.captures.map((c) => <li key={c.id}><span>{c.full_name ?? "Someone"}{c.company ? `, ${c.company}` : ""}</span><b className="m-text">{c.note}</b></li>)}</ul>
+              <div className="sl-days">{[...new Set(d.captures.map((c) => c.event_id))].map((ev) => {
+                const met = d.captures.filter((c) => c.event_id === ev);
+                return (
+                  <div key={ev} className="sl-day">
+                    <h4><To to={eventHref(ev)}>{met[0].event}</To></h4>
+                    <ul className="mc-list md-met">{met.map((c) => (
+                      <li key={c.id}>
+                        <PersonAvatar name={c.full_name ?? "Someone"} size={30} />
+                        <span className="mt-who"><To to={c.contact_id ? personHref(c.event_id, c.contact_id, c.full_name) : null}><b>{c.full_name ?? "Someone"}</b></To><span>{c.company}</span></span>
+                        <span className="md-note">{c.temperature === "hot" && <i aria-label="Hot" />}{c.note}</span>
+                      </li>
+                    ))}</ul>
+                  </div>
+                );
+              })}</div>
             </details>
           )}
           {mySeats.length > 0 && (
             <details className="fold">
               <summary><Icon.seats /><span className="fold-t">Your seat requests</span><span className="fold-peek">{`${mySeats.filter((r) => r.status === "pending").length} waiting`}</span><Chevron /></summary>
-              <ul className="m-senders">{mySeats.map((r) => <li key={r.id}><span>{r.name}</span><b>{r.status === "pending" ? "Waiting on leadership" : `Declined${r.decline_reason ? `: ${r.decline_reason}` : ""}`}</b></li>)}</ul>
+              <ul className="md-plain">{mySeats.map((r) => <li key={r.id}><span>{r.name}</span><span className="mute">{r.status === "pending" ? "Waiting on leadership" : `Declined${r.decline_reason ? `: ${r.decline_reason}` : ""}`}</span></li>)}</ul>
             </details>
           )}
         </div>

@@ -128,7 +128,16 @@ export async function demoAdvance(db: Db, deps: LifecycleDeps, tools: Record<str
       if (!upcoming) { await recordOutcome(db, deps, m.id, "held", REP); held++; }
     }
     const [firstCap] = await db.query("SELECT 1 FROM onsite_captures WHERE event_id = $1 LIMIT 1", [eventId]);
-    if (!firstCap) for (let i = 1; i <= 3; i++) await captureOnsite(db, deps, eventId, REP, { full_name: `Booth Visitor ${i}`, email: `visitor${i}@walkup${i}.example`, company: `Walk-up Co ${i}`, title: "Head of Payments", note: "Stopped by the booth, asked for a demo.", temperature: "hot", met: true });
+    // Walk-ups met at the booth: each event takes the next three in the list, so no two events share a person.
+    if (!firstCap) {
+      const [{ n }] = await db.query<{ n: number }>("SELECT count(DISTINCT event_id)::int AS n FROM onsite_captures");
+      const start = n * 3;
+      for (let i = 0; i < 3; i++) {
+        const w = WALKUPS[(start + i) % WALKUPS.length];
+        const slug = w.company.toLowerCase().replace(/[^a-z0-9]+/g, "");
+        await captureOnsite(db, deps, eventId, REP, { full_name: w.name, email: `${w.name.split(" ")[0].toLowerCase()}@${slug}.example`, company: w.company, title: w.title, note: w.note, temperature: i === 0 ? "hot" : "warm", met: true });
+      }
+    }
     await recordEventCost(db, eventId, GTM, "sponsorship", 1_500_000, "Sample figure");
     await recordEventCost(db, eventId, GTM, "booth", 400_000, "Sample figure");
     return { did: `Sends went out and people answered. ${held} meetings held, plus 3 walk-ups at the booth.` };
@@ -137,6 +146,25 @@ export async function demoAdvance(db: Db, deps: LifecycleDeps, tools: Record<str
 }
 
 export const withDemoCrm = (crm: Crm | undefined, db: Db, now: () => Date): Crm | undefined => (crm ? { ...crm, opportunities: demoOpportunities(db, now) } : crm);
+
+/** Invented walk-ups for the demo's booth captures. */
+const WALKUPS = [
+  { name: "Lena Fischer", company: "Brightmoor Payments", title: "Head of Payments", note: "Asked how the desk handles owners who keep an account." },
+  { name: "Omar Haddad", company: "Kestrel Ledger", title: "VP Revenue Operations", note: "Wants a demo for their events team next month." },
+  { name: "Sara Lindqvist", company: "Nordvik Commerce", title: "Director of Partnerships", note: "Runs twelve events a year; the follow-up is their pain." },
+  { name: "Diego Ramos", company: "Altamar Logistics", title: "Head of Growth", note: "Asked for pricing and a short call next week." },
+  { name: "Aiko Tanaka", company: "Hoshi Retail Systems", title: "Field Marketing Lead", note: "Interested in the seat approvals for her leadership." },
+  { name: "Ben Carter", company: "Quayside Data", title: "Sales Director", note: "Came back a second time with his CMO." },
+  { name: "Priya Shah", company: "Lumen Billing", title: "Revenue Operations Manager", note: "Wants to see the CRM sync with Salesforce." },
+  { name: "Lucas Moreau", company: "Sablier Fintech", title: "Head of Events", note: "Asked how replies reach the right rep." },
+  { name: "Ines Duarte", company: "Ribeira Freight", title: "Chief Revenue Officer", note: "Quick chat; send a one-pager." },
+  { name: "Tomás Varga", company: "Danube Pay", title: "Head of Partnerships", note: "Wants the follow-up groups for his own team." },
+  { name: "Grace Okafor", company: "Harbourline Insurance", title: "VP Marketing", note: "Asked who approves the seats." },
+  { name: "Mateo Silva", company: "Cerro Analytics", title: "GTM Engineer", note: "Wants to read the gate rules before a call." },
+  { name: "Hannah Brooks", company: "Ashgrove Health", title: "Director of Events", note: "Booked a demo for after the holidays." },
+  { name: "Yusuf Demir", company: "Bosphorus Trade", title: "Sales Operations Lead", note: "Asked how the inboxes are picked." },
+  { name: "Claire Dubois", company: "Lumiere Commerce", title: "Chief Marketing Officer", note: "Wants the ROI view for her board." },
+];
 
 /* The sample year shows every step after delivery, so a visitor can open each one. Run once at boot, after the flagship is in market. */
 type DemoStage = "owners" | "sequencing" | "follow_up_ready" | "in_market" | "closing" | "scored";

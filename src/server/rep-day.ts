@@ -65,7 +65,7 @@ export async function repDay(db: Db, deps: LifecycleDeps, rep: string) {
     db.query<{ id: string }>(`SELECT m.id, m.event_id, k.id AS contact_id, e.name AS event, m.status, m.scheduled_at::text AS scheduled_at, m.timezone, k.full_name, co.name AS company, s.location, (SELECT c.website FROM catalog_events c WHERE c.id = e.catalog_id) AS website, (SELECT c.brand_color FROM catalog_events c WHERE c.id = e.catalog_id) AS brand_color
               FROM meetings m JOIN contacts k ON k.id = m.contact_id JOIN companies co ON co.id = k.company_id JOIN events e ON e.id = m.event_id LEFT JOIN meeting_slots s ON s.meeting_id = m.id
               WHERE m.rep = $1 AND m.status IN ('booked', 'rescheduled') AND m.scheduled_at > $2::timestamptz - interval '1 day' ORDER BY m.scheduled_at LIMIT 50`, [rep, now.toISOString()]),
-    db.query(`SELECT c.id, c.event_id, c.full_name, c.company, c.note, c.temperature, c.captured_at::text AS captured_at FROM onsite_captures c WHERE c.rep = $1 ORDER BY c.captured_at DESC LIMIT 20`, [rep]),
+    db.query(`SELECT c.id, c.event_id, c.contact_id, (SELECT e.name FROM events e WHERE e.id = c.event_id) AS event, c.full_name, c.company, c.note, c.temperature, c.captured_at::text AS captured_at FROM onsite_captures c WHERE c.rep = $1 ORDER BY c.captured_at DESC LIMIT 20`, [rep]),
     db.query(`SELECT s.id, s.event_id, e.name AS event, s.starts_at::text AS starts_at, s.location FROM meeting_slots s JOIN events e ON e.id = s.event_id WHERE s.rep = $1 AND s.meeting_id IS NULL AND s.starts_at > $2::timestamptz AND s.starts_at::date <= ${LAST_DAY_SQL} ORDER BY s.starts_at LIMIT 30`, [rep, now.toISOString()]),
   ]);
   const briefs = await Promise.all(meetings.map(async (m) => ({ ...m, brief: await prepBrief(db, m.id) })));
