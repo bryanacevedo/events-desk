@@ -3,9 +3,11 @@
 import type { Hono } from "hono";
 import type { Db } from "./db.ts";
 import { cleanNames, renderStep, type TemplateStep } from "../shared/template-check.ts";
-import { recordEventCost, answerDebrief, learningTable, reviewDebrief, decideProposal } from "./closeout.ts";
+import { computeScorecard, recordEventCost, answerDebrief, learningTable, reviewDebrief, decideProposal } from "./closeout.ts";
 import { RuleError } from "./events.ts";
 import type { LifecycleDeps } from "./lifecycle-deps.ts";
+import type { FakeTool } from "./connectors/fake.ts";
+import { demoAdvance } from "./demo-run.ts";
 import { bookMeeting, confirmRelease, ingestCalendar, recordOutcome, type CalendarEvent } from "./meetings.ts";
 import { requestMotionCard } from "./motion.ts";
 import { decideOwner } from "./owners.ts";
@@ -25,7 +27,7 @@ export async function motionOverview(db: Db, deps: LifecycleDeps, id: string) {
   const [captures, unplaced, sequences, funnel, owners, replies, meetings, scorecards, debriefs, card, bases, cases] = await Promise.all([
     db.query("SELECT id, full_name, email, company, title, note, temperature, rep, source, captured_at::text AS captured_at FROM onsite_captures WHERE event_id = $1 ORDER BY captured_at DESC LIMIT 100", [id]),
     db.query("SELECT id, connector, channel, body, received_at::text AS received_at FROM inbound_messages WHERE status = 'unmatched' ORDER BY received_at DESC LIMIT 20"),
-    db.query(`SELECT s.id, s.name, s.channel, s.priority, s.connector, s.state, s.launched_at::text AS launched_at, s.pause_reason, s.senders_needed, s.peak_daily, s.sender_status, s.sender_excluded,
+    db.query(`SELECT s.id, s.name, s.channel, s.priority, s.connector, s.state, s.launched_at::text AS launched_at, s.pause_reason, s.senders_needed, s.peak_daily, s.sender_status, s.sender_excluded, s.timing_note, s.external_id, s.checklist_at::text AS checklist_at,
                 (SELECT count(*)::int FROM enrollments n WHERE n.sequence_id = s.id AND n.state = 'enrolled') AS enrolled,
                 (SELECT count(*)::int FROM enrollments n WHERE n.sequence_id = s.id AND n.state = 'paused') AS paused,
                 (SELECT count(*)::int FROM enrollments n WHERE n.sequence_id = s.id AND n.state = 'removed') AS removed,
@@ -37,7 +39,7 @@ export async function motionOverview(db: Db, deps: LifecycleDeps, id: string) {
     db.query(`SELECT m.id, m.status, m.scheduled_at::text AS scheduled_at, m.timezone, m.rep, m.source, m.enrolled, k.full_name, co.name AS company FROM meetings m LEFT JOIN contacts k ON k.id = m.contact_id LEFT JOIN companies co ON co.id = k.company_id WHERE m.event_id = $1 ORDER BY m.scheduled_at`, [id]),
     db.query("SELECT window_days, metrics, created_at::text AS created_at FROM scorecards WHERE event_id = $1 ORDER BY window_days", [id]),
     db.query(`SELECT d.id, d.author, d.status, d.body, d.answered_at::text AS answered_at, coalesce((SELECT json_agg(json_build_object('theme', f.theme, 'fact', f.fact, 'quote', f.quote, 'account', f.account)) FROM debrief_facts f WHERE f.debrief_id = d.id), '[]') AS facts FROM debriefs d WHERE d.event_id = $1`, [id]),
-    db.query("SELECT k.id, k.status, k.lines, k.llm_cap, k.credits_cap, k.est_cents, k.inputs FROM cost_cards k WHERE k.event_id = $1 AND k.kind = 'motion' ORDER BY k.created_at DESC LIMIT 1", [id]),
+    db.query("SELECT k.id, k.status, k.lines, k.llm_cap, k.credits_cap, k.est_cents, k.inputs, (SELECT a.id FROM approvals a WHERE a.card_id = k.id AND a.status = 'pending' LIMIT 1) AS approval_id FROM cost_cards k WHERE k.event_id = $1 AND k.kind = 'motion' ORDER BY k.created_at DESC LIMIT 1", [id]),
     db.query<{ region: string; basis: string; recorded_by: string }>("SELECT region, basis, recorded_by FROM legal_bases WHERE event_id = $1", [id]),
     db.query<{ n: number }>("SELECT count(*)::int AS n FROM review_cases WHERE event_id = $1 AND status = 'open' AND NOT blocking", [id]),
   ]);
@@ -49,18 +51,21 @@ export async function motionOverview(db: Db, deps: LifecycleDeps, id: string) {
     motion: e.motion, label: MOTION_LABEL[e.motion], stage: e.stage, tools: e.tools, verify_once: e.verify_once, write_leads: e.write_leads, started_by: e.outreach_started_by,
     connectors: Object.values(deps.connectors).map((c) => ({ name: c.name, channels: c.channels, simulated: Boolean(c.simulated), capabilities: c.capabilities })),
     poll_minutes: deps.pollMinutes ?? 5, crm_connected: Boolean(deps.crm?.connected),
-    captures, unplaced, card: card[0] ?? null, sequences, funnel: funnel[0] ?? null, owners, replies, meetings, scorecards, debriefs, open_cases: cases[0].n,
+    captures, unplaced, card: card[0] ?? null, sequences, simulated: Object.values(deps.connectors).some((c) => c.simulated), live_score: (funnel[0] as { enrolled?: number; held_all?: number })?.enrolled || (funnel[0] as { held_all?: number })?.held_all ? await computeScorecard(db, deps, id, 30) : null, funnel: funnel[0] ?? null, owners, replies, meetings, scorecards, debriefs, open_cases: cases[0].n,
     regions: [...counts].sort((a, b) => b[1] - a[1]).map(([region, people]) => ({ region, people, basis: bases.find((b) => b.region === region)?.basis ?? null, recorded_by: bases.find((b) => b.region === region)?.recorded_by ?? null })),
   };
 }
 
-export function mountLifecycle(app: App, db: Db, deps: LifecycleDeps, opts: { bad: (msg: string, status?: 400 | 401 | 403 | 404 | 409) => Response; publicDemo?: boolean }) {
+export function mountLifecycle(app: App, db: Db, deps: LifecycleDeps, opts: { bad: (msg: string, status?: 400 | 401 | 403 | 404 | 409) => Response; publicDemo?: boolean; demoTools?: Record<string, FakeTool> }) {
   const { bad } = opts;
   const guarded = (run: (c: any) => Promise<unknown>) => async (c: any) => {
     try { return c.json((await run(c)) ?? { ok: true }); }
     catch (e) { if (e instanceof RuleError) return bad(e.message, 409); throw e; }
   };
   const body = async (c: any) => (await c.req.json().catch(() => ({}))) as Record<string, any>;
+
+  // The simulator's one button. This route does not exist outside demo mode.
+  if (opts.demoTools) app.post("/api/demo/motion/:id/advance", guarded(async (c) => demoAdvance(db, deps, opts.demoTools!, c.req.param("id"))));
 
   app.get("/api/events/:id/motion", async (c) => { const o = await motionOverview(db, deps, c.req.param("id")); return o ? c.json(o) : bad("That event does not exist.", 404); });
   app.post("/api/events/:id/motion/start", guarded(async (c) => { const b = await body(c); return requestMotionCard(db, deps, c.req.param("id"), c.get("actor"), { purpose: b.purpose, verify_once: b.verify_once, write_leads: b.write_leads }); }));

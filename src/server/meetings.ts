@@ -3,6 +3,7 @@
 import type { Db } from "./db.ts";
 import { scheduleResume, stopDomain } from "./enroll-ops.ts";
 import { logActivity, newId, RuleError } from "./events.ts";
+import { canWrite, queueCreate } from "./crm-outbox.ts";
 import { drainOps } from "./sequences.ts";
 import { DESK, nowOf, type LifecycleDeps } from "./lifecycle-deps.ts";
 import { meetingReminderCard } from "./slack-cards.ts";
@@ -50,6 +51,10 @@ export async function recordOutcome(db: Db, deps: LifecycleDeps, meetingId: stri
     await q("UPDATE meetings SET status = $2, outcome_at = $3 WHERE id = $1", [m.id, status, now.toISOString()]);
     await q("UPDATE holds SET expires_at = $2 WHERE cause = 'meeting' AND cause_id = $1 AND released_at IS NULL", [m.id, new Date(now.getTime() + 14 * DAY).toISOString()]);
     await addTouch(q, { domain: m.domain, contact_id: m.contact_id, event_id: m.event_id, kind: `meeting_${status}`, source: actor, dedup_key: `mtg_out:${m.id}:${status}:${now.getTime()}` });
+    if (status === "held" && m.contact_id && canWrite(deps.crm)) {
+      const [p] = await q<{ person_id: string | null; email: string | null; full_name: string | null; company: string; name: string }>("SELECT k.person_id, k.email, k.full_name, co.name AS company, e.name FROM contacts k JOIN companies co ON co.id = k.company_id JOIN events e ON e.id = $2 WHERE k.id = $1", [m.contact_id, m.event_id]);
+      if (p?.email) await queueCreate(q, "campaign_member", `cm:${m.event_id}:${m.contact_id}:met`, p.person_id, { email: p.email.toLowerCase(), full_name: p.full_name, company: p.company, domain: m.domain, event_id: m.event_id, campaign: p.name, status: "Met" });
+    }
     await logActivity(q, m.event_id, actor, "meeting", `Recorded ${status.replace("_", " ")} on a meeting`);
     return { id: m.id, status };
   });

@@ -304,6 +304,10 @@ export interface Crm {
   accountFlags?(accounts: CrmAccountQuery[]): Promise<Record<string, { do_not_prospect: boolean }>>;
   /** Updates one record that exists. Absent means nothing is written back. */
   write?(record: CrmRecord, patch: CrmPatch): Promise<void>;
+  /** The event's Campaign. Looked up by the desk's key first, so a retry finds the one already made. */
+  findCampaignByKey?(key: string): Promise<{ id: string } | null>;
+  createCampaign?(a: { name: string; start: string; end: string; type: string; key: string }): Promise<{ id: string }>;
+  updateCampaignMemberStatus?(a: { campaign: string; record: CrmRecord; status: string }): Promise<void>;
   /** Salesforce refuses a duplicate member, so `CrmAlreadyExists` from here counts as done. */
   createCampaignMember?(a: { campaign: string; record: CrmRecord; key: string; status?: string }): Promise<{ id: string }>;
   /** Tasks can double on a retry, so the desk's key goes in a custom field and is looked for first. */

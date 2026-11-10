@@ -106,10 +106,13 @@ export async function createDrafts(db: Db, deps: LifecycleDeps, eventId: string,
     const reachable = people.filter((p) => (channel === "email" ? p.email && p.verify_1 : p.linkedin));
     const zoneOfPerson = (p: Person) => zoneGroupOf(p.location) === "event" ? zoneGroupOf(p.country) : zoneGroupOf(p.location);
     for (const [priority, zone] of [...new Set(reachable.map((p) => `${p.priority}|${zoneOfPerson(p)}`))].sort().map((k) => k.split("|") as [string, ZoneGroup])) {
-      const seq = await ensureSequence(db, deps, eventId, e.name, channel, priority, phase, zone, tool);
       const inIt = new Set((await db.query<{ contact_id: string }>("SELECT contact_id FROM enrollments WHERE contact_id = ANY($1::text[]) AND event_id = $2 AND channel = $3 AND state <> 'removed'", [reachable.map((p) => p.id), eventId, channel])).map((r) => r.contact_id));
       const fresh = reachable.filter((p) => p.priority === priority && zoneOfPerson(p) === zone && !inIt.has(p.id) && !heldOut(p.domain, e.holdout_percent));
       const results = await runGate(db, deps, eventId, fresh.map((p) => p.id), channel, "add");
+      for (const r of results) if (!r.passed) summary.refused[r.reason!] = (summary.refused[r.reason!] ?? 0) + 1;
+      // A sequence nobody can go into is not made.
+      if (!results.some((r) => r.passed)) continue;
+      const seq = await ensureSequence(db, deps, eventId, e.name, channel, priority, phase, zone, tool);
       const perDomain = new Map<string, number>();
       await db.tx(async (q) => {
         for (const r of results) {
@@ -123,7 +126,7 @@ export async function createDrafts(db: Db, deps: LifecycleDeps, eventId: string,
                      ON CONFLICT (sequence_id, contact_id) DO UPDATE SET state = 'adding', pending_op = 'add', cause = NULL, cause_id = NULL, retry_after = EXCLUDED.retry_after, changed_at = now()`,
               [newId("enr"), eventId, p.id, person_id, p.domain, seq.id, channel, later]);
             summary.added++;
-          } else summary.refused[r.reason!] = (summary.refused[r.reason!] ?? 0) + 1;
+          }
         }
         await logActivity(q, eventId, actor, "sequence", `Set up ${seq.name}: ${results.filter((r) => r.passed).length} added, ${results.filter((r) => !r.passed).length} held back`);
       });

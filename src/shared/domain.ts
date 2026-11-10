@@ -35,6 +35,8 @@ export type Flow = (typeof FLOWS)[number];
 export const DEFAULT_FLOW: Flow = "two_card";
 
 export interface EventRow {
+  /** Where the event is after delivery. */
+  motion?: string;
   id: string;
   name: string;
   venue: string;

@@ -400,7 +400,7 @@ describe("what a tool must prove", () => {
   it("a campaign can belong to one sequence only", async () => {
     const h = await deliveredInMotion(db);
     await readied(h);
-    const h2 = await deliveredInMotion(db);
+    const h2 = await deliveredInMotion(db, { csv: LIST.replace(/@/g, "2@").replace(/ana-ruiz|ben-ode|cleo-park|dan-ito/g, (m) => `${m}-2`) });
     await createDrafts(db, h2.deps, h2.id, MAYA);
     h2.deps.connectors = h.deps.connectors;
     const taken = (await seqOf(h, "linkedin")).external_id;

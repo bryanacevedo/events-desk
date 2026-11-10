@@ -30,9 +30,10 @@ import { mountBudgetRoutes } from "./budget-routes.ts";
 import { mountEventViews } from "./event-views.ts";
 import { mountLifecycle } from "./lifecycle-routes.ts";
 import type { LifecycleDeps } from "./lifecycle-deps.ts";
+import type { FakeTool } from "./connectors/fake.ts";
 import { validateRequest, type ActivityRow, type EventRow } from "../shared/domain.ts";
 
-export interface AppConfig { writeKey?: string; demo: boolean; /** Everything after delivery. Absent, those routes do not exist. */ lifecycle?: LifecycleDeps; /** The hosted demo: no login, so it takes no files a later visitor could read. */ publicDemo?: boolean; kick?: (eventId: string) => void; slack?: SlackConfig; sheets?: SheetPublisher; /** The model the ICP compile and test bench use. Defaults to the mock. */ llm?: Llm; /** The mail-server check used before the Research card. Defaults to the one for mock and simulated domains. */ dns?: Dns; /** The CRM an opt-out is queued for. */ crm?: Crm }
+export interface AppConfig { writeKey?: string; demo: boolean; /** Everything after delivery. Absent, those routes do not exist. */ lifecycle?: LifecycleDeps; demoTools?: Record<string, FakeTool>; /** The hosted demo: no login, so it takes no files a later visitor could read. */ publicDemo?: boolean; kick?: (eventId: string) => void; slack?: SlackConfig; sheets?: SheetPublisher; /** The model the ICP compile and test bench use. Defaults to the mock. */ llm?: Llm; /** The mail-server check used before the Research card. Defaults to the one for mock and simulated domains. */ dns?: Dns; /** The CRM an opt-out is queued for. */ crm?: Crm }
 type Ctx = { Variables: { actor: string } };
 
 const bad = (msg: string, status: 400 | 401 | 403 | 404 | 409 = 400) => Response.json({ error: msg }, { status });
@@ -160,7 +161,7 @@ export function createApp(db: Db, cfg: AppConfig) {
   });
 
   if (cfg.slack) mountSlack(app, db, cfg.slack, cfg.kick, cfg.lifecycle);
-  if (cfg.lifecycle) mountLifecycle(app, db, cfg.lifecycle, { bad, publicDemo: cfg.publicDemo });
+  if (cfg.lifecycle) mountLifecycle(app, db, cfg.lifecycle, { bad, publicDemo: cfg.publicDemo, demoTools: cfg.demoTools });
 
   // One route for every card. A single-card event gets its cost card. A two-card event gets the Research card from the mapped list, and the Outreach card once research is done.
   const quote = async (id: string, actor: string, flow: string, stage: string) => {

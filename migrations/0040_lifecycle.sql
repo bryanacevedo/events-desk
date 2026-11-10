@@ -8,7 +8,8 @@ ALTER TABLE events
   ADD COLUMN slack_thread text,
   ADD COLUMN verify_once boolean NOT NULL DEFAULT false,
   ADD COLUMN write_leads boolean NOT NULL DEFAULT false,
-  ADD COLUMN tools jsonb NOT NULL DEFAULT '{}'::jsonb;
+  ADD COLUMN tools jsonb NOT NULL DEFAULT '{}'::jsonb,
+  ADD COLUMN crm_campaign_id text;
 
 -- A suppression that rests only on a model's reading: honored at once, and a person confirms it.
 ALTER TABLE suppressions ADD COLUMN needs_confirmation boolean NOT NULL DEFAULT false;
@@ -283,7 +284,7 @@ CREATE TABLE integrity_runs (
 
 -- CRM writes that create records carry a key made here, so a retry cannot create a second one.
 ALTER TABLE crm_outbox DROP CONSTRAINT crm_outbox_kind_check;
-ALTER TABLE crm_outbox ADD CONSTRAINT crm_outbox_kind_check CHECK (kind IN ('email', 'opt_out', 'campaign_member', 'task', 'lead'));
+ALTER TABLE crm_outbox ADD CONSTRAINT crm_outbox_kind_check CHECK (kind IN ('email', 'opt_out', 'campaign', 'campaign_member', 'task', 'lead'));
 ALTER TABLE crm_outbox ADD COLUMN desk_key text UNIQUE;
 ALTER TABLE crm_outbox ADD COLUMN result_id text;
 

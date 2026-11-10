@@ -9,6 +9,7 @@ import { OLD_SHEET_ERROR, type EventRow, type Stage } from "../shared/domain";
 import { get, send, type Card, type CompanyRow, type EventPayload, type Page, type Pending, type PersonRow, type ReviewCase, type SeatRequest, type Spread, type TopUpCounts, type TopUpItem, type UploadItem } from "./api";
 import { Link, useActor } from "./App";
 import { Cases, openCases } from "./Cases";
+import { Motion } from "./Motion";
 import { Chevron, FileButton, ShowMore, SheetButton } from "./Patterns";
 import { isGtm } from "../shared/roles";
 import { Person } from "./Person";
@@ -638,6 +639,7 @@ export function StageBlock({ ev, go, compact }: { ev: EventState; go: (to: strin
           </section>
           {!compact && (
             <>
+              <Motion id={e.id} onChange={reload} />
               <ListBrief d={d} />
               <Cases eventId={e.id} cases={ev.cases} onChange={reload} />
               <PeopleTable id={e.id} hasPriorities={d.list.priorities.length > 0} reloadKey={reloads} />
@@ -737,16 +739,21 @@ function Meter({ label, used, cap, unit, money: asMoney = false }: { label: stri
   );
 }
 
-/** Where the event is, readable from across the room: five named steps, the one it is on lit, and who it is with. */
+/** After delivery the steps that built the list fold into one, and the same bar carries on. One timeline for the whole life of the event. */
+const AFTER: [string, string, string][] = [["none", "List ready", "Ready for outreach"], ["owners", "Owners", "With account owners"], ["sequencing", "Sequences", "Being set up"], ["in_market", "In market", "Live"], ["closing", "Closing", "Closing out"], ["scored", "Scored", ""]];
+
+/** Where the event is, readable from across the room: named steps, the one it is on lit, and who it is with. */
 function Stages({ e, approvers, cases }: { e: EventRow; approvers: string[]; cases: number }) {
   const ended = e.stage === "declined", paused = e.stage === "paused", running = isRunning(e.stage);
-  const at = ended ? -1 : stepAt(e, cases);
+  const after = e.stage === "delivered";
+  const at = ended ? -1 : after ? Math.max(0, AFTER.findIndex(([k]) => k === (e.motion ?? "none"))) : stepAt(e, cases);
+  const labels = after ? AFTER.map(([, l]) => l) : [...STEPS, "Outreach"];
   const w = waitingOn(e, approvers);
-  const caption = ended ? "" : e.stage === "ready_for_review" && cases > 0 ? plural(cases, "case") + " to settle" : paused ? "Paused" : running ? "Running now" : w.who ? `With ${w.who}` : "";
+  const caption = after ? AFTER[at][2] : ended ? "" : e.stage === "ready_for_review" && cases > 0 ? plural(cases, "case") + " to settle" : paused ? "Paused" : running ? "Running now" : w.who ? `With ${w.who}` : "";
   return (
     <ol className={`stages${ended ? " ended" : ""}${paused ? " paused" : ""}${running ? " running" : ""}`} aria-label="Stage">
-      {STEPS.map((label, i) => {
-        const state = i < at ? "done" : i === at ? "now" : "next";
+      {labels.map((label, i) => {
+        const state = i < at || (after && e.motion === "scored") ? "done" : i === at ? "now" : "next";
         return (
           <li key={label} className={state} aria-current={state === "now" ? "step" : undefined} style={{ "--s": i } as React.CSSProperties}>
             <span className="st-bar" aria-hidden="true"><i /></span>
