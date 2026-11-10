@@ -3,13 +3,13 @@
 import type { Db } from "./db.ts";
 import { crmConnected } from "./crm-checks.ts";
 import { getSettings } from "./approvals.ts";
-import { daysPast, SCORE_DAYS } from "./motion.ts";
+import { daysPast, LAST_DAY_SQL, SCORE_DAYS } from "./motion.ts";
 import { newId, RuleError } from "./events.ts";
-import { reserve, settle, spend, spendByStep } from "./ledger.ts";
+import { spend, spendByStep } from "./ledger.ts";
 import { DESK, nowOf, type LifecycleDeps } from "./lifecycle-deps.ts";
 import { moveMotion } from "./motion-state.ts";
-import { parseJson } from "./paid.ts";
-import { fill, promptHash } from "./prompts.ts";
+import { paidCall, parseJson } from "./paid.ts";
+import { fill } from "./prompts.ts";
 import { debriefCard, digestCard, scoreCard } from "./slack-cards.ts";
 import { postToEvent, queueEvent, raiseAlert } from "./operating.ts";
 import { addDays, localDay } from "../shared/motion.ts";
@@ -111,7 +111,7 @@ export async function writeScorecards(db: Db, deps: LifecycleDeps) {
   const now = nowOf(deps);
   let written = 0;
   const open = await db.query<{ id: string; motion: string; country: string | null; last_day: string; name: string }>(
-    `SELECT e.id, e.motion, e.country, e.name, coalesce((SELECT c.ends_on FROM catalog_events c WHERE c.id = e.catalog_id), e.starts_on)::text AS last_day FROM events e WHERE e.stage = 'delivered' AND e.parent_event_id IS NULL AND e.motion IN ('closing', 'scored')`);
+    `SELECT e.id, e.motion, e.country, e.name, ${LAST_DAY_SQL}::text AS last_day FROM events e WHERE e.stage = 'delivered' AND e.parent_event_id IS NULL AND e.motion IN ('closing', 'scored')`);
   for (const e of open) {
     const past = daysPast(e, now);
     for (const w of WINDOWS) {
@@ -132,8 +132,8 @@ export async function writeScorecards(db: Db, deps: LifecycleDeps) {
   return { written };
 }
 
-/** Past scores, for the moment a seat request for the same conference is decided. */
-export const pastScores = (db: Db, catalogId: string) => db.query<{ event_id: string; name: string; window_days: number; metrics: Scorecard }>(
+/** Past scores, for the moment a seat request for the same conference is decided. Each past event's latest window comes first. */
+export const pastScores = (db: Db | { query: Db["query"] }, catalogId: string) => db.query<{ event_id: string; name: string; window_days: number; metrics: Scorecard }>(
   `SELECT s.event_id, e.name, s.window_days, s.metrics FROM scorecards s JOIN events e ON e.id = s.event_id WHERE e.catalog_id = $1 ORDER BY e.starts_on DESC, s.window_days DESC`, [catalogId]);
 
 /* ---------------------------------------------------------------- debrief */
@@ -143,7 +143,7 @@ export const THEMES = ["pain", "competitor", "timing", "budget", "product_gap", 
 export async function sendDebriefPrompts(db: Db, deps: LifecycleDeps) {
   const now = nowOf(deps);
   const events = await db.query<{ id: string; name: string; country: string | null; last_day: string; delivered_on: string }>(
-    `SELECT e.id, e.name, e.country, coalesce((SELECT c.ends_on FROM catalog_events c WHERE c.id = e.catalog_id), e.starts_on)::text AS last_day, e.stage_changed_at::date::text AS delivered_on FROM events e WHERE e.stage = 'delivered' AND e.parent_event_id IS NULL`);
+    `SELECT e.id, e.name, e.country, ${LAST_DAY_SQL}::text AS last_day, e.stage_changed_at::date::text AS delivered_on FROM events e WHERE e.stage = 'delivered' AND e.parent_event_id IS NULL`);
   let sent = 0;
   for (const e of events) {
     const due = addDays(e.last_day > e.delivered_on ? e.last_day : e.delivered_on, 2);
@@ -179,31 +179,26 @@ interface RawFact { account?: unknown; theme?: unknown; fact?: unknown; quote?: 
 /** One call on the Motion card. Every fact must quote the debrief word for word or it is thrown away. With no card the answer is kept and no model reads it. */
 export async function extractDebriefs(db: Db, deps: LifecycleDeps) {
   const waiting = await db.query<{ id: string; event_id: string; body: string }>("SELECT id, event_id, body FROM debriefs WHERE status = 'answered' AND NOT extracted AND body IS NOT NULL");
-  const out = { extracted: 0, discarded: 0, no_card: 0 };
+  const out_ = { extracted: 0, discarded: 0, no_card: 0 };
   for (const d of waiting) {
-    const res = await reserve(db, d.event_id, "llm", 1, "debrief_extract");
-    if (!res) { out.no_card++; continue; }
-    let facts: RawFact[] = [];
-    try {
-      const r = await deps.llm.complete("debrief_extract", fill("debrief_extract", { themes: THEMES.join(", "), notes: d.body.replaceAll("NOTES>>>", "NOTES") }));
-      await settle(db, res, 1);
-      await db.query("INSERT INTO llm_calls (id, event_id, step, prompt_hash, model, input_tokens, output_tokens, output) VALUES ($1, $2, 'debrief_extract', $3, $4, $5, $6, $7)", [newId("llm"), d.event_id, promptHash("debrief_extract", deps.llm.model), r.model ?? deps.llm.model, r.input_tokens, r.output_tokens, r.text.slice(0, 4000)]);
-      const v = parseJson(r.text) as { facts?: unknown } | null;
-      if (Array.isArray(v?.facts)) facts = v!.facts as RawFact[];
-    } catch { await settle(db, res, 1); continue; }
+    const out = await paidCall(db, d.event_id, deps.llm, "debrief_extract", fill("debrief_extract", { themes: THEMES.join(", "), notes: d.body.replaceAll("NOTES>>>", "NOTES") }));
+    if (out.kind === "refused") { out_.no_card++; continue; }
+    if (out.kind === "failed") continue;
+    const v = parseJson(out.text) as { facts?: unknown } | null;
+    const facts: RawFact[] = Array.isArray(v?.facts) ? v!.facts as RawFact[] : [];
     await db.tx(async (q) => {
       for (const f of facts) {
         const quote = typeof f.quote === "string" ? f.quote : "", fact = typeof f.fact === "string" ? f.fact.trim() : "";
-        if (!quote.trim() || !fact || !d.body.includes(quote)) { out.discarded++; continue; }
+        if (!quote.trim() || !fact || !d.body.includes(quote)) { out_.discarded++; continue; }
         const dup = await q("SELECT 1 FROM debrief_facts WHERE debrief_id = $1 AND quote = $2", [d.id, quote]);
         if (dup.length) continue;
         await q("INSERT INTO debrief_facts (id, debrief_id, account, theme, fact, quote) VALUES ($1, $2, $3, $4, $5, $6)", [newId("fct"), d.id, typeof f.account === "string" ? f.account.slice(0, 200) : null, THEMES.includes(f.theme as never) ? f.theme : "general", fact.slice(0, 500), quote]);
-        out.extracted++;
+        out_.extracted++;
       }
       await q("UPDATE debriefs SET extracted = true WHERE id = $1", [d.id]);
     });
   }
-  return out;
+  return out_;
 }
 
 export async function reviewDebrief(db: Db, debriefId: string, actor: string, decision: "accepted" | "rejected") {

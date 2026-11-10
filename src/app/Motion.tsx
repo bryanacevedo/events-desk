@@ -5,7 +5,7 @@ import { get, send } from "./api";
 import { useActor } from "./App";
 import { Chevron, ExpandRow } from "./Patterns";
 import { Icon } from "./icons";
-import { money, num, plural } from "./words";
+import { money, num, plural, shortDate } from "./words";
 
 interface Sender { address: string; role: "primary" | "spare"; daily_share: number; health: number | null }
 interface Sequence { id: string; name: string; channel: "email" | "linkedin"; priority: string; connector: string; state: string; pause_reason: string | null; senders_needed: number | null; peak_daily: number | null; sender_status: "ok" | "short" | "not_visible" | null; sender_excluded: { address: string; reason: string }[]; enrolled: number; paused: number; senders: Sender[]; timing_note: string | null; external_id: string | null; checklist_at: string | null }
@@ -17,6 +17,7 @@ interface Overview {
   card: { status: string; llm_cap: number; est_cents: number } | null;
   sequences: Sequence[]; funnel: { kept: number; enrolled: number; sent: number; replied: number; booked: number; held: number } | null; owners: { status: string; n: number }[]; replies: Reply[]; meetings: Meeting[];
   captures: { id: string; full_name: string | null; company: string | null; rep: string }[]; regions: { region: string; people: number; basis: string | null }[]; live_score: Score | null;
+  post_event: { window: "before" | "during" | "after" | "closed"; last_day: string; last_press: string; started_at: string | null; started_by: string | null; groups: Record<string, number> } | null;
 }
 type Act = (m: "POST", p: string, b?: unknown, say?: string) => void;
 
@@ -93,6 +94,10 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
   const short = o.sequences.filter((x) => x.sender_status === "short").length;
   const pipeline = s ? s.influence.sourced.cents + s.influence.influenced.cents : 0;
   const top = s ? Math.max(s.cost.dollars_cents, pipeline, 1) : 1;
+  // After the event: the follow-up, by what happened there. A rep has the people who met someone, were hot at the booth, or replied.
+  const pe = o.post_event, g = pe?.groups ?? {};
+  const canFollowUp = Boolean(pe && pe.window === "after" && !pe.started_at && ["sequencing", "in_market"].includes(o.motion));
+  const withRep = (g.met ?? 0) + (g.hot ?? 0) + (g.replied ?? 0);
 
   return (
     <section className="motion" aria-label="Outreach" data-ready="1">
@@ -100,6 +105,7 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
         <h2 className="display">Outreach</h2>
         {demo && !["closing", "scored"].includes(o.motion) && <button className="btn small" disabled={busy} onClick={() => act("POST", `/api/demo/motion/${id}/advance`)}>{o.motion === "in_market" ? "Simulate replies" : "Next step"}</button>}
         {!demo && !started && (!o.card || o.card.status === "declined") && <button className="btn small" disabled={busy} onClick={() => act("POST", `/api/events/${id}/motion/start`)}>Start outreach</button>}
+        {canFollowUp && <button className="btn small" disabled={busy} onClick={() => act("POST", `/api/events/${id}/motion/sequences`, undefined, "The follow-up is set up. Each sequence waits for its launch checklist.")}>Start the follow-up</button>}
       </div>
       {note && <p className="m-note" role="status">{note}</p>}
       {error && <p className="error" role="alert">{error}</p>}
@@ -110,6 +116,18 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
           {!started && o.capacity && <li><span>Healthy inboxes</span><b>{o.capacity.healthy < o.capacity.needed ? <span className="fig over"><b>{o.capacity.needed - o.capacity.healthy}</b> short of {o.capacity.needed}</span> : `${o.capacity.healthy} for ${o.capacity.needed} needed`}</b></li>}
         </ul>
       )}
+
+      {pe && started && pe.window === "during" && <p className="m-line">The event is on. The follow-up can start the day after it ends, {shortDate(pe.last_day)}.</p>}
+      {canFollowUp && (
+        <ul className="m-rows m-wide" aria-label="Follow-up after the event">
+          <li><span>Scanned at the booth</span><b>{num(g.scanned ?? 0)}</b></li>
+          <li><span>Reached before, no reply</span><b>{num(g.reached ?? 0)}</b></li>
+          <li><span>Not reached before</span><b>{num(g.not_reached ?? 0)}</b></li>
+          {withRep > 0 && <li><span>With a rep, not sequenced</span><b>{num(withRep)}</b></li>}
+          <li><span>The button works until</span><b>{shortDate(pe!.last_press)}</b></li>
+        </ul>
+      )}
+      {pe?.started_at && <p className="m-line">Follow-up started by {pe.started_by ?? "someone"} on {when(pe.started_at)}</p>}
 
       {started && f && (
         <section className="brief" aria-label="Outreach in brief">

@@ -9,7 +9,7 @@ import { DEFAULT_FLOW, moveError, type EventRow, type Flow, type Stage } from ".
 
 export const newId = (p: string) => `${p}_${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`;
 
-export const EVENT_COLS = `id, name, venue, starts_on::text AS starts_on, seat_count, seat_price_cents, stage, paused_from,
+export const EVENT_COLS = `id, name, venue, starts_on::text AS starts_on, ends_on::text AS ends_on, seat_count, seat_price_cents, stage, paused_from,
   decline_reason, requested_by, created_at, updated_at, stage_changed_at, country, flow, parent_event_id, ended_at, merged_at, motion`;
 
 export class RuleError extends Error {}
@@ -19,13 +19,13 @@ export class TopUpClosed extends RuleError {}
 export const logActivity = (q: Db["query"], eventId: string, actor: string, kind: string, detail: string) =>
   q("INSERT INTO activity_log (id, event_id, actor, kind, detail) VALUES ($1, $2, $3, $4, $5)", [newId("act"), eventId, actor, kind, detail]);
 
-export async function createEvent(db: Db, actor: string, b: { name: string; venue?: string; starts_on: string; seat_count: number; seat_price_cents: number; country?: string | null; flow?: Flow }, fixedId?: string, approvers?: string[]) {
+export async function createEvent(db: Db, actor: string, b: { name: string; venue?: string; starts_on: string; ends_on?: string | null; seat_count: number; seat_price_cents: number; country?: string | null; flow?: Flow }, fixedId?: string, approvers?: string[]) {
   return db.tx(async (q) => {
     const id = fixedId ?? newId("evt");
     const [row] = await q<EventRow>(
-      `INSERT INTO events (id, name, venue, starts_on, seat_count, seat_price_cents, requested_by, country, flow)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING ${EVENT_COLS}`,
-      [id, b.name.trim(), b.venue?.trim() ?? "", b.starts_on, b.seat_count, b.seat_price_cents, actor, b.country?.trim() || null, b.flow ?? DEFAULT_FLOW],
+      `INSERT INTO events (id, name, venue, starts_on, ends_on, seat_count, seat_price_cents, requested_by, country, flow)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING ${EVENT_COLS}`,
+      [id, b.name.trim(), b.venue?.trim() ?? "", b.starts_on, b.ends_on || null, b.seat_count, b.seat_price_cents, actor, b.country?.trim() || null, b.flow ?? DEFAULT_FLOW],
     );
     await q("INSERT INTO event_settings (event_id, settings) VALUES ($1, $2::jsonb)", [id, JSON.stringify({ ...JSON.parse(readFileSync(new URL("../../config/defaults.json", import.meta.url), "utf8")), ...(approvers ? { approvers } : {}) })]);
     await q("INSERT INTO approvals (id, event_id, kind, requested_by) VALUES ($1, $2, 'seats', $3)", [newId("apr"), id, actor]);

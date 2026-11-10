@@ -116,6 +116,33 @@ A sequence that does not have enough healthy senders does not go out. Built in `
 - **While it runs.** Every sweep re-reads every sender. One that goes bad is dropped and a spare takes over. With no spare left, the sequence pauses and a person hears.
 - **What a tool cannot do.** A tool that does not show its accounts (Gong) is marked "not visible" and the screen says the desk cannot vouch for them. A tool that shows them but cannot be told which to use (HeyReach) gets a named list for a person to attach.
 
+## 5b. The post-event wave
+
+Status: built on `v2`, 2026-11-09, in `src/server/post-event.ts`, tested in `tests/post-event.test.ts`. Before it, pre-event sequences ended on the event's first day and nothing started the follow-up: a person had to remember to press set up again, and a press on day one already counted as "post". A fresh review of the spec found nine gaps before building; each is answered below.
+
+**When.** An event's days are its catalog dates, or its own `ends_on` for a custom multi-day event, or its start date for a one-day event, in the event's local time. Pre-event sequences end on the first day. While the event is on, set up refuses. The day after the last day, the event's channel gets a card for the person who uploaded the list: who goes into the follow-up, in groups, **after every check has run**, with the reasons the rest are held back, and one button. Anyone on the desk can press it there or on the Outreach screen. Nothing starts without a press. One business day without a press brings one reminder. The button works until 10 days after the last day; after that, set up says the window has closed. An event whose owners are still deciding gets its card once they are done, if the window is still open.
+
+**Who, by what happened at the event.** After the event, that matters more than the tier did. Each person is in the first group that fits:
+
+| Group | Who | What happens |
+|---|---|---|
+| Met | A meeting at this event (any status), an on-site meeting, or a quick-add capture | Nothing automated. A rep has them. |
+| Hot | A capture marked hot | At capture time: a task in the CRM and a card in the event's channel for the rep who had the conversation, the same day. Never sequenced. |
+| Replied | Replied to anything for this event, other than an out-of-office or a bounce | Nothing automated. The reply flow and a rep have them. |
+| Scanned | A badge scan, including walk-ups who were never on the list | The `scanned` post-event template |
+| Reached | Sent at least one pre-event step for this event | The `reached` template |
+| Not reached | Everyone else kept on the list | The `not_reached` template |
+
+Each group falls back to the general post-event template when it has none of its own. Copy for "not reached" should not assume the person came: the list is registrants, and nothing tells the desk who attended unless they were scanned. The gate still runs for everyone: a walk-up with an email nobody verified does not go in by email, a person at a company with a meeting is held by that meeting, and a no or an opt-out keeps them out.
+
+**Who can come back.** Ending a sequence on the calendar relabels only people who were simply in it. Anyone already paused keeps their own reason (a meeting, a reply, a booth conversation), so they cannot slip into the follow-up. Found by the review: before this, the event starting relabeled everyone, which would have put someone who said "interested" before the event into the wave.
+
+**How long.** A post-event template's last step comes at most 10 days after its first, checked when it is approved. Post-event sequences end 24 days after the last day, so one started on the last allowed day finishes, and at scoring at the latest. The event moving to closing at day 14 no longer cuts them short. A draft that never got a campaign in its tool ends on the same calendar.
+
+**Same rules as every sequence:** the gate at add, launch and resume, sender sizing and health, the launch checklist, the first cohort, the CRM trail. Post-event sequences are keyed by channel, group and zone (the group lives in the `priority` column), where pre-event ones are keyed by channel, priority and zone.
+
+**Not built:** a hand-off at the end of the wave (nurture is the CRM's), and telling attendees from registrants beyond badge scans.
+
 ## 6. Touch log and holds
 
 `touches (id, domain, person_id null, contact_id null, event_id, kind, channel, reason, at, source, dedup_key unique)`.

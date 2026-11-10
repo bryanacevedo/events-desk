@@ -3,7 +3,7 @@
 import type { Hono } from "hono";
 import type { Db } from "./db.ts";
 import { cleanNames, renderStep, type TemplateStep } from "../shared/template-check.ts";
-import { computeScorecard, recordEventCost, answerDebrief, learningTable, reviewDebrief, decideProposal } from "./closeout.ts";
+import { computeScorecard, recordEventCost, answerDebrief, droppedWhoDealt, learningTable, reviewDebrief, decideProposal } from "./closeout.ts";
 import { RuleError } from "./events.ts";
 import type { LifecycleDeps } from "./lifecycle-deps.ts";
 import type { FakeTool } from "./connectors/fake.ts";
@@ -21,6 +21,7 @@ import { addSlots, bookSlot, prepBrief, repDay, roster } from "./rep-day.ts";
 import { isGtm } from "../shared/roles.ts";
 import { MOTION_LABEL } from "../shared/motion.ts";
 import { pickSenders, planCapacity } from "../shared/sending.ts";
+import { postEventState } from "./post-event.ts";
 
 type App = Hono<{ Variables: { actor: string } }>;
 /** A webhook is outside input: bounded in size and in how many events one call can carry. */
@@ -63,6 +64,7 @@ export async function motionOverview(db: Db, deps: LifecycleDeps, id: string) {
   const counts = new Map<string, number>();
   for (const p of people) counts.set(regionOf(p), (counts.get(regionOf(p)) ?? 0) + 1);
   return {
+    post_event: await postEventState(db, deps, id),
     motion: e.motion, label: MOTION_LABEL[e.motion], stage: e.stage, tools: e.tools, verify_once: e.verify_once, write_leads: e.write_leads, started_by: e.outreach_started_by,
     connectors: Object.values(deps.connectors).map((c) => ({ name: c.name, channels: c.channels, simulated: Boolean(c.simulated), capabilities: c.capabilities })),
     poll_minutes: deps.pollMinutes ?? 5, crm_connected: Boolean(deps.crm?.connected),
@@ -124,7 +126,12 @@ export function mountLifecycle(app: App, db: Db, deps: LifecycleDeps, opts: { ba
   app.get("/api/motion/templates", async (c) => c.json({ templates: await db.query("SELECT id, name, version, channel, phase, steps, external_id, approved_by, approved_at::text AS approved_at FROM sequence_templates WHERE retired_at IS NULL ORDER BY channel, phase") }));
   app.post("/api/motion/templates", guarded(async (c) => { if (!isGtm(c.get("actor"))) throw new RuleError("Templates are GTM Engineering's to approve."); const b = await body(c); return approveTemplate(db, c.get("actor"), { name: String(b.name ?? ""), channel: b.channel, phase: b.phase, steps: Array.isArray(b.steps) ? b.steps : [], external_id: b.external_id ?? null }); }));
   app.post("/api/motion/placement", guarded(async (c) => { if (!isGtm(c.get("actor"))) throw new RuleError("Placement results are GTM Engineering's to record."); const b = await body(c); return recordPlacement(db, { domain: String(b.domain ?? ""), inbox_rate: Number(b.inbox_rate), tool: String(b.tool ?? "manual"), tested_at: String(b.tested_at ?? new Date().toISOString()) }); }));
-  app.get("/api/motion/learning", async (c) => c.json({ table: await learningTable(db), proposals: await db.query("SELECT id, kind, subject, evidence, edit, status FROM learning_proposals ORDER BY created_at DESC") }));
+  app.get("/api/motion/learning", async (c) => {
+    // People the desk dropped whose company later has a deal: the tiering's misses. Needs the CRM; when it cannot answer, the rest still loads.
+    let dropped_who_dealt: Awaited<ReturnType<typeof droppedWhoDealt>> | null = null;
+    try { dropped_who_dealt = await droppedWhoDealt(db, deps); } catch { dropped_who_dealt = null; }
+    return c.json({ table: await learningTable(db), dropped_who_dealt, proposals: await db.query("SELECT id, kind, subject, evidence, edit, status FROM learning_proposals ORDER BY created_at DESC") });
+  });
   app.post("/api/motion/learning/:pid", guarded(async (c) => { if (!isGtm(c.get("actor"))) throw new RuleError("Suggestions to the ICP are GTM Engineering's to decide."); return decideProposal(db, c.req.param("pid"), c.get("actor"), (await body(c)).status); }));
 
   /* A tool's webhook. The connector proves the call came from the tool. The answer goes back at once and the work follows, so a slow pass never makes the tool give up on the hook. */

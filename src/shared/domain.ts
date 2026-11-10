@@ -122,6 +122,7 @@ export const stageLabel = (s: Stage) => LABEL[s];
 export function validateRequest(b: Record<string, unknown>): string | null {
   if (typeof b.name !== "string" || !b.name.trim()) return "Name the event.";
   if (typeof b.starts_on !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(b.starts_on)) return "Give the event's start date.";
+  if (b.ends_on !== undefined && b.ends_on !== null && b.ends_on !== "" && (typeof b.ends_on !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(b.ends_on) || b.ends_on < (b.starts_on as string))) return "The last day is a date on or after the first.";
   if (!Number.isInteger(b.seat_count) || (b.seat_count as number) < 1) return "Ask for at least 1 seat.";
   if (!Number.isInteger(b.seat_price_cents) || (b.seat_price_cents as number) < 0) return "Give the price per seat.";
   if (b.country !== undefined && b.country !== null && (typeof b.country !== "string" || b.country.length > 80)) return "Give the country as text.";

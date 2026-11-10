@@ -1,5 +1,6 @@
 /* One pass over everything with a clock or a queue after delivery. Started on a timer in node.ts; tests call it directly with a chosen time. A step that fails is logged and the rest still run. */
 
+import { DAY } from "../shared/policy.ts";
 import type { Db } from "./db.ts";
 import { closeOut } from "./motion.ts";
 import { drainQuietly } from "./crm-outbox.ts";
@@ -10,11 +11,12 @@ import { openOwnerDecisions, ownerSweep, sendOwnerCards } from "./owners.ts";
 import { ingestEvents, processInbound } from "./replies.ts";
 import { bounceWatch, calendarSweep, drainOps, flagSweep, observeSequences, pauseSequenceById, resumeDue } from "./sequences.ts";
 import { senderSweep } from "./sending.ts";
+import { postEventStep } from "./post-event.ts";
 import { blindSweep, drainNotifications, escalateWaiting, purgeOldBodies, raiseAlert, recordRun } from "./operating.ts";
 import { dailyDigest } from "./closeout.ts";
 
 export async function pollTools(db: Db, deps: LifecycleDeps) {
-  const since = new Date(nowOf(deps).getTime() - 3 * 86_400_000).toISOString();
+  const since = new Date(nowOf(deps).getTime() - 3 * DAY).toISOString();
   for (const c of Object.values(deps.connectors)) {
     if (c.capabilities.events === "webhook") continue;
     // A campaign that ended still gets replies, and "remove me" can come late: they are read for 30 days after.
@@ -84,6 +86,7 @@ async function tickOnce(db: Db, deps: LifecycleDeps, opts: { flags?: boolean; ni
   await quietly("extract", () => extractDebriefs(db, deps));
   await quietly("close", () => closeOut(db, deps));
   await quietly("calendar", () => calendarSweep(db, deps));
+  await quietly("post-event", () => postEventStep(db, deps));
   await quietly("score", () => writeScorecards(db, deps));
   await quietly("outbox", () => drainQuietly(db, deps.crm));
   if (opts.nightly) { await quietly("digest", () => dailyDigest(db, deps)); await quietly("purge", () => purgeOldBodies(db, deps)); await quietly("learn", () => proposeEdits(db)); await quietly("integrity", () => integrityCheck(db, deps)); }

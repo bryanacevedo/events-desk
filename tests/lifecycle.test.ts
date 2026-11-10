@@ -258,8 +258,8 @@ describe("sequences", () => {
     expect((await createDrafts(db, h.deps, h.id, MAYA)).added).toBe(0);
   });
 
-  it("uses a post-event template after the first day", async () => {
-    const t = clock("2027-06-01T12:00:00Z");
+  it("uses a post-event template after the last day", async () => {
+    const t = clock("2027-02-03T12:00:00Z");
     const h = await deliveredInMotion(db, { time: t });
     await createDrafts(db, h.deps, h.id, MAYA);
     const [s] = await db.query<{ phase: string }>("SELECT t.phase FROM sequences s JOIN sequence_templates t ON t.id = s.template_id WHERE s.event_id = $1 LIMIT 1", [h.id]);
@@ -346,15 +346,18 @@ describe("sequences", () => {
 
 describe("the calendar", () => {
   it("stops pre-event copy on the first day, and starts a separate post-event sequence", async () => {
-    const t = clock("2026-12-20T12:00:00Z");
+    const t = clock("2027-01-20T12:00:00Z");
     const h = await deliveredInMotion(db, { time: t });
     const { e } = await launched(h);
     const ana = await personAt(db, h.id, "Ana Ruiz");
-    t.set("2027-01-01T12:00:00Z");
+    t.set("2027-02-01T12:00:00Z");
     await calendarSweep(db, h.deps);
     await drainOps(db, h.deps);
     expect(h.email.seqs.get(e.external_id)!.status).toBe("2");
     expect((await enrollmentStates(db, ana.id)).find((x) => x.channel === "email")).toMatchObject({ state: "removed", cause: "event_started" });
+    // While the event is on, nothing new starts. The day after, the follow-up.
+    await expect(createDrafts(db, h.deps, h.id, MAYA)).rejects.toThrow(/is on/);
+    t.set("2027-02-02T12:00:00Z");
     await db.query("UPDATE verification_cache SET checked_at = $1", [t.now.toISOString()]);
     await createDrafts(db, h.deps, h.id, MAYA);
     expect((await db.query<{ phase: string }>("SELECT phase FROM sequences WHERE event_id = $1 AND channel = 'email' ORDER BY created_at", [h.id])).map((x) => x.phase)).toEqual(["pre", "post"]);

@@ -1,10 +1,12 @@
 /* The gate (docs/LIFECYCLE.md, section 5). It runs at every moment someone could be contacted: at adding, at launch and at every resume. In doubt about whether someone may be contacted, it says no. */
 
+import { DAY, HOUR, NOT_INTERESTED_COOL_OFF_DAYS, NOT_NOW_COOL_OFF_DAYS } from "../shared/policy.ts";
 import type { Db } from "./db.ts";
 import { isOptedOut, isWrongPerson } from "./caches.ts";
 import { CrmDown, crmConnected, preSendCheck } from "./crm-checks.ts";
 import { newId } from "./events.ts";
 import { nowOf, type LifecycleDeps } from "./lifecycle-deps.ts";
+import { sendingStopped } from "./enroll-ops.ts";
 import { activeHolds } from "./touches.ts";
 import { linkContact } from "./person-record.ts";
 import { nameKey } from "../shared/email.ts";
@@ -19,8 +21,6 @@ export interface GatePerson {
   verified_at: string | null; verify_once: boolean; decision: string | null; decided_at: string | null; decided_via: string | null;
 }
 
-const DAY = 86_400_000;
-const HOUR = 3_600_000;
 const VERIFY_WINDOW_DAYS = 30;
 const RECENT_ACTIVITY_DAYS = 14;
 
@@ -78,7 +78,7 @@ async function localChecks(db: Db, p: GatePerson, channel: Channel, now: Date, b
        UNION ALL SELECT t.kind, t.at FROM touches t WHERE $2::text IS NOT NULL AND t.person_id = $2 AND t.kind IN ('reply_not_interested', 'reply_not_now') AND t.person_id IS NOT NULL
        UNION ALL SELECT t.kind, t.at FROM contacts k JOIN touches t ON t.contact_id = k.id WHERE $3::text IS NOT NULL AND lower(k.email) = lower($3) AND k.email IS NOT NULL AND t.kind IN ('reply_not_interested', 'reply_not_now')
      ) x WHERE at <= $4::timestamptz ORDER BY at DESC LIMIT 1`, [p.id, p.person_id, p.email, now.toISOString()]);
-  if (no) { const until = Date.parse(no.at) + (no.kind === "reply_not_now" ? 90 : 180) * DAY; if (until > now.getTime()) return no_("cool_off", new Date(until)); }
+  if (no) { const until = Date.parse(no.at) + (no.kind === "reply_not_now" ? NOT_NOW_COOL_OFF_DAYS : NOT_INTERESTED_COOL_OFF_DAYS) * DAY; if (until > now.getTime()) return no_("cool_off", new Date(until)); }
   // A reply waiting on a person: they stay stopped until someone decides.
   const [waiting] = await db.query("SELECT 1 FROM inbound_messages WHERE contact_id = $1 AND (status = 'received' OR (doubtful AND decided_at IS NULL)) LIMIT 1", [p.id]);
   if (waiting) return no_("reply_waiting");
@@ -112,7 +112,7 @@ async function recentActivity(db: Db, deps: LifecycleDeps, p: GatePerson, now: D
 export async function runGate(db: Db, deps: LifecycleDeps, eventId: string, contactIds: string[], channel: Channel, moment: Moment): Promise<GateResult[]> {
   const now = nowOf(deps);
   // The one switch. Nothing is added, launched or resumed while it is on.
-  if ((await db.query("SELECT 1 FROM desk_controls WHERE sending_stopped_at IS NOT NULL")).length) return contactIds.map((id) => ({ contact_id: id, passed: false, reason: "desk_stopped", retry_after: new Date(now.getTime() + HOUR) }));
+  if (await sendingStopped(db.query)) return contactIds.map((id) => ({ contact_id: id, passed: false, reason: "desk_stopped", retry_after: new Date(now.getTime() + HOUR) }));
   const people = await loadPeople(db, eventId, contactIds);
   const bases = new Set((await db.query<{ region: string }>("SELECT region FROM legal_bases WHERE event_id = $1", [eventId])).map((r) => r.region));
   const out = new Map<string, GateResult>();

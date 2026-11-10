@@ -88,6 +88,22 @@ export function parseJson(text: string): unknown {
   try { return JSON.parse(bare.slice(open, close + 1)); } catch { return null; }
 }
 
+/** One paid model call against an event's card, for the steps after delivery: reserve, call, settle, and log the full output.
+    A call the provider says it did not bill is refunded. `refused` when the card has run out; `failed` when the call did not come back. */
+export async function paidCall(db: Db, eventId: string, llm: Llm, step: Step, prompt: string): Promise<{ kind: "ok"; text: string } | { kind: "refused" } | { kind: "failed" }> {
+  const res = await reserve(db, eventId, "llm", 1, step);
+  if (!res) return { kind: "refused" };
+  try {
+    const out = await llm.complete(step, prompt);
+    await settle(db, res, 1);
+    await db.query("INSERT INTO llm_calls (id, event_id, step, prompt_hash, model, input_tokens, output_tokens, output) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)", [newId("llm"), eventId, step, promptHash(step, llm.model), out.model ?? llm.model, out.input_tokens, out.output_tokens, out.text]);
+    return { kind: "ok", text: out.text };
+  } catch (e) {
+    await settle(db, res, e instanceof VendorError && e.charged === 0 ? 0 : 1);
+    return { kind: "failed" };
+  }
+}
+
 /** One retry on an invalid answer, which the card pays for. `attempts: 1` is for steps the card prices at one call (the website read, the second look).
     `llm` lets a step use another model than the default. An answer that could not be read is `error` with why "invalid"; a provider failure is why "vendor". */
 export async function decide<T>(c: Ctx, step: Step, prompt: string, valid: (v: unknown) => T | null, opts: { llm?: Llm; attempts?: number; hint?: unknown } = {}): Promise<Paid<T>> {

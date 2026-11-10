@@ -319,6 +319,7 @@ describe("what goes out", () => {
     expect(timingFits([0, 3, 7], 5, 30).fits).toBe(true);
     expect(timingFits([0, 3, 7], 5, 8)).toEqual({ needed: 12, fits: false });
     const h = await deliveredInMotion(db, { time: clock("2026-12-30T12:00:00Z") });
+    await db.query("UPDATE events SET starts_on = '2027-01-01' WHERE id = $1", [h.id]);
     await createDrafts(db, h.deps, h.id, MAYA);
     expect((await db.query<{ timing_note: string | null }>("SELECT timing_note FROM sequences WHERE event_id = $1 AND channel = 'email'", [h.id]))[0].timing_note).toMatch(/cut off/);
   });

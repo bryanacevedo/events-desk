@@ -61,8 +61,9 @@ export interface Connector {
   createSequence(name: string, templateId: string, senders: string[]): Promise<string>;
   addContacts(sequenceId: string, people: AddContact[]): Promise<AddResult[]>;
   removeContact(sequenceId: string, externalId: string): Promise<void>;
-  pauseContact(sequenceId: string, externalId: string): Promise<void>;
-  resumeContact(sequenceId: string, externalId: string): Promise<void>;
+  /** Only a tool whose capabilities say `pause: "contact"`, and then both; the contract suite holds every tool to it. A remove-only tool leaves them out and the desk removes and re-adds instead. */
+  pauseContact?(sequenceId: string, externalId: string): Promise<void>;
+  resumeContact?(sequenceId: string, externalId: string): Promise<void>;
   pauseSequence(sequenceId: string): Promise<void>;
   sequenceState(sequenceId: string): Promise<SequenceState>;
   /** Everything since `since`, on these sequences. May return an event twice: the desk removes duplicates by provider id. */

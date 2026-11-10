@@ -60,3 +60,6 @@ export async function stopInEvent(q: Q, contactId: string, eventId: string, caus
 export const scheduleResume = (q: Q, where: { cause: string; causeId?: string; contactIds?: string[] }, at: Date) => q(
   `UPDATE enrollments SET resume_at = $1 WHERE state = 'paused' AND cause = $2 AND ($3::text IS NULL OR cause_id = $3) AND ($4::text[] IS NULL OR contact_id = ANY($4::text[]))`,
   [at.toISOString(), where.cause, where.causeId ?? null, where.contactIds ?? null]);
+
+/** The one switch: true while all sending is stopped. Read at every gate, drain and observation, never cached, so a stop takes effect on the next row. */
+export const sendingStopped = async (q: Q) => (await q("SELECT 1 FROM desk_controls WHERE sending_stopped_at IS NOT NULL LIMIT 1")).length > 0;

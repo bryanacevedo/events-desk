@@ -47,6 +47,7 @@ describe("a rep's day", () => {
 describe("after the event", () => {
   it("a badge scan does not stop anyone: it gets the scanned follow-up, from its own template", async () => {
     const h = await deliveredInMotion(db, { time: clock("2027-01-05T12:00:00Z") });
+    await db.query("UPDATE events SET starts_on = '2027-01-01' WHERE id = $1", [h.id]);
     const ana = await personAt(db, h.id, "Ana Ruiz");
     await captureOnsite(db, h.deps, h.id, "Rep A", { email: ana.email, source: "badge_scan" });
     expect((await db.query<{ followup_tier: string }>("SELECT followup_tier FROM contacts WHERE id = $1", [ana.id]))[0].followup_tier).toBe("scanned");

@@ -8,6 +8,9 @@ import { DESK, nowOf, type LifecycleDeps } from "./lifecycle-deps.ts";
 import { moveMotion } from "./motion-state.ts";
 import { DEFAULT_MOTION_RATES, daysBetween, localDay, quoteMotion, type Motion } from "../shared/motion.ts";
 
+/** An event's last day, in SQL over `events e`: the catalog's end date, then the event's own, then its start date for a one-day event. */
+export const LAST_DAY_SQL = "coalesce((SELECT c.ends_on FROM catalog_events c WHERE c.id = e.catalog_id), e.ends_on, e.starts_on)";
+
 export interface StartOptions { purpose?: "outreach" | "debrief_only"; verify_once?: boolean; write_leads?: boolean; holdout_percent?: number }
 
 /** Asks for the Motion card. While it waits, the event stays where it is. */
@@ -56,7 +59,7 @@ export const SCORE_DAYS = 30;
 interface Clock { id: string; motion: Motion; country: string | null; last_day: string; delivered_on: string }
 /** Events with a clock running. The last day is the catalog's end date, else the start date. */
 export const clocks = (db: Db) => db.query<Clock>(
-  `SELECT e.id, e.motion, e.country, coalesce((SELECT c.ends_on FROM catalog_events c WHERE c.id = e.catalog_id), e.starts_on)::text AS last_day, e.stage_changed_at::date::text AS delivered_on
+  `SELECT e.id, e.motion, e.country, ${LAST_DAY_SQL}::text AS last_day, e.stage_changed_at::date::text AS delivered_on
    FROM events e WHERE e.stage = 'delivered' AND e.parent_event_id IS NULL AND e.motion <> 'scored'`);
 
 export const daysPast = (c: Pick<Clock, "last_day" | "country">, now: Date) => daysBetween(c.last_day, localDay(now, c.country));

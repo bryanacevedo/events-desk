@@ -1,15 +1,15 @@
 /* The sending layer (docs/LIFECYCLE.md, section 5a): how many inboxes each sequence needs, the healthiest ones to use, proof they land in the inbox, and watching them while the sequence runs. A sequence that does not have enough healthy senders does not go out. */
 
+import { DAY } from "../shared/policy.ts";
 import type { Db } from "./db.ts";
 import type { Connector, SendSettings } from "./connectors/types.ts";
 import { logActivity } from "./events.ts";
 import { DESK, nowOf, type LifecycleDeps } from "./lifecycle-deps.ts";
 import { openLifecycleCase } from "./lifecycle-cases.ts";
 import { copyHash, type TemplateStep } from "../shared/template-check.ts";
-import { DEFAULT_SENDING_RULES, pickSenders, planCapacity, timingFits, type SenderInfo, type SendingRules } from "../shared/sending.ts";
+import { DEFAULT_SENDING_RULES, pickSenders, planCapacity, senderProblem, timingFits, type SenderInfo, type SendingRules } from "../shared/sending.ts";
 import { businessDaysAfter, GROUP_ZONE, localDay, zoneOf, type Channel, type ZoneGroup } from "../shared/motion.ts";
 
-const DAY = 86_400_000;
 export interface PlacementResult { domain: string; provider?: string; inbox_rate: number; tool: string; tested_at: string }
 /** Mail lands differently at each. A blended number hides the one that matters. */
 export const PLACEMENT_PROVIDERS = ["google", "microsoft"];
@@ -133,12 +133,20 @@ export async function applySendSettings(db: Db, deps: LifecycleDeps, sequenceId:
   const want = settingsFor(s.zone_group, s.country, s.peak_daily ?? 0);
   await c.applySettings(s.external_id, want);
   const got = await c.readSettings!(s.external_id);
-  const ok = JSON.stringify(got) === JSON.stringify(want);
+  const ok = sameSettings(got, want);
   let hash: string | null = null;
   if (c.pushCopy) { const [t] = await db.query<{ steps: TemplateStep[] }>("SELECT t.steps FROM sequence_templates t JOIN sequences q ON q.template_id = t.id WHERE q.id = $1", [s.id]); await c.pushCopy(s.external_id, t.steps); hash = copyHash(t.steps); }
   await db.query("UPDATE sequences SET settings_ok = $2, copy_hash = $3 WHERE id = $1", [s.id, ok, hash]);
   if (deps.webhookBase && c.registerWebhooks) { await c.registerWebhooks(s.external_id, `${deps.webhookBase.replace(/\/$/, "")}/hooks/sequencer/${c.name}`); await db.query("UPDATE sequences SET hooks_at = now() WHERE id = $1", [s.id]); }
   return { ok, want };
+}
+
+/** Field by field, so a tool that returns its keys or sending days in another order is not read as changed. */
+export function sameSettings(got: SendSettings | null | undefined, want: SendSettings) {
+  if (!got) return false;
+  const days = (d: number[]) => [...new Set(d)].sort((a, b) => a - b).join(",");
+  return got.timezone === want.timezone && got.from === want.from && got.to === want.to && days(got.days ?? []) === days(want.days)
+    && got.stop_on_reply === want.stop_on_reply && got.track_opens === want.track_opens && got.track_links === want.track_links && got.daily_limit === want.daily_limit;
 }
 
 export const settingsFor = (zone: ZoneGroup, country: string | null, daily: number): SendSettings => ({
@@ -152,7 +160,7 @@ export async function settingsConfirmed(db: Db, deps: LifecycleDeps, c: Connecto
   const [e] = await db.query<{ country: string | null; peak_daily: number | null; copy_hash: string | null }>("SELECT e.country, q.peak_daily, q.copy_hash FROM sequences q JOIN events e ON e.id = q.event_id WHERE q.id = $1", [s.id]);
   // The words that go out are the words a person approved.
   if (c.readCopy && e.copy_hash) { const live = await c.readCopy(s.external_id!); if (!live || copyHash(live) !== e.copy_hash) return false; }
-  return JSON.stringify(await c.readSettings(s.external_id!)) === JSON.stringify(settingsFor(s.zone_group, e.country, e.peak_daily ?? 0));
+  return sameSettings(await c.readSettings(s.external_id!), settingsFor(s.zone_group, e.country, e.peak_daily ?? 0));
 }
 
 /** True when the sequence may go out. A sequence that is short pauses instead of running on unhealthy senders. */
@@ -173,17 +181,15 @@ export async function senderSweep(db: Db, deps: LifecycleDeps, pause: (sequenceI
     if (!lists.has(s.connector)) { try { lists.set(s.connector, await c.listSenders()); } catch (e) { console.error("senders", s.connector, (e as Error).message); continue; } }
     const now = new Map(lists.get(s.connector)!.map((x) => [x.id, x]));
     const mine = await db.query<{ sender_id: string; role: string; daily_share: number }>("SELECT sender_id, role, daily_share FROM sequence_senders WHERE sequence_id = $1 AND dropped_at IS NULL", [s.id]);
-    const sick = mine.filter((m) => {
-      const x = now.get(m.sender_id);
-      if (!x || !x.active) return true;
-      return (x.health !== null && x.health < Math.max(r.min_health, c.healthFloor ?? 0)) || (x.bounce_rate !== null && x.bounce_rate > r.max_bounce_rate) || (x.spam_rate !== null && x.spam_rate > r.max_spam_rate);
-    });
+    // The same rule that picked them. A sender the tool no longer lists is gone.
+    const sick = mine.filter((m) => { const x = now.get(m.sender_id); return !x || senderProblem(x, r, { healthFloor: c.healthFloor, remaining: Infinity }) !== null; });
     if (!sick.length) continue;
     const spares = mine.filter((m) => m.role === "spare" && !sick.includes(m));
     let need = sick.filter((m) => m.role === "primary");
     await db.tx(async (q) => {
       for (const m of sick) await q("UPDATE sequence_senders SET dropped_at = now(), drop_reason = 'went_bad' WHERE sequence_id = $1 AND sender_id = $2", [s.id, m.sender_id]);
-      for (const sp of spares.slice(0, need.length)) { await q("UPDATE sequence_senders SET role = 'primary', daily_share = $3 WHERE sequence_id = $1 AND sender_id = $2", [s.id, sp.sender_id, need[0].daily_share]); out.replaced++; }
+      // Each spare takes the share of the sender it replaces.
+      for (const [i, sp] of spares.slice(0, need.length).entries()) { await q("UPDATE sequence_senders SET role = 'primary', daily_share = $3 WHERE sequence_id = $1 AND sender_id = $2", [s.id, sp.sender_id, need[i].daily_share]); out.replaced++; }
     });
     const covered = Math.min(spares.length, need.length);
     need = need.slice(covered);

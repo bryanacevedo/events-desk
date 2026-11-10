@@ -76,8 +76,6 @@ export function instantly(o: Opts): Connector {
       return out;
     },
     async removeContact(_s, externalId) { await api("DELETE", `/leads/${externalId}`); },
-    async pauseContact() { throw new Error("Instantly cannot pause one lead."); },
-    async resumeContact() { throw new Error("Instantly cannot resume one lead."); },
     async pauseSequence(id) { await api("POST", `/campaigns/${id}/pause`); },
     async sequenceState(id) { const j = await api("GET", `/campaigns/${id}`); return INSTANTLY_STATE[j.status as number] ?? "paused"; },
     async events(since, sequenceIds) {
@@ -129,8 +127,6 @@ export function heyreach(o: Opts): Connector {
       return people.map((p) => ({ ref: p.ref, ok: true, external_id: p.linkedin! }));
     },
     async removeContact(sequenceId, externalId) { await api("POST", "/campaign/StopLeadInCampaign", { body: { campaignId: Number(sequenceId), leadUrl: externalId } }); },
-    async pauseContact() { throw new Error("HeyReach cannot pause one lead."); },
-    async resumeContact() { throw new Error("HeyReach cannot resume one lead."); },
     async pauseSequence(id) { await api("POST", "/campaign/Pause", { query: { campaignId: id } }); },
     sequenceState: state,
     async events(since, sequenceIds) {
@@ -280,8 +276,6 @@ export function apollo(o: Opts): Connector {
       return out;
     },
     async removeContact(s, id) { await api("POST", "/emailer_campaigns/remove_or_stop_contact_ids", { body: { emailer_campaign_ids: [s], contact_ids: [id], mode: "remove" } }); },
-    async pauseContact() { throw new Error("Apollo cannot restart a stopped contact through its API."); },
-    async resumeContact() { throw new Error("Apollo cannot restart a stopped contact through its API."); },
     async pauseSequence(id) { await api("POST", `/emailer_campaigns/${id}/deactivate`, { body: {} }); },
     async sequenceState(id) {
       const c = (await api("GET", `/emailer_campaigns/${id}`)).emailer_campaign;
@@ -326,8 +320,6 @@ export function gong(o: Opts & { accessKey: string; flowOwnerEmail: string }): C
       return out;
     },
     async removeContact(s, id) { await api("POST", "/flows/prospects/unassign-flows-by-crm-prospect-id", { body: { crmProspectId: id, flowIds: [s] } }); },
-    async pauseContact() { throw new Error("Gong cannot pause one prospect through its API."); },
-    async resumeContact() { throw new Error("Gong cannot resume one prospect through its API."); },
     async pauseSequence() { throw new Error("Gong flows cannot be paused through its API."); },
     async sequenceState() { return "active"; },
     async events() { return []; },

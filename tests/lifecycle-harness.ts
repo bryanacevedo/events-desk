@@ -68,6 +68,8 @@ export async function deliveredInMotion(db: Db, opts: { crm?: Crm | null; csv?: 
   (li as any).senders = [{ id: 1, profileUrl: "https://www.linkedin.com/in/sender1", isActive: true, authIsValid: true }, { id: 2, profileUrl: "https://www.linkedin.com/in/sender2", isActive: true, authIsValid: true }];
   const deps: LifecycleDeps = { crm: opts.crm === undefined ? null : opts.crm, connectors: { instantly: email.connector, heyreach: li.connector }, llm: mockLlm, notify, userMap: { [OWNER]: "UOWNER" }, now: () => time.now };
   const id = await deliverEvent(db, opts.csv ?? LIST, {}, "Payments Summit");
+  // Before the event, so outreach runs pre-event copy. Tests about the post-event wave move the clock or the dates themselves.
+  await db.query("UPDATE events SET starts_on = '2027-02-01' WHERE id = $1", [id]);
   await db.query("UPDATE contacts SET verify_1 = 'deliverable', verify_2 = 'deliverable' WHERE event_id = $1 AND email IS NOT NULL AND dropped_at IS NULL", [id]);
   await db.query("INSERT INTO verification_cache (email, verdict, verifier, checked_at) SELECT lower(email), 'deliverable', 'test', $2::timestamptz FROM contacts WHERE event_id = $1 AND email IS NOT NULL ON CONFLICT (email) DO UPDATE SET checked_at = EXCLUDED.checked_at", [id, time.now.toISOString()]);
   await db.query("UPDATE contacts SET title_tier = 1, priority = 'A', drop_reason = NULL, dropped_at = NULL WHERE event_id = $1 AND source = 'attendee'", [id]);

@@ -1,5 +1,6 @@
 /* Replies (docs/LIFECYCLE.md, section 7). Stop first, think second: everything inbound pauses that person's whole cadence in the transaction that records it, before anything reads it. Reply text is untrusted and can only choose a code. */
 
+import { DAY, LIVE_THREAD_HOLD_DAYS } from "../shared/policy.ts";
 import type { Db } from "./db.ts";
 import type { Connector, ToolEvent } from "./connectors/types.ts";
 import { addSuppression, putVerification } from "./caches.ts";
@@ -7,11 +8,10 @@ import { canWrite, queueCreate, queueOptOut } from "./crm-outbox.ts";
 import { stopContacts, stopDomain, stopInEvent } from "./enroll-ops.ts";
 import { queueEvent, respondBy } from "./operating.ts";
 import { logActivity, newId } from "./events.ts";
-import { reserve, settle } from "./ledger.ts";
 import { DESK, nowOf, type LifecycleDeps } from "./lifecycle-deps.ts";
 import { openLifecycleCase } from "./lifecycle-cases.ts";
-import { parseJson } from "./paid.ts";
-import { fill, promptHash } from "./prompts.ts";
+import { paidCall, parseJson } from "./paid.ts";
+import { fill } from "./prompts.ts";
 import type { Crm } from "./providers.ts";
 import { doubtCard, replyCard } from "./slack-cards.ts";
 import { addHold, addTouch, creditedEvent } from "./touches.ts";
@@ -21,7 +21,6 @@ import { matchesUnsubscribe, REPLY_CODES, returnDate, type ReplyCode } from "../
 import { cleanReply } from "../shared/reply-clean.ts";
 
 type Q = Db["query"];
-const DAY = 86_400_000;
 /** Reply text is kept only as long as a person needs to read it. */
 const BODY_MAX = 20_000;
 
@@ -74,7 +73,7 @@ const who = async (q: Q, m: Pick<Msg, "contact_id" | "event_id">) => (await q<Wh
 
 /** Someone at this company is talking to us: nobody else there keeps getting the sequence while they do. */
 async function holdAccount(q: Q, m: Msg, p: Who, now: Date) {
-  await addHold(q, { domain: p.domain, cause: "live_thread", cause_id: m.contact_id, expires_at: new Date(now.getTime() + 14 * DAY) });
+  await addHold(q, { domain: p.domain, cause: "live_thread", cause_id: m.contact_id, expires_at: new Date(now.getTime() + LIVE_THREAD_HOLD_DAYS * DAY) });
   await q("UPDATE enrollments SET cause = 'waiting_for_rep' WHERE contact_id = $1 AND state = 'paused'", [m.contact_id]);
   await stopDomain(q, p.domain, "pause", "colleague_replied", m.id);
 }
@@ -164,18 +163,14 @@ export async function applyReplyAnswer(q: Q, inboundId: string, code: string, ac
 
 /** One paid call on the Motion card. Null when the card has run out or the answer cannot be used. */
 async function classify(db: Db, deps: LifecycleDeps, eventId: string, body: string): Promise<{ code: ReplyCode | null; refused: boolean; referred?: string | null; same_person?: boolean }> {
-  const res = await reserve(db, eventId, "llm", 1, "reply_classify");
-  if (!res) return { code: null, refused: true };
   const prompt = fill("reply_classify", { codes: REPLY_CODES.join(", "), reply: body.slice(0, 4000).replaceAll("REPLY>>>", "REPLY") });
-  try {
-    const out = await deps.llm.complete("reply_classify", prompt);
-    await settle(db, res, 1);
-    await db.query("INSERT INTO llm_calls (id, event_id, step, prompt_hash, model, input_tokens, output_tokens, output) VALUES ($1, $2, 'reply_classify', $3, $4, $5, $6, $7)", [newId("llm"), eventId, promptHash("reply_classify", deps.llm.model), out.model ?? deps.llm.model, out.input_tokens, out.output_tokens, out.text.slice(0, 2000)]);
-    const v = parseJson(out.text) as { code?: unknown; referred?: unknown; same_person?: unknown } | null;
-    // A name counts only if it is in the reply word for word.
-    const referred = typeof v?.referred === "string" && v.referred.trim() && body.includes(v.referred.trim()) ? v.referred.trim().slice(0, 120) : null;
-    return { code: REPLY_CODES.includes(v?.code as ReplyCode) ? (v!.code as ReplyCode) : null, refused: false, referred, same_person: v?.same_person !== false };
-  } catch { await settle(db, res, 1); return { code: null, refused: false }; }
+  const out = await paidCall(db, eventId, deps.llm, "reply_classify", prompt);
+  if (out.kind === "refused") return { code: null, refused: true };
+  if (out.kind === "failed") return { code: null, refused: false };
+  const v = parseJson(out.text) as { code?: unknown; referred?: unknown; same_person?: unknown } | null;
+  // A name counts only if it is in the reply word for word.
+  const referred = typeof v?.referred === "string" && v.referred.trim() && body.includes(v.referred.trim()) ? v.referred.trim().slice(0, 120) : null;
+  return { code: REPLY_CODES.includes(v?.code as ReplyCode) ? (v!.code as ReplyCode) : null, refused: false, referred, same_person: v?.same_person !== false };
 }
 
 /** Works through what has arrived. A crash replays: consequences and the "done" mark are one transaction. */

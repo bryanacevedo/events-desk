@@ -10,6 +10,7 @@
 
    Every producer is code; a model only supplies the flags that model_flag turns into a case. Opening is idempotent: a case already open for the same person and kind is not opened twice. */
 
+import { DEFAULT_LATE_STAGES } from "../shared/policy.ts";
 import type { Db } from "./db.ts";
 import { getSettings } from "./approvals.ts";
 import { openCase, type CaseOption } from "./cases.ts";
@@ -17,7 +18,7 @@ import type { Loop } from "./email.ts";
 import { FLAG_WORDS } from "../shared/tiers.ts";
 import { localFitsName, nameKey } from "../shared/email.ts";
 
-export const DEFAULT_LATE_STAGES = ["proposal", "negotiation", "contract", "closing", "verbal"];
+export { DEFAULT_LATE_STAGES };
 /** A fixed rule, never a model: a doubt about the person says Drop; a doubt about the address says Keep and try another channel. */
 export const suggestForFlags = (flags: string[]) => (flags.some((f) => ["title_company_mismatch", "likely_left_company", "name_looks_wrong"].includes(f)) ? "drop" : "keep");
 

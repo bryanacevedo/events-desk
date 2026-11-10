@@ -8,6 +8,7 @@ import type { Db } from "./db.ts";
 import { newId } from "./events.ts";
 import { askPeople, crmConnected } from "./crm-checks.ts";
 import { CrmAlreadyExists, type Crm, type CrmPatch, type CrmRecord } from "./providers.ts";
+import { LAST_DAY_SQL } from "./motion.ts";
 
 export const MAX_ATTEMPTS = 5;
 export const canWrite = (crm: Crm | null | undefined): crm is Crm => crmConnected(crm) && typeof crm.write === "function";
@@ -19,7 +20,7 @@ export interface OutboxPayload { email: string | null; full_name: string | null;
 export async function queueDeliveredEmails(q: Db["query"], eventId: string, crm: Crm | null | undefined, payloadEventId: string = eventId) {
   if (!canWrite(crm)) return;
   // The event's Campaign comes first, once, so everything later has somewhere to attach.
-  const [ev] = await q<{ name: string; start: string; end: string }>("SELECT e.name, e.starts_on::text AS start, coalesce((SELECT c.ends_on FROM catalog_events c WHERE c.id = e.catalog_id), e.starts_on)::text AS end FROM events e WHERE e.id = $1", [payloadEventId]);
+  const [ev] = await q<{ name: string; start: string; end: string }>(`SELECT e.name, e.starts_on::text AS start, ${LAST_DAY_SQL}::text AS end FROM events e WHERE e.id = $1`, [payloadEventId]);
   if (crm.createCampaign) await queueCreate(q, "campaign", `campaign:${payloadEventId}`, null, { event_id: payloadEventId, name: ev.name, start: ev.start, end: ev.end, email: null, full_name: null, company: null, domain: null });
   const rows = await q<{ person_id: string | null; email: string; full_name: string | null; company: string; domain: string | null }>(
     `SELECT k.person_id, lower(k.email) AS email, k.full_name, co.name AS company, co.primary_domain AS domain FROM contacts k JOIN companies co ON co.id = k.company_id

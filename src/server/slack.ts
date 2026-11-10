@@ -4,10 +4,10 @@
 
 import type { EventRoom, LifecycleDeps, Notifier } from "./lifecycle-deps.ts";
 import type { CardMessage } from "./slack-cards.ts";
-import { answerDebrief } from "./closeout.ts";
+import { answerDebrief, pastScores } from "./closeout.ts";
 import { bookMeeting, recordOutcome } from "./meetings.ts";
 import { decideOwner } from "./owners.ts";
-import { drainOps } from "./sequences.ts";
+import { createDrafts, drainOps } from "./sequences.ts";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type { Hono } from "hono";
 import { currentUploader, decideApproval } from "./approvals.ts";
@@ -123,14 +123,19 @@ export async function postApproval(db: Db, cfg: SlackConfig, approvalId: string)
 
 /** One seat request to the seats channel, for leadership: who, which event, the goal and why, with Approve and Decline. */
 export async function postSeatRequest(db: Db, cfg: SlackConfig, requestId: string) {
-  const [r] = await db.query<{ id: string; event_id: string; requester: string; name: string; team: string; role: string; goal: keyof typeof GOALS; why_event: string; why_you: string; expected_meetings: number; seat_price_cents: number }>(
-    "SELECT r.id, r.event_id, r.requester, e.name, r.team, r.role, r.goal, r.why_event, r.why_you, r.expected_meetings, e.seat_price_cents FROM seat_requests r JOIN events e ON e.id = r.event_id WHERE r.id = $1", [requestId]);
+  const [r] = await db.query<{ id: string; event_id: string; requester: string; name: string; team: string; role: string; goal: keyof typeof GOALS; why_event: string; why_you: string; expected_meetings: number; seat_price_cents: number; catalog_id: string | null }>(
+    "SELECT r.id, r.event_id, r.requester, e.name, r.team, r.role, r.goal, r.why_event, r.why_you, r.expected_meetings, e.seat_price_cents, e.catalog_id FROM seat_requests r JOIN events e ON e.id = r.event_id WHERE r.id = $1", [requestId]);
   if (!r) return;
+  // What this conference returned before, so leadership decides on evidence. Each past event once, its latest scorecard.
+  const seen = new Set<string>();
+  const past = (r.catalog_id ? await pastScores(db, r.catalog_id) : []).filter((p) => p.event_id !== r.event_id && !seen.has(p.event_id) && seen.add(p.event_id)).slice(0, 3)
+    .map((p) => `${esc(p.name)}: ${p.metrics.held_all} held${p.metrics.score ? `, ${p.metrics.score.held_per_thousand} per $1,000` : ""} (day ${p.window_days})`);
   const text = `*${esc(r.requester)}* (${esc(r.role)}, ${esc(r.team)}) asks for a seat at *${esc(r.name)}*, ${dollars(r.seat_price_cents)}\n*Goal:* ${GOALS[r.goal] ?? r.goal}, about ${r.expected_meetings} meetings\n*Why this event:* ${esc(r.why_event)}\n*Why them:* ${esc(r.why_you)}`;
   await postCard(db, cfg, r.event_id, `${r.requester}'s seat request`, {
     channel: cfg.seatsChannel ?? cfg.channel, text,
     blocks: [
       { type: "section", text: { type: "mrkdwn", text } },
+      { type: "context", elements: [{ type: "mrkdwn", text: past.length ? `*Before:* ${past.join("  ·  ")}` : "No scorecard yet from this conference" }] },
       { type: "actions", elements: [
         { type: "button", style: "primary", action_id: "approve", value: r.id, text: { type: "plain_text", text: "Approve" } },
         { type: "button", action_id: "decline", value: r.id, text: { type: "plain_text", text: "Decline" } },
@@ -149,7 +154,7 @@ const modal = (callback_id: string, title: string, blocks: unknown[], private_me
 type View = { callback_id: string; private_metadata: string; state: { values: Record<string, { value: { value: string | null } }> } };
 const field = (v: View, id: string) => (v.state.values[id]?.value.value ?? "").trim();
 
-const LIFECYCLE_ACTIONS = new Set(["owner_mine", "owner_include_all", "meeting_booked", "meeting_held", "meeting_no_show", "meeting_cancelled", "debrief_open"]);
+const LIFECYCLE_ACTIONS = new Set(["post_event_start", "owner_mine", "owner_include_all", "meeting_booked", "meeting_held", "meeting_no_show", "meeting_cancelled", "debrief_open"]);
 
 /** The event channels and the ops channel. True only when Slack says the message went. */
 /** A Slack channel name for an event: lowercase words joined by hyphens, under Slack's 80-character limit. */
@@ -253,6 +258,14 @@ export function mountSlack(app: Hono<any>, db: Db, cfg: SlackConfig, kick?: (eve
         try {
           if (action.action_id === "debrief_open") { await slackCall(cfg, "views.open", { trigger_id: p.trigger_id, view: modal("debrief_write", "Your debrief", [input("body", "Who mattered, what they said, what you would do differently")], action.value) }); return c.body(null, 200); }
           if (action.action_id === "meeting_booked") { await slackCall(cfg, "views.open", { trigger_id: p.trigger_id, view: modal("meeting_book", "Book the meeting", [input("when", "When? For example 2027-03-02 15:00 UTC")], action.value) }); return c.body(null, 200); }
+          if (action.action_id === "post_event_start") {
+            // Setting up checks everyone again, which can take longer than Slack waits for an answer: it answers now and reports when done.
+            const eventId = String(action.value);
+            void createDrafts(db, lifecycle, eventId, named)
+              .then((r) => respond(`Started. ${r.added} ${r.added === 1 ? "person" : "people"} going into the follow-up. Each sequence still waits for its launch checklist.`))
+              .catch((e) => respond(e instanceof RuleError ? e.message : "Setting up the follow-up failed. It is safe to press again."));
+            return c.body(null, 200);
+          }
           if (action.action_id === "owner_mine") { const r = await decideOwner(db, lifecycle, action.value, named, "mine"); await respond(`${r.company} is yours. Nobody there will be sequenced.`); }
           else if (action.action_id === "owner_include_all") { for (const id of String(action.value).split(",")) await decideOwner(db, lifecycle, id, named, "include"); await respond("Included. Thanks."); }
           else { await recordOutcome(db, lifecycle, action.value, action.action_id.replace("meeting_", "") as "held" | "no_show" | "cancelled", named); await respond("Recorded."); }

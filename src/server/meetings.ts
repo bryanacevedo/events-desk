@@ -1,5 +1,6 @@
 /* Meetings (docs/LIFECYCLE.md, section 8). Booking stops everyone at the domain and is kept. Cancelled or no-show releases the hold only after a rep confirms. */
 
+import { AFTER_OUTCOME_HOLD_DAYS, DAY, MEETING_HOLD_DAYS } from "../shared/policy.ts";
 import type { Db } from "./db.ts";
 import { scheduleResume, stopDomain } from "./enroll-ops.ts";
 import { logActivity, newId, RuleError } from "./events.ts";
@@ -10,7 +11,6 @@ import { nowOf, type LifecycleDeps } from "./lifecycle-deps.ts";
 import { meetingReminderCard } from "./slack-cards.ts";
 import { addHold, addTouch, creditedEvent, releaseHold } from "./touches.ts";
 
-const DAY = 86_400_000;
 export const MEETING_STATUSES = ["proposed", "booked", "held", "no_show", "cancelled", "rescheduled"] as const;
 export type MeetingStatus = (typeof MEETING_STATUSES)[number];
 
@@ -34,7 +34,7 @@ export async function bookMeeting(db: Db, deps: LifecycleDeps, m: MeetingInput, 
     else await q("INSERT INTO meetings (id, event_id, contact_id, domain, external_key, status, scheduled_at, timezone, source, rep, enrolled) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)", [id, eventId, k.id, k.domain, key, m.status ?? "booked", m.scheduled_at, m.timezone ?? "UTC", m.source, m.rep ?? null, Boolean(en)]);
     // Everyone at the domain stops, kept and never deleted. Thirty days after the meeting the hold runs out on its own if nobody says what happened.
     await stopDomain(q, k.domain, "pause", "meeting", id);
-    await addHold(q, { domain: k.domain, cause: "meeting", cause_id: id, expires_at: new Date(Date.parse(m.scheduled_at) + 30 * DAY) });
+    await addHold(q, { domain: k.domain, cause: "meeting", cause_id: id, expires_at: new Date(Date.parse(m.scheduled_at) + MEETING_HOLD_DAYS * DAY) });
     await addTouch(q, { domain: k.domain, person_id: k.person_id, contact_id: k.id, event_id: eventId, kind: "meeting_booked", source: actor, dedup_key: `mtg:${id}:${Date.parse(m.scheduled_at)}` });
     await logActivity(q, eventId, actor, "meeting", `${moved ? "Moved" : before ? "Updated" : "Booked"} a meeting with ${k.full_name ?? "someone"} at ${k.company}`);
     return { id, event_id: eventId, status: moved ? "rescheduled" : m.status ?? "booked" };
@@ -59,7 +59,7 @@ export async function recordOutcome(db: Db, deps: LifecycleDeps, meetingId: stri
     if (!m) throw new RuleError("That meeting does not exist.");
     await mayActOn(q, m, actor);
     await q("UPDATE meetings SET status = $2, outcome_at = $3 WHERE id = $1", [m.id, status, now.toISOString()]);
-    await q("UPDATE holds SET expires_at = $2 WHERE cause = 'meeting' AND cause_id = $1 AND released_at IS NULL", [m.id, new Date(now.getTime() + 14 * DAY).toISOString()]);
+    await q("UPDATE holds SET expires_at = $2 WHERE cause = 'meeting' AND cause_id = $1 AND released_at IS NULL", [m.id, new Date(now.getTime() + AFTER_OUTCOME_HOLD_DAYS * DAY).toISOString()]);
     await addTouch(q, { domain: m.domain, contact_id: m.contact_id, event_id: m.event_id, kind: `meeting_${status}`, source: actor, dedup_key: `mtg_out:${m.id}:${status}:${now.getTime()}` });
     if (status === "held" && m.contact_id && canWrite(deps.crm)) {
       const [p] = await q<{ person_id: string | null; email: string | null; full_name: string | null; company: string; name: string }>("SELECT k.person_id, k.email, k.full_name, co.name AS company, e.name FROM contacts k JOIN companies co ON co.id = k.company_id JOIN events e ON e.id = $2 WHERE k.id = $1", [m.contact_id, m.event_id]);

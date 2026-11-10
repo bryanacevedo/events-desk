@@ -49,13 +49,14 @@ describe.each(Object.keys(FAKES) as (keyof typeof FAKES)[])("%s", (name) => {
   it("takes a person out, the way its pause capability says", async () => {
     const t = make(); const seq = await setup(t); ready(t, seq);
     const [r] = await add(t, seq, [person(1)]);
+    // What a tool declares and what it implements agree, so the desk never calls a pause that is not there.
+    expect(Boolean(t.connector.pauseContact && t.connector.resumeContact)).toBe(t.connector.capabilities.pause === "contact");
+    expect(Boolean(t.connector.pauseContact || t.connector.resumeContact)).toBe(t.connector.capabilities.pause === "contact");
     if (t.connector.capabilities.pause === "contact") {
-      await t.connector.pauseContact(seq, r.external_id!);
+      await t.connector.pauseContact!(seq, r.external_id!);
       expect([...t.seqs.get(seq)!.people.values()][0].paused).toBe(true);
-      await t.connector.resumeContact(seq, r.external_id!);
+      await t.connector.resumeContact!(seq, r.external_id!);
       expect([...t.seqs.get(seq)!.people.values()][0].paused).toBe(false);
-    } else {
-      await expect(t.connector.pauseContact(seq, r.external_id!)).rejects.toThrow();
     }
     await t.connector.removeContact(seq, r.external_id!);
     expect(t.seqs.get(seq)!.people.size).toBe(0);

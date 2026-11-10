@@ -1,20 +1,24 @@
 /* Sequences on any tool (docs/LIFECYCLE.md, section 5). The desk owns the rules and a Connector is a plug. Every call to a tool is driven from a row written first, so a crash at any step replays to the same result. */
 
+import { BOUNCE_MIN_SENDS, BOUNCE_PAUSE_RATE, DEFAULT_LATE_STAGES, MINUTE, REGATE_AFTER_MINUTES } from "../shared/policy.ts";
 import { createHash } from "node:crypto";
 import type { Db } from "./db.ts";
 import { CrmDown, askPeople, crmConnected, preSendCheck } from "./crm-checks.ts";
 import type { AddContact, Connector, SequenceState } from "./connectors/types.ts";
 import { logActivity, newId, RuleError } from "./events.ts";
-import { OWED_REMOVE_SQL, RETURNABLE_CAUSES, stopContacts, stopDomain } from "./enroll-ops.ts";
+import { openLifecycleCase } from "./lifecycle-cases.ts";
+import { OWED_REMOVE_SQL, RETURNABLE_CAUSES, sendingStopped, stopContacts, stopDomain } from "./enroll-ops.ts";
 import { runGate } from "./gate.ts";
 import { DESK, nowOf, type LifecycleDeps } from "./lifecycle-deps.ts";
 import { moveMotion } from "./motion-state.ts";
+import { LAST_DAY_SQL } from "./motion.ts";
 import { openOwnerDecisions } from "./owners.ts";
 import { addTouch } from "./touches.ts";
 import { cleanNames, lintTemplate, type TemplateStep } from "../shared/template-check.ts";
 import { applySendSettings, launchAllowed, planSenders, settingsConfirmed } from "./sending.ts";
 import { isGtm } from "../shared/roles.ts";
-import { localDay, zoneGroupOf, type Channel, type ZoneGroup } from "../shared/motion.ts";
+import { addDays, localDay, zoneGroupOf, type Channel, type ZoneGroup } from "../shared/motion.ts";
+import { eventDays, eventWindow, POST_START_LATEST_DAYS, POST_TEMPLATE_MAX_DAYS, POST_WAVE_END_DAYS, postGroups, SEQUENCED_GROUPS } from "./post-event.ts";
 
 const ACCOUNT_DAILY = 2;
 /** A share of accounts nobody contacts, always the same ones, so the scorecard has something to compare against. */
@@ -57,6 +61,9 @@ export async function recordLegalBasis(db: Db, eventId: string, actor: string, r
 export async function approveTemplate(db: Db, actor: string, t: { name: string; channel: Channel; phase: "pre" | "post"; steps: TemplateStep[]; external_id?: string | null; audience?: string }) {
   const lint = lintTemplate(t.channel, t.steps as TemplateStep[]);
   if (lint.errors.length) throw new RuleError(lint.errors.join(" "));
+  // The follow-up has to finish while the event is still fresh, and before its sequences end.
+  if (t.phase === "post" && t.steps.length && t.steps[t.steps.length - 1].day - t.steps[0].day > POST_TEMPLATE_MAX_DAYS)
+    throw new RuleError(`A post-event template's last step comes at most ${POST_TEMPLATE_MAX_DAYS} days after its first.`);
   return db.tx(async (q) => {
     const [{ v }] = await q<{ v: number }>("SELECT coalesce(max(version), 0)::int AS v FROM sequence_templates WHERE name = $1", [t.name]);
     const audience = t.audience ?? "all";
@@ -77,7 +84,7 @@ async function ensureSequence(db: Db, deps: LifecycleDeps, eventId: string, even
     if (!tpl) throw new RuleError(`Approve a ${phase === "pre" ? "pre-event" : "post-event"} ${channel} template in Settings first.`);
     const id = newId("seq");
     [row] = await db.query<SeqRow>("INSERT INTO sequences (id, event_id, connector, channel, priority, phase, zone_group, template_id, name) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) ON CONFLICT (event_id, channel, priority, phase, zone_group) DO UPDATE SET name = sequences.name RETURNING *",
-      [id, eventId, tool, channel, priority, phase, zone, tpl.id, `${eventName} ${priority} ${channel} ${phase === "pre" ? "pre-event" : "post-event"}${zone === "event" ? "" : ` ${zone}`} ${id.slice(-6)}`]);
+      [id, eventId, tool, channel, priority, phase, zone, tpl.id, `${eventName} ${priority.replace(/_/g, " ")} ${channel} ${phase === "pre" ? "pre-event" : "post-event"}${zone === "event" ? "" : ` ${zone}`} ${id.slice(-6)}`]);
   }
   // A tool that cannot make campaigns waits for a person to give this sequence one of its own.
   if (!row.external_id && c.capabilities.createsSequences) {
@@ -98,15 +105,22 @@ export async function createDrafts(db: Db, deps: LifecycleDeps, eventId: string,
   const channels = (Object.keys(e.tools) as Channel[]).filter((c) => e.tools[c]);
   if (!channels.length) throw new RuleError("Connect a sequencer for this event first.");
   if (crmConnected(deps.crm)) await openOwnerDecisions(db, deps, eventId);
-  const phase = localDay(nowOf(deps), e.country) < e.starts_on ? "pre" : "post";
-  const people = await db.query<Person>(
+  // Before the event, its pre-event copy. While it is on, nothing new starts. After it, the post-event wave, until the window closes.
+  const days = await eventDays(db.query, eventId);
+  const window = eventWindow(localDay(nowOf(deps), e.country), days.first_day, days.last_day);
+  if (window === "during") throw new RuleError(`${e.name} is on. The follow-up starts the day after its last day, ${days.last_day}.`);
+  if (window === "closed") throw new RuleError(`The follow-up for ${e.name} could start until ${addDays(days.last_day, POST_START_LATEST_DAYS)}. That window has closed.`);
+  const phase = window === "before" ? "pre" : "post";
+  const groups = phase === "post" ? await postGroups(db.query, eventId) : null;
+  const people = (await db.query<Person>(
     `SELECT k.id, k.priority, k.full_name, k.title, k.email, k.linkedin, co.name AS company, co.primary_domain AS domain, k.verify_1, k.person_id, k.person_location AS location, co.firmo->>'country' AS country, k.followup_tier
-     FROM contacts k JOIN companies co ON co.id = k.company_id WHERE k.event_id = $1 AND k.dropped_at IS NULL AND k.priority IS NOT NULL AND co.primary_domain IS NOT NULL ORDER BY k.id`, [eventId]);
+     FROM contacts k JOIN companies co ON co.id = k.company_id WHERE k.event_id = $1 AND k.dropped_at IS NULL AND (k.priority IS NOT NULL OR ($2 AND k.followup_tier = 'scanned')) AND co.primary_domain IS NOT NULL ORDER BY k.id`, [eventId, phase === "post"]))
+    // After the event, what happened there decides the sequence: each person goes by their group, and the groups a rep has are not sequenced.
+    .flatMap((p) => { if (!groups) return [p]; const g = groups.get(p.id); return g && SEQUENCED_GROUPS.includes(g) ? [{ ...p, priority: g }] : []; });
   const summary = { added: 0, refused: {} as Record<string, number> };
   for (const channel of channels) {
     const tool = e.tools[channel]!;
-    // After the event, people scanned at the booth get the follow-up written for them.
-    const reachable = people.filter((p) => (channel === "email" ? p.email && p.verify_1 : p.linkedin)).map((p) => (phase === "post" && p.followup_tier === "scanned" ? { ...p, priority: "scanned" } : p));
+    const reachable = people.filter((p) => (channel === "email" ? p.email && p.verify_1 : p.linkedin));
     const zoneOfPerson = (p: Person) => zoneGroupOf(p.location) === "event" ? zoneGroupOf(p.country) : zoneGroupOf(p.location);
     for (const [priority, zone] of [...new Set(reachable.map((p) => `${p.priority}|${zoneOfPerson(p)}`))].sort().map((k) => k.split("|") as [string, ZoneGroup])) {
       // Already in, or taken out for a reason that holds (a no, an opt-out, a bounce, a gate refusal): either way, not added again by this press.
@@ -136,6 +150,7 @@ export async function createDrafts(db: Db, deps: LifecycleDeps, eventId: string,
       });
     }
   }
+  if (phase === "post") await db.query("UPDATE events SET post_started_at = coalesce(post_started_at, $2), post_started_by = coalesce(post_started_by, $3) WHERE id = $1", [eventId, nowOf(deps).toISOString(), actor]);
   await drainOps(db, deps, eventId);
   // Who is in each sequence is settled now, so its size, and the senders it needs, are too.
   for (const s of await db.query<{ id: string }>("SELECT id FROM sequences WHERE event_id = $1 AND state <> 'archived'", [eventId])) { await planSenders(db, deps, s.id, actor); await applySendSettings(db, deps, s.id); }
@@ -154,7 +169,7 @@ export async function drainOps(db: Db, deps: LifecycleDeps, eventId: string | nu
      ORDER BY CASE n.pending_op WHEN 'remove' THEN 0 WHEN 'pause' THEN 1 ELSE 2 END, n.id`, [eventId, now.toISOString()]);
   const out = { done: 0, failed: 0 };
   const adds = new Map<string, typeof rows>();
-  const stopped = (await db.query("SELECT 1 FROM desk_controls WHERE sending_stopped_at IS NOT NULL")).length > 0;
+  const stopped = await sendingStopped(db.query);
   for (const r of rows) {
     const c = deps.connectors[r.connector];
     if (!c) { out.failed++; continue; }
@@ -180,9 +195,9 @@ export async function drainOps(db: Db, deps: LifecycleDeps, eventId: string | nu
     }
     if (r.pending_op === "add" || (r.pending_op === "resume" && (c.capabilities.pause === "remove-only" || !r.external_contact_id))) { adds.set(r.sequence_id, [...(adds.get(r.sequence_id) ?? []), r]); continue; }
     try {
-      if (r.pending_op === "remove" || (r.pending_op === "pause" && c.capabilities.pause === "remove-only")) await c.removeContact(r.ext!, r.external_contact_id!);
-      else if (r.pending_op === "pause") await c.pauseContact(r.ext!, r.external_contact_id!);
-      else await c.resumeContact(r.ext!, r.external_contact_id!);
+      if (r.pending_op === "remove" || (r.pending_op === "pause" && !c.pauseContact)) await c.removeContact(r.ext!, r.external_contact_id!);
+      else if (r.pending_op === "pause") await c.pauseContact!(r.ext!, r.external_contact_id!);
+      else await c.resumeContact!(r.ext!, r.external_contact_id!);
       // A later stop may have changed what is owed while the call ran: only the op that was carried out is cleared.
       await db.tx(async (q) => {
         const nextState = r.pending_op === "resume" ? "enrolled" : null;
@@ -201,7 +216,7 @@ export async function drainOps(db: Db, deps: LifecycleDeps, eventId: string | nu
     let group = all.slice(0, room);
     if (!group.length) continue;
     // Anyone who waited (the two-a-day spread, a first-cohort release) is checked again: things change while people wait.
-    const stale = group.filter((g) => g.pending_op === "add" && now.getTime() - Date.parse(g.added_at) > 15 * 60_000);
+    const stale = group.filter((g) => g.pending_op === "add" && now.getTime() - Date.parse(g.added_at) > REGATE_AFTER_MINUTES * MINUTE);
     if (stale.length) {
       let res;
       try { res = await runGate(db, deps, stale[0].event_id, stale.map((g) => g.contact_id), stale[0].channel, "add"); }
@@ -265,21 +280,34 @@ async function pauseWhole(db: Db, c: Connector, s: SeqRow, reason: string, actor
 async function endSequence(db: Db, c: Connector, s: SeqRow, cause: string) {
   await pauseWhole(db, c, s, cause);
   await db.tx(async (q) => {
-    await q(`UPDATE enrollments SET state = 'removed', pending_op = ${OWED_REMOVE_SQL}, cause = $2, changed_at = now() WHERE sequence_id = $1 AND state <> 'removed'`, [s.id, cause]);
+    // Only people who were simply in the sequence take the calendar's reason. Anyone already paused keeps theirs: a meeting, a reply or a booth conversation must not
+    // become "the event started", which lets a person be added again after the event. An out-of-office was only ever temporary, so it takes the calendar's reason.
+    await q(`UPDATE enrollments SET state = 'removed', pending_op = ${OWED_REMOVE_SQL}, cause = CASE WHEN cause IS NULL OR cause = 'out_of_office' THEN $2 ELSE cause END, changed_at = now() WHERE sequence_id = $1 AND state <> 'removed'`, [s.id, cause]);
     await q("UPDATE sequences SET state = 'archived' WHERE id = $1 AND NOT pause_owed", [s.id]);
   });
 }
 
-/** What the calendar ends. Pre-event copy stops on the event's first day, and everything stops at closing. */
+/** What the calendar ends. Pre-event copy stops on the event's first day, or at closing if it is somehow still out. The post-event wave ends 24 days after the last day, so one started on the last allowed day finishes, and at scoring at the latest. */
 export async function calendarSweep(db: Db, deps: LifecycleDeps) {
   const now = nowOf(deps);
-  const rows = await db.query<SeqRow & { first_day: string; country: string | null; motion: string }>("SELECT s.*, e.starts_on::text AS first_day, e.country, e.motion FROM sequences s JOIN events e ON e.id = s.event_id WHERE s.state <> 'archived'");
+  const rows = await db.query<SeqRow & { first_day: string; last_day: string; country: string | null; motion: string }>(`SELECT s.*, e.starts_on::text AS first_day, ${LAST_DAY_SQL}::text AS last_day, e.country, e.motion FROM sequences s JOIN events e ON e.id = s.event_id WHERE s.state <> 'archived'`);
   let ended = 0;
   for (const s of rows) {
     const c = deps.connectors[s.connector];
-    if (!c || !s.external_id) continue;
-    if (["closing", "scored"].includes(s.motion)) { await endSequence(db, c, s, "event_closed"); ended++; }
-    else if (s.phase === "pre" && localDay(now, s.country) >= s.first_day) { await endSequence(db, c, s, "event_started"); ended++; }
+    if (!c) continue;
+    const today = localDay(now, s.country);
+    // A draft that never got a campaign in the tool has nothing to stop there: it just ends here, when its time comes.
+    if (!s.external_id) {
+      const due = s.phase === "pre" ? today >= s.first_day || ["closing", "scored"].includes(s.motion) : s.motion === "scored" || today >= addDays(s.last_day, POST_WAVE_END_DAYS);
+      if (due) await db.tx(async (q) => {
+        await q(`UPDATE enrollments SET state = 'removed', pending_op = NULL, cause = CASE WHEN cause IS NULL OR cause = 'out_of_office' THEN $2 ELSE cause END, changed_at = now() WHERE sequence_id = $1 AND state <> 'removed' AND external_contact_id IS NULL AND NOT add_attempted`, [s.id, s.phase === "pre" && today >= s.first_day ? "event_started" : "event_closed"]);
+        await q("UPDATE sequences SET state = 'archived' WHERE id = $1", [s.id]);
+      });
+      continue;
+    }
+    if (s.phase === "pre" && today >= s.first_day) { await endSequence(db, c, s, "event_started"); ended++; }
+    else if (s.phase === "pre" && ["closing", "scored"].includes(s.motion)) { await endSequence(db, c, s, "event_closed"); ended++; }
+    else if (s.phase === "post" && (s.motion === "scored" || today >= addDays(s.last_day, POST_WAVE_END_DAYS))) { await endSequence(db, c, s, "event_closed"); ended++; }
   }
   if (ended) await drainOps(db, deps);
   return { ended };
@@ -330,7 +358,7 @@ export async function observeSequences(db: Db, deps: LifecycleDeps) {
     const c = deps.connectors[s.connector];
     if (!c) continue;
     if (s.pause_owed) { await pauseWhole(db, c, s, "Retrying a pause the tool had not confirmed."); continue; }
-    const stopped = (await db.query("SELECT 1 FROM desk_controls WHERE sending_stopped_at IS NOT NULL")).length > 0;
+    const stopped = await sendingStopped(db.query);
     let real: SequenceState;
     try { real = c.capabilities.observesLaunch ? await c.sequenceState(s.external_id!) : (await db.query("SELECT 1 FROM enrollments WHERE sequence_id = $1 AND state = 'enrolled' LIMIT 1", [s.id])).length ? "active" : "draft"; }
     catch (e) { console.error("sequence state", s.id, (e as Error).message); continue; }
@@ -377,7 +405,6 @@ export async function flagSweep(db: Db, deps: LifecycleDeps) {
   // A deal that reached a late stage since launch: the account's owner should be talking to them, not a sequence.
   let paused = 0;
   if (crmConnected(deps.crm)) {
-    const { DEFAULT_LATE_STAGES } = await import("./later-cases.ts");
     const accounts = await db.query<{ domain: string; company: string; event_id: string; late: string[] | null }>("SELECT DISTINCT ON (n.domain) n.domain, co.name AS company, n.event_id, s.settings->'late_stages' AS late FROM enrollments n JOIN contacts k ON k.id = n.contact_id JOIN companies co ON co.id = k.company_id LEFT JOIN event_settings s ON s.event_id = n.event_id WHERE n.state IN ('enrolled', 'adding') ORDER BY n.domain");
     for (const a of accounts) {
       let info;
@@ -432,7 +459,7 @@ export async function resumePerson(db: Db, deps: LifecycleDeps, eventId: string,
 
 /** Pauses a sequence whose bounce rate crossed the line, and opens a case. */
 export async function bounceWatch(db: Db, deps: LifecycleDeps, opts: { threshold?: number; minSends?: number } = {}) {
-  const threshold = opts.threshold ?? 0.03, minSends = opts.minSends ?? 50;
+  const threshold = opts.threshold ?? BOUNCE_PAUSE_RATE, minSends = opts.minSends ?? BOUNCE_MIN_SENDS;
   const rows = await db.query<SeqRow & { sends: number; bounces: number }>(
     `SELECT s.*, (SELECT count(DISTINCT t.contact_id) FROM touches t JOIN enrollments n ON n.contact_id = t.contact_id AND n.sequence_id = s.id WHERE t.kind = 'send' AND t.event_id = s.event_id AND t.channel = s.channel)::int AS sends,
             (SELECT count(DISTINCT m.contact_id) FROM inbound_messages m JOIN enrollments n ON n.contact_id = m.contact_id AND n.sequence_id = s.id WHERE m.code = 'bounced' AND m.event_id = s.event_id)::int AS bounces
@@ -442,7 +469,6 @@ export async function bounceWatch(db: Db, deps: LifecycleDeps, opts: { threshold
     const c = deps.connectors[s.connector];
     if (!c) continue;
     await pauseWhole(db, c, s, `Bounce rate ${Math.round((s.bounces / s.sends) * 1000) / 10}% is over ${threshold * 100}%.`);
-    const { openLifecycleCase } = await import("./lifecycle-cases.ts");
     await db.tx((q) => openLifecycleCase(q, { eventId: s.event_id, kind: "bounce_rate", summary: `${s.name} paused itself: ${s.bounces} of ${s.sends} addresses bounced.`, facts: [{ sequence: s.name, bounced: s.bounces, sent: s.sends }], payload: { sequence_id: s.id } }));
   }
 }
