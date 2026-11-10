@@ -411,12 +411,29 @@ describe("event ROI", () => {
   };
   const D = "tallgrasssoftware.example";
 
-  it("separates sourced from influenced, and reports per dollar", async () => {
-    const { h } = await scored({ [D]: [open({ id: "new", created_date: "2027-02-01" }), open({ id: "old", amount_cents: 2_000_000, created_date: "2026-11-01", stage_history: [{ stage: "Negotiation", at: "2027-02-10" }] })] });
+  it("counts a deal created after the meeting as new pipeline, and reports per dollar", async () => {
+    const { h } = await scored({ [D]: [open({ id: "new", created_date: "2027-02-01" })] });
     const s = await computeScorecard(db, h.deps, h.id, 30);
     expect(s.influence.sourced).toEqual({ n: 1, cents: 5_000_000 });
+    expect(s.roi.pipeline_per_dollar).toBe(5);
+  });
+
+  it("an open deal that moved is influenced, and a new deal beside it is not new pipeline", async () => {
+    const { h } = await scored({ [D]: [open({ id: "new", created_date: "2027-02-01" }), open({ id: "old", amount_cents: 2_000_000, created_date: "2026-11-01", stage_history: [{ stage: "Negotiation", at: "2027-02-10" }] })] });
+    const s = await computeScorecard(db, h.deps, h.id, 30);
+    expect(s.influence.sourced).toEqual({ n: 0, cents: 0 });
     expect(s.influence.influenced).toEqual({ n: 1, cents: 2_000_000 });
-    expect(s.roi.pipeline_per_dollar).toBe(7);
+  });
+
+  it("a deal closed before the meeting does not stop a new one counting as new", async () => {
+    const { h } = await scored({ [D]: [open({ id: "new", created_date: "2027-02-01" }), open({ id: "gone", created_date: "2026-01-01", is_closed: true, close_date: "2026-06-01" })] });
+    expect((await computeScorecard(db, h.deps, h.id, 30)).influence.sourced.n).toBe(1);
+  });
+
+  it("reading the screen never moves credit between events", async () => {
+    const { h } = await scored({ [D]: [open({ id: "new", created_date: "2027-02-01" })] });
+    await computeScorecard(db, h.deps, h.id, 30, { write: false });
+    expect(await db.query("SELECT 1 FROM attribution_claims")).toHaveLength(0);
   });
 
   it("does not credit a deal that was already open and did not move", async () => {

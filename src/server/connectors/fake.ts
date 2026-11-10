@@ -82,7 +82,8 @@ export function fakeHeyreach(): FakeTool {
   t.reply = (seq: string, who: string, body: string | null) => {
     const id = `c_${++n}`, at = new Date().toISOString();
     (t.mail ??= []).push({ id, campaignId: seq, lastMessageSender: "CORRESPONDENT", lastMessageAt: at, lastMessageText: body, correspondentProfile: { profileUrl: who } });
-    const w = { event_type: "MESSAGE_REPLY_RECEIVED", conversation_id: id, timestamp: at, campaign: { id: seq }, lead: { profile_url: who }, recent_messages: [{ message: body }] };
+    // The real payload's shape: lower-case event, our messages and theirs in one thread.
+    const w = { event_type: "message_reply_received", conversation_id: id, campaign: { id: seq, name: "Campaign" }, lead: { first_name: "Pat", last_name: "N", custom_email: "", profile_url: who }, recent_messages: [{ message: "Hi Pat, good to connect.", is_reply: false, timestamp: at }, { message: body, is_reply: true, timestamp: at }, { message: "Thanks, I will send times.", is_reply: false, timestamp: at }] };
     return { webhook: w, request: { headers: {}, query: { secret: SECRET }, body: w } };
   };
   return t;

@@ -2,7 +2,8 @@
    before anything is read from it. Approvals go through decideApproval, the same
    function the demo panel calls. */
 
-import type { LifecycleDeps, Notifier } from "./lifecycle-deps.ts";
+import type { EventRoom, LifecycleDeps, Notifier } from "./lifecycle-deps.ts";
+import type { CardMessage } from "./slack-cards.ts";
 import { answerDebrief } from "./closeout.ts";
 import { bookMeeting, recordOutcome } from "./meetings.ts";
 import { decideOwner } from "./owners.ts";
@@ -21,6 +22,8 @@ export interface SlackConfig {
   signingSecret: string;
   botToken: string;
   channel: string;
+  /** Where problems that belong to no one event go. Defaults to `channel`. */
+  opsChannel?: string;
   approvers: string[];
   /** Person name to Slack user ID. A cost card is confirmed by the person who uploaded the list, and in live mode the Slack user is the only proof of who that is. Required for LIVE_SPEND=1. */
   userMap?: Record<string, string>;
@@ -51,11 +54,12 @@ const dollars = (cents: number) => `$${(cents / 100).toLocaleString("en-US", { m
 async function slackCall(cfg: SlackConfig, method: string, payload: unknown) {
   const r = await (cfg.fetch ?? fetch)(`https://slack.com/api/${method}`, {
     method: "POST",
+    signal: AbortSignal.timeout(15_000),
     headers: { authorization: `Bearer ${cfg.botToken}`, "content-type": "application/json; charset=utf-8" },
     body: JSON.stringify(payload),
   });
   const j = await r.json() as { ok: boolean; error?: string };
-  if (!j.ok) console.error(`Slack ${method} failed: ${j.error}`);
+  if (!j.ok && j.error !== "already_in_channel") console.error(`Slack ${method} failed: ${j.error}`);
   return j;
 }
 
@@ -140,14 +144,39 @@ const field = (v: View, id: string) => (v.state.values[id]?.value.value ?? "").t
 
 const LIFECYCLE_ACTIONS = new Set(["owner_mine", "owner_include_all", "meeting_booked", "meeting_held", "meeting_no_show", "meeting_cancelled", "debrief_open"]);
 
-/** Direct messages and the event's thread. True only when Slack says the message went. */
+/** The event channels and the ops channel. True only when Slack says the message went. */
+/** A Slack channel name for an event: lowercase words joined by hyphens, under Slack's 80-character limit. */
+export function eventChannelName(eventName: string, suffix = "") {
+  const base = "evt-" + eventName.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return (base.slice(0, 80 - suffix.length).replace(/-+$/, "") + suffix);
+}
+
+/** The cards say who they are for at the top, so the person is notified and everyone else can see who has it. */
+const addressed = (m: CardMessage, mention: string[]): CardMessage => !mention.length ? m : {
+  text: `${mention.map((id) => `<@${id}>`).join(" ")} ${m.text}`,
+  blocks: [{ type: "context", elements: [{ type: "mrkdwn", text: `For ${mention.map((id) => `<@${id}>`).join(", ")}` }] }, ...(m.blocks ?? [])],
+};
+
 export function slackNotifier(cfg: SlackConfig): Notifier {
+  /** Opens a public channel for the event. A name already taken gets the event's id on the end, so two events never share a channel. */
+  async function open(room: EventRoom) {
+    for (const suffix of ["", `-${room.event_id.slice(-6).toLowerCase()}`]) {
+      const j = await slackCall(cfg, "conversations.create", { name: eventChannelName(room.name, suffix), is_private: false }) as { ok: boolean; error?: string; channel?: { id: string } };
+      if (j.ok && j.channel) return j.channel.id;
+      if (j.error !== "name_taken") return null;
+    }
+    return null;
+  }
   return {
-    async dm(slackId, m) { return (await slackCall(cfg, "chat.postMessage", { channel: slackId, text: m.text, blocks: m.blocks })).ok; },
-    async thread(thread, m) {
-      const j = await slackCall(cfg, "chat.postMessage", { channel: cfg.channel, text: m.text, blocks: m.blocks, ...(thread ? { thread_ts: thread } : {}) }) as { ok: boolean; ts?: string };
-      return j.ok ? thread ?? j.ts ?? null : null;
+    async post(room, m, mention = []) {
+      const channel = room.channel ?? await open(room);
+      if (!channel) return null;
+      // Someone outside a channel gets no notification from a mention, so they are added first. Already there is fine.
+      if (mention.length) await slackCall(cfg, "conversations.invite", { channel, users: mention.join(",") });
+      const j = await slackCall(cfg, "chat.postMessage", { channel, ...addressed(m, mention) });
+      return j.ok ? channel : null;
     },
+    async ops(m) { return (await slackCall(cfg, "chat.postMessage", { channel: cfg.opsChannel ?? cfg.channel, text: m.text, blocks: m.blocks })).ok; },
   };
 }
 

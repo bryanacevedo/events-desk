@@ -149,8 +149,13 @@ export function heyreach(o: Opts): Connector {
     verifyWebhook(req) {
       if (!sameSecret(req.query.secret, o.webhookSecret)) return null;
       const b = req.body as any;
-      if (!["MESSAGE_REPLY_RECEIVED", "EVERY_MESSAGE_REPLY_RECEIVED"].includes(b?.event_type) || !b?.lead?.profile_url) return [];
-      return [{ provider_message_id: `reply:${b.conversation_id}:${b.timestamp}`, signal: "reply", channel: "linkedin", sequence_external_id: b.campaign?.id ? String(b.campaign.id) : null, email: null, linkedin: b.lead.profile_url, external_contact_id: b.lead.profile_url, body: b.recent_messages?.at(-1)?.message ?? null, at: b.timestamp }];
+      // HeyReach sends the event in lower case, and fires only on a lead's first reply: later replies come in through the poll.
+      if (!["message_reply_received", "every_message_reply_received"].includes(String(b?.event_type ?? "").toLowerCase()) || !b?.lead?.profile_url) return [];
+      // The thread holds our messages and theirs. Only what they sent is the reply.
+      const theirs = (Array.isArray(b.recent_messages) ? b.recent_messages : []).filter((m: any) => m?.is_reply === true);
+      const last = theirs.at(-1);
+      const at = last?.timestamp ?? b.timestamp ?? new Date().toISOString();
+      return [{ provider_message_id: `reply:${b.conversation_id}:${last?.timestamp ?? theirs.length}`, signal: "reply", channel: "linkedin", sequence_external_id: b.campaign?.id ? String(b.campaign.id) : null, email: b.lead.custom_email ? String(b.lead.custom_email).toLowerCase() : null, linkedin: b.lead.profile_url, external_contact_id: b.lead.profile_url, body: last?.message ?? null, at }];
     },
   };
 }

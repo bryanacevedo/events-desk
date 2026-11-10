@@ -5,7 +5,7 @@ export type Motion = (typeof MOTIONS)[number];
 
 const ALLOWED: Record<Motion, Motion[]> = {
   none: ["owners", "sequencing", "closing"],
-  owners: ["sequencing"],
+  owners: ["sequencing", "closing"],
   sequencing: ["in_market", "closing"],
   in_market: ["closing"],
   closing: ["scored"],
@@ -43,6 +43,17 @@ export function zoneGroupOf(place: string | null | undefined): ZoneGroup {
   const z = zoneOf(place?.split(",").at(-1)?.trim() ?? null);
   if (!z) return "event";
   return z.startsWith("America/") ? "americas" : z.startsWith("Europe/") || z.startsWith("Africa/") ? "emea" : "apac";
+}
+
+/** The moment `n` business days after `from`, skipping weekends and holidays, at the same time of day. */
+export function addBusinessDays(from: Date, n: number, holidays: string[] = []) {
+  let t = from.getTime(), left = n;
+  while (left > 0) {
+    t += 86_400_000;
+    const d = new Date(t), wd = d.getUTCDay(), ymd = d.toISOString().slice(0, 10);
+    if (wd !== 0 && wd !== 6 && !holidays.includes(ymd)) left--;
+  }
+  return new Date(t);
 }
 
 /** Full business days after `from`, up to and including `to`. Weekends do not count, and neither do the desk's configured holidays. */

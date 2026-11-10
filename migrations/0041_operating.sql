@@ -140,6 +140,9 @@ ALTER TABLE contacts ADD COLUMN followup_tier text CHECK (followup_tier IN ('sca
 -- A template can be for one audience: a priority, or the people scanned at the booth.
 ALTER TABLE sequence_templates ADD COLUMN audience text NOT NULL DEFAULT 'all';
 
+-- An add was sent to the tool. If its answer was lost, a later stop must still be carried out there.
+ALTER TABLE enrollments ADD COLUMN add_attempted boolean NOT NULL DEFAULT false;
+
 -- Consent recorded per rep before their LinkedIn account sends anything.
 CREATE TABLE sender_consents (
   connector  text NOT NULL,
@@ -162,5 +165,5 @@ SELECT e.id AS event_id,
   (SELECT count(DISTINCT m.contact_id) FROM meetings m WHERE m.event_id = e.id AND m.enrolled AND m.status IN ('booked', 'held', 'no_show', 'rescheduled') AND EXISTS (SELECT 1 FROM inbound_messages i WHERE i.contact_id = m.contact_id AND i.signal = 'reply'))::int AS booked,
   (SELECT count(DISTINCT m.contact_id) FROM meetings m WHERE m.event_id = e.id AND m.enrolled AND m.status = 'held' AND EXISTS (SELECT 1 FROM inbound_messages i WHERE i.contact_id = m.contact_id AND i.signal = 'reply'))::int AS held,
   (SELECT count(*) FROM meetings m WHERE m.event_id = e.id AND m.status IN ('booked', 'held') AND NOT (m.enrolled AND EXISTS (SELECT 1 FROM inbound_messages i WHERE i.contact_id = m.contact_id AND i.signal = 'reply')))::int AS logged_outside,
-  (SELECT count(*) FROM meetings m WHERE m.event_id = e.id AND m.status = 'held')::int AS held_all
+  (SELECT count(DISTINCT m.contact_id) FROM meetings m WHERE m.event_id = e.id AND m.status = 'held')::int AS held_all
 FROM events e;

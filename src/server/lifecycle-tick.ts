@@ -17,7 +17,8 @@ export async function pollTools(db: Db, deps: LifecycleDeps) {
   const since = new Date(nowOf(deps).getTime() - 3 * 86_400_000).toISOString();
   for (const c of Object.values(deps.connectors)) {
     if (c.capabilities.events === "webhook") continue;
-    const seqs = await db.query<{ external_id: string }>("SELECT external_id FROM sequences WHERE connector = $1 AND launched_at IS NOT NULL AND state <> 'archived' AND external_id IS NOT NULL", [c.name]);
+    // A campaign that ended still gets replies, and "remove me" can come late: they are read for 30 days after.
+    const seqs = await db.query<{ external_id: string }>("SELECT external_id FROM sequences WHERE connector = $1 AND launched_at IS NOT NULL AND external_id IS NOT NULL AND (state <> 'archived' OR launched_at > $2::timestamptz - interval '120 days')", [c.name, nowOf(deps).toISOString()]);
     if (!seqs.length) continue;
     try { const events = await c.events(since, seqs.map((s) => s.external_id)); await ingestEvents(db, deps, c, events); await recordRun(db, c.name, true, events.length, undefined, nowOf(deps)); }
     catch (e) { await recordRun(db, c.name, false, 0, (e as Error).message, nowOf(deps)); console.error("poll", c.name, (e as Error).message); }
@@ -37,7 +38,33 @@ export async function ownerStep(db: Db, deps: LifecycleDeps) {
 
 const lastOk = (db: Db) => async (connector: string) => { const [r] = await db.query<{ last_ok_at: string | null }>("SELECT last_ok_at::text AS last_ok_at FROM connector_runs WHERE connector = $1", [connector]); return r?.last_ok_at ? new Date(r.last_ok_at) : null; };
 
+let ticking = false;
+/** When the last pass started and finished in this process. /api/health reads it, so a tick that died or hangs is seen from outside. */
+export const tickState = { startedAt: null as Date | null, finishedAt: null as Date | null };
+/** A pass still running after this long is stuck: every stop, sweep and escalation waits behind it. */
+export const TICK_STUCK_MINUTES = 15;
+
+/** One pass at a time in this process. Every drain also claims its rows, so a webhook running alongside never repeats a call. */
 export async function lifecycleTick(db: Db, deps: LifecycleDeps, opts: { flags?: boolean; nightly?: boolean } = {}) {
+  if (ticking) {
+    const since = tickState.startedAt;
+    if (since && nowOf(deps).getTime() - since.getTime() > TICK_STUCK_MINUTES * 60_000)
+      await raiseAlert(db, deps, "tick:stuck", `The desk's background pass has been running since ${since.toISOString().slice(11, 16)} UTC and has not finished. Stops, replies and escalations are waiting behind it. Restart the service.`).catch(() => {});
+    return;
+  }
+  ticking = true;
+  tickState.startedAt = nowOf(deps);
+  try { await tickOnce(db, deps, opts); tickState.finishedAt = nowOf(deps); } finally { ticking = false; }
+}
+
+/** The tick is stale when a pass has started in this process and none has finished in the last 20 minutes (four missed passes). */
+export function tickStale(now: Date = new Date()) {
+  if (!tickState.startedAt) return false;
+  const last = tickState.finishedAt ?? tickState.startedAt;
+  return now.getTime() - last.getTime() > 20 * 60_000;
+}
+
+async function tickOnce(db: Db, deps: LifecycleDeps, opts: { flags?: boolean; nightly?: boolean }) {
   running.db = db; running.deps = deps;
   await quietly("owners", () => ownerStep(db, deps));
   await quietly("observe", () => observeSequences(db, deps));

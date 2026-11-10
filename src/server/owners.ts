@@ -6,10 +6,11 @@ import { stopDomain } from "./enroll-ops.ts";
 import { logActivity, newId, RuleError } from "./events.ts";
 import { DESK, nowOf, type LifecycleDeps } from "./lifecycle-deps.ts";
 import { moveMotion } from "./motion-state.ts";
+import { postToEvent } from "./operating.ts";
 import { openLifecycleCase } from "./lifecycle-cases.ts";
 import { ACCOUNTS_PER_CARD, ownerCard, ownerWarningCard, type OwnerAccount } from "./slack-cards.ts";
 import { addHold, addTouch, releaseHold } from "./touches.ts";
-import { addDays, businessDaysAfter } from "../shared/motion.ts";
+import { addBusinessDays } from "../shared/motion.ts";
 
 type Q = Db["query"];
 const FAR = 400 * 86_400_000;
@@ -63,11 +64,7 @@ async function handToUploader(q: Q, d: { id: string; event_id: string; company_i
   });
 }
 
-const byDate = (d: Date, holidays: string[]) => {
-  let day = d.toISOString().slice(0, 10), left = 2;
-  while (left > 0) { day = addDays(day, 1); if (businessDaysAfter(addDays(day, -1), day, holidays) === 1) left--; }
-  return new Intl.DateTimeFormat("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(`${day}T00:00:00Z`));
-};
+const byDate = (d: Date, holidays: string[]) => new Intl.DateTimeFormat("en-US", { weekday: "long", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "UTC", timeZoneName: "short" }).format(addBusinessDays(d, 2, holidays));
 
 /** Sends one grouped card per owner. The clock starts only for a message that was delivered. An unmapped owner or a failed message goes to the uploader as a case. */
 export async function sendOwnerCards(db: Db, deps: LifecycleDeps, eventId: string) {
@@ -90,8 +87,7 @@ export async function sendOwnerCards(db: Db, deps: LifecycleDeps, eventId: strin
     for (let i = 0; i < rows.length; i += ACCOUNTS_PER_CARD) {
       const page = rows.slice(i, i + ACCOUNTS_PER_CARD);
       const card = ownerCard(page[0].event, page.map<OwnerAccount>((d) => ({ decision_id: d.id, company: d.company, people: d.people, deal: d.deal_stage })), by);
-      let delivered = false;
-      try { delivered = await deps.notify.dm(slackId, card); } catch { delivered = false; }
+      const delivered = await postToEvent(db, deps, eventId, card, [slackId]);
       await db.tx(async (q) => {
         for (const d of page) {
           if (delivered) await q("UPDATE owner_decisions SET sent_at = $2 WHERE id = $1", [d.id, now.toISOString()]);
@@ -104,13 +100,14 @@ export async function sendOwnerCards(db: Db, deps: LifecycleDeps, eventId: strin
 
 /** Warns at one business day of silence, includes at two, and moves the event on when nothing is waiting. */
 export async function ownerSweep(db: Db, deps: LifecycleDeps, eventId: string) {
-  const now = nowOf(deps), today = now.toISOString().slice(0, 10), holidays = deps.holidays ?? [];
+  const now = nowOf(deps), holidays = deps.holidays ?? [];
   const open = await db.query<{ id: string; event_id: string; company_id: string; domain: string | null; owner: string; sent_at: string; warned_at: string | null; event: string }>(
     `SELECT d.id, d.event_id, d.company_id, co.primary_domain AS domain, d.owner, d.sent_at::text AS sent_at, d.warned_at::text AS warned_at, e.name AS event FROM owner_decisions d JOIN companies co ON co.id = d.company_id JOIN events e ON e.id = d.event_id
      WHERE d.event_id = $1 AND d.status = 'pending' AND d.sent_at IS NOT NULL`, [eventId]);
   const warn = new Map<string, typeof open>();
   for (const d of open) {
-    const days = businessDaysAfter(new Date(d.sent_at).toISOString().slice(0, 10), today, holidays);
+    const sent = new Date(d.sent_at);
+    const days = now >= addBusinessDays(sent, 2, holidays) ? 2 : now >= addBusinessDays(sent, 1, holidays) ? 1 : 0;
     if (days >= 2) await db.tx(async (q) => {
       await applyDecision(q, d, "include", "default", DESK, now);
       await addTouch(q, { domain: d.domain, event_id: d.event_id, kind: "owner_default", reason: "No answer in two business days", source: DESK, dedup_key: `own_default:${d.id}` });
@@ -119,7 +116,7 @@ export async function ownerSweep(db: Db, deps: LifecycleDeps, eventId: string) {
   }
   for (const [owner, rows] of warn) {
     const slackId = deps.userMap?.[owner];
-    if (slackId && deps.notify) { try { await deps.notify.dm(slackId, ownerWarningCard(rows[0].event, rows.length, "the next business day")); } catch { /* the default still waits for its day */ } }
+    if (slackId) await postToEvent(db, deps, eventId, ownerWarningCard(rows[0].event, rows.length, "the next business day"), [slackId]);
     await db.query("UPDATE owner_decisions SET warned_at = $2 WHERE id = ANY($1::text[])", [rows.map((r) => r.id), now.toISOString()]);
   }
   await db.tx(async (q) => {
@@ -139,6 +136,8 @@ export async function decideOwner(db: Db, deps: LifecycleDeps, decisionId: strin
     if (!d) throw new RuleError("That decision does not exist.");
     const [up] = await q<{ uploaded_by: string }>("SELECT uploaded_by FROM uploads WHERE event_id = $1 ORDER BY created_at DESC LIMIT 1", [d.event_id]);
     if (actor !== d.owner && actor !== up?.uploaded_by) throw new RuleError(`Only ${d.owner} or the person who uploaded the list can decide this.`);
+    const [cur] = await q<{ status: string; via: string | null }>("SELECT status, via FROM owner_decisions WHERE id = $1", [decisionId]);
+    if (actor !== d.owner && cur.via === "owner") throw new RuleError(`${d.owner} already decided this.`);
     await applyDecision(q, d, status, actor === d.owner ? "owner" : "uploader", actor, now);
     await logActivity(q, d.event_id, actor, "owner", `${actor} said ${status} on ${d.company}`);
     return d;

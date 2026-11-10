@@ -6,7 +6,7 @@ import { logActivity } from "./events.ts";
 import { DESK, nowOf, type LifecycleDeps } from "./lifecycle-deps.ts";
 import { openLifecycleCase } from "./lifecycle-cases.ts";
 import { copyHash, type TemplateStep } from "../shared/template-check.ts";
-import { DEFAULT_SENDING_RULES, pickSenders, planCapacity, senderWords, timingFits, type SenderInfo, type SendingRules } from "../shared/sending.ts";
+import { DEFAULT_SENDING_RULES, pickSenders, planCapacity, timingFits, type SenderInfo, type SendingRules } from "../shared/sending.ts";
 import { businessDaysAfter, GROUP_ZONE, localDay, zoneOf, type Channel, type ZoneGroup } from "../shared/motion.ts";
 
 const DAY = 86_400_000;
@@ -14,13 +14,19 @@ export interface PlacementResult { domain: string; provider?: string; inbox_rate
 /** Mail lands differently at each. A blended number hides the one that matters. */
 export const PLACEMENT_PROVIDERS = ["google", "microsoft"];
 
-/** Exactly one SPF and one DMARC record, and a DMARC that says something. */
-export function authRecordsOk(records: string[][]) {
-  const txt = records.map((r) => r.join("").trim().toLowerCase());
-  return txt.filter((t) => t.startsWith("v=spf1")).length;
-}
 /** A domain's mail records. Absent in a mock: nothing is claimed about authentication then. */
 export interface MailAuth { hasSpfAndDmarc(domain: string): Promise<boolean> }
+
+/** Real DNS: exactly one SPF record, and one DMARC record that sets a policy. */
+export const systemMailAuth: MailAuth = {
+  async hasSpfAndDmarc(domain) {
+    const { resolveTxt } = await import("node:dns/promises");
+    const txt = async (name: string) => { try { return (await resolveTxt(name)).map((r) => r.join("").trim().toLowerCase()); } catch { return []; } };
+    const spf = (await txt(domain)).filter((t) => t.startsWith("v=spf1"));
+    const dmarc = (await txt(`_dmarc.${domain}`)).filter((t) => t.startsWith("v=dmarc1"));
+    return spf.length === 1 && dmarc.length === 1 && /;\s*p=(none|quarantine|reject)/.test(dmarc[0]);
+  },
+};
 
 const rulesOf = (deps: LifecycleDeps): SendingRules => ({ ...DEFAULT_SENDING_RULES, ...deps.sendingRules });
 
@@ -191,6 +197,5 @@ export async function senderSweep(db: Db, deps: LifecycleDeps, pause: (sequenceI
       await c.assignSenders(s.external_id, rows.map((x) => now.get(x.sender_id)!).filter(Boolean));
     }
   }
-  void senderWords;
   return out;
 }

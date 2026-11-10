@@ -29,6 +29,7 @@ import { mountSeatRoutes } from "./seat-routes.ts";
 import { mountBudgetRoutes } from "./budget-routes.ts";
 import { mountEventViews } from "./event-views.ts";
 import { mountLifecycle } from "./lifecycle-routes.ts";
+import { tickStale, tickState } from "./lifecycle-tick.ts";
 import type { LifecycleDeps } from "./lifecycle-deps.ts";
 import type { FakeTool } from "./connectors/fake.ts";
 import { validateRequest, type ActivityRow, type EventRow } from "../shared/domain.ts";
@@ -85,7 +86,12 @@ export function createApp(db: Db, cfg: AppConfig) {
     return bad("Something went wrong saving that. Reload and check before trying again.");
   });
 
-  app.get("/api/health", (c) => c.json({ ok: true, demo: cfg.demo }));
+  // An outside uptime check reads this. It fails when the background pass has stopped finishing, and it carries today's alerts, including the ones Slack could not deliver.
+  app.get("/api/health", async (c) => {
+    const stale = tickStale();
+    const [a] = await db.query<{ n: number }>("SELECT count(*)::int AS n FROM alerts WHERE day = $1", [new Date().toISOString().slice(0, 10)]).catch(() => [{ n: -1 }]);
+    return c.json({ ok: !stale, demo: cfg.demo, tick: { started_at: tickState.startedAt, finished_at: tickState.finishedAt, stale }, alerts_today: a?.n ?? 0 }, stale ? 503 : 200);
+  });
 
   // The rules every new event starts from, read-only. The ICP screen shows them until uploading a document exists.
   app.get("/api/settings/defaults", (c) => c.json({ settings: defaultSettings() }));

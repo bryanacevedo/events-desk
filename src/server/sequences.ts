@@ -5,7 +5,7 @@ import type { Db } from "./db.ts";
 import { CrmDown, askPeople, crmConnected, preSendCheck } from "./crm-checks.ts";
 import type { AddContact, Connector, SequenceState } from "./connectors/types.ts";
 import { logActivity, newId, RuleError } from "./events.ts";
-import { stopContacts, stopDomain } from "./enroll-ops.ts";
+import { OWED_REMOVE_SQL, RETURNABLE_CAUSES, stopContacts, stopDomain } from "./enroll-ops.ts";
 import { runGate } from "./gate.ts";
 import { DESK, nowOf, type LifecycleDeps } from "./lifecycle-deps.ts";
 import { moveMotion } from "./motion-state.ts";
@@ -109,7 +109,8 @@ export async function createDrafts(db: Db, deps: LifecycleDeps, eventId: string,
     const reachable = people.filter((p) => (channel === "email" ? p.email && p.verify_1 : p.linkedin)).map((p) => (phase === "post" && p.followup_tier === "scanned" ? { ...p, priority: "scanned" } : p));
     const zoneOfPerson = (p: Person) => zoneGroupOf(p.location) === "event" ? zoneGroupOf(p.country) : zoneGroupOf(p.location);
     for (const [priority, zone] of [...new Set(reachable.map((p) => `${p.priority}|${zoneOfPerson(p)}`))].sort().map((k) => k.split("|") as [string, ZoneGroup])) {
-      const inIt = new Set((await db.query<{ contact_id: string }>("SELECT contact_id FROM enrollments WHERE contact_id = ANY($1::text[]) AND event_id = $2 AND channel = $3 AND state <> 'removed'", [reachable.map((p) => p.id), eventId, channel])).map((r) => r.contact_id));
+      // Already in, or taken out for a reason that holds (a no, an opt-out, a bounce, a gate refusal): either way, not added again by this press.
+      const inIt = new Set((await db.query<{ contact_id: string }>("SELECT contact_id FROM enrollments WHERE contact_id = ANY($1::text[]) AND event_id = $2 AND channel = $3 AND (state <> 'removed' OR NOT (coalesce(cause, '') = ANY($4::text[])))", [reachable.map((p) => p.id), eventId, channel, RETURNABLE_CAUSES])).map((r) => r.contact_id));
       const fresh = reachable.filter((p) => p.priority === priority && zoneOfPerson(p) === zone && !inIt.has(p.id) && !heldOut(p.domain, e.holdout_percent));
       const results = await runGate(db, deps, eventId, fresh.map((p) => p.id), channel, "add");
       for (const r of results) if (!r.passed) summary.refused[r.reason!] = (summary.refused[r.reason!] ?? 0) + 1;
@@ -146,8 +147,8 @@ const namesOf = cleanNames;
 /** Carries out what the rows say is owed to the tools. A tool that fails leaves the row owed, and a later sweep finishes it. */
 export async function drainOps(db: Db, deps: LifecycleDeps, eventId: string | null = null) {
   const now = nowOf(deps);
-  const rows = await db.query<{ id: string; event_id: string; contact_id: string; sequence_id: string; channel: Channel; external_contact_id: string | null; pending_op: "add" | "pause" | "resume" | "remove"; state: string; connector: string; ext: string | null; seq_state: SequenceState; released_by: string | null; in_tool: number }>(
-    `SELECT n.id, n.event_id, n.contact_id, n.sequence_id, n.channel, n.external_contact_id, n.pending_op, n.state, s.connector, s.external_id AS ext, s.state AS seq_state, s.released_by,
+  const rows = await db.query<{ id: string; event_id: string; contact_id: string; sequence_id: string; channel: Channel; external_contact_id: string | null; pending_op: "add" | "pause" | "resume" | "remove"; state: string; connector: string; ext: string | null; seq_state: SequenceState; released_by: string | null; in_tool: number; added_at: string }>(
+    `SELECT n.id, n.event_id, n.contact_id, n.sequence_id, n.channel, n.external_contact_id, n.pending_op, n.state, n.added_at::text AS added_at, s.connector, s.external_id AS ext, s.state AS seq_state, s.released_by,
             (SELECT count(*)::int FROM enrollments x WHERE x.sequence_id = s.id AND x.external_contact_id IS NOT NULL) AS in_tool
      FROM enrollments n JOIN sequences s ON s.id = n.sequence_id WHERE n.pending_op IS NOT NULL AND ($1::text IS NULL OR n.event_id = $1) AND (n.retry_after IS NULL OR n.retry_after <= $2::timestamptz)
      ORDER BY CASE n.pending_op WHEN 'remove' THEN 0 WHEN 'pause' THEN 1 ELSE 2 END, n.id`, [eventId, now.toISOString()]);
@@ -159,11 +160,22 @@ export async function drainOps(db: Db, deps: LifecycleDeps, eventId: string | nu
     if (!c) { out.failed++; continue; }
     // No campaign yet: the tool waits for a person to name one.
     if (!r.ext) continue;
+    if ((r.pending_op === "remove" || r.pending_op === "pause") && !r.external_contact_id) {
+      // An add whose answer was lost: the tool may hold the person. Adding is safe to repeat and gives back their id, so they can be taken out.
+      try {
+        const [p] = await db.query<Person>("SELECT k.id, k.priority, k.full_name, k.title, k.email, k.linkedin, co.name AS company, co.primary_domain AS domain, k.verify_1, k.person_id FROM contacts k JOIN companies co ON co.id = k.company_id WHERE k.id = $1", [r.contact_id]);
+        const base = { ref: p.id, email: p.email, linkedin: p.linkedin, ...namesOf(p.full_name), company: p.company, title: p.title, crm_id: null };
+        const [found] = await c.addContacts(r.ext, [{ ...base, external_id: await c.ensureContact(base) }]);
+        if (found?.external_id) { await c.removeContact(r.ext, found.external_id); await db.query("UPDATE enrollments SET pending_op = NULL, external_contact_id = $2 WHERE id = $1 AND pending_op = $3", [r.id, found.external_id, r.pending_op]); out.done++; }
+      } catch (e) { out.failed++; console.error("sequence op", r.pending_op, r.id, (e as Error).message); }
+      continue;
+    }
     // The one switch: stops still go out, adds and resumes wait.
     if (stopped && (r.pending_op === "add" || r.pending_op === "resume")) continue;
     if (r.pending_op === "resume" && c.capabilities.pause === "remove-only" && r.external_contact_id) {
       // Adding someone back to a tool that cannot hold them would restart them at step 1. Once anything has gone out, they stop for good.
-      const [sent] = await db.query("SELECT 1 FROM touches WHERE contact_id = $1 AND event_id = $2 AND kind = 'send' AND channel = $3 LIMIT 1", [r.contact_id, r.event_id, r.channel]);
+      // Not every tool reports its sends, so being in a launched campaign counts as sent.
+      const [sent] = await db.query("SELECT 1 FROM touches WHERE contact_id = $1 AND event_id = $2 AND kind = 'send' AND channel = $3 UNION ALL SELECT 1 FROM sequences WHERE id = $4 AND launched_at IS NOT NULL LIMIT 1", [r.contact_id, r.event_id, r.channel, r.sequence_id]);
       if (sent) { await db.query("UPDATE enrollments SET state = 'removed', pending_op = NULL, cause = 'cannot_resume_mid_sequence', changed_at = now() WHERE id = $1", [r.id]); continue; }
     }
     if (r.pending_op === "add" || (r.pending_op === "resume" && (c.capabilities.pause === "remove-only" || !r.external_contact_id))) { adds.set(r.sequence_id, [...(adds.get(r.sequence_id) ?? []), r]); continue; }
@@ -186,8 +198,19 @@ export async function drainOps(db: Db, deps: LifecycleDeps, eventId: string | nu
     if (!c.capabilities.addsWhileDraft && all[0].seq_state !== "active") continue;
     // A real tool's first send is small and watched. The rest wait until a person has looked and released them.
     const room = !c.simulated && deps.firstCohort && !all[0].released_by ? Math.max(0, deps.firstCohort - all[0].in_tool) : all.length;
-    const group = all.slice(0, room);
+    let group = all.slice(0, room);
     if (!group.length) continue;
+    // Anyone who waited (the two-a-day spread, a first-cohort release) is checked again: things change while people wait.
+    const stale = group.filter((g) => g.pending_op === "add" && now.getTime() - Date.parse(g.added_at) > 15 * 60_000);
+    if (stale.length) {
+      let res;
+      try { res = await runGate(db, deps, stale[0].event_id, stale.map((g) => g.contact_id), stale[0].channel, "add"); }
+      catch (e) { if (e instanceof CrmDown) continue; throw e; }
+      const failed = new Set(res.filter((x) => !x.passed).map((x) => x.contact_id));
+      for (const x of res.filter((x) => !x.passed)) await db.query(`UPDATE enrollments SET state = 'removed', pending_op = ${OWED_REMOVE_SQL}, cause = $2, changed_at = now() WHERE id = $1`, [stale.find((g) => g.contact_id === x.contact_id)!.id, `gate:${x.reason}`]);
+      group = group.filter((g) => !failed.has(g.contact_id));
+      if (!group.length) continue;
+    }
     try {
       const people = await db.query<Person & { contact_id: string }>("SELECT k.id, k.priority, k.full_name, k.title, k.email, k.linkedin, co.name AS company, co.primary_domain AS domain, k.verify_1, k.person_id FROM contacts k JOIN companies co ON co.id = k.company_id WHERE k.id = ANY($1::text[])", [group.map((g) => g.contact_id)]);
       const crmIds = new Map<string, string>();
@@ -205,12 +228,17 @@ export async function drainOps(db: Db, deps: LifecycleDeps, eventId: string | nu
         toSend.push({ ...base, external_id: await c.ensureContact(base) });
       }
       if (!toSend.length) continue;
+      // Written before the call: if the answer is lost, a later stop still reaches the tool.
+      await db.query("UPDATE enrollments SET add_attempted = true WHERE id = ANY($1::text[])", [group.filter((g) => toSend.some((t) => t.ref === g.contact_id)).map((g) => g.id)]);
       const results = await c.addContacts(ext, toSend);
       await db.tx(async (q) => {
         for (const r of results) {
           const row = group.find((g) => g.contact_id === r.ref)!;
           if (r.ok) {
-            await q("UPDATE enrollments SET state = CASE WHEN pending_op IN ('add', 'resume') THEN 'enrolled' ELSE state END, pending_op = CASE WHEN pending_op IN ('add', 'resume') THEN NULL ELSE pending_op END, external_contact_id = $2, retry_after = NULL, changed_at = now() WHERE id = $1", [row.id, r.external_id]);
+            // A stop that landed while the add was in flight is still owed: the person is in the tool now.
+            await q(`UPDATE enrollments SET state = CASE WHEN pending_op IN ('add', 'resume') THEN 'enrolled' ELSE state END,
+                       pending_op = CASE WHEN pending_op IN ('add', 'resume') THEN NULL WHEN pending_op IS NULL AND state = 'removed' THEN 'remove' WHEN pending_op IS NULL AND state = 'paused' THEN 'pause' ELSE pending_op END,
+                       external_contact_id = $2, retry_after = NULL, changed_at = now() WHERE id = $1`, [row.id, r.external_id]);
             const p = people.find((x) => x.id === r.ref)!;
             await addTouch(q, { domain: p.domain, person_id: p.person_id, contact_id: p.id, event_id: row.event_id, kind: "sequence_add", channel: row.channel, source: DESK, dedup_key: `add:${row.id}:${row.pending_op === "add" ? "first" : now.getTime()}` });
           } else await q("UPDATE enrollments SET cause = $2, retry_after = $3 WHERE id = $1", [row.id, r.reason ?? "tool_refused", new Date(now.getTime() + (r.retry_after_minutes ?? 60) * 60_000).toISOString()]);
@@ -237,7 +265,7 @@ async function pauseWhole(db: Db, c: Connector, s: SeqRow, reason: string, actor
 async function endSequence(db: Db, c: Connector, s: SeqRow, cause: string) {
   await pauseWhole(db, c, s, cause);
   await db.tx(async (q) => {
-    await q("UPDATE enrollments SET state = 'removed', pending_op = CASE WHEN external_contact_id IS NULL THEN NULL ELSE 'remove' END, cause = $2, changed_at = now() WHERE sequence_id = $1 AND state <> 'removed'", [s.id, cause]);
+    await q(`UPDATE enrollments SET state = 'removed', pending_op = ${OWED_REMOVE_SQL}, cause = $2, changed_at = now() WHERE sequence_id = $1 AND state <> 'removed'`, [s.id, cause]);
     await q("UPDATE sequences SET state = 'archived' WHERE id = $1 AND NOT pause_owed", [s.id]);
   });
 }
@@ -302,11 +330,18 @@ export async function observeSequences(db: Db, deps: LifecycleDeps) {
     const c = deps.connectors[s.connector];
     if (!c) continue;
     if (s.pause_owed) { await pauseWhole(db, c, s, "Retrying a pause the tool had not confirmed."); continue; }
+    const stopped = (await db.query("SELECT 1 FROM desk_controls WHERE sending_stopped_at IS NOT NULL")).length > 0;
     let real: SequenceState;
     try { real = c.capabilities.observesLaunch ? await c.sequenceState(s.external_id!) : (await db.query("SELECT 1 FROM enrollments WHERE sequence_id = $1 AND state = 'enrolled' LIMIT 1", [s.id])).length ? "active" : "draft"; }
     catch (e) { console.error("sequence state", s.id, (e as Error).message); continue; }
     if (real === s.state) continue;
+    if (real === "archived" && s.state !== "archived") {
+      // The tool ended it. Its people are out, with that cause, so they are free for the next event.
+      await db.tx(async (q) => { await q("UPDATE sequences SET state = 'archived' WHERE id = $1", [s.id]); await q("UPDATE enrollments SET state = 'removed', pending_op = NULL, cause = 'campaign_ended', changed_at = now() WHERE sequence_id = $1 AND state <> 'removed'", [s.id]); });
+      continue;
+    }
     if (real !== "active") { await db.query("UPDATE sequences SET state = $2 WHERE id = $1", [s.id, real]); continue; }
+    if (stopped) { await pauseWhole(db, c, s, "All sending is stopped, so a campaign started in the tool was paused again."); continue; }
     // Not enough healthy senders: it does not run, whatever the tool was told.
     if (!(await launchAllowed(db, s.id))) { await pauseWhole(db, c, s, "There are not enough healthy senders for this sequence."); continue; }
     if (!(await settingsConfirmed(db, deps, c, s))) { await pauseWhole(db, c, s, "Its send window, tracking or stop-on-reply are not what the desk set, or the launch checklist is not confirmed."); continue; }
@@ -322,7 +357,7 @@ export async function observeSequences(db: Db, deps: LifecycleDeps) {
     await db.tx(async (q) => {
       await q("UPDATE sequences SET state = 'active', launched_at = coalesce(launched_at, $2), gate_passed_at = $2, pause_reason = NULL WHERE id = $1", [s.id, now.toISOString()]);
       const failed = results.filter((r) => !r.passed);
-      for (const r of failed) await q("UPDATE enrollments SET state = 'removed', pending_op = CASE WHEN external_contact_id IS NULL THEN NULL ELSE 'remove' END, cause = $3, changed_at = now() WHERE sequence_id = $1 AND contact_id = $2 AND state <> 'removed'", [s.id, r.contact_id, `gate:${r.reason}`]);
+      for (const r of failed) await q(`UPDATE enrollments SET state = 'removed', pending_op = ${OWED_REMOVE_SQL}, cause = $3, changed_at = now() WHERE sequence_id = $1 AND contact_id = $2 AND state <> 'removed'`, [s.id, r.contact_id, `gate:${r.reason}`]);
       await logActivity(q, s.event_id, DESK, "sequence", `${s.name} is live. ${results.length - failed.length} passed the launch check, ${failed.length} came out.`);
       const [e] = await q<{ motion: string }>("SELECT motion FROM events WHERE id = $1 FOR UPDATE", [s.event_id]);
       if (e.motion === "sequencing") await moveMotion(q, s.event_id, "in_market", DESK, "The first sequence went live");
@@ -333,7 +368,7 @@ export async function observeSequences(db: Db, deps: LifecycleDeps) {
 
 /** After launch nothing waits for a gate: every 15 minutes the opt-out and CRM flags are read again for everyone active. */
 export async function flagSweep(db: Db, deps: LifecycleDeps) {
-  const rows = await db.query<{ contact_id: string }>("SELECT DISTINCT contact_id FROM enrollments WHERE state = 'enrolled'");
+  const rows = await db.query<{ contact_id: string }>("SELECT DISTINCT contact_id FROM enrollments WHERE state = 'enrolled' OR (state IN ('adding', 'paused') AND pending_op IN ('add', 'resume'))");
   if (!rows.length) return { removed: 0 };
   let checked;
   try { checked = await preSendCheck(db, rows.map((r) => r.contact_id), deps.crm); }
@@ -342,11 +377,12 @@ export async function flagSweep(db: Db, deps: LifecycleDeps) {
   // A deal that reached a late stage since launch: the account's owner should be talking to them, not a sequence.
   let paused = 0;
   if (crmConnected(deps.crm)) {
-    const late = (await import("./later-cases.ts")).DEFAULT_LATE_STAGES;
-    const accounts = await db.query<{ domain: string; company: string; event_id: string }>("SELECT DISTINCT ON (n.domain) n.domain, co.name AS company, n.event_id FROM enrollments n JOIN contacts k ON k.id = n.contact_id JOIN companies co ON co.id = k.company_id WHERE n.state = 'enrolled' LIMIT 200");
+    const { DEFAULT_LATE_STAGES } = await import("./later-cases.ts");
+    const accounts = await db.query<{ domain: string; company: string; event_id: string; late: string[] | null }>("SELECT DISTINCT ON (n.domain) n.domain, co.name AS company, n.event_id, s.settings->'late_stages' AS late FROM enrollments n JOIN contacts k ON k.id = n.contact_id JOIN companies co ON co.id = k.company_id LEFT JOIN event_settings s ON s.event_id = n.event_id WHERE n.state IN ('enrolled', 'adding') ORDER BY n.domain");
     for (const a of accounts) {
       let info;
       try { info = deps.crm.lookupByDomain ? await deps.crm.lookupByDomain(a.domain, a.company, nowOf(deps).toISOString().slice(0, 10)) : null; } catch { break; }
+      const late = Array.isArray(a.late) ? a.late.map((x) => String(x).toLowerCase()) : DEFAULT_LATE_STAGES;
       if (!info?.deal_stage || !late.includes(info.deal_stage.toLowerCase())) continue;
       await db.tx(async (q) => { await stopDomain(q, a.domain, "pause", "new_late_deal", null); await logActivity(q, a.event_id, DESK, "sequence", `${a.company} now has a ${info.deal_stage} deal, so its people were paused for the owner`); });
       paused++;
@@ -373,7 +409,7 @@ export async function resumeDue(db: Db, deps: LifecycleDeps) {
     try { [r] = await runGate(db, deps, d.event_id, [d.contact_id], d.channel, "resume"); }
     catch (e) { if (e instanceof CrmDown) continue; throw e; }
     if (r.passed) { await db.query("UPDATE enrollments SET pending_op = 'resume', resume_at = NULL, cause = NULL, cause_id = NULL WHERE id = $1 AND state = 'paused'", [d.id]); resumed++; }
-    else await db.query("UPDATE enrollments SET resume_at = $2 WHERE id = $1", [d.id, r.retry_after?.toISOString() ?? null]);
+    else await db.query("UPDATE enrollments SET resume_at = $2 WHERE id = $1", [d.id, r.reason?.startsWith("hold:") || r.reason === "reply_waiting" ? null : r.retry_after?.toISOString() ?? null]);
   }
   if (resumed) await drainOps(db, deps);
   return { resumed };
@@ -398,8 +434,8 @@ export async function resumePerson(db: Db, deps: LifecycleDeps, eventId: string,
 export async function bounceWatch(db: Db, deps: LifecycleDeps, opts: { threshold?: number; minSends?: number } = {}) {
   const threshold = opts.threshold ?? 0.03, minSends = opts.minSends ?? 50;
   const rows = await db.query<SeqRow & { sends: number; bounces: number }>(
-    `SELECT s.*, (SELECT count(DISTINCT t.contact_id) FROM touches t JOIN enrollments n ON n.contact_id = t.contact_id AND n.sequence_id = s.id WHERE t.kind = 'send')::int AS sends,
-            (SELECT count(DISTINCT m.contact_id) FROM inbound_messages m JOIN enrollments n ON n.contact_id = m.contact_id AND n.sequence_id = s.id WHERE m.code = 'bounced')::int AS bounces
+    `SELECT s.*, (SELECT count(DISTINCT t.contact_id) FROM touches t JOIN enrollments n ON n.contact_id = t.contact_id AND n.sequence_id = s.id WHERE t.kind = 'send' AND t.event_id = s.event_id AND t.channel = s.channel)::int AS sends,
+            (SELECT count(DISTINCT m.contact_id) FROM inbound_messages m JOIN enrollments n ON n.contact_id = m.contact_id AND n.sequence_id = s.id WHERE m.code = 'bounced' AND m.event_id = s.event_id)::int AS bounces
      FROM sequences s WHERE s.state = 'active' AND s.channel = 'email'`);
   for (const s of rows) {
     if (s.sends < minSends || s.bounces / s.sends <= threshold) continue;

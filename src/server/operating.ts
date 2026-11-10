@@ -6,35 +6,44 @@ import { logActivity, newId, RuleError } from "./events.ts";
 import { DESK, nowOf, type LifecycleDeps } from "./lifecycle-deps.ts";
 import { pauseSequenceById, drainOps } from "./sequences.ts";
 import { addHold, addTouch } from "./touches.ts";
-import type { CardMessage } from "./slack-cards.ts";
+import { alertCard, type CardMessage } from "./slack-cards.ts";
 import { addDays, businessDaysAfter } from "../shared/motion.ts";
 import { cleanLinkedin, companyKey, labelFromDomain } from "../shared/ingest.ts";
 import { emailDomain, isFreeWebmail } from "../shared/layer0.ts";
+import { nameKey } from "../shared/email.ts";
 
 type Q = Db["query"];
 const MAX_TRIES = 5;
 
 /* ---------------------------------------------------------- notifications */
 
-export const queueDm = (q: Q, eventId: string | null, slackId: string, card: CardMessage) => q("INSERT INTO notifications (id, event_id, target, slack_id, card) VALUES ($1, $2, 'dm', $3, $4::jsonb)", [newId("ntf"), eventId, slackId, JSON.stringify(card)]);
-export const queueThread = (q: Q, eventId: string, card: CardMessage) => q("INSERT INTO notifications (id, event_id, target, card) VALUES ($1, $2, 'thread', $3::jsonb)", [newId("ntf"), eventId, JSON.stringify(card)]);
+/** A card for the event's channel, @-mentioning the people it is for. Written in the caller's transaction and sent from the queue, so a Slack outage loses nothing. */
+export const queueEvent = (q: Q, eventId: string, card: CardMessage, mention: (string | null | undefined)[] = []) =>
+  q("INSERT INTO notifications (id, event_id, target, card, mention) VALUES ($1, $2, 'event', $3::jsonb, $4::text[])", [newId("ntf"), eventId, JSON.stringify(card), [...new Set(mention.filter((m): m is string => Boolean(m)))]]);
+/** A card for the ops channel. */
+export const queueOps = (q: Q, card: CardMessage) => q("INSERT INTO notifications (id, event_id, target, card) VALUES ($1, NULL, 'ops', $2::jsonb)", [newId("ntf"), JSON.stringify(card)]);
+
+/** Posts to the event's channel now, and remembers the channel the first time. For callers that must know it arrived (an owner card that did not becomes the uploader's to decide). */
+export async function postToEvent(db: Db, deps: LifecycleDeps, eventId: string, card: CardMessage, mention: (string | null | undefined)[] = []) {
+  if (!deps.notify) return false;
+  const [e] = await db.query<{ name: string; slack_channel: string | null }>("SELECT name, slack_channel FROM events WHERE id = $1", [eventId]);
+  if (!e) return false;
+  let channel: string | null = null;
+  try { channel = await deps.notify.post({ event_id: eventId, name: e.name, channel: e.slack_channel }, card, [...new Set(mention.filter((m): m is string => Boolean(m)))]); } catch { channel = null; }
+  if (channel && !e.slack_channel) await db.query("UPDATE events SET slack_channel = $2 WHERE id = $1 AND slack_channel IS NULL", [eventId, channel]);
+  return channel !== null;
+}
 
 /** Sends what is queued. One that keeps failing raises an alert instead of disappearing. */
 export async function drainNotifications(db: Db, deps: LifecycleDeps) {
   if (!deps.notify) return { sent: 0 };
-  const rows = await db.query<{ id: string; event_id: string | null; target: string; slack_id: string | null; card: CardMessage; attempts: number; thread: string | null }>(
-    "SELECT n.id, n.event_id, n.target, n.slack_id, n.card, n.attempts, e.slack_thread AS thread FROM notifications n LEFT JOIN events e ON e.id = n.event_id WHERE n.status = 'queued' ORDER BY n.created_at, n.id LIMIT 200");
+  const rows = await db.query<{ id: string; event_id: string | null; target: string; mention: string[]; card: CardMessage; attempts: number }>(
+    "SELECT id, event_id, target, mention, card, attempts FROM notifications WHERE status = 'queued' ORDER BY created_at, id LIMIT 200");
   let sent = 0;
   for (const n of rows) {
     let ok = false;
     try {
-      if (n.target === "dm") ok = await deps.notify.dm(n.slack_id!, n.card);
-      else {
-        const [fresh] = await db.query<{ slack_thread: string | null }>("SELECT slack_thread FROM events WHERE id = $1", [n.event_id]);
-        const t = await deps.notify.thread(fresh?.slack_thread ?? n.thread, n.card);
-        ok = t !== null;
-        if (t && !fresh?.slack_thread) await db.query("UPDATE events SET slack_thread = $2 WHERE id = $1 AND slack_thread IS NULL", [n.event_id, t]);
-      }
+      ok = n.target === "ops" ? await deps.notify.ops(n.card) : await postToEvent(db, deps, n.event_id!, n.card, n.mention);
     } catch { ok = false; }
     if (ok) { await db.query("UPDATE notifications SET status = 'sent', attempts = attempts + 1, sent_at = now() WHERE id = $1", [n.id]); sent++; continue; }
     const tries = n.attempts + 1;
@@ -50,8 +59,11 @@ export async function drainNotifications(db: Db, deps: LifecycleDeps) {
 export async function raiseAlert(db: Db, deps: LifecycleDeps, key: string, text: string) {
   const day = nowOf(deps).toISOString().slice(0, 10);
   const rows = await db.query("INSERT INTO alerts (id, key, day, text) VALUES ($1, $2, $3, $4) ON CONFLICT (key, day) DO NOTHING RETURNING id", [newId("alr"), key, day, text.slice(0, 500)]);
-  if (rows.length) console.error("ALERT", key, text);
-  return rows.length > 0;
+  if (!rows.length) return false;
+  console.error(JSON.stringify({ event: "alert", key, text: text.slice(0, 500) }));
+  // It goes to the ops channel. Not a failed Slack message itself: that would queue another message to the same broken Slack. Those show on /api/health.
+  if (!key.startsWith("notify:")) await queueOps(db.query, alertCard({ text }));
+  return true;
 }
 
 /* -------------------------------------------------------- hearing from tools */
@@ -103,9 +115,7 @@ export async function escalateWaiting(db: Db, deps: LifecycleDeps) {
   const { overdueCard } = await import("./slack-cards.ts");
   for (const m of late) await db.tx(async (q) => {
     await q("UPDATE inbound_messages SET escalated_at = $2 WHERE id = $1", [m.id, now.toISOString()]);
-    const slackId = m.uploader ? deps.userMap?.[m.uploader] : undefined;
-    const card = overdueCard({ person: m.full_name ?? "Someone", company: m.company });
-    if (slackId) await queueDm(q, m.event_id, slackId, card); else await queueThread(q, m.event_id, card);
+    await queueEvent(q, m.event_id, overdueCard({ person: m.full_name ?? "Someone", company: m.company }), [m.uploader ? deps.userMap?.[m.uploader] : null]);
     await logActivity(q, m.event_id, DESK, "reply", `Nobody picked up the reply from ${m.full_name ?? "someone"} at ${m.company}`);
   });
   return { escalated: late.length };
@@ -168,14 +178,24 @@ export async function captureOnsite(db: Db, deps: LifecycleDeps, eventId: string
 export async function forgetPerson(db: Db, deps: LifecycleDeps, email: string, actor: string) {
   const e = email.trim().toLowerCase();
   const out = await db.tx(async (q) => {
-    const rows = await q<{ id: string }>("SELECT id FROM contacts WHERE lower(email) = $1", [e]);
+    // Every record of the person: by address, by the shared person record, and by LinkedIn profile.
+    const rows = await q<{ id: string; full_name: string | null; key: string | null; linkedin: string | null }>(
+      `SELECT k.id, k.full_name, co.key, k.linkedin FROM contacts k LEFT JOIN companies co ON co.id = k.company_id
+       WHERE lower(k.email) = $1 OR k.person_id IN (SELECT person_id FROM contacts WHERE lower(email) = $1 AND person_id IS NOT NULL)
+          OR (k.linkedin IS NOT NULL AND k.linkedin IN (SELECT linkedin FROM contacts WHERE lower(email) = $1 AND linkedin IS NOT NULL))`, [e]);
     const ids = rows.map((r) => r.id);
+    // The name at the company is blocked too, so a later list with no address still finds them.
+    for (const r of rows) if (r.full_name && r.key) await q("INSERT INTO suppressions (id, kind, name_key, company_key, reason, created_by) VALUES ($1, 'opt_out', $2, $3, 'Erasure request', $4)", [newId("sup"), nameKey(r.full_name), r.key, actor]);
     await stopContacts(q, ids, "remove", "erasure");
     await q("UPDATE inbound_messages SET body = NULL WHERE contact_id = ANY($1::text[])", [ids]);
     await q("UPDATE contacts SET full_name = NULL, title = NULL, linkedin = NULL, email = NULL, person_location = NULL, drop_reason = 'opted_out', dropped_at = coalesce(dropped_at, now()), person_id = NULL WHERE id = ANY($1::text[])", [ids]);
     await q("DELETE FROM person_emails WHERE email = $1", [e]);
     await q("DELETE FROM people WHERE email = $1", [e]);
-    await q("DELETE FROM onsite_captures WHERE lower(email) = $1", [e]);
+    await q("DELETE FROM onsite_captures WHERE lower(email) = $1 OR contact_id = ANY($2::text[])", [e, ids]);
+    // Copies elsewhere: notes on their history, CRM writes not yet sent, and Slack cards still waiting to go.
+    await q("UPDATE touches SET reason = '' WHERE contact_id = ANY($1::text[])", [ids]);
+    await q("UPDATE crm_outbox SET status = 'cancelled' WHERE status = 'queued' AND lower(payload->>'email') = $1", [e]);
+    await q("UPDATE notifications SET card = '{}'::jsonb, status = CASE WHEN status = 'queued' THEN 'failed' ELSE status END WHERE event_id IN (SELECT event_id FROM contacts WHERE id = ANY($1::text[])) AND card::text ILIKE '%' || $2 || '%'", [ids, (await q<{ full_name: string | null }>("SELECT full_name FROM contacts WHERE id = ANY($1::text[]) AND full_name IS NOT NULL LIMIT 1", [ids]))[0]?.full_name ?? e]);
     await q("INSERT INTO suppressions (id, kind, email, reason, created_by) VALUES ($1, 'opt_out', $2, 'Erasure request', $3)", [newId("sup"), e, actor]);
     return { contacts: ids.length };
   });
@@ -183,5 +203,9 @@ export async function forgetPerson(db: Db, deps: LifecycleDeps, email: string, a
   return out;
 }
 
-/** Reply text is not kept forever. */
-export const purgeOldBodies = (db: Db, deps: LifecycleDeps, days = 180) => db.query("UPDATE inbound_messages SET body = NULL WHERE body IS NOT NULL AND received_at < $1::timestamptz - ($2::text || ' days')::interval", [nowOf(deps).toISOString(), String(days)]);
+/** Reply text is not kept forever: replies after 180 days, and the copies inside sent Slack cards after 7. */
+export async function purgeOldBodies(db: Db, deps: LifecycleDeps, days = 180) {
+  const now = nowOf(deps).toISOString();
+  await db.query("UPDATE inbound_messages SET body = NULL WHERE body IS NOT NULL AND received_at < $1::timestamptz - ($2::text || ' days')::interval", [now, String(days)]);
+  await db.query("UPDATE notifications SET card = '{}'::jsonb WHERE status <> 'queued' AND card <> '{}'::jsonb AND created_at < $1::timestamptz - interval '7 days'", [now]);
+}

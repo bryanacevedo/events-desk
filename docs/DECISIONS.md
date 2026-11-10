@@ -218,3 +218,9 @@ Built on branch `v2` from `docs/LIFECYCLE.md`. What changed from the spec while 
 - **ROI has written definitions.** New pipeline: created within 30 days after a held meeting, with no open deal before it. Pipeline it moved: already open and moved forward within 90 days after one. One deal counts for one event. Accounts nobody reached are shown beside the accounts met.
 - **Testing is tiered.** Touched files while building, the full suite in the background before a commit, real Postgres once per batch and in CI.
 
+
+## 34. Slack in the open: one channel per event, no direct messages (2026-11-09)
+
+v2 first sent owner cards, hot replies, reminders and debrief prompts by direct message, and event news to a thread in the approvals channel. Bryan caught it: direct messages hide the work from the team, so nobody can see who has a reply, cover for someone out, or learn from what landed. Now each event has its own public channel, opened by the desk on first post, and every card for the event goes there with the responsible person @-mentioned and invited first (Slack does not notify someone outside a channel). Problems that belong to no one event go to an ops channel. This matches §10, where cost approvals already used a channel with an @mention instead of a direct message. Costs: one more channel per event in the workspace, and the bot needs `channels:manage` to open them.
+
+Alerts used to land only in a table and the server log, served by an endpoint no screen called, so "Instantly went quiet, 4 sequences paused" would have gone unseen. They now go to the ops channel. With them: a 30-second timeout on every tool call and 15 on Slack, a report when a background pass runs past 15 minutes, and `/api/health` answering 503 when no pass has finished for 20, so an outside uptime check sees a dead desk even when Slack is the thing that is down.

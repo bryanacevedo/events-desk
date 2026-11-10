@@ -622,7 +622,7 @@ describe("replies", () => {
     expect((await enrollmentStates(db, ana.id)).every((x) => x.state === "removed")).toBe(true);
   });
 
-  it("out of office resumes on its stated date, through the gate", async () => {
+  it("out of office ends the sequence for good on a tool that cannot hold people, instead of restarting it at step 1", async () => {
     const { h, e, ana } = await go();
     await ingestEvents(db, h.deps, h.email.connector, [reply(ana.email, "I am out of office, back on 2027-01-20.", e.external_id)]);
     await processInbound(db, h.deps);
@@ -632,8 +632,8 @@ describe("replies", () => {
     await db.query("UPDATE verification_cache SET checked_at = $1", [h.time.now.toISOString()]);
     await resumeDue(db, h.deps);
     await drainOps(db, h.deps);
-    expect((await enrollmentStates(db, ana.id)).find((x) => x.channel === "email")).toMatchObject({ state: "enrolled", pending_op: null });
-    expect(h.email.seqs.get(e.external_id)!.people.has(ana.email)).toBe(true);
+    expect((await enrollmentStates(db, ana.id)).find((x) => x.channel === "email")).toMatchObject({ state: "removed", cause: "cannot_resume_mid_sequence" });
+    expect(h.email.seqs.get(e.external_id)!.people.has(ana.email)).toBe(false);
   });
 
   it("when the card runs out, code still acts and everything else is doubtful", async () => {
@@ -644,14 +644,15 @@ describe("replies", () => {
     expect((await db.query<{ doubtful: boolean }>("SELECT doubtful FROM inbound_messages"))[0].doubtful).toBe(true);
   });
 
-  it("posts good news to the event's thread, with no cramped text", async () => {
+  it("posts good news to the event's own channel, opened on the first post, with no cramped text", async () => {
     const { h, e, ana } = await go();
     await ingestEvents(db, h.deps, h.email.connector, [reply(ana.email, "Sounds good, tell me more", e.external_id)]);
     await processInbound(db, h.deps);
     await (await import("../src/server/operating.ts")).drainNotifications(db, h.deps);
     expect(h.notify.posts).toHaveLength(1);
     expect(h.notify.posts[0].blocks.length).toBeLessThanOrEqual(5);
-    expect((await db.query<{ slack_thread: string }>("SELECT slack_thread FROM events WHERE id = $1", [h.id]))[0].slack_thread).toBe("thread_1");
+    expect((await db.query<{ slack_channel: string }>("SELECT slack_channel FROM events WHERE id = $1", [h.id]))[0].slack_channel).toBe(`C_${h.id}`);
+    expect(h.notify.opened).toEqual([`C_${h.id}`]);
   });
 
   it("a crash after the model call replays to the same result", async () => {
@@ -684,7 +685,7 @@ describe("meetings", () => {
     expect(await db.query("SELECT 1 FROM holds WHERE cause = 'meeting' AND event_id IS NULL")).toHaveLength(1);
   });
 
-  it("a cancelled meeting releases only after a rep confirms, then resumes through the gate", async () => {
+  it("a cancelled meeting releases only after a rep confirms, and the person never restarts mid-sequence", async () => {
     const { h, ana } = await go();
     const m = await bookMeeting(db, h.deps, { contact_id: ana.id, scheduled_at: "2027-01-20T15:00:00Z", source: "manual", rep: "R" }, "R");
     await recordOutcome(db, h.deps, m.id, "cancelled", "R");
@@ -693,7 +694,7 @@ describe("meetings", () => {
     await confirmRelease(db, h.deps, m.id, "R");
     await resumeDue(db, h.deps);
     await drainOps(db, h.deps);
-    expect((await enrollmentStates(db, ana.id)).find((x) => x.channel === "email")!.state).toBe("enrolled");
+    expect((await enrollmentStates(db, ana.id)).find((x) => x.channel === "email")).toMatchObject({ state: "removed", cause: "cannot_resume_mid_sequence" });
   });
 
   it("a held meeting keeps the hold 14 days past the outcome", async () => {

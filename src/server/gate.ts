@@ -4,7 +4,7 @@ import type { Db } from "./db.ts";
 import { isOptedOut, isWrongPerson } from "./caches.ts";
 import { CrmDown, crmConnected, preSendCheck } from "./crm-checks.ts";
 import { newId } from "./events.ts";
-import { DESK, nowOf, type LifecycleDeps } from "./lifecycle-deps.ts";
+import { nowOf, type LifecycleDeps } from "./lifecycle-deps.ts";
 import { activeHolds } from "./touches.ts";
 import { linkContact } from "./person-record.ts";
 import { nameKey } from "../shared/email.ts";
@@ -71,10 +71,20 @@ async function localChecks(db: Db, p: GatePerson, channel: Channel, now: Date, b
        AND (n.contact_id = $2 OR ($3::text IS NOT NULL AND n.person_id = $3) OR ($4::text IS NOT NULL AND lower(k.email) = lower($4))) LIMIT 1`, [p.event_id, p.id, p.person_id, p.email]);
   if (other.length) return no_("in_another_cadence", new Date(now.getTime() + DAY));
   // A no carries to the next event, for a while.
+  // Three lookups, one per way of being the same person, so each uses its index. One query OR-ing them read every no ever recorded, per person.
   const [no] = await db.query<{ kind: string; at: string }>(
-    `SELECT t.kind, t.at::text AS at FROM touches t LEFT JOIN contacts k ON k.id = t.contact_id WHERE t.kind IN ('reply_not_interested', 'reply_not_now') AND t.at <= $4::timestamptz AND t.event_id <> $5
-       AND (t.contact_id = $1 OR ($2::text IS NOT NULL AND t.person_id = $2) OR ($3::text IS NOT NULL AND lower(k.email) = lower($3))) ORDER BY t.at DESC LIMIT 1`, [p.id, p.person_id, p.email, now.toISOString(), p.event_id]);
+    `SELECT kind, at::text AS at FROM (
+       SELECT t.kind, t.at FROM touches t WHERE t.contact_id = $1 AND t.kind IN ('reply_not_interested', 'reply_not_now')
+       UNION ALL SELECT t.kind, t.at FROM touches t WHERE $2::text IS NOT NULL AND t.person_id = $2 AND t.kind IN ('reply_not_interested', 'reply_not_now') AND t.person_id IS NOT NULL
+       UNION ALL SELECT t.kind, t.at FROM contacts k JOIN touches t ON t.contact_id = k.id WHERE $3::text IS NOT NULL AND lower(k.email) = lower($3) AND k.email IS NOT NULL AND t.kind IN ('reply_not_interested', 'reply_not_now')
+     ) x WHERE at <= $4::timestamptz ORDER BY at DESC LIMIT 1`, [p.id, p.person_id, p.email, now.toISOString()]);
   if (no) { const until = Date.parse(no.at) + (no.kind === "reply_not_now" ? 90 : 180) * DAY; if (until > now.getTime()) return no_("cool_off", new Date(until)); }
+  // A reply waiting on a person: they stay stopped until someone decides.
+  const [waiting] = await db.query("SELECT 1 FROM inbound_messages WHERE contact_id = $1 AND (status = 'received' OR (doubtful AND decided_at IS NULL)) LIMIT 1", [p.id]);
+  if (waiting) return no_("reply_waiting");
+  // Met in person at this event: a rep has them, not a sequence.
+  const [met] = await db.query("SELECT 1 FROM onsite_captures c WHERE c.contact_id = $1 AND c.event_id = $2 AND (c.source = 'quick_add' OR EXISTS (SELECT 1 FROM meetings m WHERE m.contact_id = c.contact_id AND m.source = 'onsite')) LIMIT 1", [p.id, p.event_id]);
+  if (met) return no_("met_in_person");
   // 6. No hold applies.
   const holds = await activeHolds(db.query, { domain: p.domain, person_id: p.person_id, event_id: p.event_id, now });
   if (holds.length) return no_(`hold:${holds[0].cause}`, new Date(holds[0].expires_at));
@@ -144,6 +154,5 @@ export async function runGate(db: Db, deps: LifecycleDeps, eventId: string, cont
     for (const r of results) if (people.some((p) => p.id === r.contact_id))
       await q("INSERT INTO gate_log (id, event_id, contact_id, channel, moment, passed, reason, retry_after, at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)", [newId("gat"), eventId, r.contact_id, channel, moment, r.passed, r.reason, r.retry_after?.toISOString() ?? null, now.toISOString()]);
   });
-  void DESK;
   return results;
 }

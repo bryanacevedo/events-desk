@@ -6,8 +6,8 @@ const REPLY_HEADER = [
   /^\s*_{10,}\s*$/, /^\s*(From|De|Von|Sent|Enviado|Gesendet)\s*:\s.+$/i,
 ];
 const SIGNATURE = [/^\s*--\s*$/, /^\s*(Sent from my|Sent via|Enviado desde mi|Von meinem .* gesendet|Get Outlook for)\b/i];
-/** A line a sending tool or legal template adds. It is removed wherever it sits. */
-const FOOTER = [/\b(unsubscribe|opt[ -]?out|darse de baja|abmelden|d[eé]sabonner)\b.*(https?:\/\/|click|here|aqu[ií]|hier|ici|link|below|this email)/i, /(https?:\/\/|click|here|aqu[ií]|hier|ici|link).*\b(unsubscribe|opt[ -]?out|darse de baja|abmelden|d[eé]sabonner)\b/i, /\bif you (no longer wish|would (prefer|rather) not|do not wish)\b/i, /\bmanage (your )?(email )?preferences\b/i];
+/** A line a sending tool or legal template adds. Only a line carrying a link, or the template wording, counts: a person writing "please unsubscribe me from this email list" is a request, not a footer. */
+const FOOTER = [/\b(unsubscribe|opt[ -]?out|darse de baja|abmelden|d[eé]sabonner|preferences)\b.*https?:\/\//i, /https?:\/\/\S*\b(unsubscribe|opt[ -]?out|preferences)\b/i, /^\s*(if you (no longer wish|would (prefer|rather) not|do not wish) to receive)/i, /^\s*(to unsubscribe|click here to unsubscribe|manage (your )?(email )?preferences)\b/i];
 
 /** The text the person wrote, or an empty string when nothing is left. */
 export function cleanReply(body: string | null | undefined): string {

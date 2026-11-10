@@ -7,12 +7,13 @@ import { computeScorecard, recordEventCost, answerDebrief, learningTable, review
 import { RuleError } from "./events.ts";
 import type { LifecycleDeps } from "./lifecycle-deps.ts";
 import type { FakeTool } from "./connectors/fake.ts";
+import { sameSecret } from "./connectors/types.ts";
 import { demoAdvance } from "./demo-run.ts";
 import { bookMeeting, confirmRelease, ingestCalendar, recordOutcome, type CalendarEvent } from "./meetings.ts";
 import { requestMotionCard } from "./motion.ts";
 import { decideOwner } from "./owners.ts";
 import { ingestEvents, processInbound } from "./replies.ts";
-import { releaseSequence, approveTemplate, attachCampaign, confirmLaunchChecklist, createDrafts, recordLegalBasis, restartSending, resumePerson, setTools, stopAllSending } from "./sequences.ts";
+import { drainOps, releaseSequence, approveTemplate, attachCampaign, confirmLaunchChecklist, createDrafts, recordLegalBasis, restartSending, resumePerson, setTools, stopAllSending } from "./sequences.ts";
 import { regionOf, loadPeople } from "./gate.ts";
 import { recordConsent, recordPlacement, setDomainStatus } from "./sending.ts";
 import { captureOnsite, forgetPerson, markHandled } from "./operating.ts";
@@ -22,6 +23,8 @@ import { MOTION_LABEL } from "../shared/motion.ts";
 import { pickSenders, planCapacity } from "../shared/sending.ts";
 
 type App = Hono<{ Variables: { actor: string } }>;
+/** A webhook is outside input: bounded in size and in how many events one call can carry. */
+export const HOOK_MAX_BYTES = 1_000_000, HOOK_MAX_EVENTS = 500;
 
 export async function motionOverview(db: Db, deps: LifecycleDeps, id: string) {
   const [e] = await db.query<{ motion: keyof typeof MOTION_LABEL; tools: Record<string, string>; stage: string; verify_once: boolean; write_leads: boolean; outreach_started_by: string | null }>("SELECT motion, tools, stage, verify_once, write_leads, outreach_started_by FROM events WHERE id = $1", [id]);
@@ -40,7 +43,7 @@ export async function motionOverview(db: Db, deps: LifecycleDeps, id: string) {
     db.query(`SELECT m.id, m.channel, m.signal, m.code, m.doubtful, m.status, m.received_at::text AS received_at, m.body, k.id AS contact_id, k.full_name, co.name AS company FROM inbound_messages m LEFT JOIN contacts k ON k.id = m.contact_id LEFT JOIN companies co ON co.id = k.company_id WHERE m.event_id = $1 ORDER BY m.received_at DESC LIMIT 50`, [id]),
     db.query(`SELECT m.id, m.contact_id, m.status, m.scheduled_at::text AS scheduled_at, m.timezone, m.rep, m.source, m.enrolled, k.full_name, co.name AS company FROM meetings m LEFT JOIN contacts k ON k.id = m.contact_id LEFT JOIN companies co ON co.id = k.company_id WHERE m.event_id = $1 ORDER BY m.scheduled_at`, [id]),
     db.query("SELECT window_days, metrics, created_at::text AS created_at FROM scorecards WHERE event_id = $1 ORDER BY window_days", [id]),
-    db.query(`SELECT d.id, d.author, d.status, d.body, d.answered_at::text AS answered_at, coalesce((SELECT json_agg(json_build_object('theme', f.theme, 'fact', f.fact, 'quote', f.quote, 'account', f.account)) FROM debrief_facts f WHERE f.debrief_id = d.id), '[]') AS facts FROM debriefs d WHERE d.event_id = $1`, [id]),
+    db.query(`SELECT d.id, d.author, d.status, d.body, d.answered_at::text AS answered_at, coalesce((SELECT json_agg(json_build_object('theme', f.theme, 'fact', f.fact, 'quote', f.quote, 'account', f.account)) FROM debrief_facts f WHERE f.debrief_id = d.id AND d.status = 'accepted'), '[]') AS facts FROM debriefs d WHERE d.event_id = $1`, [id]),
     db.query("SELECT k.id, k.status, k.lines, k.llm_cap, k.credits_cap, k.est_cents, k.inputs, (SELECT a.id FROM approvals a WHERE a.card_id = k.id AND a.status = 'pending' LIMIT 1) AS approval_id FROM cost_cards k WHERE k.event_id = $1 AND k.kind = 'motion' ORDER BY k.created_at DESC LIMIT 1", [id]),
     db.query<{ region: string; basis: string; recorded_by: string }>("SELECT region, basis, recorded_by FROM legal_bases WHERE event_id = $1", [id]),
     db.query<{ n: number }>("SELECT count(*)::int AS n FROM review_cases WHERE event_id = $1 AND status = 'open' AND NOT blocking", [id]),
@@ -63,7 +66,7 @@ export async function motionOverview(db: Db, deps: LifecycleDeps, id: string) {
     motion: e.motion, label: MOTION_LABEL[e.motion], stage: e.stage, tools: e.tools, verify_once: e.verify_once, write_leads: e.write_leads, started_by: e.outreach_started_by,
     connectors: Object.values(deps.connectors).map((c) => ({ name: c.name, channels: c.channels, simulated: Boolean(c.simulated), capabilities: c.capabilities })),
     poll_minutes: deps.pollMinutes ?? 5, crm_connected: Boolean(deps.crm?.connected),
-    capacity, captures, unplaced, card: card[0] ?? null, sequences, simulated: Object.values(deps.connectors).some((c) => c.simulated), live_score: (funnel[0] as { enrolled?: number; held_all?: number })?.enrolled || (funnel[0] as { held_all?: number })?.held_all ? await computeScorecard(db, deps, id, 30) : null, funnel: funnel[0] ?? null, owners, replies, meetings, scorecards, debriefs, open_cases: cases[0].n,
+    capacity, captures, unplaced, card: card[0] ?? null, sequences, simulated: Object.values(deps.connectors).some((c) => c.simulated), live_score: (funnel[0] as { enrolled?: number; held_all?: number })?.enrolled || (funnel[0] as { held_all?: number })?.held_all ? await computeScorecard(db, deps, id, 30, { write: false }) : null, funnel: funnel[0] ?? null, owners, replies, meetings, scorecards, debriefs, open_cases: cases[0].n,
     regions: [...counts].sort((a, b) => b[1] - a[1]).map(([region, people]) => ({ region, people, basis: bases.find((b) => b.region === region)?.basis ?? null, recorded_by: bases.find((b) => b.region === region)?.recorded_by ?? null })),
   };
 }
@@ -80,7 +83,7 @@ export function mountLifecycle(app: App, db: Db, deps: LifecycleDeps, opts: { ba
   if (opts.demoTools) app.post("/api/demo/motion/:id/advance", guarded(async (c) => demoAdvance(db, deps, opts.demoTools!, c.req.param("id"))));
 
   app.get("/api/events/:id/motion", async (c) => { const o = await motionOverview(db, deps, c.req.param("id")); return o ? c.json(o) : bad("That event does not exist.", 404); });
-  app.post("/api/events/:id/motion/start", guarded(async (c) => { const b = await body(c); return requestMotionCard(db, deps, c.req.param("id"), c.get("actor"), { purpose: b.purpose, verify_once: b.verify_once, write_leads: b.write_leads }); }));
+  app.post("/api/events/:id/motion/start", guarded(async (c) => { const b = await body(c); return requestMotionCard(db, deps, c.req.param("id"), c.get("actor"), { purpose: b.purpose, verify_once: b.verify_once, write_leads: b.write_leads, holdout_percent: Number(b.holdout_percent ?? 0) }); }));
   app.post("/api/events/:id/motion/tools", guarded(async (c) => setTools(db, c.req.param("id"), c.get("actor"), (await body(c)).tools ?? {}, deps)));
   app.post("/api/events/:id/motion/legal-basis", guarded(async (c) => { const b = await body(c); return recordLegalBasis(db, c.req.param("id"), c.get("actor"), String(b.region ?? ""), String(b.basis ?? "")); }));
   app.post("/api/events/:id/motion/sequences", guarded(async (c) => createDrafts(db, deps, c.req.param("id"), c.get("actor"))));
@@ -89,7 +92,8 @@ export function mountLifecycle(app: App, db: Db, deps: LifecycleDeps, opts: { ba
   app.post("/api/events/:id/motion/capture", guarded(async (c) => { const b = await body(c); return captureOnsite(db, deps, c.req.param("id"), c.get("actor"), b); }));
   app.post("/api/motion/replies/:rid/handled", guarded(async (c) => markHandled(db, c.req.param("rid"), c.get("actor"))));
   app.post("/api/motion/forget", guarded(async (c) => { if (!isGtm(c.get("actor"))) throw new RuleError("Erasure requests are GTM Engineering's to carry out."); return forgetPerson(db, deps, String((await body(c)).email ?? ""), c.get("actor")); }));
-  app.post("/api/motion/consent", guarded(async (c) => { const b = await body(c); return recordConsent(db, String(b.connector), String(b.sender_id), String(b.rep), c.get("actor")); }));
+  // A rep agrees for their own LinkedIn account. Nobody agrees for someone else.
+  app.post("/api/motion/consent", guarded(async (c) => { const b = await body(c); return recordConsent(db, String(b.connector), String(b.sender_id), c.get("actor"), c.get("actor")); }));
   app.post("/api/motion/domains", guarded(async (c) => { if (!isGtm(c.get("actor"))) throw new RuleError("Sending domains are GTM Engineering's to mark."); const b = await body(c); return setDomainStatus(db, String(b.domain), String(b.status), String(b.reason ?? ""), c.get("actor")); }));
   app.post("/api/motion/sequences/:sid/placement-override", guarded(async (c) => { if (!isGtm(c.get("actor"))) throw new RuleError("Only GTM Engineering can send without a placement test."); await db.query("UPDATE sequences SET placement_override_by = $2 WHERE id = $1", [c.req.param("sid"), c.get("actor")]); }));
   app.get("/api/motion/alerts", async (c) => c.json({ alerts: await db.query("SELECT key, day::text AS day, text, created_at::text AS created_at FROM alerts ORDER BY created_at DESC LIMIT 50"), controls: (await db.query("SELECT sending_stopped_at::text AS stopped_at, stopped_by, reason FROM desk_controls"))[0] }));
@@ -127,10 +131,16 @@ export function mountLifecycle(app: App, db: Db, deps: LifecycleDeps, opts: { ba
   app.post("/hooks/sequencer/:name", async (c) => {
     const conn = deps.connectors[c.req.param("name")];
     if (!conn) return c.text("Unknown tool", 404);
-    const parsed = await c.req.json().catch(() => null);
+    const raw = await c.req.text();
+    if (raw.length > HOOK_MAX_BYTES) return c.text("Too large", 413);
+    let parsed: unknown = null;
+    try { parsed = JSON.parse(raw); } catch { parsed = null; }
     const events = conn.verifyWebhook({ headers: Object.fromEntries(c.req.raw.headers), query: c.req.query() as Record<string, string>, body: parsed });
     if (events === null) return c.text("Not from this tool", 401);
-    void (async () => { await ingestEvents(db, deps, conn, events); await processInbound(db, deps); })().catch((e) => console.error("sequencer hook", e));
+    if (events.length > HOOK_MAX_EVENTS) return c.text("Too many events", 413);
+    // Recorded before the answer, so a crash after "received" loses nothing. Reading them can wait.
+    await ingestEvents(db, deps, conn, events, { drain: false });
+    void (async () => { await drainOps(db, deps); await processInbound(db, deps); })().catch((e) => console.error("sequencer hook", e));
     return c.json({ received: events.length });
   });
 
@@ -138,8 +148,12 @@ export function mountLifecycle(app: App, db: Db, deps: LifecycleDeps, opts: { ba
   app.post("/hooks/calendar", async (c) => {
     const secret = process.env.CALENDAR_WEBHOOK_SECRET;
     if (!secret) return c.text("Not set up", 404);
-    if (c.req.header("x-desk-secret") !== secret) return c.text("Bad secret", 401);
-    const b = await c.req.json().catch(() => null) as { events?: CalendarEvent[] } | null;
-    return c.json(await ingestCalendar(db, deps, b?.events ?? []));
+    if (!sameSecret(c.req.header("x-desk-secret"), secret)) return c.text("Bad secret", 401);
+    const raw = await c.req.text();
+    if (raw.length > HOOK_MAX_BYTES) return c.text("Too large", 413);
+    let b: { events?: CalendarEvent[] } | null = null;
+    try { b = JSON.parse(raw); } catch { b = null; }
+    const events = Array.isArray(b?.events) ? b!.events.slice(0, HOOK_MAX_EVENTS) : [];
+    return c.json(await ingestCalendar(db, deps, events));
   });
 }

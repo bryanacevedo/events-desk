@@ -66,7 +66,7 @@ export async function closeOut(db: Db, deps: LifecycleDeps) {
   const now = nowOf(deps);
   let moved = 0;
   for (const c of await clocks(db)) {
-    if (!["none", "sequencing", "in_market"].includes(c.motion) || daysPast(c, now) < CLOSE_DAYS) continue;
+    if (!["none", "owners", "sequencing", "in_market"].includes(c.motion) || daysPast(c, now) < CLOSE_DAYS) continue;
     await db.tx((q) => moveMotion(q, c.id, "closing", DESK, `${CLOSE_DAYS} days after the event`));
     moved++;
   }

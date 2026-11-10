@@ -88,6 +88,12 @@ export const overdueCard = (r: { person: string; company: string }): CardMessage
   blocks: [say(`*Nobody has answered ${esc(r.person)}*\n${esc(r.company)} replied and is still waiting for a rep.`)],
 });
 
+/** Something the desk did on its own, or could not do, that a person should know today. Sent once a day per problem. */
+export const alertCard = (a: { text: string }): CardMessage => ({
+  text: `Events Desk: ${a.text}`,
+  blocks: [say(`*Events Desk needs a look*\n${esc(a.text)}`), small("Raised once a day while it lasts")],
+});
+
 export const digestCard = (d: { event: string; sent: number; replied: number; booked: number; waiting: number }): CardMessage => ({
   text: `${d.event} today: ${d.replied} replied, ${d.booked} booked.`,
   blocks: [header(d.event), { type: "section", fields: [{ type: "mrkdwn", text: `*Reached*\n${d.sent}` }, { type: "mrkdwn", text: `*Replied*\n${d.replied}` }, { type: "mrkdwn", text: `*Booked*\n${d.booked}` }, { type: "mrkdwn", text: `*Waiting on a rep*\n${d.waiting}` }] }],

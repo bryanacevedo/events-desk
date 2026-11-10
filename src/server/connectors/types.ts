@@ -77,11 +77,14 @@ export class ToolError extends Error {
   constructor(tool: string, status: number, detail: string) { super(`${tool} answered ${status}: ${detail}`); this.tool = tool; this.status = status; }
 }
 
+/** A tool that does not answer in this long is treated as down. Without it one hung call would hold the tick, and every stop behind it, forever. */
+export const TOOL_TIMEOUT_MS = 30_000;
+
 export function client(tool: string, f: Fetch, base: string, auth: { headers?: Record<string, string>; query?: Record<string, string> }) {
   return async function call<T = any>(method: string, path: string, opts: { body?: unknown; query?: Record<string, string | number | undefined> } = {}): Promise<T> {
     const u = new URL(base + path);
     for (const [k, v] of Object.entries({ ...auth.query, ...opts.query })) if (v !== undefined) u.searchParams.set(k, String(v));
-    const r = await f(u.toString(), { method, headers: { ...(opts.body !== undefined ? { "content-type": "application/json" } : {}), ...auth.headers }, ...(opts.body !== undefined ? { body: JSON.stringify(opts.body) } : {}) });
+    const r = await f(u.toString(), { method, signal: AbortSignal.timeout(TOOL_TIMEOUT_MS), headers: { ...(opts.body !== undefined ? { "content-type": "application/json" } : {}), ...auth.headers }, ...(opts.body !== undefined ? { body: JSON.stringify(opts.body) } : {}) });
     const text = await r.text();
     if (!r.ok) throw new ToolError(tool, r.status, text.slice(0, 200));
     return (text ? JSON.parse(text) : {}) as T;

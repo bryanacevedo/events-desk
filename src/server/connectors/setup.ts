@@ -32,6 +32,10 @@ export async function demoConnectors(db: Db): Promise<{ connectors: Record<strin
 /** Real tools, only when asked for. Gong is left out on purpose: it cannot report replies or opt-outs, so stopping someone the moment they answer cannot work there. */
 export function liveConnectors(env: Record<string, string | undefined>): Record<string, Connector> {
   if (env.LIVE_SEND !== "1") return {};
+  // Real sending reaches real people. The desk has no login yet, so anyone with the write key could act as anyone: it does not start until one exists.
+  if (env.DESK_LOGIN !== "1") throw new Error("LIVE_SEND=1 needs a real login, which is not built yet (anyone with the write key could act as anyone). Refusing to start.");
+  if (env.LIVE_SPEND !== "1") throw new Error("LIVE_SEND=1 needs LIVE_SPEND=1, so replies are read by the real model and the timer runs. Refusing to start.");
+  if (!env.WEBHOOK_BASE) throw new Error("LIVE_SEND=1 needs WEBHOOK_BASE, so bounces and unsubscribes reach the desk. Refusing to start.");
   if (!env.WRITE_KEY) throw new Error("LIVE_SEND=1 reaches real people, so it needs WRITE_KEY at the least. Refusing to start.");
   const secret = env.SEQUENCER_WEBHOOK_SECRET;
   if (!secret) throw new Error("LIVE_SEND=1 needs SEQUENCER_WEBHOOK_SECRET. Refusing to start.");

@@ -110,6 +110,15 @@ describe.each(Object.keys(FAKES) as (keyof typeof FAKES)[])("%s", (name) => {
 });
 
 describe("what each tool does on its own", () => {
+  it("HeyReach: the reply is the lead's message, never ours, and the event name may come in either case", async () => {
+    const t = FAKES.heyreach(); const seq = t.newSeq();
+    const { request } = t.reply(seq, "https://www.linkedin.com/in/p1", "Yes, let's talk");
+    const [e] = t.connector.verifyWebhook(request)!;
+    expect(e.body).toBe("Yes, let's talk");
+    const upper = { ...request, body: { ...(request.body as object), event_type: "MESSAGE_REPLY_RECEIVED" } };
+    expect(t.connector.verifyWebhook(upper)).toHaveLength(1);
+  });
+
   it("HeyReach: never adds to a paused campaign, which would restart it", async () => {
     const t = FAKES.heyreach(); const seq = t.newSeq();
     t.launch(seq); t.pause(seq);

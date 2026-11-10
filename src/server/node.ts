@@ -31,6 +31,7 @@ import { demoAdvance, withDemoCrm } from "./demo-run.ts";
 import { addSlots } from "./rep-day.ts";
 import type { LifecycleDeps } from "./lifecycle-deps.ts";
 import { slackNotifier } from "./slack.ts";
+import { systemMailAuth } from "./sending.ts";
 
 const root = fileURLToPath(new URL("../..", import.meta.url));
 const port = Number(process.env.PORT ?? 8787);
@@ -72,7 +73,7 @@ const deps: Deps = mode.liveSpend
 // Google only in live mode. Bad Google settings stop the start here, not at the first delivery.
 try { deps.sheets = sheetsFor(mode.liveSpend, env); } catch (e) { console.error((e as Error).message); process.exit(1); }
 const slack = mode.liveSpend
-  ? { signingSecret: env.SLACK_SIGNING_SECRET, botToken: env.SLACK_BOT_TOKEN, channel: env.SLACK_APPROVALS_CHANNEL, approvers: env.APPROVER_SLACK_IDS.split(",").map((s) => s.trim()), userMap: parseUserMap(env.SLACK_USER_MAP), llm: deps.llm }
+  ? { signingSecret: env.SLACK_SIGNING_SECRET, botToken: env.SLACK_BOT_TOKEN, channel: env.SLACK_APPROVALS_CHANNEL, opsChannel: env.SLACK_OPS_CHANNEL || undefined, approvers: env.APPROVER_SLACK_IDS.split(",").map((s) => s.trim()), userMap: parseUserMap(env.SLACK_USER_MAP), llm: deps.llm }
   : undefined;
 // A real database with spend off must never run mock vendors: that would write fake emails into real events.
 const mayRun = mode.liveSpend || !url;
@@ -90,7 +91,14 @@ try { live = liveConnectors(env); } catch (e) { console.error((e as Error).messa
 const demoSetup = mode.demo ? await demoConnectors(db) : undefined;
 const lifecycle: LifecycleDeps | undefined = demoSetup
   ? { crm: withDemoCrm(deps.crm, db, () => new Date()), connectors: demoSetup.connectors, llm: deps.llm }
-  : Object.keys(live).length ? { crm: deps.crm, connectors: live, llm: deps.llm, notify: slack ? slackNotifier(slack) : undefined, userMap: slack?.userMap } : undefined;
+  : Object.keys(live).length ? {
+      crm: deps.crm, connectors: live, llm: deps.llm, notify: slack ? slackNotifier(slack) : undefined, userMap: slack?.userMap,
+      // Every protection the sending layer has is on for real sending, read from the environment.
+      webhookBase: env.WEBHOOK_BASE, firstCohort: Number(env.FIRST_COHORT ?? 25), placementRequired: env.PLACEMENT_REQUIRED !== "0", mailAuth: systemMailAuth,
+      primaryDomains: (env.PRIMARY_DOMAINS ?? "").split(",").map((d) => d.trim().toLowerCase()).filter(Boolean), holidays: (env.HOLIDAYS ?? "").split(",").map((d) => d.trim()).filter(Boolean),
+    } : undefined;
+if (lifecycle && Object.keys(live).length && !lifecycle.notify) console.error("WARNING: Slack is not connected. Event channels, owner cards and alerts (a tool gone quiet, a stuck pass) reach only the log and /api/health.");
+if (lifecycle && !lifecycle.crm?.connected && Object.keys(live).length) console.error("WARNING: no CRM is connected. Owner say, CRM opt-outs, do-not-contact and recent-activity checks do not run.");
 // The demo opens with one event already in market, so the after-delivery screens have something in them. The sample events finish building in the
 // background, so this waits for the flagship to be delivered. The others wait for a visitor to press.
 let demoMotionReady = !(mode.demo && !fromSnapshot && demoSetup && lifecycle);

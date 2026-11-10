@@ -27,12 +27,20 @@ export const clock = (iso = "2027-01-10T12:00:00Z"): Clock => {
   return c;
 };
 
+/** Slack as the desk uses it. `sent` holds one entry per person a card @-mentioned; `posts` every card in an event channel; `opsPosts` the ops channel. */
 export function fakeNotifier(opts: { fail?: boolean } = {}) {
-  const sent: { to: string; card: CardMessage }[] = [], thread: CardMessage[] = [];
-  const n: Notifier & { sent: typeof sent; posts: typeof thread; fail: boolean } = {
-    sent, posts: thread, fail: Boolean(opts.fail),
-    async dm(to, card) { if (n.fail) return false; sent.push({ to, card }); return true; },
-    async thread(t, card) { thread.push(card); return t ?? "thread_1"; },
+  const sent: { to: string; card: CardMessage; channel: string }[] = [], posts: CardMessage[] = [], opsPosts: CardMessage[] = [], opened: string[] = [];
+  const n: Notifier & { sent: typeof sent; posts: typeof posts; opsPosts: typeof opsPosts; opened: typeof opened; fail: boolean } = {
+    sent, posts, opsPosts, opened, fail: Boolean(opts.fail),
+    async post(room, card, mention = []) {
+      if (n.fail) return null;
+      const channel = room.channel ?? `C_${room.event_id}`;
+      if (!room.channel) opened.push(channel);
+      posts.push(card);
+      for (const to of mention) sent.push({ to, card, channel });
+      return channel;
+    },
+    async ops(card) { if (n.fail) return false; opsPosts.push(card); return true; },
   };
   return n;
 }

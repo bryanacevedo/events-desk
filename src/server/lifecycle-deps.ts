@@ -6,11 +6,15 @@ import type { CardMessage } from "./slack-cards.ts";
 import type { MailAuth } from "./sending.ts";
 import type { SendingRules } from "../shared/sending.ts";
 
+/** The event's own Slack channel. `channel` is null until the first post opens it. */
+export interface EventRoom { event_id: string; name: string; channel: string | null }
+
+/** Slack, as the desk uses it: in the open. Nothing goes by direct message, so the team sees every reply, owner card and reminder. */
 export interface Notifier {
-  /** True only when the message was delivered. */
-  dm(slackId: string, message: CardMessage): Promise<boolean>;
-  /** Posts to the event's thread, starting one when `thread` is null. Returns the thread, or null when nothing was posted. */
-  thread(thread: string | null, message: CardMessage): Promise<string | null>;
+  /** Posts to the event's channel, opening it the first time and inviting whoever is @-mentioned (Slack does not notify someone outside the channel). Returns the channel, or null when nothing was posted. */
+  post(room: EventRoom, message: CardMessage, mention?: string[]): Promise<string | null>;
+  /** Posts to the desk's ops channel: problems that belong to no one event. True only when it was delivered. */
+  ops(message: CardMessage): Promise<boolean>;
 }
 
 export interface LifecycleDeps {

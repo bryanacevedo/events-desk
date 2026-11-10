@@ -48,7 +48,7 @@ The mapper already accepts these. Reverse lookup runs only on the two-card flow,
 
 ## 4. Owner say
 
-On starting outreach, each account with a CRM owner produces one decision, sent by Slack DM per owner, grouped. **Include** lets the team sequence the account. **Mine** keeps it out and writes a touch, so the desk knows.
+On starting outreach, each account with a CRM owner produces one decision, posted to the event's Slack channel with the owner @-mentioned, grouped per owner. **Include** lets the team sequence the account. **Mine** keeps it out and writes a touch, so the desk knows.
 
 - The owner's name is resolved through `SLACK_USER_MAP`. **An unmapped owner, or a Slack message that failed to send, never defaults to include**: the clock starts only when a message is delivered, and otherwise the decision goes to the uploader as a case. An unanswered case holds only that account out of sequences; the event moves on.
 - The owner is read fresh from the CRM when decisions are sent. If it changed, the new owner is asked.
@@ -97,13 +97,13 @@ Connector {
 
 A CRM that cannot answer fails the gate. At launch that **pauses the whole sequence** and alerts. A refusal has a reason and, when it can clear, a `retry_after`, and a sweep retries those.
 
-**At launch:** the desk observes `sequenceState` turn active by polling and re-runs the gate, removing anyone who now fails within one poll interval, default 5 minutes. The screen states that delay.
+**At launch:** the desk observes `sequenceState` turn active by polling and re-runs the gate, removing anyone who now fails within one poll interval, default 5 minutes.
 
 **After launch, nothing waits for a gate.** Any opt-out, from any source (`recordOptOut`, a reply, the CRM), removes that person from every cadence at once, and a sweep every 15 minutes re-reads CRM flags and suppressions for everyone active.
 
 - Deleting an event with an active sequence is refused. A Review tab drop removes the person.
 - **Sender limits:** per-sender daily caps live in the tool; where it exposes them the desk warns. A bounce rate over a configured threshold (default 3%, a rule of thumb to confirm) pauses that sequence and opens a case. Authentication and one-click unsubscribe are the sending tool's job, and the launch checklist says so.
-- **Legal basis is a person's decision.** Before launch the uploader records the basis for contacting this list, per region. Region comes from the company's country, then the person's location. Unknown is its own region. The desk stores who recorded it and what they said, gives no legal advice, and excludes any region with no recorded basis.
+- **Legal basis is a person's decision.** Before launch the uploader records the basis for contacting this list, per region. Region comes from the person's location, then the company's country. Unknown is its own region. The desk stores who recorded it and what they said, gives no legal advice, and excludes any region with no recorded basis.
 
 ## 5a. The sending layer
 
@@ -128,7 +128,7 @@ Every sequence add, send, reply, meeting and owner decision writes one. **It sto
 |---|---|---|
 | Booked meeting | Domain, all events | Outcome recorded plus 14 days; 30 days after the meeting if no outcome, and the rep is reminded at day 3 |
 | Mine | Domain, that event | The event's motion reaches `scored` |
-| Live thread: a genuine reply with no resolution | That person, all events | 14 days |
+| Live thread: a genuine reply with no resolution | Domain, all events (colleagues pause too) | 14 days |
 
 **A hold's expiry never restarts anyone.** It only makes them eligible, and a resume still passes the gate. A person under a **doubtful** reply is not on a hold at all: they stay stopped until a person decides.
 
@@ -156,10 +156,10 @@ Inbound goes to `inbound_messages` first, unique on the provider's message id, a
 | Departed | Removed, successor case opened |
 | Out of office | Resumes after the stated return date, or 7 days |
 | Referral | Case with the named person |
-| Interested, meeting request | Stays paused for a rep, posted to the event's Slack thread |
+| Interested, meeting request | Stays paused for a rep, posted to the event's Slack channel with the account owner @-mentioned |
 | Not now, not interested | Removed from this sequence, recorded |
 
-A suppression caused by a model label alone (no code match) is marked `needs_confirmation` and a person sees it, while the person stays stopped. The model never drafts or sends. Slack gains DMs and per-event threads, stored on the event.
+A suppression caused by a model label alone (no code match) is marked `needs_confirmation` and a person sees it, while the person stays stopped. The model never drafts or sends.
 
 Reply rates read a single view that excludes the carve-out codes.
 
@@ -179,7 +179,7 @@ The outbox's retry safety rests on writes that only fill blanks. Creates are dif
 - New outbox kinds `campaign_member` and `task`, each with a desk-generated key stored on the row.
 - **Campaign member:** Salesforce errors when a member already exists rather than duplicating, so that error counts as success.
 - **Task:** the record id is stored on success. Since a crash after the call could create a duplicate, the Task carries the desk's key in a custom field and the adapter checks for it first.
-- **Net-new people** have no record. They are written as Leads only if the uploader turned that on for the event, otherwise they are skipped and counted. A Lead outbox row looks up the email first, so a crash cannot duplicate one.
+- **Net-new people** have no record. They are written as Leads only if the uploader turned that on for the event, otherwise they are skipped and counted. One exception: a positive reply always creates its trail, a Lead if there is no record, the campaign member as Responded, and a task for the rep. A Lead outbox row looks up the email first, so a crash cannot duplicate one.
 - The seam gains `createCampaignMember`, `createTask`, `createLead` and `opportunities(accountIds)`, the last returning id, stage, amount, created date and stage history. All of this is tested on simulated shapes and unproven until a real org connects.
 
 ## 10. Debrief
@@ -190,7 +190,7 @@ Two days after the event's last day, or delivery if later, anyone with a held me
 
 One SQL view defines each funnel step. Enrollment funnel: kept, enrolled, sent, replied, booked, held. **Meetings logged with no enrollment are counted beside it, not inside it**, so the steps can be compared honestly.
 
-- **Influence:** an opportunity counts if its account had a held meeting credited to this event and it was created, or moved forward, within 90 days after. It is influence, never sole credit, and needs `opportunities()`. With no CRM the line reads "not available".
+- **Pipeline:** an opportunity counts only if its account had a held meeting credited to this event. **New pipeline** is created within 30 days after that meeting, with no open deal at the account at the time. **Pipeline it moved** was already open and moved forward within 90 days after. One opportunity is credited to one event. It is influence, never sole credit, and needs `opportunities()`. With no CRM the line reads "not available".
 - Cost stays apart: tickets, and travel from seat requests, in dollars; AI in dollars; credits per provider in credits. Cost per held meeting uses dollars only and says it excludes credits.
 - **Timing:** first score 30 days after the event's last day, revised at 60 and 90, each version kept.
 - **Score:** held meetings per thousand dollars, and influenced pipeline per dollar, each shown beside the median of past events. No blended number until real outcomes justify weights. An event with fewer than 5 held meetings shows its counts and no score.
@@ -203,6 +203,14 @@ All aggregation is `GROUP BY`.
 - Meetings by company tier, title tier and segment. People dropped who later appear in a deal.
 - Accepted debrief facts, by account and theme.
 - A proposal is a suggested edit to the ICP or title table, with its evidence. It takes a person to accept, and goes through the existing ICP confirm screen as a new version. Fewer than 20 outcomes in a group reads "too few to say".
+
+## 12a. Slack, in the open
+
+Every event has its own public channel (`evt-<event-name>`), opened by the desk on its first post and stored on the event. Everything about the event goes there: owner cards and the one-day warning, hot replies, doubtful replies, replies nobody picked up, meeting reminders, debrief prompts, the daily digest, the scorecard. The person a card is for is @-mentioned at the top and invited to the channel first, because Slack does not notify someone outside a channel. Nothing goes by direct message: a reply or an owner card sent privately is work the rest of the team cannot see, cover for, or learn from. This is the same call v1 made for cost approvals (DECISIONS §10).
+
+Problems that belong to no one event go to the ops channel (`SLACK_OPS_CHANNEL`, defaulting to the approvals channel): a tool gone quiet, a pass that hangs, a step that failed. One per problem per day. A Slack message that failed for good is not announced to the same Slack; it shows on `/api/health`.
+
+The background pass runs every five minutes. Every call to a tool times out at 30 seconds and every Slack call at 15, so one hung call cannot hold every stop behind it. A pass still running after 15 minutes is reported to the ops channel by the next timer. `/api/health` answers 503 when no pass has finished for 20 minutes and carries today's alert count, for an outside uptime check that works even when Slack does not.
 
 ## 13. Integrity
 
@@ -217,6 +225,7 @@ Nightly checks that observe, alert and never repair. Nobody opted out is enrolle
 - Reply classifier: real recorded evals on a labeled set with a frozen holdout, plus an injection set of replies that try to instruct the model.
 - Collision tests: unsubscribe mid-enrollment, launch before the poll, owner changes, cancelled meetings, a person in two events, a reply on one channel while the other is mid-step, a resume after a hold expires.
 - Every connector passes the same contract suite.
+- The gate at 10,000 people on real Postgres (`BENCH_GATE=1`, `tests/gate-scale.bench.test.ts`), with ten touches and two messages of history per person: 60.5 s before, 18.4 s after rewriting the cool-off check as three indexed lookups and adding two partial indexes (migration 0043), with the same 9,775 passed and 225 in cool-off. The rest is about eight round trips per person; batching each check over the whole list is the next step if a press needs to be faster. The funnel view reads in 34 ms at that size. Not measured: the other-cadence check with many live enrollments at other events (the bench had none).
 
 ## 15. Build order
 

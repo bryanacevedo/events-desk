@@ -5,7 +5,7 @@ import type { Connector, ToolEvent } from "./connectors/types.ts";
 import { addSuppression, putVerification } from "./caches.ts";
 import { canWrite, queueCreate, queueOptOut } from "./crm-outbox.ts";
 import { stopContacts, stopDomain, stopInEvent } from "./enroll-ops.ts";
-import { queueDm, queueThread, respondBy } from "./operating.ts";
+import { queueEvent, respondBy } from "./operating.ts";
 import { logActivity, newId } from "./events.ts";
 import { reserve, settle } from "./ledger.ts";
 import { DESK, nowOf, type LifecycleDeps } from "./lifecycle-deps.ts";
@@ -22,6 +22,8 @@ import { cleanReply } from "../shared/reply-clean.ts";
 
 type Q = Db["query"];
 const DAY = 86_400_000;
+/** Reply text is kept only as long as a person needs to read it. */
+const BODY_MAX = 20_000;
 
 async function findContact(db: Pick<Db, "query">, connector: string, e: ToolEvent) {
   const email = e.email?.toLowerCase() ?? null;
@@ -33,7 +35,7 @@ async function findContact(db: Pick<Db, "query">, connector: string, e: ToolEven
 }
 
 /** Records what the tools report. Safe to call any number of times, in any order, from a webhook and a poll at once. */
-export async function ingestEvents(db: Db, deps: LifecycleDeps, connector: Connector, events: ToolEvent[]) {
+export async function ingestEvents(db: Db, deps: LifecycleDeps, connector: Connector, events: ToolEvent[], opts: { drain?: boolean } = {}) {
   const out = { new: 0, duplicates: 0, unmatched: 0 };
   for (const e of events) {
     const c = await findContact(db, connector.name, e);
@@ -45,7 +47,7 @@ export async function ingestEvents(db: Db, deps: LifecycleDeps, connector: Conne
       const eventId = c ? (await creditedEvent(q, { contact_id: c.contact_id, person_id: c.person_id, domain: c.domain })) ?? c.event_id : null;
       const id = newId("inb");
       const ins = await q(`INSERT INTO inbound_messages (id, connector, provider_message_id, event_id, contact_id, channel, signal, body, received_at, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) ON CONFLICT (connector, provider_message_id) DO NOTHING RETURNING id`,
-        [id, connector.name, e.provider_message_id, eventId, c?.contact_id ?? null, e.channel, e.signal, e.body, e.at, c ? "received" : "unmatched"]);
+        [id, connector.name, e.provider_message_id, eventId, c?.contact_id ?? null, e.channel, e.signal, e.body ? e.body.slice(0, BODY_MAX) : null, e.at, c ? "received" : "unmatched"]);
       if (!ins.length) { out.duplicates++; return; }
       out.new++;
       if (!c) {
@@ -59,15 +61,15 @@ export async function ingestEvents(db: Db, deps: LifecycleDeps, connector: Conne
       await addTouch(q, { domain: c.domain, person_id: c.person_id, contact_id: c.contact_id, event_id: eventId, kind: e.signal, channel: e.channel, at: e.at, source: connector.name, dedup_key: `${connector.name}:${e.provider_message_id}` });
     });
   }
-  await drainOps(db, deps);
+  if (opts.drain !== false) await drainOps(db, deps);
   return out;
 }
 
 interface Msg { id: string; event_id: string; contact_id: string; channel: string; signal: string; body: string | null; connector: string }
-interface Who { full_name: string | null; email: string | null; company: string; company_key: string; company_id: string; person_id: string | null; domain: string; event: string; thread: string | null }
+interface Who { full_name: string | null; email: string | null; company: string; company_key: string; company_id: string; person_id: string | null; domain: string; event: string }
 
 const who = async (q: Q, m: Pick<Msg, "contact_id" | "event_id">) => (await q<Who>(
-  `SELECT k.full_name, k.email, co.name AS company, co.key AS company_key, co.id AS company_id, k.person_id, co.primary_domain AS domain, e.name AS event, e.slack_thread AS thread
+  `SELECT k.full_name, k.email, co.name AS company, co.key AS company_key, co.id AS company_id, k.person_id, co.primary_domain AS domain, e.name AS event
    FROM contacts k JOIN companies co ON co.id = k.company_id JOIN events e ON e.id = $2 WHERE k.id = $1`, [m.contact_id, m.event_id]))[0];
 
 /** Someone at this company is talking to us: nobody else there keeps getting the sequence while they do. */
@@ -123,7 +125,7 @@ async function applyCode(q: Q, m: Msg, p: Who, code: ReplyCode, ctx: { modelOnly
     case "out_of_office": {
       const back = returnDate(m.body, ctx.now);
       const at = back ? new Date(`${back}T09:00:00Z`) : new Date(ctx.now.getTime() + 7 * DAY);
-      await q("UPDATE enrollments SET cause = 'out_of_office', cause_id = $2, resume_at = $3 WHERE contact_id = $1 AND state = 'paused'", [m.contact_id, m.id, at.toISOString()]);
+      await q("UPDATE enrollments SET cause = 'out_of_office', resume_at = $3 WHERE contact_id = $1 AND state = 'paused' AND cause = 'inbound' AND cause_id = $2", [m.contact_id, m.id, at.toISOString()]);
       break;
     }
     case "referral":
@@ -190,6 +192,7 @@ export async function processInbound(db: Db, deps: LifecycleDeps, limit = 200) {
     const typed = cleanReply(m.body);
     const reading = { ...m, body: typed };
     const keyword = !provider && matchesUnsubscribe(typed);
+    await db.query("UPDATE inbound_messages SET lease_until = $2::timestamptz + interval '5 minutes' WHERE id = $1", [m.id, new Date().toISOString()]);
     let code: ReplyCode | null = provider ?? (keyword ? "unsubscribe" : null);
     let modelCode: ReplyCode | null = null, doubt: string | null = null, referredName: string | null = null;
     if (!provider) {
@@ -222,16 +225,15 @@ export async function processInbound(db: Db, deps: LifecycleDeps, limit = 200) {
   return out;
 }
 
-/** Written in the same transaction as the decision, then sent from a queue, so a Slack outage loses nothing. A hot reply goes straight to the account's owner, on a clock. */
+/** Written in the same transaction as the decision, then sent from a queue, so a Slack outage loses nothing. A hot reply goes to the event's channel with the account's owner @-mentioned, on a clock. */
 async function announce(q: Q, deps: LifecycleDeps, m: Msg, p: Who, code: ReplyCode | null, doubt: string | null, now: Date) {
   const name = p.full_name ?? "Someone", body = cleanReply(m.body) || m.body;
   const hot = !doubt && code && ["interested", "meeting_request", "referral"].includes(code);
-  if (doubt) await queueThread(q, m.event_id, doubtCard({ person: name, company: p.company, body }));
+  if (doubt) await queueEvent(q, m.event_id, doubtCard({ person: name, company: p.company, body }));
   if (!hot) return;
   const card = replyCard({ event: p.event, person: name, company: p.company, code: code!, body, contact_id: m.contact_id, channel: m.channel });
   const [o] = await q<{ owner: string | null }>("SELECT coalesce((SELECT d.owner FROM owner_decisions d WHERE d.event_id = $1 AND d.company_id = $2), (SELECT account_owner FROM companies WHERE id = $2)) AS owner", [m.event_id, p.company_id]);
   const slackId = o?.owner ? deps.userMap?.[o.owner] : undefined;
   await q("UPDATE inbound_messages SET owner = $2, respond_by = $3 WHERE id = $1", [m.id, o?.owner ?? null, respondBy(now, deps.holidays).toISOString()]);
-  if (slackId) await queueDm(q, m.event_id, slackId, card);
-  await queueThread(q, m.event_id, card);
+  await queueEvent(q, m.event_id, card, [slackId]);
 }

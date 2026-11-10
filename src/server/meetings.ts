@@ -5,7 +5,8 @@ import { scheduleResume, stopDomain } from "./enroll-ops.ts";
 import { logActivity, newId, RuleError } from "./events.ts";
 import { canWrite, queueCreate } from "./crm-outbox.ts";
 import { drainOps } from "./sequences.ts";
-import { DESK, nowOf, type LifecycleDeps } from "./lifecycle-deps.ts";
+import { postToEvent } from "./operating.ts";
+import { nowOf, type LifecycleDeps } from "./lifecycle-deps.ts";
 import { meetingReminderCard } from "./slack-cards.ts";
 import { addHold, addTouch, creditedEvent, releaseHold } from "./touches.ts";
 
@@ -42,12 +43,21 @@ export async function bookMeeting(db: Db, deps: LifecycleDeps, m: MeetingInput, 
   return out;
 }
 
+/** The meeting's rep, the person who uploaded the list, or a system source records what happened. Nobody else. */
+const SYSTEM_SOURCES = ["Calendar", "CRM", "Events Desk"];
+async function mayActOn(q: Db["query"], m: { event_id: string; rep: string | null }, actor: string) {
+  if (SYSTEM_SOURCES.includes(actor) || actor === m.rep) return;
+  const [up] = await q<{ uploaded_by: string }>("SELECT uploaded_by FROM uploads WHERE event_id = $1 ORDER BY created_at DESC LIMIT 1", [m.event_id]);
+  if (actor !== up?.uploaded_by) throw new RuleError(`Only ${m.rep ?? "the meeting's rep"} or the person who uploaded the list can record this.`);
+}
+
 /** Held, no-show, cancelled. A real outcome sets when the hold ends. */
 export async function recordOutcome(db: Db, deps: LifecycleDeps, meetingId: string, status: "held" | "no_show" | "cancelled", actor: string) {
   const now = nowOf(deps);
   return db.tx(async (q) => {
-    const [m] = await q<{ id: string; event_id: string; domain: string; contact_id: string | null }>("SELECT id, event_id, domain, contact_id FROM meetings WHERE id = $1 FOR UPDATE", [meetingId]);
+    const [m] = await q<{ id: string; event_id: string; domain: string; contact_id: string | null; rep: string | null }>("SELECT id, event_id, domain, contact_id, rep FROM meetings WHERE id = $1 FOR UPDATE", [meetingId]);
     if (!m) throw new RuleError("That meeting does not exist.");
+    await mayActOn(q, m, actor);
     await q("UPDATE meetings SET status = $2, outcome_at = $3 WHERE id = $1", [m.id, status, now.toISOString()]);
     await q("UPDATE holds SET expires_at = $2 WHERE cause = 'meeting' AND cause_id = $1 AND released_at IS NULL", [m.id, new Date(now.getTime() + 14 * DAY).toISOString()]);
     await addTouch(q, { domain: m.domain, contact_id: m.contact_id, event_id: m.event_id, kind: `meeting_${status}`, source: actor, dedup_key: `mtg_out:${m.id}:${status}:${now.getTime()}` });
@@ -64,8 +74,9 @@ export async function recordOutcome(db: Db, deps: LifecycleDeps, meetingId: stri
 export async function confirmRelease(db: Db, deps: LifecycleDeps, meetingId: string, actor: string) {
   const now = nowOf(deps);
   return db.tx(async (q) => {
-    const [m] = await q<{ id: string; status: string; event_id: string }>("SELECT id, status, event_id FROM meetings WHERE id = $1 FOR UPDATE", [meetingId]);
+    const [m] = await q<{ id: string; status: string; event_id: string; rep: string | null }>("SELECT id, status, event_id, rep FROM meetings WHERE id = $1 FOR UPDATE", [meetingId]);
     if (!m) throw new RuleError("That meeting does not exist.");
+    await mayActOn(q, m, actor);
     if (!["cancelled", "no_show"].includes(m.status)) throw new RuleError("Only a cancelled meeting or a no-show can release its hold.");
     await q("UPDATE meetings SET release_confirmed_by = $2 WHERE id = $1", [m.id, actor]);
     await releaseHold(q, "meeting", m.id, actor);
@@ -78,18 +89,16 @@ export async function confirmRelease(db: Db, deps: LifecycleDeps, meetingId: str
 /** Three days after a meeting nobody has said anything about, the rep is asked. Once. */
 export async function meetingReminders(db: Db, deps: LifecycleDeps) {
   const now = nowOf(deps);
-  const due = await db.query<{ id: string; rep: string; person: string | null; company: string; scheduled_at: string }>(
-    `SELECT m.id, m.rep, k.full_name AS person, co.name AS company, m.scheduled_at::text AS scheduled_at FROM meetings m JOIN contacts k ON k.id = m.contact_id JOIN companies co ON co.id = k.company_id
+  const due = await db.query<{ id: string; event_id: string; rep: string; person: string | null; company: string; scheduled_at: string }>(
+    `SELECT m.id, m.event_id, m.rep, k.full_name AS person, co.name AS company, m.scheduled_at::text AS scheduled_at FROM meetings m JOIN contacts k ON k.id = m.contact_id JOIN companies co ON co.id = k.company_id
      WHERE m.status IN ('booked', 'rescheduled') AND m.outcome_at IS NULL AND m.reminded_at IS NULL AND m.rep IS NOT NULL AND m.scheduled_at < $1::timestamptz - interval '3 days'`, [now.toISOString()]);
   let sent = 0;
   for (const m of due) {
     const slackId = deps.userMap?.[m.rep];
     if (!slackId || !deps.notify) continue;
-    let ok = false;
-    try { ok = await deps.notify.dm(slackId, meetingReminderCard({ person: m.person ?? "them", company: m.company, when: new Date(m.scheduled_at).toUTCString().slice(0, 16), meeting_id: m.id })); } catch { ok = false; }
+    const ok = await postToEvent(db, deps, m.event_id, meetingReminderCard({ person: m.person ?? "them", company: m.company, when: new Date(m.scheduled_at).toUTCString().slice(0, 16), meeting_id: m.id }), [slackId]);
     if (ok) { await db.query("UPDATE meetings SET reminded_at = $2 WHERE id = $1", [m.id, now.toISOString()]); sent++; }
   }
-  void DESK;
   return { sent };
 }
 
@@ -104,6 +113,8 @@ export async function ingestCrmMeetings(db: Db, deps: LifecycleDeps) {
     const key = `${m.id}:${m.email.toLowerCase()}`;
     if (seen.has(key)) continue;
     seen.add(key);
+    const [known] = await db.query<{ scheduled_at: string; status: string }>("SELECT scheduled_at::text AS scheduled_at, status FROM meetings WHERE external_key = $1", [`cal:crm:${key}`]);
+    if (known && Date.parse(known.scheduled_at) === Date.parse(m.start) && (m.status !== "cancelled" || known.status === "cancelled") && (m.status !== "held" || known.status === "held")) continue;
     const r = await ingestCalendar(db, deps, [{ id: `crm:${key}`, attendee_email: m.email, start: m.start, timezone: m.timezone ?? "UTC", cancelled: m.status === "cancelled", organizer: m.organizer }]);
     if (m.status === "held" && r.booked) { const [mt] = await db.query<{ id: string }>("SELECT id FROM meetings WHERE external_key = $1", [`cal:crm:${key}`]); if (mt) await recordOutcome(db, deps, mt.id, "held", "CRM"); }
     out.booked += r.booked;
