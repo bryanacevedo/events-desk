@@ -7,13 +7,13 @@ import { Chevron, ExpandRow } from "./Patterns";
 import { Icon } from "./icons";
 import { PersonAvatar } from "./PersonAvatar";
 import { companyHref, personHref, To } from "./To";
-import { CODE_WORDS, dayIn, headIn, MeetingRows, meetTime, ObjectSheets, openObject, ReplyRows } from "./Objects";
+import { CODE_WORDS, dayIn, headIn, MeetingRows, meetTime, objectHref, ObjectSheets, openObject, ReplyRows } from "./Objects";
 import { money, num, plural, shortDate } from "./words";
 import { isGtm } from "../shared/roles";
 
 interface Sender { address: string; role: "primary" | "spare"; daily_share: number; health: number | null }
 interface Sequence { id: string; name: string; channel: "email" | "linkedin"; priority: string; phase?: "pre" | "post"; zone_group?: string; adding?: number; connector: string; state: string; pause_reason: string | null; senders_needed: number | null; peak_daily: number | null; sender_status: "ok" | "short" | "not_visible" | null; sender_excluded: { address: string; reason: string }[]; enrolled: number; paused: number; senders: Sender[]; timing_note: string | null; external_id: string | null; checklist_at: string | null }
-interface Reply { id: string; connector?: string; thread_url?: string | null; code: string | null; doubtful: boolean; waiting?: boolean; body: string | null; contact_id: string | null; full_name: string | null; company: string | null }
+interface Reply { id: string; signal?: string; connector?: string; thread_url?: string | null; code: string | null; doubtful: boolean; waiting?: boolean; body: string | null; contact_id: string | null; full_name: string | null; company: string | null }
 interface Meeting { id: string; contact_id?: string; from_reply?: boolean; status: string; scheduled_at: string; rep: string | null; full_name: string | null; company: string | null }
 interface Score { held_all: number; logged_outside: number; cost: { dollars_cents: number }; cost_per_held_cents: number | null; influence: { available: boolean; sourced: { n: number; cents: number }; influenced: { n: number; cents: number }; won: { n: number; cents: number } }; control: { available: boolean; met_accounts: number; met_with_pipeline: number; control_accounts: number; control_with_pipeline: number }; roi: { pipeline_per_dollar: number | null; cost_missing: string[] } }
 interface Overview {
@@ -59,8 +59,6 @@ export function Fold({ icon, title, peek, children }: { icon: React.ReactNode; t
 }
 
 const REGION: Record<string, string> = { americas: "Americas", emea: "EMEA", apac: "APAC", event: "Event's region" };
-const GROUP_WORDS: Record<string, string> = { scanned: "Scanned at the booth", reached: "Reached before", not_reached: "Not reached before" };
-const GROUP_ORDER = ["scanned", "reached", "not_reached"];
 const peopleIn = (s: Sequence) => s.enrolled + s.paused + (s.adding ?? 0);
 
 /** One region's sequence, opened from its cell: its state, its sending accounts, and what it still needs before it goes out. */
@@ -86,52 +84,6 @@ function SequenceDetail({ s, act, busy }: { s: Sequence; act: Act; busy: boolean
   );
 }
 
-/** The sequences as a grid: who (rows, by what happened or by priority) by channel (columns). Each cell is a count and a state; regions and inboxes open from it. */
-function SequenceGrid({ sequences, act, busy }: { sequences: Sequence[]; act: Act; busy: boolean }) {
-  const [open, setOpen] = useState<string | null>(null);
-  const shown = sequences.filter((s) => peopleIn(s) > 0 || s.state === "draft");
-  const phases = (["pre", "post"] as const).filter((p) => shown.some((s) => (s.phase ?? "pre") === p));
-  const channels = (["email", "linkedin"] as const).filter((c) => shown.some((s) => s.channel === c));
-  return (
-    <div className="sq">
-      {phases.map((phase) => {
-        const mine = shown.filter((s) => (s.phase ?? "pre") === phase);
-        const groups = [...new Set(mine.map((s) => s.priority))].sort((a, b) => (GROUP_ORDER.indexOf(a) + 1 || 99) - (GROUP_ORDER.indexOf(b) + 1 || 99) || a.localeCompare(b));
-        return (
-          <div key={phase} className="sq-phase">
-            {phases.length > 1 && <h4>{phase === "pre" ? "Before the event" : "After the event"}</h4>}
-            <div className="sq-grid" style={{ gridTemplateColumns: `minmax(120px, 1fr) repeat(${channels.length}, minmax(0, 1.2fr))` }}>
-              <span />
-              {channels.map((c) => <span key={c} className="sq-col">{c === "email" ? "Email" : "LinkedIn"}</span>)}
-              {groups.map((g) => (
-                <div key={g} className="sq-row" style={{ display: "contents" }}>
-                  <span className="sq-label">{GROUP_WORDS[g] ?? `Priority ${g}`}</span>
-                  {channels.map((c) => {
-                    const cell = mine.filter((s) => s.priority === g && s.channel === c);
-                    const key = `${phase}|${g}|${c}`;
-                    if (!cell.length) return <span key={c} className="sq-cell empty">None</span>;
-                    const people = cell.reduce((n, s) => n + peopleIn(s), 0);
-                    const states = [...new Set(cell.map((s) => STATE[s.state] ?? s.state))];
-                    const toCheck = cell.filter((s) => s.state === "draft" && !s.checklist_at).length;
-                    const short = cell.some((s) => s.sender_status === "short");
-                    return (
-                      <button key={c} type="button" className={`sq-cell${open === key ? " on" : ""}`} aria-expanded={open === key} onClick={() => setOpen(open === key ? null : key)}>
-                        <b>{num(people)}</b>
-                        <span>{toCheck ? `${toCheck} to check` : states.join(", ")}{short ? " · short of inboxes" : ""}</span>
-                        <i>{cell.map((s) => REGION[s.zone_group ?? "event"] ?? s.zone_group).join(" · ")}</i>
-                      </button>
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
-            {mine.filter((s) => open === `${phase}|${s.priority}|${s.channel}`).map((s) => <SequenceDetail key={s.id} s={s} act={act} busy={busy} />)}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 
 export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
   const { actor, demo, needs } = useActor();
@@ -147,8 +99,10 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
   // Which meetings a funnel row asked for: the Meetings fold shows only those until "All meetings".
   const [meetView, setMeetView] = useState<keyof typeof MEET_VIEWS | null>(null);
   const showMeetings = (v: keyof typeof MEET_VIEWS) => { setMeetView(v); requestAnimationFrame(() => openFold("Meetings")); };
+  const [seqs, setSeqs] = useState<SeqList | null>(null);
   const load = async () => {
     setO(await get<Overview>(`/api/events/${id}/motion`));
+    setSeqs(await get<SeqList>(`/api/events/${id}/sequences`));
     const r = await get<typeof slots>(`/api/events/${id}/motion/roster`);
     if (r) { setSlots(r); setSlot((x) => (x.rep ? x : { ...x, rep: r.roster[0]?.rep ?? "" })); }
   };
@@ -211,19 +165,7 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
           </div>
         </section>
       )}
-      {pe?.started_at && (() => {
-        // When the follow-up went out and who pressed it: a row in the page's tray, the person on the left, the day on the right edge.
-        const day = pe.started_at.slice(0, 10), after = Math.round((Date.parse(day) - Date.parse(pe.last_day)) / 86_400_000);
-        return (
-          <div className="ob-tray m-started" aria-label="Follow-up">
-            <div className="ob-row ob-still">
-              <span className="ob-face"><PersonAvatar name={pe.started_by ?? "Events Desk"} size={36} /></span>
-              <span className="ob-who"><b>Follow-up started</b><span>{pe.started_by ?? "Events Desk"}</span></span>
-              <span className="m-started-at"><b>{shortDate(day)}</b><span>{after <= 0 ? "Last day of the event" : after === 1 ? "1 day after the event" : `${after} days after the event`}</span></span>
-            </div>
-          </div>
-        );
-      })()}
+      {seqs && <Started seqs={seqs} followUp={pe?.started_at ? { at: pe.started_at, by: pe.started_by } : null} />}
 
       {started && f && (
         <section className="brief" aria-label="Outreach in brief">
@@ -232,7 +174,7 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
             <ul>
               <Row label="In sequences" n={f.enrolled} of={f.kept} onOpen={() => openFold("Sequences")} />
               <Row label="Reached" n={f.sent} of={f.kept} />
-              <Row label="Replied" n={f.replied} of={f.kept} onOpen={hot.length ? () => document.querySelector(".m-replies")?.scrollIntoView({ behavior: "smooth", block: "start" }) : undefined} />
+              <Row label="Replied" n={f.replied} of={f.kept} onOpen={hot.length ? () => document.querySelector(".m-replies")?.scrollIntoView({ behavior: "smooth", block: "start" }) : () => openFold("Replies")} />
               {/* Where meetings came from, then every meeting held: the same total as every other screen. */}
               <Row label="Booked from a reply" onOpen={() => showMeetings("reply")} n={f.booked} of={f.kept} />
               {(f.held_all ?? f.held) > f.held && <Row label="Met at the booth" n={(f.held_all ?? f.held) - f.held} of={f.kept} onOpen={() => showMeetings("booth")} />}
@@ -253,7 +195,8 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
       <div className="folds">
         {o.sequences.length > 0 && (
           <Fold icon={<Icon.lists />} title="Sequences" peek={<>{short > 0 && <span className="fig over"><b>{short}</b> short of inboxes</span>}<i>{live} of {o.sequences.length} live</i></>}>
-            <SequenceGrid sequences={o.sequences} busy={busy} act={act} />
+            {seqs ? <SequenceLanes list={seqs} eventId={id} /> : null}
+            {o.sequences.filter((x) => x.state === "draft" && (!x.external_id || !x.checklist_at)).map((x) => <SequenceDetail key={x.id} s={x} act={act} busy={busy} />)}
           </Fold>
         )}
         {started && missingRegions.length > 0 && (
@@ -267,6 +210,7 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
             ))}</div>
           </Fold>
         )}
+        {o.replies.some((r) => (r.signal ?? "reply") === "reply") && <RepliesFold replies={o.replies.filter((r) => (r.signal ?? "reply") === "reply")} open={sheet.reply} />}
         {o.meetings.length > 0 && (
           <Fold icon={<Icon.calendar />} title="Meetings" peek={<>{num(o.meetings.filter((m) => m.status === "held").length)} held<i>{num(o.meetings.filter((m) => ["booked", "rescheduled"].includes(m.status)).length)} coming up</i></>}>
             {meetView ? (() => {
@@ -342,5 +286,95 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
       </div>
       <ObjectSheets changed={() => { load(); onChange(); }} />
     </section>
+  );
+}
+
+/** Every reply the event drew, answered or not, by what it said: on a finished event this is where the replies live (Waiting on a rep is empty by then). */
+function RepliesFold({ replies, open }: { replies: Reply[]; open: string | null }) {
+  const [code, setCode] = useState("");
+  const codes = [...new Set(replies.map((r) => r.code ?? ""))].sort((a, b) => replies.filter((r) => (r.code ?? "") === b).length - replies.filter((r) => (r.code ?? "") === a).length);
+  const shown = code ? replies.filter((r) => (r.code ?? "") === code) : replies;
+  const word = (c: string) => CODE_WORDS[c] ?? (c ? c.replace(/_/g, " ") : "Not read yet");
+  // The same split the funnel makes: a person who answered, against an automatic or closing answer. The list shows every one.
+  const AUTO = ["out_of_office", "bounced", "unsubscribe", "wrong_person", "departed"];
+  const real = new Set(replies.filter((r) => !AUTO.includes(r.code ?? "")).map((r) => r.contact_id ?? r.id)).size, auto = replies.filter((r) => AUTO.includes(r.code ?? "")).length;
+  return (
+    <Fold icon={<Icon.reply />} title="Replies" peek={<>{num(real)} replied{auto > 0 && <i>{num(auto)} out of office, bounced or opted out</i>}</>}>
+      {codes.length > 1 && (
+        <div className="seg rp-codes" role="group" aria-label="What they said">
+          <button type="button" aria-pressed={!code} onClick={() => setCode("")}>All<span>{replies.length}</span></button>
+          {codes.map((c) => <button key={c} type="button" aria-pressed={code === c} onClick={() => setCode(c)}>{word(c)}<span>{replies.filter((r) => (r.code ?? "") === c).length}</span></button>)}
+        </div>
+      )}
+      <ReplyRows rows={shown.slice(0, 50)} open={open} state={(r) => ({ text: word(r.code ?? ""), soon: false })} />
+    </Fold>
+  );
+}
+
+interface SeqRowData { id: string; name: string; channel: "email" | "linkedin"; phase: "pre" | "post"; priority: string; zone_group: string | null; connector: string; state: string; launched_at: string | null; checklist_by: string | null; people: number; reached: number | null; replied: number | null; meetings: number; invites: number | null; accepted: number | null }
+interface SeqList { sequences: SeqRowData[]; starts_on: string | null; last_day: string | null }
+const daysBetween = (a: string, b: string) => Math.round((Date.parse(b.slice(0, 10)) - Date.parse(a.slice(0, 10))) / 86_400_000);
+
+/** One row saying when a half of the outreach started and who started it: the person on the left, the day on the right edge. */
+function StartedRow({ title, by, day, rel }: { title: string; by: string; day: string; rel: string }) {
+  return (
+    <div className="ob-row ob-still">
+      <span className="ob-face"><PersonAvatar name={by} size={36} /></span>
+      <span className="ob-who"><b>{title}</b><span>{by}</span></span>
+      <span className="m-started-at"><b>{shortDate(day)}</b><span>{rel}</span></span>
+    </div>
+  );
+}
+
+/** Pre-event and follow-up sequences, each with when it started and who started it. Pre-event: whoever cleared the first launched sequence's checklist. */
+function Started({ seqs, followUp }: { seqs: SeqList; followUp: { at: string; by: string | null } | null }) {
+  const pre = seqs.sequences.filter((s) => s.phase === "pre" && s.launched_at).sort((a, b) => a.launched_at!.localeCompare(b.launched_at!))[0];
+  if (!pre && !followUp) return null;
+  const before = pre && seqs.starts_on ? daysBetween(pre.launched_at!, seqs.starts_on) : null;
+  const after = followUp && seqs.last_day ? daysBetween(seqs.last_day, followUp.at) : null;
+  return (
+    <div className="ob-tray m-started" aria-label="When the sequences started">
+      {pre && <StartedRow title="Pre-event sequences started" by={pre.checklist_by ?? "Events Desk"} day={pre.launched_at!.slice(0, 10)} rel={before === null ? "" : before <= 0 ? "On the first day" : before === 1 ? "1 day before the event" : `${before} days before the event`} />}
+      {followUp && <StartedRow title="Follow-up sequences started" by={followUp.by ?? "Events Desk"} day={followUp.at.slice(0, 10)} rel={after === null ? "" : after <= 0 ? "Last day of the event" : after === 1 ? "1 day after the event" : `${after} days after the event`} />}
+    </div>
+  );
+}
+
+const SEQ_STATE_WORD: Record<string, string> = { active: "Live", paused: "Paused", archived: "Ended", draft: "Draft" };
+const GROUP_WORD: Record<string, string> = { scanned: "Scanned at the booth", reached: "Reached before", not_reached: "Not reached before" };
+
+/** The sequences, before the event and after it, one row each: what it is, how many are in it, how many it reached and how many replied. A row opens the sequence. */
+function SequenceLanes({ list, eventId }: { list: SeqList; eventId: string }) {
+  const { go } = useActor();
+  const shown = list.sequences.filter((s) => s.people > 0 || s.state !== "draft" || (s.reached ?? 0) > 0);
+  // Both halves always show; an empty one says what happened or when it will.
+  const today = new Date().toISOString().slice(0, 10);
+  const halves = (["pre", "post"] as const).map((ph) => [ph, shown.filter((s) => s.phase === ph)] as const);
+  const empty = (ph: "pre" | "post") => ph === "pre"
+    ? (list.starts_on && today >= list.starts_on ? "None before the event" : "None yet")
+    : (list.last_day && today <= list.last_day ? `From ${shortDate(new Date(Date.parse(`${list.last_day}T12:00:00Z`) + 86_400_000).toISOString().slice(0, 10))}` : "Not started");
+  return (
+    <div className="sq-lanes">
+      {halves.map(([ph, rows]) => (
+        <section key={ph} className="sq-lane" aria-label={ph === "pre" ? "Before the event" : "After the event"}>
+          <h4>{ph === "pre" ? "Before the event" : "After the event"}{rows.length > 0 && <span>{rows.length}</span>}</h4>
+          {!rows.length && <p className="sq-empty">{empty(ph)}</p>}
+          {rows.length > 0 && <ul className="ob-tray">{rows.map((s, i) => {
+            const reach = s.channel === "linkedin" && s.invites !== null ? s.invites : s.reached;
+            return (
+              <li key={s.id} style={{ "--i": i } as React.CSSProperties}>
+                <a href={objectHref("sequence", `${eventId}|${s.id}`)} className="ob-row sq-row" data-opens-sheet="" onClick={(ev) => { ev.preventDefault(); go(objectHref("sequence", `${eventId}|${s.id}`)); }}>
+                  <span className="ob-who"><b>{s.channel === "linkedin" ? "LinkedIn" : "Email"}{s.zone_group ? `, ${REGION[s.zone_group] ?? s.zone_group}` : ""}</b><span>{[GROUP_WORD[s.priority] ?? (s.priority.length === 1 ? `Priority ${s.priority}` : null), SEQ_STATE_WORD[s.state] ?? s.state].filter(Boolean).join(" · ")}</span></span>
+                  <span className="sq-fig"><b>{num(s.people)}</b><span>added</span></span>
+                  <span className="sq-fig"><b>{reach === null ? "None" : num(reach)}</b><span>{reach === null ? "not reported" : s.channel === "linkedin" && s.invites !== null ? "invited" : "reached"}</span></span>
+                  <span className="sq-fig"><b>{s.replied === null ? "None" : num(s.replied)}</b><span>{s.replied === null ? "not reported" : "replied"}</span></span>
+                  <span className="ob-go">Open<svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h9M8.5 4l4 4-4 4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
+                </a>
+              </li>
+            );
+          })}</ul>}
+        </section>
+      ))}
+    </div>
   );
 }

@@ -1,10 +1,11 @@
 # comes off every outreach list and is never looked up again, at every event.
-# credits · # AI calls
+# does not say which step each message was.
 # new, # already in
 # no tier#
 # of # held a meeting
 # of # live
 # of # used
+# out of office, bounced or opted out
 #% of met accounts have pipeline
 #, #, not requested. Request a seat
 A line for the version history
@@ -12,12 +13,11 @@ Accounts you know will be there (optional)
 Budget is for leadership and GTM Engineering.
 Declined by ##
 Domain not set up to send
-Follow-up started by # on #
-Found at the company, not on the attendee list.
 From the attendee file (unverified):
 Keep it as my rule
 No event has finished sending yet.
 Not on the outreach list
+Not read: the card ran out
 Nothing needs anyone right now.
 One company per line: name, employees, industry, business model, expected tier, kind (won, lost or bad fit)
 One ticket ###
@@ -29,14 +29,15 @@ Real event names, simulated attendees.
 Results are for leadership and GTM Engineering.
 Review the cost to verify and find contacts
 Save the document as .txt or .md, or paste its text.
-Saved. Their outreach is stopped, and a task for today is in the CRM.
-Saved. Their outreach is stopped.
+Says unsubscribe, read as something else
 Seats are for leadership and GTM Engineering.
-Take the suggested answer for all #
+That company is not on this event.
 That deal is no longer credited here.
 That event does not exist.
 That meeting is no longer here.
+That person is not on the list.
 That reply is no longer here.
+That sequence is not on this event.
 The Google Sheet stays in Drive.
 The rules changed since this test. Test again before publishing.
 This draft was thrown away.

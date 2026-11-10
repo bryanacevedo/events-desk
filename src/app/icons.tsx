@@ -11,6 +11,7 @@ export const Icon = {
   usage: () => <svg {...base}><path d="M3 14.5 7.5 9l3 3 6-7" /><path d="M13.5 5h3v3" /></svg>,
   more: () => <svg {...base}><circle cx="5" cy="10" r="1.2" /><circle cx="10" cy="10" r="1.2" /><circle cx="15" cy="10" r="1.2" /></svg>,
   calendar: () => <svg {...base}><rect x="3" y="4.5" width="14" height="12.5" rx="2" /><path d="M3 8.5h14M7 2.8v3M13 2.8v3" /></svg>,
+  reply: () => <svg {...base}><path d="M3.5 5.5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v6.5a2 2 0 0 1-2 2H9l-3.5 3v-3h0a2 2 0 0 1-2-2Z" /><path d="M7 8.8h6" /></svg>,
   pin: () => <svg {...base}><path d="M10 17.5s5.5-5 5.5-9.3a5.5 5.5 0 0 0-11 0c0 4.3 5.5 9.3 5.5 9.3Z" /><circle cx="10" cy="8.2" r="1.9" /></svg>,
   people: () => <svg {...base}><circle cx="7.5" cy="7" r="2.8" /><path d="M2.5 16.5c.4-3 2.4-4.6 5-4.6s4.6 1.6 5 4.6" /><path d="M13 4.6a2.6 2.6 0 0 1 0 4.9M14.8 12.3c1.5.6 2.4 2 2.7 4.2" /></svg>,
   next: () => <svg {...base}><circle cx="10" cy="10" r="7" /><path d="M7 10h5.5M10.3 7.5l2.5 2.5-2.5 2.5" /></svg>,

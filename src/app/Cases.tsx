@@ -7,6 +7,7 @@ import { companyDisplayName as co, dealDisplayName } from "../shared/names";
 import { useEffect, useState } from "react";
 import { send, type CaseOption, type ReviewCase } from "./api";
 import { useActor } from "./App";
+import { objectHref } from "./Objects";
 import { caseWords, plural } from "./words";
 import { PersonAvatar } from "./PersonAvatar";
 import { Chevron } from "./Patterns";
@@ -31,7 +32,10 @@ const pair = (line: string): [string, string] => { const at = line.indexOf(": ")
 const USEFUL = /country|city|region|title|job|role|position|department|industry|company|employer|seniority/i;
 
 /** The reason a case was raised, in a few words. The full sentence lives in the server's summary. */
-const REASON: [RegExp, string][] = [[/Nothing we found backs up a tier/i, "No evidence for a tier"], [/checked its website and still could not tell/i, "Website checked, still unclear"]];
+const REASON: [RegExp, string][] = [[/Nothing we found backs up a tier/i, "No evidence for a tier"], [/checked its website and still could not tell/i, "Website checked, still unclear"],
+  // A reply set aside for a person: why, as a label, not a sentence (the server's summary stays in the activity log).
+  [/it says unsubscribe, the AI read it differently/i, "Says unsubscribe, read as something else"], [/may have been written by someone else/i, "Maybe not from them"],
+  [/the Motion card ran out/i, "Not read: the card ran out"], [/answer could not be used/i, "Could not be read"], [/fits no category/i, "Fits no answer"]];
 const reasonOf = (summary: string) => REASON.find(([re]) => re.test(summary))?.[1] ?? null;
 
 /** The one long "what we know" line, taken apart by where each fact came from, and shown whole. */
@@ -92,13 +96,14 @@ function CaseRow({ eventId, c, onDone }: { eventId: string; c: ReviewCase; onDon
     setBusy(null);
     if (r.ok) onDone(); else setError(r.error);
   };
+  const { go } = useActor();
   const who = c.person?.full_name ? `${c.person.full_name}${c.company ? `, ${co(c.company)}` : ""}` : c.company ? co(c.company) : "";
   const site = who ? siteOf(c.facts) : null;
   return (
     <li className="crow" data-case={c.id}>
       <div className="cmain">
         <div className="min0">
-          {who && <p className="cwho">{who}{site && <span>{site}</span>}</p>}
+          {who && <p className="cwho">{c.person?.id ? <a className="to" href={objectHref("person", c.person.id)} data-opens-sheet="" onClick={(ev) => { ev.preventDefault(); go(objectHref("person", c.person!.id)); }}>{who}</a> : who}{site && <span>{site}</span>}</p>}
           {/* The question is said once: by the fields when there are any, otherwise in a line. */}
           {reasonOf(c.summary) ? <p className="csum">{reasonOf(c.summary)}</p> : factCount(c.facts, [...(who ? ["company", "person"] : []), ...(site ? ["website"] : [])]) < 2 && <p className="csum">{c.summary.replace(/^Which tier is ".*?"\?\s*/, "")}</p>}
         </div>

@@ -5,14 +5,14 @@ import { newId } from "./events.ts";
 
 type Q = Db["query"];
 
-export interface Touch { sender?: string | null; step?: number | null; domain: string | null; person_id?: string | null; contact_id?: string | null; event_id: string | null; kind: string; channel?: string | null; reason?: string; at?: Date | string; source: string; dedup_key: string }
+export interface Touch { sender?: string | null; step?: number | null; sequence_id?: string | null; action?: "invite" | "message" | null; domain: string | null; person_id?: string | null; contact_id?: string | null; event_id: string | null; kind: string; channel?: string | null; reason?: string; at?: Date | string; source: string; dedup_key: string }
 
 /** True when this is the first time the touch was seen. A replayed event writes nothing. */
 export async function addTouch(q: Q, t: Touch) {
   const rows = await q(
-    `INSERT INTO touches (id, domain, person_id, contact_id, event_id, kind, channel, reason, at, source, dedup_key, sender, step) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, coalesce($9::timestamptz, now()), $10, $11, $12, $13)
+    `INSERT INTO touches (id, domain, person_id, contact_id, event_id, kind, channel, reason, at, source, dedup_key, sender, step, sequence_id, action) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, coalesce($9::timestamptz, now()), $10, $11, $12, $13, $14, $15)
      ON CONFLICT (dedup_key) DO NOTHING RETURNING id`,
-    [newId("tch"), t.domain, t.person_id ?? null, t.contact_id ?? null, t.event_id, t.kind, t.channel ?? null, t.reason ?? "", t.at ? new Date(t.at).toISOString() : null, t.source, t.dedup_key, t.sender ?? null, t.step ?? null]);
+    [newId("tch"), t.domain, t.person_id ?? null, t.contact_id ?? null, t.event_id, t.kind, t.channel ?? null, t.reason ?? "", t.at ? new Date(t.at).toISOString() : null, t.source, t.dedup_key, t.sender ?? null, t.step ?? null, t.sequence_id ?? null, t.action ?? null]);
   return rows.length > 0;
 }
 

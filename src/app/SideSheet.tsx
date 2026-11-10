@@ -86,8 +86,9 @@ export function SideSheet({ id, go, close, lens }: { id: string; go: (to: string
 
   // A small version of the event's own header: who it is, where it stands, the one thing to do, and a few quiet facts. The rest is a click away.
   return (
-    <aside className="sheet" ref={ref} role="dialog" aria-label={e.name} data-sheet={id}>
+    <aside className="sheet ob-sheet" ref={ref} role="dialog" aria-label={e.name} data-sheet={id} data-kind="event">
       {top}
+      <p className="ob-kind">Event</p>
       <header className="ehero mini" style={{ "--brand": e.brand_color ?? "#1F5D3F" } as CSSProperties}>
         <EventLogo name={e.name} website={e.website} size={48} />
         <div className="ehero-text">

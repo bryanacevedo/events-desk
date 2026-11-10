@@ -11,13 +11,13 @@ import { OLD_SHEET_ERROR, type EventRow, type Stage } from "../shared/domain";
 import { AFTER, afterStep } from "./stages";
 import { get, send, type Card, type CompanyRow, type EventPayload, type Page, type Pending, type PersonRow, type ReviewCase, type SeatRequest, type Spread, type TopUpCounts, type TopUpItem, type UploadItem } from "./api";
 import { Link, useActor } from "./App";
+import { objectHref, ObjectSheets } from "./Objects";
 import { Cases, openCases } from "./Cases";
 import { Motion } from "./Motion";
 import { ResultView } from "./Result";
 import { To } from "./To";
 import { Chevron, FileButton, ShowMore, SheetButton } from "./Patterns";
 import { isGtm } from "../shared/roles";
-import { Person } from "./Person";
 import { EventLogo } from "./EventLogo";
 import { Icon, Mark } from "./icons";
 import { STEPS, stepAt, waiting as waitingOn } from "./waiting";
@@ -441,6 +441,8 @@ function PeopleTable({ id, hasPriorities, reloadKey, past = false }: { id: strin
   const [page, setPage] = useState<Page<PersonRow> | null>(null);
   // A link to a person (?person=…) opens their panel on arrival.
   const [open, setOpen] = useState<string | null>(f.person || null);
+  // The person's sheet lives in the address: closing it closes the row's highlight, and an opt-out in it reloads the list.
+  useEffect(() => { setOpen(f.person || null); }, [f.person]);
   // An opt-out from the panel changes the row under it; the list reloads once the panel closes, so the panel can first say what happened.
   const [stale, setStale] = useState(0);
   const dirty = useRef(false);
@@ -477,18 +479,18 @@ function PeopleTable({ id, hasPriorities, reloadKey, past = false }: { id: strin
       <ul className="prows">
         {rows.map((c) => (
           <li key={c.id} className={open === c.id ? "open" : undefined} data-person={c.id}>
-            <button type="button" className={`prow${c.drop_reason ? " off" : ""}`} aria-expanded={open === c.id} onClick={() => (open === c.id ? close() : setOpen(c.id))}>
+            <button type="button" className={`prow${c.drop_reason ? " off" : ""}`} aria-expanded={open === c.id} data-opens-sheet="" onClick={() => { setOpen(c.id); go(objectHref("person", c.id)); }}>
               <span className={`av sm ${c.drop_reason ? "off" : c.priority === "A" ? "a" : c.priority === "C" ? "c" : c.priority === "B" ? "b" : "none"}`} aria-hidden="true">{initials(c.full_name)}</span>
               <span className="pname"><b>{c.full_name ?? "No name"}</b><span className="mute"><span className={`psrc ${c.source === "prospect" ? "prospect" : "attendee"}`}>{c.source === "prospect" ? "Prospect" : "Attendee"}</span>{c.title ? co(c.title) : "No title"}</span></span>
-              <span className="pco"><span className={c.company_id ? "pco-link" : undefined} onClick={c.company_id ? (ev) => { ev.stopPropagation(); go(`/event/${id}?by=companies&cq=${encodeURIComponent(c.company!)}&co=${c.company_id}#people`); } : undefined}>{c.company ? co(c.company) : "No company"}</span><span className="mute">{c.company_tier ? `Tier ${c.company_tier}` : "No tier"}</span></span>
+              <span className="pco"><span className={c.company_id ? "pco-link" : undefined} data-opens-sheet={c.company_id ? "" : undefined} onClick={c.company_id ? (ev) => { ev.stopPropagation(); go(objectHref("company", `${id}|${c.company_id}`)); } : undefined}>{c.company ? co(c.company) : "No company"}</span><span className="mute">{c.company_tier ? `Tier ${c.company_tier}` : "No tier"}</span></span>
               <span className="pprio" aria-label={c.priority ? `Priority ${c.priority}` : undefined}>{c.priority ?? ""}</span>
               <span className={`pmail${c.drop_reason ? " orange" : c.email ? "" : " mute"}`}>{c.drop_reason ? dropWords(c.drop_reason) : c.email ?? "No email"}</span>
             </button>
-            {open === c.id && <Person c={c} eventId={id} past={past} onClose={close} onChange={() => { dirty.current = true; }} />}
             {open === c.id && c.id === f.person && <ArriveAt id={c.id} />}
           </li>
         ))}
       </ul>
+      <ObjectSheets changed={() => setStale((n) => n + 1)} />
       {page && <Pager total={page.total} offset={offset} limit={PAGE} onPage={(o) => setF({ page: String(o / PAGE + 1) })} />}
     </section>
   );
@@ -512,8 +514,7 @@ function ListTables({ id, hasPriorities, reloadKey, past = false }: { id: string
 
 function CompaniesTable({ id, reloadKey }: { id: string; reloadKey: number }) {
   const [f, setF] = useUrlState(["cq", "ct", "cpage", "co"], {});
-  const [open, setOpen] = useState<string | null>(f.co || null);
-  useEffect(() => { if (f.co) setOpen(f.co); }, [f.co]);
+  const { go } = useActor();
   const [typed, setTyped] = useState(f.cq);
   useEffect(() => { setTyped(f.cq); }, [f.cq]);
   const [page, setPage] = useState<Page<CompanyRow> | null>(null);
@@ -538,17 +539,17 @@ function CompaniesTable({ id, reloadKey }: { id: string; reloadKey: number }) {
       <ul className="prows">
         {rows.map((r) => (
           <li key={r.id}>
-            {open !== r.id && <button type="button" className={`prow corow${r.list_status || !r.in_research ? " off" : ""}`} aria-expanded={open === r.id} onClick={() => setOpen(open === r.id ? null : r.id)}>
+            <button type="button" className={`prow corow${r.list_status || !r.in_research ? " off" : ""}`} data-opens-sheet="" onClick={() => go(objectHref("company", `${id}|${r.id}`))}>
               <EventLogo name={co(r.name)} website={r.primary_domain ? `https://${r.primary_domain}` : null} size={30} />
               <span className="pname"><b>{co(r.name)}</b><span className="mute">{[r.industry, r.employees ? `${num(Number(r.employees))} people` : null, r.country].filter(Boolean).join(", ") || r.primary_domain || ""}</span></span>
               <span className="pco"><span>{status(r)}</span>{r.tier && (tierBasis(r.tier_fact) ?? r.tier_fact) && <span className="mute">{tierBasis(r.tier_fact) ?? r.tier_fact}</span>}</span>
               <span className="pmail mute">{r.people === r.rows_total ? plural(r.people, "person", "people") : `${r.people} of ${r.rows_total} kept`}</span>
-            </button>}
-            {open === r.id && <CompanyPanel eventId={id} companyId={r.id} onClose={() => setOpen(null)} />}
+            </button>
           </li>
         ))}
       </ul>
       {page && <Pager total={page.total} offset={offset} limit={PAGE} onPage={(o) => setF({ cpage: String(o / PAGE + 1) })} />}
+      <ObjectSheets />
     </section>
   );
 }
@@ -1143,44 +1144,3 @@ const PERSON_STATE: Record<string, string> = { meeting: "Meeting", replied: "Rep
 
 /** One company, opened from the list: its logo and site, its fit and size, why it got its tier, who owns it and any open deal,
     and everyone from it on this event with where they stand. A person opens their own panel. */
-function CompanyPanel({ eventId, companyId, onClose }: { eventId: string; companyId: string; onClose: () => void }) {
-  const { go } = useActor();
-  const [c, setC] = useState<CompanyDetail | null>(null);
-  useEffect(() => { let live = true; get<CompanyDetail>(`/api/events/${eventId}/companies/${companyId}`).then((x) => { if (live) setC(x ?? null); }); return () => { live = false; }; }, [eventId, companyId]);
-  if (!c) return null;
-  return (
-    <article className="panel copanel" aria-label={co(c.name)}>
-      <button className="sheet-x panel-x" type="button" aria-label="Close" onClick={onClose}>&times;</button>
-      <div className="col">
-        <div className="ob-account"><EventLogo name={co(c.name)} website={c.website ? `https://${c.website}` : null} size={40} /><div><b>{co(c.name)}</b>{c.website && <a className="mute" href={`https://${c.website}`} target="_blank" rel="noopener noreferrer">{c.website}</a>}</div></div>
-        <div className="md-figs ob-figs">
-          <p><b>{c.tier ? `Tier ${c.tier}` : "No tier"}</b><span>{c.tier && tierBasis(c.tier_fact) ? `fit, ${tierBasis(c.tier_fact)}` : "fit"}</span></p>
-          {c.employees && <p><b>{num(Number(c.employees))}</b><span>people</span></p>}
-          {c.industry && <p><b>{c.industry}</b><span>industry</span></p>}
-        </div>
-        {c.tier_fact && !tierBasis(c.tier_fact) && <p className="mute copanel-why">{c.tier_fact}</p>}
-        {(c.owner || c.deal || c.country) && (
-          <dl className="sheet-facts">
-            {c.owner && <div><dt>Owner</dt><dd>{c.owner}</dd></div>}
-            {c.deal && <div><dt>Open deal</dt><dd>{dealDisplayName(c.deal, c.name)}</dd></div>}
-            {c.country && <div><dt>Country</dt><dd>{c.country}</dd></div>}
-          </dl>
-        )}
-      </div>
-      <div className="col copanel-people">
-        <h3>People from it<span>{c.others.length}</span></h3>
-        {c.others.length ? (
-          <ul className="ob-tray ob-people">{c.others.map((p, i) => (
-            <li key={p.id} style={{ "--i": i } as React.CSSProperties}>
-              <Link to={personHref(eventId, p.id, p.full_name)} go={go} className="ob-row ob-person">
-                <span className="ob-face"><PersonAvatar name={p.full_name ?? "Someone"} size={30} /></span>
-                <span className="ob-who"><b>{p.full_name ?? "Someone"}</b><span>{p.title ? co(p.title) : ""}</span></span>
-                <span className="ob-end"><span className="ob-when">{PERSON_STATE[p.state] ?? p.state}</span></span>
-              </Link>
-            </li>
-          ))}</ul>
-        ) : <p className="mute">Nobody kept</p>}
-      </div>
-    </article>
-  );
-}

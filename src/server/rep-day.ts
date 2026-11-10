@@ -100,7 +100,7 @@ const BRAND = `(SELECT c.website FROM catalog_events c WHERE c.id = e.catalog_id
 
 /** Everything the desk did with this person at this event, oldest first: added to a sequence, each send, the reply, the meeting and how it went. */
 const pathOf = (db: Db, contactId: string, eventId: string) => db.query<{ kind: string; channel: string | null; at: string }>(
-  `SELECT kind, channel, at::text AS at FROM touches WHERE contact_id = $1 AND event_id = $2 AND (kind IN ('sequence_add', 'send', 'meeting_booked', 'met_onsite', 'badge_scan') OR kind LIKE 'reply_%' OR kind LIKE 'meeting_%') ORDER BY at, kind LIMIT 40`, [contactId, eventId]);
+  `SELECT kind, channel, action, at::text AS at FROM touches WHERE contact_id = $1 AND event_id = $2 AND (kind IN ('sequence_add', 'send', 'accepted', 'meeting_booked', 'met_onsite', 'badge_scan') OR kind LIKE 'reply_%' OR kind LIKE 'meeting_%') ORDER BY at, kind LIMIT 40`, [contactId, eventId]);
 
 /** One reply as its own thing: who wrote it and what, where the thread lives, how long is left to answer, who they are, and what has happened since. */
 /** The account behind a reply, a meeting or a deal: its fit, size, owner and open deal, and the other people from it on this event,
@@ -127,8 +127,9 @@ export async function replyDetail(db: Db, replyId: string) {
   const [r] = await db.query<{ id: string; event_id: string; contact_id: string | null; handled_at: string | null }>(
     `SELECT m.id, m.event_id, e.name AS event, ${BRAND}, m.contact_id, k.full_name, k.title, co.name AS company, co.tier, co.tier_fact AS why,
             co.firmo->>'industry' AS industry, co.firmo->>'employees' AS employees, co.account_owner AS owner, nullif(concat_ws(', ', co.deal_name, co.deal_stage), '') AS deal,
-            m.code, m.body, m.channel, m.connector, m.thread_url, m.received_at::text AS received_at, m.respond_by::text AS respond_by, m.owner AS rep, m.handled_at::text AS handled_at
-     FROM inbound_messages m JOIN events e ON e.id = m.event_id LEFT JOIN contacts k ON k.id = m.contact_id LEFT JOIN companies co ON co.id = k.company_id
+            m.code, m.body, m.channel, m.connector, m.thread_url, m.received_at::text AS received_at, m.respond_by::text AS respond_by, m.owner AS rep, m.handled_at::text AS handled_at,
+            m.sequence_id, m.step, s.channel AS seq_channel, s.phase AS seq_phase, s.zone_group AS seq_zone
+     FROM inbound_messages m JOIN events e ON e.id = m.event_id LEFT JOIN contacts k ON k.id = m.contact_id LEFT JOIN companies co ON co.id = k.company_id LEFT JOIN sequences s ON s.id = m.sequence_id
      WHERE m.id = $1 AND m.signal = 'reply'`, [replyId]);
   if (!r) return null;
   const [meeting] = r.contact_id ? await db.query("SELECT id, status, scheduled_at::text AS scheduled_at, timezone, rep FROM meetings WHERE contact_id = $1 AND event_id = $2 ORDER BY scheduled_at DESC LIMIT 1", [r.contact_id, r.event_id]) : [];
@@ -166,4 +167,44 @@ export async function dealDetail(db: Db, eventId: string, opportunityId: string,
   const meeting = deal.meeting_id ? (await meetingDetail(db, deal.meeting_id)) as unknown as { id: string; scheduled_at: string; full_name: string | null; rep: string | null; status: string } | null : null;
   return { ...deal, ...crmNow, event_id: eventId, event: e?.name ?? "", website: e?.website ?? null, meeting: meeting ? { id: meeting.id, scheduled_at: meeting.scheduled_at, timezone: (meeting as { timezone?: string | null }).timezone ?? null, full_name: meeting.full_name, rep: meeting.rep, status: meeting.status } : null,
     account_info: await accountOf(db, eventId, { domain: deal.domain }) };
+}
+
+/** Meetings and replies for a set of people on one event: what the sheets list and link to. */
+async function touchpoints(db: Db, eventId: string, contactIds: string[]) {
+  if (!contactIds.length) return { meetings: [], replies: [] };
+  const meetings = await db.query(
+    `SELECT m.id, m.contact_id, k.full_name, m.status, m.scheduled_at::text AS scheduled_at, m.timezone, m.rep, m.source FROM meetings m LEFT JOIN contacts k ON k.id = m.contact_id
+     WHERE m.event_id = $1 AND m.contact_id = ANY($2) ORDER BY m.scheduled_at DESC`, [eventId, contactIds]);
+  const replies = await db.query(
+    `SELECT i.id, i.contact_id, k.full_name, i.code, i.body, i.received_at::text AS received_at, i.sequence_id, s.name AS sequence, s.channel, s.phase, i.step
+     FROM inbound_messages i LEFT JOIN contacts k ON k.id = i.contact_id LEFT JOIN sequences s ON s.id = i.sequence_id
+     WHERE i.contact_id = ANY($2) AND i.signal = 'reply' AND (i.event_id = $1 OR s.event_id = $1) ORDER BY i.received_at DESC LIMIT 50`, [eventId, contactIds]);
+  return { meetings, replies };
+}
+
+/** One person as their own record: who they are, why they are on the list, every meeting, reply and sequence, what was said at the booth, and their account. */
+export async function personDetail(db: Db, contactId: string) {
+  const [p] = await db.query<{ id: string; event_id: string; company_id: string | null }>(
+    `SELECT k.id, k.event_id, e.name AS event, ${BRAND}, k.full_name, k.title, k.email, k.linkedin, k.priority, k.title_tier, k.source, k.drop_reason, k.employer,
+            co.id AS company_id, co.name AS company, co.tier AS company_tier, co.primary_domain AS domain,
+            (SELECT pp.last_verified_at::text FROM people pp WHERE pp.id = k.person_id) AS last_verified_at,
+            (SELECT count(DISTINCT coalesce(ev.parent_event_id, ev.id))::int FROM contacts x JOIN events ev ON ev.id = x.event_id WHERE x.person_id = k.person_id) AS seen_at,
+            coalesce((SELECT array_agg(f.flag ORDER BY f.flag) FROM review_flags f WHERE f.contact_id = k.id), '{}') AS flags
+     FROM contacts k JOIN events e ON e.id = k.event_id LEFT JOIN companies co ON co.id = k.company_id WHERE k.id = $1`, [contactId]);
+  if (!p) return null;
+  const { meetings, replies } = await touchpoints(db, p.event_id, [contactId]);
+  const sequences = await db.query(
+    `SELECT s.id, s.name, s.channel, s.phase, s.zone_group, n.state, n.cause,
+            (SELECT count(*)::int FROM touches t WHERE t.contact_id = n.contact_id AND t.sequence_id = s.id AND t.kind = 'send') AS sent,
+            (SELECT max(t.step) FROM touches t WHERE t.contact_id = n.contact_id AND t.sequence_id = s.id AND t.kind = 'send') AS last_step,
+            EXISTS (SELECT 1 FROM touches t WHERE t.contact_id = n.contact_id AND t.sequence_id = s.id AND t.kind = 'accepted') AS accepted
+     FROM enrollments n JOIN sequences s ON s.id = n.sequence_id WHERE n.contact_id = $1 ORDER BY s.phase DESC, s.channel`, [contactId]);
+  const met = await db.query("SELECT id, rep, note, temperature, captured_at::text AS captured_at FROM onsite_captures WHERE contact_id = $1 ORDER BY captured_at DESC", [contactId]);
+  return { ...p, meetings, replies, sequences, met, path: await pathOf(db, contactId, p.event_id), account: await accountOf(db, p.event_id, { contactId }) };
+}
+
+/** A company's meetings and replies on an event, for its sheet: who at it met us and who wrote back. */
+export async function companyTouchpoints(db: Db, eventId: string, companyId: string) {
+  const ids = (await db.query<{ id: string }>("SELECT id FROM contacts WHERE event_id = $1 AND company_id = $2", [eventId, companyId])).map((r) => r.id);
+  return touchpoints(db, eventId, ids);
 }

@@ -10,9 +10,10 @@ import { EventLogo } from "./EventLogo";
 import { PersonAvatar } from "./PersonAvatar";
 import { useSheet } from "./SideSheet";
 import { companyHref, eventHref, personHref, To } from "./To";
+import { OptOut, PriorityGrid, whyPriority } from "./Person";
 
 export const TOOL_NAME: Record<string, string> = { instantly: "Instantly", heyreach: "HeyReach", smartlead: "Smartlead", apollo: "Apollo" };
-export const CODE_WORDS: Record<string, string> = { interested: "Interested", meeting_request: "Wants a meeting", referral: "Pointed us to someone", not_interested: "Not interested" };
+export const CODE_WORDS: Record<string, string> = { interested: "Interested", meeting_request: "Wants a meeting", referral: "Pointed us to someone", not_interested: "Not interested", not_now: "Not now", question: "Asked a question", out_of_office: "Out of office", unsubscribe: "Opted out", wrong_person: "Wrong person", departed: "Left the company", bounced: "Bounced", other: "Needs a person" };
 const STATUS: Record<string, string> = { proposed: "Proposed", booked: "Booked", rescheduled: "Moved", held: "Held", no_show: "No-show", cancelled: "Cancelled" };
 
 const dayKey = (d: Date) => d.toLocaleDateString("en-CA");
@@ -52,11 +53,16 @@ export function answerBy(iso: string): { text: string; soon: boolean } {
 }
 
 /** The current URL with one object open, or with none: the page underneath stays as it was. */
-export function objectHref(kind: "reply" | "meeting" | "deal" | "notes" | null, id?: string, fromSheet = false) {
+/** Every kind of object that opens as a sheet. A person and a company carry their event: `person=<contact id>`, `company=<event id>|<company id>`, `sequence=<event id>|<sequence id>`. */
+export const KINDS = ["reply", "meeting", "deal", "notes", "sequence", "person", "company"] as const;
+export type Kind = (typeof KINDS)[number];
+const clearKinds = (u: URL) => { for (const k of KINDS) u.searchParams.delete(k); u.searchParams.delete("trail"); };
+
+export function objectHref(kind: Kind | null, id?: string, fromSheet = false) {
   const u = new URL(location.href);
-  const here = (["reply", "meeting", "deal", "notes"] as const).find((k) => u.searchParams.get(k));
+  const here = KINDS.find((k) => u.searchParams.get(k));
   const trail = (u.searchParams.get("trail") ?? "").split(",").filter(Boolean);
-  u.searchParams.delete("reply"); u.searchParams.delete("meeting"); u.searchParams.delete("deal"); u.searchParams.delete("notes"); u.searchParams.delete("trail");
+  clearKinds(u);
   if (kind && id) {
     u.searchParams.set(kind, id);
     if (fromSheet && here) { const next = [...trail, `${here}:${u.searchParams.get(here) ?? new URLSearchParams(location.search).get(here)}`]; u.searchParams.set("trail", next.join(",")); }
@@ -72,21 +78,21 @@ function backHref(): { kind: string; to: string } | null {
   if (!last) return null;
   const [kind, ...rest] = last.split(":");
   const u = new URL(location.href);
-  u.searchParams.delete("reply"); u.searchParams.delete("meeting"); u.searchParams.delete("deal"); u.searchParams.delete("notes"); u.searchParams.delete("trail"); u.searchParams.delete("event");
+  clearKinds(u); u.searchParams.delete("event");
   u.searchParams.set(kind, rest.join(":"));
   if (trail.length) u.searchParams.set("trail", trail.join(","));
   return { kind, to: u.pathname + u.search + u.hash };
 }
-const KIND_WORD: Record<string, string> = { reply: "Reply", meeting: "Meeting", deal: "Deal", notes: "Notes", event: "Event" };
+const KIND_WORD: Record<string, string> = { reply: "Reply", meeting: "Meeting", deal: "Deal", notes: "Notes", event: "Event", sequence: "Sequence", person: "Person", company: "Company" };
 
 /** A reply, meeting or deal opened from an event's sheet: over the same page, with the event sheet as the way back. */
-export function fromEventSheet(kind: "reply" | "meeting" | "deal", id: string, eventId: string) {
+export function fromEventSheet(kind: Kind, id: string, eventId: string) {
   const u = new URL(location.href);
-  u.searchParams.delete("event"); u.searchParams.delete("reply"); u.searchParams.delete("meeting"); u.searchParams.delete("deal"); u.searchParams.delete("notes");
+  clearKinds(u); u.searchParams.delete("event");
   u.searchParams.set(kind, id); u.searchParams.set("trail", `event:${eventId}`);
   return u.pathname + u.search + u.hash;
 }
-export const openObject = () => { const s = new URLSearchParams(location.search); return { reply: s.get("reply"), meeting: s.get("meeting"), deal: s.get("deal"), notes: s.get("notes") }; };
+export const openObject = () => { const s = new URLSearchParams(location.search); return Object.fromEntries(KINDS.map((k) => [k, s.get(k)])) as Record<Kind, string | null>; };
 
 const Arrow = () => <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h9M8.5 4l4 4-4 4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>;
 const Out = () => <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3h7v7M13 3 4 12" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>;
@@ -169,6 +175,7 @@ interface Who { full_name: string | null; title?: string | null; company: string
 interface ReplyDetail extends Who {
   id: string; event_id: string; event: string; website: string | null; brand_color: string | null; contact_id: string | null;
   code: string | null; body: string | null; channel: string; connector: string; thread_url: string | null; received_at: string; respond_by: string | null; rep: string | null; handled_at: string | null;
+  sequence_id?: string | null; step?: number | null; seq_channel?: string | null; seq_phase?: string | null;
   meeting: { id: string; status: string; scheduled_at: string; rep: string | null } | null; path: Step[];
   account: Account | null;
 }
@@ -193,7 +200,11 @@ const dollars = (c: number) => `$${Math.round(c / 100).toLocaleString("en-US")}`
 const via = (c: string | null) => (c === "linkedin" ? "on LinkedIn" : c === "email" ? "by email" : "");
 function stepWords(s: Step) {
   if (s.kind === "sequence_add") return s.channel === "linkedin" ? "Added to the LinkedIn sequence" : s.channel === "email" ? "Added to the email sequence" : "Added to a sequence";
-  if (s.kind === "send") return s.channel === "linkedin" ? "Messaged on LinkedIn" : "Emailed";
+  if (s.kind === "send") return (s as { action?: string | null }).action === "invite" ? "Invited on LinkedIn" : s.channel === "linkedin" ? "Messaged on LinkedIn" : "Emailed";
+  if (s.kind === "accepted") return "Accepted on LinkedIn";
+  if (s.kind === "reply_bounced" || s.kind === "bounce") return "Email bounced";
+  if (s.kind === "reply_unsubscribe" || s.kind === "unsubscribe") return "Opted out";
+  if (s.kind === "reply_out_of_office") return "Out of office reply";
   if (s.kind.startsWith("reply_")) return `Replied: ${(CODE_WORDS[s.kind.slice(6)] ?? "replied").toLowerCase()}`;
   if (s.kind === "met_onsite" || s.kind === "badge_scan") return "Met at the event";
   if (s.kind.startsWith("meeting_")) return `Meeting ${(STATUS[s.kind.slice(8)] ?? s.kind.slice(8)).toLowerCase()}`;
@@ -236,7 +247,7 @@ function AccountBlock({ a, eventId, named = false }: { a: Account; eventId: stri
       {!named && (
         <div className="ob-account">
           <EventLogo name={co(a.name)} website={a.website ? `https://${a.website}` : null} size={40} />
-          <div><To to={companyHref(eventId, a.name)}><b>{co(a.name)}</b></To><span>{a.website}</span></div>
+          <div><Link to={objectHref("company", `${eventId}|${a.company_id}`, true)} go={go} className="to" data-opens-sheet=""><b>{co(a.name)}</b></Link><span>{a.website}</span></div>
         </div>
       )}
       <div className="md-figs rs-figs ob-figs ob-account-figs">
@@ -253,7 +264,7 @@ function AccountBlock({ a, eventId, named = false }: { a: Account; eventId: stri
       {a.others.length > 0 && (
         <ul className="ob-tray ob-people">{a.others.map((p, i) => (
           <li key={p.id} style={{ "--i": i } as CSSProperties}>
-            <Link to={personHref(eventId, p.id, p.full_name)} go={go} className="ob-row ob-person">
+            <Link to={objectHref("person", p.id, true)} go={go} className="ob-row ob-person" data-opens-sheet="">
               <span className="ob-face"><PersonAvatar name={p.full_name ?? "Someone"} size={30} /></span>
               <span className="ob-who"><b>{p.full_name ?? "Someone"}</b><span>{p.title ? co(p.title) : ""}</span></span>
               <span className="ob-end"><span className="ob-when">{STATE[p.state] ?? p.state}</span><span className="ob-go">Open<Arrow /></span></span>
@@ -269,14 +280,17 @@ function Shell({ label, close, event, children }: { label: string; close: () => 
   const ref = useSheet(close);
   const { go } = useActor();
   const back = backHref();
+  // Which kind of sheet this is, from the address: named in its own color above the heading, the one cue that tells a deal from a meeting from a person.
+  const kind = KINDS.find((k) => new URLSearchParams(location.search).get(k));
   return (
-    <aside className="sheet ob-sheet" ref={ref} role="dialog" aria-label={label}>
+    <aside className="sheet ob-sheet" ref={ref} role="dialog" aria-label={label} data-kind={kind}>
       <div className="sheet-top">
         {back && <button type="button" className="ob-back" onClick={() => go(back.to)} aria-label={`Back to the ${KIND_WORD[back.kind]?.toLowerCase() ?? "last sheet"}`}><Arrow /><span>{KIND_WORD[back.kind] ?? "Back"}</span></button>}
         {event && <To to={eventHref(event.id, "outreach")} className="ob-event"><EventLogo name={event.name} website={event.website} size={26} /><span>{event.name}</span></To>}
         <span className="spacer" />
         <button className="sheet-x" type="button" data-close aria-label="Close" onClick={close}>&times;</button>
       </div>
+      {kind && <p className="ob-kind">{KIND_WORD[kind]}</p>}
       {children}
     </aside>
   );
@@ -317,7 +331,7 @@ export function ReplySheet({ id, close, changed }: { id: string; close: () => vo
         <PersonAvatar name={name} size={56} />
         <div>
           <h2>{name}</h2>
-          <p>{r.title ? `${co(r.title)} at ` : ""}{r.company ? <To to={companyHref(r.event_id, r.company)}>{co(r.company)}</To> : null}</p>
+          <p>{r.title ? `${co(r.title)} at ` : ""}{r.company ? (r.account ? <Link to={objectHref("company", `${r.event_id}|${r.account.company_id}`, true)} go={go} className="to" data-opens-sheet="">{co(r.company)}</Link> : co(r.company)) : null}</p>
         </div>
       </header>
 
@@ -333,6 +347,11 @@ export function ReplySheet({ id, close, changed }: { id: string; close: () => vo
         {!r.handled_at && <button className="btn line" type="button" disabled={busy} onClick={() => act(() => send("POST", `/api/motion/replies/${r.id}/handled`, actor))}>Mark answered</button>}
       </div>
 
+      {r.sequence_id && (
+        <Link to={objectHref("sequence", `${r.event_id}|${r.sequence_id}`, true)} go={go} className="ob-link" data-opens-sheet="">
+          <span className="ob-link-k">From</span><span>{r.seq_channel === "linkedin" ? "LinkedIn" : "Email"}, {r.seq_phase === "post" ? "after the event" : "before the event"}{r.step ? `, step ${r.step}` : ""}</span><span className="ob-link-s">Sequence<Arrow /></span>
+        </Link>
+      )}
       {r.meeting ? (
         <Link to={objectHref("meeting", r.meeting.id, true)} go={go} className="ob-link" data-opens-sheet="">
           <span className="ob-link-k">Meeting</span><span>{meetStamp(r.meeting.scheduled_at, (r.meeting as { timezone?: string | null }).timezone)}{r.meeting.rep ? ` with ${r.meeting.rep.split(" ")[0]}` : ""}</span><span className="ob-link-s">{STATUS[r.meeting.status] ?? r.meeting.status}<Arrow /></span>
@@ -345,9 +364,9 @@ export function ReplySheet({ id, close, changed }: { id: string; close: () => vo
       )}
 
       <WhoFacts w={r} />
-      {r.account && <AccountBlock a={r.account} eventId={r.event_id} />}
+      {r.account && <AccountBlock a={r.account} eventId={r.event_id} named />}
       <Path steps={r.path} />
-      {r.contact_id && <To to={personHref(r.event_id, r.contact_id, r.full_name)} className="btn ob-record">Open {first}'s record <Arrow /></To>}
+      {r.contact_id && <Link to={objectHref("person", r.contact_id, true)} go={go} className="btn ob-record to" data-opens-sheet="">Open {first}'s record <Arrow /></Link>}
     </Shell>
   );
 }
@@ -370,7 +389,7 @@ export function MeetingSheet({ id, close, changed }: { id: string; close: () => 
         <span className="ob-day big"><b>{t.day}</b><span>{t.month}<br />{t.weekday}</span></span>
         <div>
           <h2>{t.time} with {name}</h2>
-          <p>{m.company ? <To to={companyHref(m.event_id, m.company)}>{co(m.company)}</To> : null}</p>
+          <p>{m.company ? (m.account ? <Link to={objectHref("company", `${m.event_id}|${m.account.company_id}`, true)} go={go} className="to" data-opens-sheet="">{co(m.company)}</Link> : co(m.company)) : null}</p>
         </div>
       </header>
 
@@ -404,9 +423,9 @@ export function MeetingSheet({ id, close, changed }: { id: string; close: () => 
         </section>
       )}
       {m.brief && <WhoFacts w={{ ...m.brief, full_name: m.full_name }} met={m.brief.met_note} />}
-      {m.account && <AccountBlock a={m.account} eventId={m.event_id} />}
+      {m.account && <AccountBlock a={m.account} eventId={m.event_id} named />}
       <Path steps={m.path} />
-      {m.contact_id && <To to={personHref(m.event_id, m.contact_id, m.full_name)} className="btn ob-record">Open {first}'s record <Arrow /></To>}
+      {m.contact_id && <Link to={objectHref("person", m.contact_id, true)} go={go} className="btn ob-record to" data-opens-sheet="">Open {first}'s record <Arrow /></Link>}
     </Shell>
   );
 }
@@ -414,8 +433,11 @@ export function MeetingSheet({ id, close, changed }: { id: string; close: () => 
 /** Whichever object the URL names, over the page. */
 export function ObjectSheets({ changed }: { changed?: () => void }) {
   const { go } = useActor();
-  const { reply, meeting, deal, notes } = openObject();
+  const { reply, meeting, deal, notes, person, company, sequence } = openObject();
   const close = () => go(objectHref(null));
+  if (sequence) return <SequenceSheet id={sequence} close={close} changed={changed} />;
+  if (person) return <PersonSheet id={person} close={close} changed={changed} />;
+  if (company) return <CompanySheet id={company} close={close} />;
   if (notes) return <NotesSheet id={notes} close={close} changed={changed} />;
   if (reply) return <ReplySheet id={reply} close={close} changed={changed} />;
   if (meeting) return <MeetingSheet id={meeting} close={close} changed={changed} />;
@@ -542,3 +564,280 @@ function NotesSheet({ id, close, changed }: { id: string; close: () => void; cha
   );
 }
 const shortDateOf = (ymd: string) => new Date(`${ymd}T12:00:00Z`).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+
+/* ---------------------------------------------------- person, company, sequence */
+
+interface MeetingLite { id: string; contact_id: string | null; full_name: string | null; status: string; scheduled_at: string; timezone: string | null; rep: string | null; source: string | null }
+interface ReplyLite { id: string; contact_id: string | null; full_name: string | null; code: string | null; body: string | null; received_at: string; sequence_id: string | null; sequence: string | null; channel: string | null; phase: string | null; step: number | null }
+const PHASE = (p: string | null) => (p === "post" ? "After the event" : "Before the event");
+const CHANNEL = (c: string | null) => (c === "linkedin" ? "LinkedIn" : "Email");
+const REGION_WORD: Record<string, string> = { americas: "Americas", emea: "EMEA", apac: "APAC", event: "Event's region" };
+
+/** Meetings as links to their sheets: when, where it is, with whom, and how it went. `who` names the person when the list spans several. */
+function MeetingLinks({ rows, who = false }: { rows: MeetingLite[]; who?: boolean }) {
+  const { go } = useActor();
+  if (!rows.length) return null;
+  return (
+    <section className="ob-sec">
+      <h3>Meetings<span>{rows.length}</span></h3>
+      {rows.map((m) => (
+        <Link key={m.id} to={objectHref("meeting", m.id, true)} go={go} className="ob-link" data-opens-sheet="">
+          <span className="ob-link-k">{m.source === "onsite" ? "At the booth" : "Booked"}</span>
+          <span>{meetStamp(m.scheduled_at, m.timezone)}{who && m.full_name ? ` · ${m.full_name}` : ""}{m.rep ? ` · with ${m.rep.split(" ")[0]}` : ""}</span>
+          <span className="ob-link-s">{STATUS[m.status] ?? m.status}<Arrow /></span>
+        </Link>
+      ))}
+    </section>
+  );
+}
+
+/** Replies as quotes that open their sheets, each saying which sequence and step drew it when the desk knows. */
+function ReplyLinks({ rows, who = false }: { rows: ReplyLite[]; who?: boolean }) {
+  const { go } = useActor();
+  if (!rows.length) return null;
+  return (
+    <section className="ob-sec">
+      <h3>Replies<span>{rows.length}</span></h3>
+      {rows.map((r) => (
+        <Link key={r.id} to={objectHref("reply", r.id, true)} go={go} className="ob-link ob-quote" data-opens-sheet="">
+          <span className="ob-qmark" aria-hidden="true">&ldquo;</span>
+          <span className="ob-said">{r.body ?? CODE_WORDS[r.code ?? ""] ?? "Replied"}
+            <i className="ob-from">{[who ? r.full_name : null, CODE_WORDS[r.code ?? ""] ?? null, r.sequence_id ? `${CHANNEL(r.channel)}, ${PHASE(r.phase).toLowerCase()}${r.step ? `, step ${r.step}` : ""}` : null].filter(Boolean).join(" · ")}</i>
+          </span>
+          <span className="ob-link-s">Open<Arrow /></span>
+        </Link>
+      ))}
+    </section>
+  );
+}
+
+interface PersonDetail {
+  id: string; event_id: string; event: string; website: string | null; full_name: string | null; title: string | null; email: string | null; linkedin: string | null;
+  priority: "A" | "B" | "C" | null; title_tier: 1 | 2 | 3 | null; source: "attendee" | "prospect"; drop_reason: string | null; employer: string | null;
+  company_id: string | null; company: string | null; company_tier: 1 | 2 | 3 | null; domain: string | null; last_verified_at: string | null; seen_at: number; flags: string[];
+  meetings: MeetingLite[]; replies: ReplyLite[]; path: Step[]; account: Account | null;
+  sequences: { id: string; name: string; channel: string; phase: string; zone_group: string | null; state: string; cause: string | null; sent: number; last_step: number | null; accepted: boolean }[];
+  met: { id: string; rep: string; note: string; temperature: string; captured_at: string }[];
+}
+const ENROLL: Record<string, string> = { adding: "Being added", enrolled: "In it", paused: "Paused", removed: "Taken out" };
+
+/** A person as their own record: why they are on the list, everything that happened with them at this event, and their account. */
+export function PersonSheet({ id, close, changed }: { id: string; close: () => void; changed?: () => void }) {
+  const { go } = useActor();
+  const [p, setP] = useState<PersonDetail | null | "missing">(null);
+  const load = () => get<PersonDetail>(`/api/people/${id}`).then((x) => setP(x ?? "missing"));
+  useEffect(() => { setP(null); load(); }, [id]);
+  if (p === "missing") return <Shell label="Person" close={close}><p className="mute">That person is not on the list.</p></Shell>;
+  if (!p) return <Shell label="Person" close={close} />;
+  const name = p.full_name ?? "Someone", booth = p.met[0];
+  return (
+    <Shell label={name} close={close} event={{ id: p.event_id, name: p.event, website: p.website }}>
+      <header className="ob-head">
+        <PersonAvatar name={name} size={56} />
+        <div>
+          <h2>{name}</h2>
+          <p><span className={`psrc ${p.source === "prospect" ? "prospect" : "attendee"}`}>{p.source === "prospect" ? "Prospect" : "Attendee"}</span>{p.title ? `${co(p.title)} at ` : ""}{p.company_id ? <Link to={objectHref("company", `${p.event_id}|${p.company_id}`, true)} go={go} className="to" data-opens-sheet="">{co(p.company ?? "")}</Link> : p.company ? co(p.company) : null}</p>
+        </div>
+      </header>
+      <div className="ob-priority">
+        <PriorityGrid company={p.company_tier} title={p.title_tier} />
+        <div><b>{p.priority ? `Priority ${p.priority}` : booth ? "Met at the booth" : "No priority"}</b><span>{p.priority || !booth ? whyPriority(p) : "Added by a rep, not ranked"}</span></div>
+      </div>
+      {p.met.length > 0 && (
+        <section className="ob-sec">
+          <h3>At the booth</h3>
+          {p.met.map((m) => <article key={m.id} className="ob-note"><p>{m.note || "No note"}</p><span>{m.rep.split(" ")[0]} · {new Date(m.captured_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</span></article>)}
+        </section>
+      )}
+      <MeetingLinks rows={p.meetings} />
+      <ReplyLinks rows={p.replies} />
+      {p.sequences.length > 0 && (
+        <section className="ob-sec">
+          <h3>Sequences<span>{p.sequences.length}</span></h3>
+          {p.sequences.map((s) => (
+            <Link key={s.id} to={objectHref("sequence", `${p.event_id}|${s.id}`, true)} go={go} className="ob-link" data-opens-sheet="">
+              <span className="ob-link-k">{CHANNEL(s.channel)}</span>
+              <span>{PHASE(s.phase)}{s.zone_group ? ` · ${REGION_WORD[s.zone_group] ?? s.zone_group}` : ""}</span>
+              <span className="ob-link-s">{s.accepted ? "Accepted" : s.last_step ? `Step ${s.last_step}` : s.sent ? `${s.sent} sent` : ENROLL[s.state] ?? s.state}<Arrow /></span>
+            </Link>
+          ))}
+        </section>
+      )}
+      <Path steps={p.path} />
+      <section className="ob-sec">
+        <h3>Contact</h3>
+        <dl className="sheet-facts">
+          <div><dt>Email</dt><dd className="wrap-any">{p.email ?? "None"}</dd></div>
+          {p.last_verified_at && <div><dt>Verified</dt><dd>{new Date(p.last_verified_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</dd></div>}
+          {p.linkedin && <div><dt>LinkedIn</dt><dd><a className="to wrap-any" href={p.linkedin} target="_blank" rel="noopener noreferrer">{p.linkedin.replace(/^https?:\/\/(www\.)?linkedin\.com\/in\//, "")}</a></dd></div>}
+          {p.employer && p.employer !== p.company && <div><dt>Vendor lists</dt><dd>{co(p.employer)}</dd></div>}
+          {p.seen_at > 1 && <div><dt>Events</dt><dd>{p.seen_at}</dd></div>}
+        </dl>
+      </section>
+      {p.account && <AccountBlock a={p.account} eventId={p.event_id} named />}
+      {!p.drop_reason && <div className="ob-acts"><OptOut c={{ full_name: p.full_name, email: p.email, company: p.company }} onDone={() => { load(); changed?.(); }} /></div>}
+    </Shell>
+  );
+}
+
+interface CompanyDetail extends Account { tier_fact: string | null; country: string | null; meetings: MeetingLite[]; replies: ReplyLite[]; event: { name: string; website: string | null } | null;
+  deals: { opportunity_id: string; name: string | null; amount_cents: number; stage: string | null; kind: string; won: boolean }[] }
+
+/** A company on an event: its fit, who owns it, who from it is on the list, and who met us or wrote back. */
+export function CompanySheet({ id, close }: { id: string; close: () => void }) {
+  const { go } = useActor();
+  const [eventId, cid] = id.split("|");
+  const [c, setC] = useState<CompanyDetail | null | "missing">(null);
+  useEffect(() => { setC(null); get<CompanyDetail>(`/api/events/${eventId}/companies/${cid}`).then((x) => setC(x ?? "missing")); }, [id]);
+  if (c === "missing") return <Shell label="Company" close={close}><p className="mute">That company is not on this event.</p></Shell>;
+  if (!c) return <Shell label="Company" close={close} />;
+  return (
+    <Shell label={co(c.name)} close={close} event={c.event ? { id: eventId, name: c.event.name, website: c.event.website } : undefined}>
+      <header className="ob-head">
+        <EventLogo name={co(c.name)} website={c.website ? `https://${c.website}` : null} size={56} />
+        <div><h2>{co(c.name)}</h2>{c.website && <p>{c.website}</p>}</div>
+      </header>
+      <div className="md-figs rs-figs ob-figs">
+        <p><b>{c.tier ? `Tier ${c.tier}` : "No tier"}</b><span>fit</span></p>
+        {c.employees && <p><b>{Number(c.employees).toLocaleString("en-US")}</b><span>people</span></p>}
+        {c.industry && <p><b>{c.industry}</b><span>industry</span></p>}
+      </div>
+      {c.tier_fact && !/^employees:/i.test(c.tier_fact) && <p className="ob-why">{c.tier_fact}</p>}
+      {c.deals.length > 0 && (
+        <section className="ob-sec">
+          <h3>Deals<span>{c.deals.length}</span></h3>
+          {c.deals.map((d) => (
+            <Link key={d.opportunity_id} to={objectHref("deal", `${eventId}|${d.opportunity_id}`, true)} go={go} className="ob-link" data-opens-sheet="">
+              <span className="ob-link-k">{d.won ? "Won" : d.kind === "sourced" ? "New pipeline" : "Moved forward"}</span><span>{dealDisplayName(d.name, c.name) ?? co(c.name)}{d.stage ? ` · ${d.stage}` : ""}</span><span className="ob-link-s">{dollars(d.amount_cents)}<Arrow /></span>
+            </Link>
+          ))}
+        </section>
+      )}
+      {(c.owner || c.deal || c.country) && (
+        <dl className="sheet-facts">
+          {c.owner && <div><dt>Owner</dt><dd>{c.owner}</dd></div>}
+          {c.deal && !c.deals.length && <div><dt>Open deal</dt><dd>{dealDisplayName(c.deal, c.name)}</dd></div>}
+          {c.country && <div><dt>Country</dt><dd>{c.country}</dd></div>}
+        </dl>
+      )}
+      <MeetingLinks rows={c.meetings} who />
+      <ReplyLinks rows={c.replies} who />
+      {c.others.length > 0 && (
+        <section className="ob-sec">
+          <h3>On the list<span>{c.others.length}</span></h3>
+          <ul className="ob-tray ob-people">{c.others.map((p, i) => (
+            <li key={p.id} style={{ "--i": i } as CSSProperties}>
+              <Link to={objectHref("person", p.id, true)} go={go} className="ob-row ob-person" data-opens-sheet="">
+                <span className="ob-face"><PersonAvatar name={p.full_name ?? "Someone"} size={30} /></span>
+                <span className="ob-who"><b>{p.full_name ?? "Someone"}</b><span>{p.title ? co(p.title) : ""}</span></span>
+                <span className="ob-end"><span className="ob-when">{STATE[p.state] ?? p.state}</span><span className="ob-go">Open<Arrow /></span></span>
+              </Link>
+            </li>
+          ))}</ul>
+        </section>
+      )}
+    </Shell>
+  );
+}
+
+interface SequenceDetailData {
+  id: string; name: string; channel: "email" | "linkedin"; phase: "pre" | "post"; zone_group: string | null; connector: string; state: string; launched_at: string | null;
+  people: number; reached: number | null; replied: number | null; meetings: number; invites: number | null; accepted: number | null; messages_sent: number | null;
+  event: { name: string; website: string | null; starts_on: string | null; last_day: string | null };
+  who: { state: string; cause: string | null; n: number }[];
+  steps: { step: number; sent: number; invites: number; replied: number; bounced: number; unsubscribed: number }[] | null;
+  replies: { id: string; code: string | null; body: string | null; received_at: string; full_name: string | null; company: string | null; contact_id: string | null; step: number | null }[];
+  people_in: { contact_id: string; full_name: string | null; company: string | null; state: string; cause: string | null; last_step: number | null; sent: number; accepted: boolean }[];
+  checklist_by?: string | null;
+  senders: { sender: string; sends: number; bounces: number | null }[] | null;
+  days: { day: string; n: number }[] | null;
+  unplaced: { sends: number; replies: number };
+}
+const SEQ_STATE: Record<string, string> = { active: "Live", paused: "Paused", archived: "Ended", draft: "Draft" };
+const TOOL: Record<string, string> = { instantly: "Instantly", heyreach: "HeyReach", smartlead: "Smartlead", apollo: "Apollo", gong: "Gong" };
+const CAUSE: Record<string, string> = { unsubscribe: "opted out", inbound: "replied", meeting: "a meeting was booked", met_onsite: "met at the event", owner: "kept by the owner", mine: "kept by the owner", bounced: "the email bounced", departed: "left the company", wrong_person: "wrong person", dropped_in_review: "dropped in review", event_started: "the event opened", event_closed: "the follow-up ended", colleague_replied: "a colleague replied", waiting_for_rep: "waiting on a rep" };
+
+/** One sequence: what it did, step by step, and with whom. Opened from its row on the Outreach tab or from a person. */
+export function SequenceSheet({ id, close }: { id: string; close: () => void; changed?: () => void }) {
+  const { go } = useActor();
+  const [eventId, sid] = id.split("|");
+  const [s, setS] = useState<SequenceDetailData | null | "missing">(null);
+  useEffect(() => { setS(null); get<SequenceDetailData>(`/api/events/${eventId}/sequences/${sid}`).then((x) => setS(x ?? "missing")); }, [id]);
+  if (s === "missing") return <Shell label="Sequence" close={close}><p className="mute">That sequence is not on this event.</p></Shell>;
+  if (!s) return <Shell label="Sequence" close={close} />;
+  const tool = TOOL[s.connector] ?? s.connector;
+  const fig = (v: number | null, label: string) => <p className={v === null ? "nr" : undefined}><b>{v === null ? "None" : v.toLocaleString("en-US")}</b><span>{v === null ? `${label}, not reported` : label}</span></p>;
+  const topStep = Math.max(1, ...(s.steps ?? []).map((x) => x.sent));
+  const topDay = Math.max(1, ...(s.days ?? []).map((x) => x.n));
+  const allDays = (() => {
+    if (!s.days?.length) return [];
+    const have = new Map(s.days.map((d) => [d.day, d.n])), out: { day: string; n: number }[] = [];
+    for (let t = Date.parse(`${s.days[0].day}T12:00:00Z`), end = Date.parse(`${s.days[s.days.length - 1].day}T12:00:00Z`); t <= end; t += 86_400_000) { const d = new Date(t).toISOString().slice(0, 10); out.push({ day: d, n: have.get(d) ?? 0 }); }
+    return out;
+  })();
+  const removed = s.who.filter((w) => w.state === "removed");
+  return (
+    <Shell label={`${CHANNEL(s.channel)} sequence`} close={close} event={{ id: eventId, name: s.event.name, website: s.event.website }}>
+      <header className="ob-head ob-head-plain">
+        <div><h2>{CHANNEL(s.channel)}{s.zone_group ? `, ${REGION_WORD[s.zone_group] ?? s.zone_group}` : ""}</h2><p>{PHASE(s.phase)} · {tool} · {SEQ_STATE[s.state] ?? s.state}{s.launched_at ? ` · started ${new Date(s.launched_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}${s.checklist_by ? ` by ${s.checklist_by.split(" ")[0]}` : ""}` : ""}</p></div>
+      </header>
+      <p className="sq-name" title={`Its name in ${tool}`}>{s.name}</p>
+      <div className="md-figs rs-figs ob-figs">
+        <p><b>{s.people.toLocaleString("en-US")}</b><span>added</span></p>
+        {s.channel === "linkedin" && s.invites !== null ? fig(s.invites, "invited") : fig(s.reached, "reached")}
+        {s.channel === "linkedin" && s.accepted !== null && fig(s.accepted, "accepted")}
+        {fig(s.replied, "replied")}
+        <p><b>{s.meetings}</b><span>{s.meetings === 1 ? "meeting" : "meetings"}</span></p>
+      </div>
+      {s.steps ? (
+        <section className="ob-sec">
+          <h3>By step</h3>
+          <ol className="sq-steps">{s.steps.map((x) => (
+            <li key={x.step}>
+              <span className="sq-step-k">Step {x.step}</span>
+              <span className="sq-step-bar" aria-hidden="true"><u style={{ width: `${Math.max(2, (x.sent / topStep) * 100)}%` }} /></span>
+              <span className="sq-step-n"><b>{x.sent}</b> sent</span>
+              <span className="sq-step-out">{[x.replied ? `${x.replied} replied` : null, x.bounced ? `${x.bounced} bounced` : null, x.unsubscribed ? `${x.unsubscribed} opted out` : null].filter(Boolean).join(" · ") || "No answer yet"}</span>
+            </li>
+          ))}</ol>
+        </section>
+      ) : s.messages_sent !== null && <p className="ob-why">{tool} does not say which step each message was.</p>}
+      {s.days && s.days.length > 0 && (
+        <section className="ob-sec">
+          <h3>Sent by day<span>{s.messages_sent}</span><i className="sq-days-max">busiest day {topDay}</i></h3>
+          <div className="sq-days" role="img" aria-label={`Sends per day, ${s.days[0].day} to ${s.days[s.days.length - 1].day}, busiest day ${topDay}`}>
+            {allDays.map((d) => <span key={d.day} className={s.event.starts_on && d.day >= s.event.starts_on && (!s.event.last_day || d.day <= s.event.last_day) ? "at" : undefined} style={{ "--h": d.n / topDay } as CSSProperties} title={`${d.day}: ${d.n}`} />)}
+          </div>
+          <p className="sq-days-k"><span>{new Date(`${s.days[0].day}T12:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</span><span>{new Date(`${s.days[s.days.length - 1].day}T12:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</span></p>
+        </section>
+      )}
+      <ReplyLinks rows={s.replies.map((r) => ({ ...r, sequence_id: s.id, sequence: null, channel: s.channel, phase: s.phase }))} who />
+      {s.people_in.length > 0 && (
+        <section className="ob-sec">
+          <h3>People<span>{s.people_in.length}</span></h3>
+          <ul className="ob-tray ob-people">{s.people_in.slice(0, 60).map((x, i) => (
+            <li key={x.contact_id} style={{ "--i": i } as CSSProperties}>
+              <Link to={objectHref("person", x.contact_id, true)} go={go} className="ob-row ob-person" data-opens-sheet="">
+                <span className="ob-face"><PersonAvatar name={x.full_name ?? "Someone"} size={30} /></span>
+                <span className="ob-who"><b>{x.full_name ?? "Someone"}</b><span>{x.company ? co(x.company) : ""}</span></span>
+                <span className="ob-end"><span className="ob-when">{x.state === "removed" ? (CAUSE[x.cause ?? ""] ? CAUSE[x.cause ?? ""][0].toUpperCase() + CAUSE[x.cause ?? ""].slice(1) : "Taken out") : x.accepted ? "Accepted" : x.last_step ? `Step ${x.last_step}` : x.sent ? "Sent" : ENROLL[x.state] ?? x.state}</span><span className="ob-go">Open<Arrow /></span></span>
+              </Link>
+            </li>
+          ))}</ul>
+        </section>
+      )}
+      {s.senders && s.senders.length > 0 && (
+        <section className="ob-sec">
+          <h3>{s.channel === "linkedin" ? "Accounts" : "Inboxes"}<span>{s.senders.length}</span></h3>
+          <ul className="sq-senders">{s.senders.map((x) => <li key={x.sender}><span className="wrap-any">{x.sender.replace(/^https:\/\/www\.linkedin\.com\/in\//, "")}</span><span><b>{x.sends}</b> sent{x.bounces ? ` · ${x.bounces} bounced` : ""}</span></li>)}</ul>
+        </section>
+      )}
+      {removed.length > 0 && (
+        <section className="ob-sec">
+          <h3>Taken out<span>{removed.reduce((n, w) => n + w.n, 0)}</span></h3>
+          <dl className="sheet-facts">{removed.map((w) => <div key={w.cause ?? "none"}><dt>{CAUSE[w.cause ?? ""] ? CAUSE[w.cause ?? ""][0].toUpperCase() + CAUSE[w.cause ?? ""].slice(1) : "Other"}</dt><dd>{w.n}</dd></div>)}</dl>
+        </section>
+      )}
+    </Shell>
+  );
+}

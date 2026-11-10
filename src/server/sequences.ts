@@ -1,5 +1,6 @@
 /* Sequences on any tool (docs/LIFECYCLE.md, section 5). The desk owns the rules and a Connector is a plug. Every call to a tool is driven from a row written first, so a crash at any step replays to the same result. */
 
+import { sequenceName } from "../shared/sequence-name.ts";
 import { BOUNCE_MIN_SENDS, BOUNCE_PAUSE_RATE, DEFAULT_LATE_STAGES, MINUTE, REGATE_AFTER_MINUTES } from "../shared/policy.ts";
 import { createHash } from "node:crypto";
 import type { Db } from "./db.ts";
@@ -84,7 +85,7 @@ async function ensureSequence(db: Db, deps: LifecycleDeps, eventId: string, even
     if (!tpl) throw new RuleError(`Approve a ${phase === "pre" ? "pre-event" : "post-event"} ${channel} template in Settings first.`);
     const id = newId("seq");
     [row] = await db.query<SeqRow>("INSERT INTO sequences (id, event_id, connector, channel, priority, phase, zone_group, template_id, name) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) ON CONFLICT (event_id, channel, priority, phase, zone_group) DO UPDATE SET name = sequences.name RETURNING *",
-      [id, eventId, tool, channel, priority, phase, zone, tpl.id, `${eventName} ${priority.replace(/_/g, " ")} ${channel} ${phase === "pre" ? "pre-event" : "post-event"}${zone === "event" ? "" : ` ${zone}`} ${id.slice(-6)}`]);
+      [id, eventId, tool, channel, priority, phase, zone, tpl.id, sequenceName({ event: eventName, startsOn: (await db.query<{ s: string }>("SELECT starts_on::text AS s FROM events WHERE id = $1", [eventId]))[0]?.s ?? "", phase, channel, audience: priority, region: zone, id })]);
   }
   // A tool that cannot make campaigns waits for a person to give this sequence one of its own.
   if (!row.external_id && c.capabilities.createsSequences) {

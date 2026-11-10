@@ -2340,3 +2340,74 @@ section.more[aria-label="More"] { max-width: none; }
 .mt-col .ob-tray li { display: block; min-height: 0; border-top: 0; }
 .mt-only h4 { align-items: center; }
 .mt-only h4 .btn { margin-left: auto; }
+/* Replies fold: what they said, as a filter above the replies. */
+.rp-codes { flex-wrap: wrap; margin-bottom: 10px; width: max-content; max-width: 100%; }
+.rp-codes button span { margin-left: 6px; color: var(--mute); font-variant-numeric: tabular-nums; }
+/* Which sheet this is: each kind has one quiet color, worn as a hairline on the sheet's top edge and as its name above the heading.
+   Muted hues from the Desk's own range: green for meetings, blue for what a prospect said, warmer ones for deals and sequences. */
+.ob-sheet[data-kind] { --kind: var(--ink); box-shadow: inset 0 3px 0 color-mix(in srgb, var(--kind) 70%, transparent), -1px 0 0 var(--line), -24px 0 48px rgba(21, 35, 27, 0.08); }
+.ob-sheet[data-kind="meeting"] { --kind: #1F5D3F; }
+.ob-sheet[data-kind="reply"] { --kind: #2C5A8C; }
+.ob-sheet[data-kind="deal"] { --kind: #94640F; }
+.ob-sheet[data-kind="notes"] { --kind: #74508A; }
+.ob-sheet[data-kind="person"] { --kind: #2B7672; }
+.ob-sheet[data-kind="company"] { --kind: #4E5A66; }
+.ob-sheet[data-kind="sequence"] { --kind: #8A5A2E; }
+.ob-kind { display: inline-flex; align-items: center; gap: 8px; margin: -6px 0 -10px; font: 600 12px/16px var(--sans); letter-spacing: 0.02em; color: var(--kind); animation: rise 280ms var(--ease) backwards; }
+.ob-kind::before { content: ""; width: 14px; height: 3px; border-radius: 2px; background: var(--kind); }
+
+/* Person sheet: why they are on the list, beside the grid that decides it. */
+.ob-priority { display: flex; align-items: center; gap: 18px; padding: 14px 16px; border-radius: 12px; background: var(--well); }
+.ob-priority > div:last-child { display: grid; gap: 2px; }
+.ob-priority b { font: 500 18px/24px var(--display); color: var(--ink); }
+.ob-priority span { font-size: 13px; line-height: 18px; color: var(--mute); }
+.ob-note { display: grid; gap: 4px; padding: 12px 14px; border-radius: 10px; background: var(--well); }
+.ob-note p { margin: 0; font: 400 15px/22px var(--display); color: var(--ink); }
+.ob-note span { font-size: 12px; color: var(--mute); }
+.ob-from { display: block; margin-top: 4px; font-style: normal; font-size: 12px; line-height: 16px; color: var(--mute); }
+.ob-why { margin: 0; font-size: 13px; line-height: 19px; color: var(--mute); }
+.ob-head-plain { grid-template-columns: minmax(0, 1fr); }
+.md-figs .nr b { color: var(--line-2); }
+
+/* Sequence sheet: the steps as a ladder, and sends by day with the event's own days marked. */
+.sq-steps { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+.sq-steps li { display: grid; grid-template-columns: 64px minmax(0, 1fr) 64px; grid-template-areas: "k bar n" "k out out"; column-gap: 12px; row-gap: 2px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+.sq-step-k { grid-area: k; font-size: 13px; font-weight: 500; color: var(--ink); align-self: start; padding-top: 1px; }
+.sq-step-bar { grid-area: bar; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.sq-step-bar u { display: block; height: 100%; border-radius: 3px; background: var(--kind, var(--green)); animation: draw 600ms var(--ease) backwards; }
+.sq-step-n { grid-area: n; justify-self: end; font-size: 12px; color: var(--mute); } .sq-step-n b { font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums; }
+.sq-step-out { grid-area: out; font-size: 12px; line-height: 16px; color: var(--mute); }
+.sq-days { display: flex; align-items: flex-end; gap: 2px; height: 56px; padding-top: 4px; }
+.sq-days span { flex: 1 1 0; min-width: 2px; height: calc(var(--h) * 100%); min-height: 2px; border-radius: 2px 2px 0 0; background: color-mix(in srgb, var(--kind, var(--green)) 55%, transparent); }
+.sq-days span.at { background: var(--kind, var(--green)); }
+.sq-days-k { display: flex; justify-content: space-between; margin: 4px 0 0; font-size: 12px; color: var(--mute); }
+
+/* Outreach: the sequences before and after the event, one row each, figures on one right edge. */
+.sq-lanes { display: grid; gap: 20px; }
+.sq-lane h4 { display: flex; align-items: baseline; gap: 8px; margin: 0 0 6px; font: 500 14px/20px var(--sans); color: var(--mute); }
+.sq-lane h4 span { font-family: var(--display); color: var(--ink); }
+.sq-row { grid-template-columns: minmax(0, 1fr) repeat(3, 76px) auto; }
+.sq-fig { display: grid; gap: 1px; justify-items: end; text-align: right; }
+.sq-fig b { font: 500 15px/20px var(--sans); color: var(--ink); font-variant-numeric: tabular-nums; }
+.sq-fig span { font-size: 12px; line-height: 16px; color: var(--mute); }
+@media (max-width: 760px) {
+  .sq-row { grid-template-columns: minmax(0, 1fr) repeat(3, auto); column-gap: 14px; }
+  .sq-row .ob-go { display: none; }
+}
+/* A section's count sits beside its title, a step apart, in the page's own count style. */
+.ob-sec h3 span { margin-left: 8px; font-family: var(--display); font-weight: 500; color: var(--mute); }
+.sq-senders { display: grid; margin: 0; padding: 0; list-style: none; }
+.sq-senders li { display: flex; justify-content: space-between; gap: 16px; padding: 10px 0; border-top: 1px solid var(--line); font-size: 14px; color: var(--ink); }
+.sq-senders li span:last-child { flex: none; color: var(--mute); font-size: 13px; } .sq-senders b { font-weight: 500; color: var(--ink); }
+.ob-sheet[data-kind="event"] { --kind: #3D4A42; }
+.sq-days-max { margin-left: auto; font-style: normal; font-size: 12px; font-weight: 400; font-family: var(--sans); color: var(--mute); }
+.ob-sec h3:has(.sq-days-max) { display: flex; align-items: baseline; }
+/* Phone: a sheet's way back and its close are full tap targets; the event's tabs too; a long row title wraps rather than cut. */
+@media (pointer: coarse), (max-width: 760px) {
+  .ob-back { min-height: 44px; }
+  .sheet-x { min-width: 44px; min-height: 44px; }
+  .seg.views button { min-height: 44px; }
+  .m-started .ob-who b { white-space: normal; }
+}
+.sq-empty { margin: 0; padding: 14px 16px; border-radius: 12px; background: var(--well); font-size: 14px; color: var(--mute); }
+.sq-name { margin: -8px 0 0; font: 400 12px/18px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--mute); user-select: all; overflow-wrap: anywhere; }

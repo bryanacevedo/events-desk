@@ -38,7 +38,7 @@ export function whyPriority(c: Pick<PersonRow, "company" | "company_tier" | "tit
 }
 
 /** The quiet "Opt out" on the panel, its confirmation, and the call. `onDone` tells the list the person is now dropped. */
-function OptOut({ c, onDone }: { c: PersonRow; onDone: () => void }) {
+export function OptOut({ c, onDone }: { c: Pick<PersonRow, "full_name" | "email" | "company">; onDone: () => void }) {
   const { actor } = useActor();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);

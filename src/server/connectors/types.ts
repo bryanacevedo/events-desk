@@ -8,6 +8,8 @@ import type { TemplateStep } from "../../shared/template-check.ts";
 export type SequenceState = "draft" | "active" | "paused" | "archived";
 
 export interface Capabilities {
+  /** The signals this tool's webhooks and polls deliver. A figure built on one it does not report reads "not reported", never 0. */
+  reports: EventSignal[];
   /** False: the tool cannot make a sequence through its API, so the template carries the id of one a person made. */
   createsSequences: boolean;
   /** "remove-only": the tool cannot pause one person. The desk removes them and adds them back, and records why. */
@@ -32,7 +34,8 @@ export interface SendSettings { timezone: string; from: string; to: string; days
 export interface PersonForTool { ref: string; email: string | null; linkedin: string | null; first_name: string; last_name: string; company: string; title: string | null; crm_id: string | null }
 export interface AddContact extends PersonForTool { external_id: string }
 export interface AddResult { ref: string; ok: boolean; external_id?: string; reason?: string; retry_after_minutes?: number }
-export type EventSignal = "send" | "reply" | "bounce" | "unsubscribe";
+/** `invite` is a LinkedIn connection request sent, `accepted` one accepted (docs/SEQUENCES-VIEW.md §2). */
+export type EventSignal = "send" | "invite" | "accepted" | "reply" | "bounce" | "unsubscribe";
 export interface ToolEvent { /** Where the rep answers it: the conversation in the tool's inbox. */ thread_url?: string | null; sender?: string | null; step?: number | null; hard?: boolean; provider_message_id: string; signal: EventSignal; channel: Channel; sequence_external_id: string | null; email: string | null; linkedin: string | null; external_contact_id: string | null; body: string | null; at: string }
 export interface WebhookRequest { headers: Record<string, string | undefined>; query: Record<string, string | undefined>; body: unknown }
 

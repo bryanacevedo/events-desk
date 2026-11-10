@@ -185,7 +185,7 @@ export function Overview({ go, sheetId }: { go: (to: string) => void; sheetId: s
                   const e = byId.get(i.event_id);
                   const side = needSide(i);
                   return (
-                    <Link to={kind === "costs" ? `/event/${i.event_id}#cost` : `/?event=${i.event_id}`} go={go} className="risk" key={`${kind}:${i.event_id}`} data-opens-sheet={kind === "costs" ? undefined : ""} data-row={`${kind}:${i.event_id}`}>
+                    <Link to={kind === "costs" ? `/event/${i.event_id}#cost` : kind === "replies" || kind === "meetings" || kind === "paused" ? `/event/${i.event_id}#outreach` : `/?event=${i.event_id}`} go={go} className="risk" key={`${kind}:${i.event_id}`} data-opens-sheet={["costs", "replies", "meetings", "paused"].includes(kind) ? undefined : ""} data-row={`${kind}:${i.event_id}`}>
                       <EventLogo name={i.name} website={i.website} size={34} />
                       <span className="who-text"><b>{i.name}</b>{e && <span className="small mute">{[shortDate(e.starts_on), city(e.venue)].filter(Boolean).join(" · ")}</span>}</span>
                       <span className="risk-end">

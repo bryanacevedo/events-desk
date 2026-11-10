@@ -1,7 +1,8 @@
 /* Read routes the event page needs at volume. A list of 1,650 rows is never sent whole: the people and
    the companies of an event are searched, filtered and paged here, so the screen asks for 50 at a time. */
 
-import { accountOf } from "./rep-day.ts";
+import { accountOf, companyTouchpoints, eventDeals } from "./rep-day.ts";
+import { isLead } from "./money.ts";
 import type { Hono } from "hono";
 import type { Db } from "./db.ts";
 
@@ -60,7 +61,10 @@ export function mountEventViews(app: Hono<{ Variables: { actor: string } }>, db:
     const a = await accountOf(db, c.req.param("id"), { companyId: c.req.param("cid") }, 100);
     if (!a) return c.json({ error: "That company is not on this event." }, 404);
     const [x] = await db.query<{ tier_fact: string | null; country: string | null; list_status: string | null }>("SELECT tier_fact, firmo->>'country' AS country, list_status FROM companies WHERE id = $1", [a.company_id]);
-    return c.json({ ...a, ...x });
+    // Deals credited to this event at this account: money, so leadership's and GTM's only.
+    const deals = isLead(c.get("actor")) && a.website ? (await eventDeals(db, c.req.param("id"))).filter((d) => d.domain === a.website).map((d) => ({ opportunity_id: d.opportunity_id, name: d.name, amount_cents: d.amount_cents, stage: d.stage, kind: d.kind, won: d.won })) : [];
+    const [ev] = await db.query<{ name: string; website: string | null }>("SELECT e.name, (SELECT k.website FROM catalog_events k WHERE k.id = e.catalog_id) AS website FROM events e WHERE e.id = $1", [c.req.param("id")]);
+    return c.json({ ...a, ...x, ...(await companyTouchpoints(db, c.req.param("id"), a.company_id)), deals, event: ev ?? null });
   });
 
   app.get("/api/events/:id/companies", async (c) => {

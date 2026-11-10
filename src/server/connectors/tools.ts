@@ -33,7 +33,7 @@ export function instantly(o: Opts): Connector {
   return {
     name: "instantly", channels: ["email"],
     // Instantly documents no way to pause one lead in a campaign, so a pause is a removal and a resume is adding them back.
-    capabilities: { createsSequences: true, pause: "remove-only", events: "both", replyBodies: true, needsCrmRecord: false, observesLaunch: true, addsWhileDraft: true, reportsStops: true, appliesSettings: true },
+    capabilities: { reports: ["send", "reply", "bounce", "unsubscribe"], createsSequences: true, pause: "remove-only", events: "both", replyBodies: true, needsCrmRecord: false, observesLaunch: true, addsWhileDraft: true, reportsStops: true, appliesSettings: true },
     healthFloor: 90,
     async listSenders() {
       const j = await api("GET", "/accounts", { query: { limit: 100 } });
@@ -102,18 +102,25 @@ export function instantly(o: Opts): Connector {
 
 const HEYREACH_STATE: Record<string, SequenceState> = { DRAFT: "draft", STARTING: "active", IN_PROGRESS: "active", ACTIVE: "active", PAUSED: "paused", FINISHED: "archived", CANCELED: "archived", FAILED: "paused" };
 
+/** HeyReach's webhook event types for what a campaign did, and the signal each becomes. UNCONFIRMED: these names come from third-party
+    integration docs (Make, Zapier, OutboundSync), not HeyReach's own reference, which listed only some. A correction is one line here. */
+export const HEYREACH_EVENTS: Record<string, "invite" | "accepted" | "send"> = { CONNECTION_REQUEST_SENT: "invite", CONNECTION_REQUEST_ACCEPTED: "accepted", MESSAGE_SENT: "send" };
+
 export function heyreach(o: Opts): Connector {
   const api = client("heyreach", o.fetch ?? fetch, "https://api.heyreach.io/api/public", { headers: { "X-API-KEY": o.apiKey } });
   const state = async (id: string) => HEYREACH_STATE[(await api("GET", "/campaign/GetById", { query: { campaignId: id } })).status as string] ?? "paused";
   return {
     name: "heyreach", channels: ["linkedin"],
-    capabilities: { createsSequences: false, pause: "remove-only", events: "both", replyBodies: true, needsCrmRecord: false, observesLaunch: true, addsWhileDraft: false, reportsStops: true, appliesSettings: false },
+    capabilities: { reports: ["invite", "accepted", "send", "reply"], createsSequences: false, pause: "remove-only", events: "both", replyBodies: true, needsCrmRecord: false, observesLaunch: true, addsWhileDraft: false, reportsStops: true, appliesSettings: false },
     // Which accounts run a campaign is set by a person in HeyReach, so there is no assignSenders. The desk names the ones to attach.
     async registerWebhooks(id, url) {
       const target = `${url}?secret=${encodeURIComponent(o.webhookSecret)}`;
       const have = await api("POST", "/webhooks/GetAllWebhooks", { body: { offset: 0, limit: 100 } });
-      if ((have.items ?? []).some((w: any) => w.webhookUrl === target && (w.campaignIds ?? []).includes(Number(id)))) return;
-      await api("POST", "/webhooks/CreateWebhook", { body: { webhookName: `Events Desk ${id}`, webhookUrl: target, eventType: "MESSAGE_REPLY_RECEIVED", campaignIds: [Number(id)] } });
+      // HeyReach takes one event type per webhook: one each, so a campaign that already has the reply webhook still gets the others.
+      for (const eventType of ["MESSAGE_REPLY_RECEIVED", ...Object.keys(HEYREACH_EVENTS)]) {
+        if ((have.items ?? []).some((w: any) => w.webhookUrl === target && (w.campaignIds ?? []).includes(Number(id)) && String(w.eventType ?? "").toUpperCase() === eventType)) continue;
+        await api("POST", "/webhooks/CreateWebhook", { body: { webhookName: `Events Desk ${id} ${eventType.toLowerCase()}`, webhookUrl: target, eventType, campaignIds: [Number(id)] } });
+      }
     },
     async listSenders() {
       const j = await api("POST", "/li_account/GetAll", { body: { offset: 0, limit: 100 } });
@@ -148,6 +155,13 @@ export function heyreach(o: Opts): Connector {
     verifyWebhook(req) {
       if (!sameSecret(req.query.secret, o.webhookSecret)) return null;
       const b = req.body as any;
+      // What the campaign did: a connection request sent, one accepted, a message sent. No step comes with them.
+      const did = HEYREACH_EVENTS[String(b?.event_type ?? "").toUpperCase()];
+      if (did) {
+        if (!b?.lead?.profile_url) return [];
+        const at = b.timestamp ?? new Date().toISOString();
+        return [{ provider_message_id: `${String(b.event_type).toLowerCase()}:${b.campaign?.id ?? ""}:${b.lead.profile_url}:${at}`, signal: did, channel: "linkedin", sequence_external_id: b.campaign?.id ? String(b.campaign.id) : null, email: null, linkedin: b.lead.profile_url, external_contact_id: b.lead.profile_url, body: null, at, step: null, sender: null }];
+      }
       // HeyReach sends the event in lower case, and fires only on a lead's first reply: later replies come in through the poll.
       if (!["message_reply_received", "every_message_reply_received"].includes(String(b?.event_type ?? "").toLowerCase()) || !b?.lead?.profile_url) return [];
       // The thread holds our messages and theirs. Only what they sent is the reply.
@@ -174,7 +188,7 @@ export function smartlead(o: Opts): Connector {
   const api = client("smartlead", o.fetch ?? fetch, "https://server.smartlead.ai/api/v1", { query: { api_key: o.apiKey } });
   return {
     name: "smartlead", channels: ["email"],
-    capabilities: { createsSequences: true, pause: "contact", events: "both", replyBodies: true, needsCrmRecord: false, observesLaunch: true, addsWhileDraft: true, reportsStops: true, appliesSettings: true },
+    capabilities: { reports: ["send", "reply", "bounce", "unsubscribe"], createsSequences: true, pause: "contact", events: "both", replyBodies: true, needsCrmRecord: false, observesLaunch: true, addsWhileDraft: true, reportsStops: true, appliesSettings: true },
     // Smartlead's own guidance is to add accounts with reputation above 80%; the desk's rule is stricter by default.
     healthFloor: 80,
     async listSenders() {
@@ -262,7 +276,7 @@ export function apollo(o: Opts): Connector {
   return {
     name: "apollo", channels: ["email"],
     // A contact can be stopped but not started again through the API, so a pause is a removal. Reply text is not reliably available, so the desk works from status.
-    capabilities: { createsSequences: false, pause: "remove-only", events: "poll", replyBodies: false, needsCrmRecord: false, observesLaunch: true, addsWhileDraft: true, reportsStops: true, appliesSettings: false },
+    capabilities: { reports: ["reply", "bounce"], createsSequences: false, pause: "remove-only", events: "poll", replyBodies: false, needsCrmRecord: false, observesLaunch: true, addsWhileDraft: true, reportsStops: true, appliesSettings: false },
     async listTemplates() { const j = await api("POST", "/emailer_campaigns/search", { body: { per_page: 100 } }); return (j.emailer_campaigns ?? []).map((c: any) => ({ id: c.id, name: c.name })); },
     async ensureContact(p) {
       const j = await api("POST", "/contacts", { body: { first_name: p.first_name, last_name: p.last_name, email: p.email, organization_name: p.company, title: p.title ?? undefined, run_dedupe: true } });
@@ -309,7 +323,7 @@ export function gong(o: Opts & { accessKey: string; flowOwnerEmail: string }): C
   const api = client("gong", o.fetch ?? fetch, "https://api.gong.io/v2", { headers: { authorization: `Basic ${btoa(`${o.accessKey}:${o.apiKey}`)}` } });
   return {
     name: "gong", channels: ["email"],
-    capabilities: { createsSequences: false, pause: "remove-only", events: "poll", replyBodies: false, needsCrmRecord: true, observesLaunch: false, addsWhileDraft: true, reportsStops: false, appliesSettings: false },
+    capabilities: { reports: [], createsSequences: false, pause: "remove-only", events: "poll", replyBodies: false, needsCrmRecord: true, observesLaunch: false, addsWhileDraft: true, reportsStops: false, appliesSettings: false },
     async listTemplates() { const j = await api("GET", "/flows"); return (j.flows ?? []).map((f: any) => ({ id: f.id, name: f.name })); },
     async ensureContact(p) { if (!p.crm_id) throw new Error("Gong assigns by CRM record."); return p.crm_id; },
     async createSequence() { throw new Error("Gong flows are made by a person."); },

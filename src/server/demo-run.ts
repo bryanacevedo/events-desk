@@ -2,6 +2,7 @@
 
 import { createHash } from "node:crypto";
 import { currentUploader, decideApproval } from "./approvals.ts";
+import { answerCase } from "./cases.ts";
 import type { Db } from "./db.ts";
 import type { FakeTool } from "./connectors/fake.ts";
 import type { ToolEvent } from "./connectors/types.ts";
@@ -11,7 +12,7 @@ import { bookMeeting, eventZone, recordOutcome } from "./meetings.ts";
 import { LAST_DAY_SQL, requestMotionCard } from "./motion.ts";
 import { openOwnerDecisions, sendOwnerCards, ownerSweep } from "./owners.ts";
 import { ingestEvents, processInbound } from "./replies.ts";
-import { approveTemplate, attachCampaign, confirmLaunchChecklist, createDrafts, drainOps, observeSequences, recordLegalBasis, setTools } from "./sequences.ts";
+import { approveTemplate, attachCampaign, calendarSweep, confirmLaunchChecklist, createDrafts, drainOps, observeSequences, recordLegalBasis, setTools } from "./sequences.ts";
 import { recordConsent, recordPlacement } from "./sending.ts";
 import { recordEventCost, writeScorecards } from "./closeout.ts";
 import { moveMotion } from "./motion-state.ts";
@@ -29,13 +30,17 @@ const REP = "Maya Ortiz";
 /* Each kind of answer comes in several wordings, so two people never send the same sentence. The classifier reads them the same way. */
 const WORDINGS: Record<string, string[]> = {
   "Sounds good, tell me more about how this works.": ["Sounds good, tell me more about how this works.", "Interested. How does it handle people who sign up at the door?", "Sounds good. We have this problem every show; what does setup look like?", "Interested. Could you send a short overview? I'll share it with our events lead.", "Tell me more about how this fits with the badge scanner we already use."],
-  "Happy to book a call. Thursday afternoon works for me.": ["Happy to meet at the show. Send me a time that suits you.", "Let's talk while we're both there. Mornings are easier for me.", "Sure, grab 30 minutes with me at the event.", "Yes, let's meet at the show. Booth or coffee, either works.", "Worth a chat. Pick a slot and I'll come by the booth."],
-  "I am out of office and back on 2027-12-20.": ["I am out of office and back on 2027-12-20.", "Out of the office this week, back on Monday.", "I'm away until the 21st with limited access to email.", "Out of office at a conference. I'll reply when I'm back."],
+  "Happy to book a call. Thursday afternoon works for me.": ["Happy to meet at the show. Send me a time that suits you.", "Let's meet while we're both there. Mornings are easier for me.", "Sure, book 30 minutes with me at the event.", "Yes, let's meet at the show. Booth or coffee, either works.", "Worth a call. Pick a slot and I'll come by the booth."],
+  "I am out of office and back on 2027-12-20.": ["I am out of office this week and back on Monday.", "Out of the office this week, back on Monday.", "I'm away until the 21st with limited access to email.", "Out of office at a conference. I'll reply when I'm back."],
   "Not interested, thanks.": ["Not interested, thanks.", "Not interested this year, our budget is spoken for.", "No thanks, we're set for now.", "Not interested right now, thanks for thinking of us."],
+};
+// After the event, a yes to a meeting reads like one: the show is over. Same classifier words (meet, call, book).
+const AFTER_WORDINGS: Record<string, string[]> = {
+  "Happy to book a call. Thursday afternoon works for me.": ["Sorry we missed each other at the show. Happy to book a call next week.", "Now the show is over, let's set up a call.", "Good timing. Book 30 minutes with me next week.", "Yes, let's meet next week while it is fresh.", "Worth a call. Send me a couple of times."],
 };
 // Wordings rotate in order, so the replies on one screen never repeat each other.
 const said = new Map<string, number>();
-const wording = (body: string) => { const w = WORDINGS[body]; if (!w) return body; const n = said.get(body) ?? 0; said.set(body, n + 1); return w[n % w.length]; };
+const wording = (body: string, phase: string = "pre") => { const w = (phase === "post" ? AFTER_WORDINGS[body] : null) ?? WORDINGS[body]; if (!w) return body; const k = `${phase}|${body}`, n = said.get(k) ?? 0; said.set(k, n + 1); return w[n % w.length]; };
 
 const REPLIES: { share: number; body: string; signal?: ToolEvent["signal"] }[] = [
   { share: 0.12, body: "Sounds good, tell me more about how this works." },
@@ -134,16 +139,31 @@ export async function demoAdvance(db: Db, deps: LifecycleDeps, tools: Record<str
     return { did: "The sequences are live. Everyone was checked again at launch." };
   }
   if (e.motion === "in_market") {
-    const live = await db.query<{ contact_id: string; email: string | null; linkedin: string | null; sequence: string | null; channel: string; connector: string }>(
-      `SELECT n.contact_id, k.email, k.linkedin, s.external_id AS sequence, n.channel, s.connector FROM enrollments n JOIN contacts k ON k.id = n.contact_id JOIN sequences s ON s.id = n.sequence_id WHERE n.event_id = $1 AND n.state = 'enrolled' ORDER BY n.id`, [eventId]);
+    const live = await db.query<{ contact_id: string; email: string | null; linkedin: string | null; sequence: string | null; sequence_id: string; channel: string; connector: string; senders: string[]; phase: string }>(
+      `SELECT n.contact_id, k.email, k.linkedin, s.external_id AS sequence, s.id AS sequence_id, n.channel, s.connector, s.phase,
+              coalesce((SELECT array_agg(x.address ORDER BY x.address) FROM sequence_senders x WHERE x.sequence_id = s.id AND x.role = 'primary' AND x.dropped_at IS NULL), '{}') AS senders
+       FROM enrollments n JOIN contacts k ON k.id = n.contact_id JOIN sequences s ON s.id = n.sequence_id WHERE n.event_id = $1 AND n.state = 'enrolled' ORDER BY n.id`, [eventId]);
     const by = new Map<string, ToolEvent[]>();
     const add = (c: string, x: ToolEvent) => by.set(c, [...(by.get(c) ?? []), x]);
     for (const p of live) {
       const base = { channel: p.channel as "email" | "linkedin", sequence_external_id: p.sequence, email: p.channel === "email" ? p.email : null, linkedin: p.channel === "linkedin" ? p.linkedin : null, external_contact_id: null, at: new Date().toISOString() };
-      add(p.connector, { ...base, provider_message_id: `send:${p.contact_id}:${p.channel}`, signal: "send", body: null, sender: null, step: 0 });
-      if (p.channel !== "email") continue;
+      // What the tool would report: on email, the first message and for most a second, from one of the sequence's inboxes;
+      // on LinkedIn, the connection request, then for those who accept, a message. Ids carry the sequence, so a person in a
+      // before and an after sequence keeps both.
+      const sender = p.senders.length ? p.senders[Math.floor(u(`sender|${p.contact_id}|${p.sequence_id}`) * p.senders.length)] : null;
+      const id = (k: string) => `${k}:${p.sequence_id}:${p.contact_id}`;
+      if (p.channel === "linkedin") {
+        add(p.connector, { ...base, provider_message_id: id("invite"), signal: "invite", body: null, sender, step: null });
+        if (u(`accept|${p.contact_id}`) < 0.42) {
+          add(p.connector, { ...base, provider_message_id: id("accepted"), signal: "accepted", body: null, sender, step: null });
+          add(p.connector, { ...base, provider_message_id: id("message"), signal: "send", body: null, sender, step: null });
+        }
+        continue;
+      }
+      add(p.connector, { ...base, provider_message_id: id("send1"), signal: "send", body: null, sender, step: 1 });
+      if (u(`second|${p.contact_id}`) < 0.7) add(p.connector, { ...base, provider_message_id: id("send2"), signal: "send", body: null, sender, step: 2 });
       let r = u(`reply|${p.contact_id}`);
-      for (const x of REPLIES) { if (r < x.share) { add(p.connector, { ...base, provider_message_id: `reply:${p.contact_id}`, signal: x.signal ?? "reply", body: x.body ? wording(x.body) : null, thread_url: p.connector === "heyreach" ? "https://app.heyreach.io/app/inbox" : "https://app.instantly.ai/app/unibox" }); break; } r -= x.share; }
+      for (const x of REPLIES) { if (r < x.share) { add(p.connector, { ...base, provider_message_id: `reply:${p.sequence_id}:${p.contact_id}`, signal: x.signal ?? "reply", body: x.body ? wording(x.body, p.phase) : null, thread_url: p.connector === "heyreach" ? "https://app.heyreach.io/app/inbox" : "https://app.instantly.ai/app/unibox" }); break; } r -= x.share; }
     }
     for (const [name, events] of by) await ingestEvents(db, deps, deps.connectors[name], events);
     await processInbound(db, deps, 2000);
@@ -231,20 +251,39 @@ export async function seedDemoStages(db: Db, deps: LifecycleDeps, tools: Record<
   const motion = async (id: string) => (await db.query<{ motion: string; stage: string }>("SELECT motion, stage FROM events WHERE id = $1", [id]))[0];
   // Each event waits until its list is delivered by the background build.
   for (const [id] of DEMO_STAGES) for (let i = 0; i < 240 && (await motion(id))?.stage !== "delivered"; i++) await new Promise((r) => setTimeout(r, 1000));
-  const toMarket = async (id: string) => {
-    for (let k = 0; k < 6 && (await motion(id))?.motion !== "in_market"; k++) await demoAdvance(db, deps, tools, id, { pressFollowUp: true });
-    await demoAdvance(db, deps, tools, id, { pressFollowUp: true });
+  const toMarket = async (id: string, d: LifecycleDeps = deps) => {
+    for (let k = 0; k < 6 && (await motion(id))?.motion !== "in_market"; k++) await demoAdvance(db, d, tools, id, { pressFollowUp: true });
+    await demoAdvance(db, d, tools, id, { pressFollowUp: true });
+  };
+  // A finished event ran two waves, as a real one would: its pre-event sequences, run on a clock eighteen days before it opened,
+  // then its follow-up after it closed. Without the first, the demo's past events would show only a follow-up.
+  const twoWaves = async (id: string) => {
+    const [{ starts_on }] = await db.query<{ starts_on: string }>("SELECT starts_on::text AS starts_on FROM events WHERE id = $1", [id]);
+    const before = new Date(Date.parse(`${starts_on}T14:00:00Z`) - 18 * 86_400_000);
+    await toMarket(id, { ...deps, now: () => before });
+    // The event opened: the calendar ends the pre-event sequences, which frees everyone in them for the follow-up.
+    await calendarSweep(db, deps);
+    await db.query("UPDATE events SET motion = 'sequencing' WHERE id = $1 AND motion = 'in_market'", [id]);
+    await toMarket(id);
   };
   for (const [id, stage] of DEMO_STAGES) {
     if ((await motion(id))?.stage !== "delivered") continue;
     if (stage === "owners") { await demoAdvance(db, deps, tools, id); continue; }
     if (stage === "follow_up_ready") { for (let k = 0; k < 3 && (await motion(id)).motion !== "sequencing"; k++) await demoAdvance(db, deps, tools, id); continue; }
     if (stage === "sequencing") { for (let k = 0; k < 3 && (await motion(id)).motion !== "sequencing"; k++) await demoAdvance(db, deps, tools, id); await demoAdvance(db, deps, tools, id, { pressFollowUp: true }); continue; }
-    await toMarket(id);
+    // A finished event had its list settled before outreach, as a team would: every open case answered the way the desk suggested.
+    const settle = async () => {
+      for (const c of await db.query<{ id: string; suggested: string | null }>("SELECT id, suggested FROM review_cases WHERE event_id = $1 AND status = 'open'", [id])) {
+        try { await answerCase(db, id, c.id, (await currentUploader(db.query, id))?.uploaded_by ?? "Maya Ortiz", c.suggested ?? "dismiss"); } catch { /* a case its answer no longer fits stays open */ }
+      }
+    };
+    if (stage === "closing" || stage === "scored") { await settle(); await twoWaves(id); await settle(); } else await toMarket(id);
     if (stage === "closing" || stage === "scored") { await db.tx((q) => moveMotion(q, id, "closing", "Events Desk", "Fourteen days after the event")); await redateDemo(db); }
     // The scorecards run before Shoptalk closes, so NRF is scored and Shoptalk stays in closing.
     if (stage === "scored") await writeScorecards(db, deps);
   }
+  // The calendar ends what has run its course: a follow-up wave 24 days after its event, anything of a scored event.
+  await calendarSweep(db, deps);
   await redateDemo(db);
   await seedDemoDebriefs(db);
   // NRF's costs are all in, as a scored event's should be; Shoptalk, still closing, has lines left for Overview to ask about.
@@ -311,9 +350,16 @@ export async function redateDemo(db: Db) {
   // A meeting on the show floor: one of the event's days, between 09:00 and 17:00 in the meeting's own zone.
   const meet = (c: string, tz: string) => `((e.starts_on::date + make_interval(days => (${c} % ${N})::int))::timestamp + interval '9 hours' + make_interval(mins => ((${c} / 7) % 16)::int * 30)) AT TIME ZONE ${tz}`;
   const TZ_OF_TOUCH = "coalesce((SELECT m.timezone FROM meetings m WHERE m.contact_id = t.contact_id AND m.event_id = t.event_id LIMIT 1), 'UTC')";
+  // Anything from a follow-up sequence happened after the event closed: added the day after, sent over the days after that, answered later.
+  const L = `(${LAST_DAY_SQL})::date + time '15:00'`;
+  const POST = "(SELECT x.phase FROM sequences x WHERE x.id = t.sequence_id) = 'post'";
   await db.query(`UPDATE touches t SET at = CASE
+      WHEN ${POST} AND t.kind = 'sequence_add' THEN ${L} + interval '1 day' + make_interval(mins => (${C} % 240)::int)
+      WHEN ${POST} AND t.kind IN ('send', 'accepted') THEN ${L} + interval '1 day' + make_interval(days => (${C} % 3)::int + 3 * (coalesce(t.step, 1) - 1) + CASE WHEN t.action = 'message' OR t.kind = 'accepted' THEN 2 ELSE 0 END, mins => (${C} % 300)::int)
+      WHEN ${POST} AND t.kind LIKE 'reply_%' THEN ${L} + interval '4 days' + make_interval(days => (${C} % 5)::int, mins => (${C} % 420)::int)
       WHEN t.kind = 'sequence_add' THEN ${S} - interval '21 days' + make_interval(days => (${C} % 3)::int, mins => (${C} % 240)::int) + CASE WHEN t.channel = 'linkedin' THEN interval '2 hours 17 minutes' ELSE interval '0' END
-      WHEN t.kind = 'send' THEN ${S} - interval '17 days' + make_interval(days => (${C} % 4)::int + CASE WHEN t.channel = 'linkedin' THEN 1 ELSE 0 END, mins => (${C} % 300)::int)
+      WHEN t.kind = 'send' THEN ${S} - interval '17 days' + make_interval(days => (${C} % 4)::int + CASE WHEN t.channel = 'linkedin' THEN 1 ELSE 0 END + 3 * (coalesce(t.step, 1) - 1) + CASE WHEN t.action = 'message' THEN 2 ELSE 0 END, mins => (${C} % 300)::int)
+      WHEN t.kind = 'accepted' THEN ${S} - interval '15 days' + make_interval(days => (${C} % 4)::int, mins => (${C} % 300)::int)
       WHEN t.kind LIKE 'reply_%' THEN ${reply(C)}
       WHEN t.kind = 'meeting_booked' THEN ${reply(C)} + make_interval(hours => 3, mins => (${C} % 90)::int)
       WHEN t.kind LIKE 'meeting_%' THEN ${meet(C, TZ_OF_TOUCH)} + interval '45 minutes'
@@ -324,9 +370,13 @@ export async function redateDemo(db: Db) {
   await db.query(`UPDATE inbound_messages t SET received_at = n.at, decided_at = t.decided_at + (n.at - t.received_at), respond_by = t.respond_by + (n.at - t.received_at),
       handled_at = coalesce(t.handled_at + (n.at - t.received_at), CASE WHEN t.respond_by IS NOT NULL THEN n.at + interval '4 hours' END),
       handled_by = coalesce(t.handled_by, CASE WHEN t.respond_by IS NOT NULL THEN t.owner END), escalated_at = t.escalated_at + (n.at - t.received_at)
-    FROM (SELECT t.id, ${reply(C)} AS at FROM inbound_messages t JOIN events e ON e.id = t.event_id WHERE ${past} AND t.contact_id IS NOT NULL) n WHERE n.id = t.id`);
+    FROM (SELECT t.id, CASE WHEN ${POST} THEN ${L} + interval '4 days' + make_interval(days => (${C} % 5)::int, mins => (${C} % 420)::int) ELSE ${reply(C)} END AS at FROM inbound_messages t JOIN events e ON e.id = t.event_id WHERE ${past} AND t.contact_id IS NOT NULL) n WHERE n.id = t.id`);
+  await db.query(`UPDATE sequences s SET launched_at = CASE WHEN s.phase = 'post' THEN ${L} + interval '1 day' ELSE ${S} - interval '18 days' END
+    FROM events e WHERE e.id = s.event_id AND ${past} AND s.launched_at IS NOT NULL`);
   await db.query(`UPDATE enrollments t SET added_at = ${S} - interval '21 days' + make_interval(days => (${C} % 3)::int, mins => (${C} % 240)::int), changed_at = ${S} - interval '17 days' + make_interval(days => (${C} % 4)::int, mins => (${C} % 300)::int)
     FROM events e WHERE e.id = t.event_id AND ${past}`);
+  await db.query(`UPDATE enrollments t SET added_at = ${L} + interval '1 day', changed_at = ${L} + interval '1 day' + interval '2 hours'
+    FROM events e, sequences x WHERE e.id = t.event_id AND x.id = t.sequence_id AND x.phase = 'post' AND ${past}`);
   await db.query(`UPDATE meetings t SET scheduled_at = n.at, outcome_at = CASE WHEN t.outcome_at IS NULL THEN NULL ELSE n.at + interval '45 minutes' END,
       reminded_at = CASE WHEN t.reminded_at IS NULL THEN NULL ELSE n.at - interval '1 day' END, created_at = n.booked
     FROM (SELECT t.id, ${meet(C, "t.timezone")} AS at, ${reply(C)} + interval '3 hours' AS booked FROM meetings t JOIN events e ON e.id = t.event_id WHERE ${past} AND t.contact_id IS NOT NULL) n WHERE n.id = t.id`);
@@ -350,8 +400,8 @@ export async function redateDemo(db: Db) {
   await db.query(`UPDATE events e SET post_started_at = ((${LAST_DAY_SQL})::date + 1 + time '15:00')::timestamptz WHERE e.post_started_at IS NOT NULL AND e.starts_on::date <= current_date`);
   // Still following up: the sends went out before the event; each reply's steps carry its reply's own time.
   await db.query(`UPDATE touches t SET at = CASE WHEN t.kind = 'sequence_add' THEN ${S} - interval '21 days' + make_interval(days => (${C} % 3)::int, mins => (${C} % 240)::int) + CASE WHEN t.channel = 'linkedin' THEN interval '2 hours 17 minutes' ELSE interval '0' END
-      ELSE ${S} - interval '17 days' + make_interval(days => (${C} % 4)::int + CASE WHEN t.channel = 'linkedin' THEN 1 ELSE 0 END, mins => (${C} % 300)::int) END
-    FROM events e WHERE e.id = t.event_id AND e.starts_on::date <= current_date AND NOT (${past}) AND t.kind IN ('sequence_add', 'send')`);
+      ELSE ${S} - interval '17 days' + make_interval(days => (${C} % 4)::int + CASE WHEN t.channel = 'linkedin' THEN 1 ELSE 0 END + 3 * (coalesce(t.step, 1) - 1) + CASE WHEN t.action = 'message' OR t.kind = 'accepted' THEN 2 ELSE 0 END, mins => (${C} % 300)::int) END
+    FROM events e WHERE e.id = t.event_id AND e.starts_on::date <= current_date AND NOT (${past}) AND t.kind IN ('sequence_add', 'send', 'accepted')`);
   await db.query(`UPDATE inbound_messages i SET received_at = i.received_at - make_interval(mins => ((hashtext(i.id)::bigint & 2147483647) % 1440)::int)
     FROM events e WHERE e.id = i.event_id AND e.starts_on::date <= current_date AND NOT (${past}) AND i.received_at > now() - interval '1 hour'`);
   await db.query(`UPDATE touches t SET at = i.received_at FROM inbound_messages i, events e WHERE e.id = t.event_id AND i.contact_id = t.contact_id AND i.event_id = t.event_id
@@ -362,8 +412,8 @@ export async function redateDemo(db: Db) {
   // a few hours apart; a reply arrived over the last day, not all in one minute. Nothing is dated after now.
   const ahead = "e.starts_on::date > current_date AND e.motion IN ('in_market', 'sequencing')";
   await db.query(`UPDATE touches t SET at = CASE WHEN t.kind = 'sequence_add' THEN now() - interval '14 days' + make_interval(days => (${C} % 2)::int, mins => (${C} % 240)::int) + CASE WHEN t.channel = 'linkedin' THEN interval '2 hours 17 minutes' ELSE interval '0' END
-      ELSE now() - interval '11 days' + make_interval(days => (${C} % 4)::int + CASE WHEN t.channel = 'linkedin' THEN 1 ELSE 0 END, mins => (${C} % 300)::int) END
-    FROM events e WHERE e.id = t.event_id AND ${ahead} AND t.kind IN ('sequence_add', 'send')`);
+      ELSE now() - interval '11 days' + make_interval(days => (${C} % 4)::int + CASE WHEN t.channel = 'linkedin' THEN 1 ELSE 0 END + 3 * (coalesce(t.step, 1) - 1) + CASE WHEN t.action = 'message' OR t.kind = 'accepted' THEN 2 ELSE 0 END, mins => (${C} % 300)::int) END
+    FROM events e WHERE e.id = t.event_id AND ${ahead} AND t.kind IN ('sequence_add', 'send', 'accepted')`);
   await db.query(`UPDATE inbound_messages i SET received_at = i.received_at - make_interval(mins => 60 + ((hashtext(i.id)::bigint & 2147483647) % 1380)::int)
     FROM events e WHERE e.id = i.event_id AND ${ahead} AND i.received_at > now() - interval '1 hour'`);
   await db.query(`UPDATE touches t SET at = i.received_at FROM inbound_messages i, events e WHERE e.id = t.event_id AND i.contact_id = t.contact_id AND i.event_id = t.event_id AND ${ahead} AND t.kind LIKE 'reply_%'`);
@@ -389,4 +439,26 @@ export async function redateDemo(db: Db) {
   // And a meeting's own step sits at the meeting.
   await db.query(`UPDATE touches t SET at = m.scheduled_at + interval '45 minutes' FROM meetings m, events e WHERE e.id = t.event_id AND m.contact_id = t.contact_id AND m.event_id = t.event_id
     AND e.starts_on::date <= current_date AND NOT (${past}) AND t.kind LIKE 'meeting_%' AND t.kind <> 'meeting_booked'`);
+  // Last, so every date reads in order whatever moved above it.
+  // An event still following up: its follow-up was added the day after it closed, sent over the days after, answered after that, never later than now.
+  const LIVE = "e.starts_on::date <= current_date AND NOT (" + past + ")";
+  await db.query(`UPDATE touches t SET at = least(now() - interval '1 hour', CASE
+      WHEN t.kind = 'sequence_add' THEN ${L} + interval '1 day' + make_interval(mins => (${C} % 240)::int)
+      ELSE ${L} + interval '1 day' + make_interval(days => (${C} % 3)::int + 3 * (coalesce(t.step, 1) - 1) + CASE WHEN t.action = 'message' OR t.kind = 'accepted' THEN 2 ELSE 0 END, mins => (${C} % 300)::int) END)
+    FROM events e WHERE e.id = t.event_id AND ${LIVE} AND ${POST} AND t.kind IN ('sequence_add', 'send', 'accepted')`);
+  await db.query(`UPDATE inbound_messages t SET received_at = least(now() - make_interval(mins => 30 + (${C} % 600)::int), ${L} + interval '4 days' + make_interval(days => (${C} % 5)::int, mins => (${C} % 420)::int))
+    FROM events e WHERE e.id = t.event_id AND ${LIVE} AND ${POST} AND t.contact_id IS NOT NULL`);
+  await db.query(`UPDATE touches t SET at = i.received_at FROM inbound_messages i, events e WHERE e.id = t.event_id AND i.contact_id = t.contact_id AND i.sequence_id = t.sequence_id AND ${LIVE} AND t.kind LIKE 'reply_%'`);
+  // A sequence started when its first message went: pre-event ones before the event, follow-ups the day after it closed.
+  await db.query(`UPDATE sequences s SET launched_at = sub.first FROM (SELECT t.sequence_id, min(t.at) - interval '2 hours' AS first FROM touches t WHERE t.kind = 'send' AND t.sequence_id IS NOT NULL GROUP BY 1) sub
+    WHERE s.id = sub.sequence_id AND s.launched_at IS NOT NULL`);
+  // An answer comes after the reply it answers, within the day it was due; a reply is due a day after it arrived.
+  await db.query(`UPDATE inbound_messages SET respond_by = received_at + interval '1 day' WHERE respond_by IS NOT NULL AND (respond_by < received_at OR respond_by > received_at + interval '3 days')`);
+  await db.query(`UPDATE inbound_messages SET handled_at = least(now() - interval '5 minutes', received_at + interval '4 hours') WHERE handled_at IS NOT NULL AND (handled_at < received_at OR handled_at > received_at + interval '7 days')`);
+  // A meeting booked from a reply is after that reply: three days on, mid-afternoon where the meeting is.
+  await db.query(`UPDATE meetings m SET scheduled_at = CASE WHEN m.status IN ('held', 'no_show') THEN least(now() - interval '2 hours', x.at) ELSE x.at END, outcome_at = CASE WHEN m.outcome_at IS NULL THEN NULL ELSE least(now() - interval '1 hour', x.at + interval '45 minutes') END
+    FROM (SELECT m2.id, (date_trunc('day', (min(i.received_at) + interval '3 days') AT TIME ZONE coalesce(m2.timezone, 'UTC')) + interval '15 hours') AT TIME ZONE coalesce(m2.timezone, 'UTC') AS at
+          FROM meetings m2 JOIN inbound_messages i ON i.contact_id = m2.contact_id AND i.signal = 'reply' WHERE m2.source = 'reply' GROUP BY m2.id, m2.timezone, m2.scheduled_at HAVING min(i.received_at) > m2.scheduled_at) x
+    WHERE m.id = x.id`);
+  await db.query(`UPDATE touches t SET at = m.scheduled_at + interval '45 minutes' FROM meetings m WHERE m.contact_id = t.contact_id AND m.event_id = t.event_id AND m.source = 'reply' AND t.kind LIKE 'meeting_%' AND t.kind <> 'meeting_booked' AND t.at < m.scheduled_at`);
 }

@@ -26,8 +26,8 @@ const BODY_MAX = 20_000;
 
 async function findContact(db: Pick<Db, "query">, connector: string, e: ToolEvent) {
   const email = e.email?.toLowerCase() ?? null;
-  const [hit] = await db.query<{ contact_id: string; event_id: string; person_id: string | null; domain: string }>(
-    `SELECT n.contact_id, n.event_id, n.person_id, n.domain FROM enrollments n JOIN contacts k ON k.id = n.contact_id JOIN sequences s ON s.id = n.sequence_id
+  const [hit] = await db.query<{ contact_id: string; event_id: string; person_id: string | null; domain: string; sequence_id: string }>(
+    `SELECT n.contact_id, n.event_id, n.person_id, n.domain, n.sequence_id FROM enrollments n JOIN contacts k ON k.id = n.contact_id JOIN sequences s ON s.id = n.sequence_id
      WHERE s.connector = $1 AND ((($2::text IS NOT NULL AND lower(k.email) = $2) OR ($3::text IS NOT NULL AND k.linkedin = $3)) OR ($4::text IS NOT NULL AND n.external_contact_id = $4))
      ORDER BY (s.external_id = $5) DESC NULLS LAST, n.added_at DESC, n.id LIMIT 1`, [connector, email, e.linkedin, e.external_contact_id, e.sequence_external_id]);
   return hit ?? null;
@@ -38,15 +38,24 @@ export async function ingestEvents(db: Db, deps: LifecycleDeps, connector: Conne
   const out = { new: 0, duplicates: 0, unmatched: 0 };
   for (const e of events) {
     const c = await findContact(db, connector.name, e);
-    if (e.signal === "send") {
-      if (c) await db.tx((q) => addTouch(q, { domain: c.domain, person_id: c.person_id, contact_id: c.contact_id, event_id: c.event_id, kind: "send", channel: e.channel, at: e.at, source: connector.name, sender: e.sender ?? null, step: e.step ?? null, dedup_key: `${connector.name}:${e.provider_message_id}` }));
+    // Sends, LinkedIn invites and acceptances are records of what the tool did. They never write an inbound row and never pause anyone.
+    // An invite is a send (the first touch of a LinkedIn sequence), told apart by `action`; an acceptance is its own kind.
+    if (e.signal === "send" || e.signal === "invite") {
+      const action = e.signal === "invite" ? "invite" : e.channel === "linkedin" ? "message" : null;
+      if (c) await db.tx((q) => addTouch(q, { domain: c.domain, person_id: c.person_id, contact_id: c.contact_id, event_id: c.event_id, kind: "send", channel: e.channel, at: e.at, source: connector.name, sender: e.sender ?? null, step: e.step ?? null, sequence_id: c.sequence_id, action, dedup_key: `${connector.name}:${e.provider_message_id}` }));
+      continue;
+    }
+    if (e.signal === "accepted") {
+      if (c) await db.tx((q) => addTouch(q, { domain: c.domain, person_id: c.person_id, contact_id: c.contact_id, event_id: c.event_id, kind: "accepted", channel: e.channel, at: e.at, source: connector.name, sender: e.sender ?? null, sequence_id: c.sequence_id, dedup_key: `${connector.name}:${e.provider_message_id}` }));
       continue;
     }
     await db.tx(async (q) => {
       const eventId = c ? (await creditedEvent(q, { contact_id: c.contact_id, person_id: c.person_id, domain: c.domain })) ?? c.event_id : null;
       const id = newId("inb");
-      const ins = await q(`INSERT INTO inbound_messages (id, connector, provider_message_id, event_id, contact_id, channel, signal, body, received_at, status, thread_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) ON CONFLICT (connector, provider_message_id) DO NOTHING RETURNING id`,
-        [id, connector.name, e.provider_message_id, eventId, c?.contact_id ?? null, e.channel, e.signal, e.body ? e.body.slice(0, BODY_MAX) : null, e.at, c ? "received" : "unmatched", e.thread_url ?? null]);
+      // The step: the tool's, else the last send to this person in this sequence.
+      const step = e.step ?? (c ? (await q<{ step: number | null }>("SELECT step FROM touches WHERE contact_id = $1 AND sequence_id = $2 AND kind = 'send' AND step IS NOT NULL ORDER BY at DESC, step DESC LIMIT 1", [c.contact_id, c.sequence_id]))[0]?.step ?? null : null);
+      const ins = await q(`INSERT INTO inbound_messages (id, connector, provider_message_id, event_id, contact_id, channel, signal, body, received_at, status, thread_url, sequence_id, step) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) ON CONFLICT (connector, provider_message_id) DO NOTHING RETURNING id`,
+        [id, connector.name, e.provider_message_id, eventId, c?.contact_id ?? null, e.channel, e.signal, e.body ? e.body.slice(0, BODY_MAX) : null, e.at, c ? "received" : "unmatched", e.thread_url ?? null, c?.sequence_id ?? null, step]);
       if (!ins.length) { out.duplicates++; return; }
       out.new++;
       if (!c) {
@@ -57,14 +66,14 @@ export async function ingestEvents(db: Db, deps: LifecycleDeps, connector: Conne
         return;
       }
       await stopContacts(q, [c.contact_id], "pause", "inbound", id);
-      await addTouch(q, { domain: c.domain, person_id: c.person_id, contact_id: c.contact_id, event_id: eventId, kind: e.signal, channel: e.channel, at: e.at, source: connector.name, dedup_key: `${connector.name}:${e.provider_message_id}` });
+      await addTouch(q, { domain: c.domain, person_id: c.person_id, contact_id: c.contact_id, event_id: eventId, kind: e.signal, channel: e.channel, at: e.at, source: connector.name, sender: e.sender ?? null, step, sequence_id: c.sequence_id, dedup_key: `${connector.name}:${e.provider_message_id}` });
     });
   }
   if (opts.drain !== false) await drainOps(db, deps);
   return out;
 }
 
-interface Msg { id: string; event_id: string; contact_id: string; channel: string; signal: string; body: string | null; connector: string }
+interface Msg { id: string; event_id: string; contact_id: string; channel: string; signal: string; body: string | null; connector: string; sequence_id?: string | null; step?: number | null }
 interface Who { full_name: string | null; email: string | null; company: string; company_key: string; company_id: string; person_id: string | null; domain: string; event: string }
 
 const who = async (q: Q, m: Pick<Msg, "contact_id" | "event_id">) => (await q<Who>(
@@ -144,7 +153,7 @@ async function applyCode(q: Q, m: Msg, p: Who, code: ReplyCode, ctx: { modelOnly
     default:
       break;
   }
-  await addTouch(q, { domain: p.domain, person_id: p.person_id, contact_id: m.contact_id, event_id: m.event_id, kind: `reply_${code}`, channel: m.channel, source: ctx.actor, dedup_key: `code:${m.id}:${code}` });
+  await addTouch(q, { domain: p.domain, person_id: p.person_id, contact_id: m.contact_id, event_id: m.event_id, kind: `reply_${code}`, channel: m.channel, source: ctx.actor, sequence_id: m.sequence_id ?? null, step: m.step ?? null, dedup_key: `code:${m.id}:${code}` });
 }
 
 async function openDoubt(q: Q, m: Msg, p: Who, why: string) {
@@ -154,7 +163,7 @@ async function openDoubt(q: Q, m: Msg, p: Who, why: string) {
 
 /** A person's answer to a doubtful reply. Runs in the case's transaction. */
 export async function applyReplyAnswer(q: Q, inboundId: string, code: string, actor: string, crm?: Crm | null) {
-  const [m] = await q<Msg>("SELECT id, event_id, contact_id, channel, signal, body, connector FROM inbound_messages WHERE id = $1", [inboundId]);
+  const [m] = await q<Msg>("SELECT id, event_id, contact_id, channel, signal, body, connector, sequence_id, step FROM inbound_messages WHERE id = $1", [inboundId]);
   if (!m?.contact_id) return;
   const p = await who(q, m);
   await applyCode(q, m, p, code as ReplyCode, { modelOnly: false, actor, now: new Date(), crm });
@@ -178,7 +187,7 @@ export async function processInbound(db: Db, deps: LifecycleDeps, limit = 200) {
   const now = nowOf(deps);
   const claimed = await db.tx((q) => q<Msg>(
     `UPDATE inbound_messages SET lease_until = $1::timestamptz + interval '5 minutes' WHERE id IN (SELECT id FROM inbound_messages WHERE status = 'received' AND (lease_until IS NULL OR lease_until < $1::timestamptz) ORDER BY received_at, id LIMIT $2 FOR UPDATE SKIP LOCKED)
-     RETURNING id, event_id, contact_id, channel, signal, body, connector`, [now.toISOString(), limit]));
+     RETURNING id, event_id, contact_id, channel, signal, body, connector, sequence_id, step`, [now.toISOString(), limit]));
   const out = { processed: 0, doubtful: 0 };
   for (const m of claimed) {
     // Code runs first. These never wait for a model and never depend on one.

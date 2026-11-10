@@ -10,16 +10,17 @@ import type { FakeTool } from "./connectors/fake.ts";
 import { sameSecret } from "./connectors/types.ts";
 import { demoAdvance } from "./demo-run.ts";
 import { bookMeeting, confirmRelease, eventZone, ingestCalendar, recordOutcome, type CalendarEvent } from "./meetings.ts";
-import { requestMotionCard } from "./motion.ts";
+import { LAST_DAY_SQL, requestMotionCard } from "./motion.ts";
 import { decideOwner } from "./owners.ts";
 import { ingestEvents, processInbound } from "./replies.ts";
 import { drainOps, releaseSequence, approveTemplate, attachCampaign, confirmLaunchChecklist, createDrafts, recordLegalBasis, restartSending, resumePerson, setTools, stopAllSending } from "./sequences.ts";
 import { regionOf, loadPeople } from "./gate.ts";
 import { recordConsent, recordPlacement, setDomainStatus } from "./sending.ts";
 import { captureOnsite, forgetPerson, markHandled } from "./operating.ts";
-import { addSlots, bookSlot, dealDetail, debriefDetail, meetingDetail, prepBrief, repDay, replyDetail, roster } from "./rep-day.ts";
+import { addSlots, bookSlot, dealDetail, debriefDetail, meetingDetail, personDetail, prepBrief, repDay, replyDetail, roster } from "./rep-day.ts";
 import { isGtm } from "../shared/roles.ts";
 import { forRep, isLead, MONEY_REFUSAL, withoutMoney } from "./money.ts";
+import { sequenceDetail, sequenceList } from "./sequence-view.ts";
 import { MOTION_LABEL } from "../shared/motion.ts";
 import { pickSenders, planCapacity } from "../shared/sending.ts";
 import { nextStep, postEventState } from "./post-event.ts";
@@ -43,7 +44,7 @@ export async function motionOverview(db: Db, deps: LifecycleDeps, id: string) {
               FROM sequences s WHERE s.event_id = $1 ORDER BY s.channel, s.priority`, [id]),
     db.query("SELECT * FROM event_funnel WHERE event_id = $1", [id]),
     db.query<{ status: string; n: number }>("SELECT status, count(*)::int AS n FROM owner_decisions WHERE event_id = $1 GROUP BY status", [id]),
-    db.query(`SELECT m.id, m.channel, m.connector, m.thread_url, m.signal, m.code, m.doubtful, m.status, m.received_at::text AS received_at, m.body, (m.respond_by IS NOT NULL AND m.handled_at IS NULL) AS waiting, k.id AS contact_id, k.full_name, co.name AS company FROM inbound_messages m LEFT JOIN contacts k ON k.id = m.contact_id LEFT JOIN companies co ON co.id = k.company_id WHERE m.event_id = $1 ORDER BY m.received_at DESC LIMIT 50`, [id]),
+    db.query(`SELECT m.id, m.channel, m.connector, m.thread_url, m.signal, m.code, m.doubtful, m.status, m.received_at::text AS received_at, m.body, (m.respond_by IS NOT NULL AND m.handled_at IS NULL) AS waiting, m.sequence_id, m.step, s.channel AS seq_channel, s.phase AS seq_phase, k.id AS contact_id, k.full_name, co.name AS company FROM inbound_messages m LEFT JOIN contacts k ON k.id = m.contact_id LEFT JOIN companies co ON co.id = k.company_id LEFT JOIN sequences s ON s.id = m.sequence_id WHERE m.event_id = $1 ORDER BY m.received_at DESC LIMIT 50`, [id]),
     db.query(`SELECT m.id, m.contact_id, m.status, m.scheduled_at::text AS scheduled_at, m.timezone, m.rep, m.source, m.enrolled, (m.enrolled AND EXISTS (SELECT 1 FROM inbound_messages i WHERE i.contact_id = m.contact_id AND i.signal = 'reply')) AS from_reply, k.full_name, co.name AS company FROM meetings m LEFT JOIN contacts k ON k.id = m.contact_id LEFT JOIN companies co ON co.id = k.company_id WHERE m.event_id = $1 ORDER BY m.scheduled_at`, [id]),
     db.query("SELECT window_days, metrics, created_at::text AS created_at FROM scorecards WHERE event_id = $1 ORDER BY window_days", [id]),
     db.query(`SELECT d.id, d.author, d.status, d.body, d.prompted_at::text AS prompted_at, d.answered_at::text AS answered_at, coalesce((SELECT json_agg(json_build_object('theme', f.theme, 'fact', f.fact, 'quote', f.quote, 'account', f.account)) FROM debrief_facts f WHERE f.debrief_id = d.id AND d.status = 'accepted'), '[]') AS facts FROM debriefs d WHERE d.event_id = $1`, [id]),
@@ -101,6 +102,9 @@ export function mountLifecycle(app: App, db: Db, deps: LifecycleDeps, opts: { ba
          + (SELECT count(*)::int FROM meetings WHERE event_id = $1 AND status IN ('booked', 'rescheduled') AND outcome_at IS NULL AND scheduled_at < now()) AS outreach`, [id]);
     return c.json({ next: await nextStep(db, deps, id), counts: n ?? { people: 0, outreach: 0 } });
   });
+  // What each sequence did (docs/SEQUENCES-VIEW.md §4). No money in it, so reps read it too.
+  app.get("/api/events/:id/sequences", async (c) => { const id = c.req.param("id"); const [e] = await db.query<{ starts_on: string; last_day: string }>(`SELECT e.starts_on::text AS starts_on, (${LAST_DAY_SQL})::text AS last_day FROM events e WHERE e.id = $1`, [id]); return c.json({ sequences: await sequenceList(db, deps, id), starts_on: e?.starts_on ?? null, last_day: e?.last_day ?? null }); });
+  app.get("/api/events/:id/sequences/:sid", async (c) => { const d = await sequenceDetail(db, deps, c.req.param("id"), c.req.param("sid")); return d ? c.json(d) : bad("That sequence is not on this event.", 404); });
   app.get("/api/events/:id/motion", async (c) => {
     const o = await motionOverview(db, deps, c.req.param("id"));
     if (!o) return bad("That event does not exist.", 404);
@@ -135,6 +139,7 @@ export function mountLifecycle(app: App, db: Db, deps: LifecycleDeps, opts: { ba
   app.get("/api/events/:id/motion/roster", async (c) => c.json({ roster: await roster(db, c.req.param("id")), timezone: await eventZone((sql, args) => db.query(sql, args), c.req.param("id")), slots: await db.query("SELECT s.id, s.rep, s.starts_at::text AS starts_at, s.location, s.meeting_id, k.full_name FROM meeting_slots s LEFT JOIN meetings m ON m.id = s.meeting_id LEFT JOIN contacts k ON k.id = m.contact_id WHERE s.event_id = $1 ORDER BY s.starts_at, s.rep", [c.req.param("id")]) }));
   app.post("/api/events/:id/motion/slots", guarded(async (c) => { const b = await body(c); return addSlots(db, c.req.param("id"), c.get("actor"), { rep: String(b.rep ?? ""), day: String(b.day ?? ""), from: String(b.from ?? ""), to: String(b.to ?? ""), minutes: Number(b.minutes ?? 30), location: String(b.location ?? "") }); }));
   app.post("/api/motion/slots/:sid/book", guarded(async (c) => bookSlot(db, deps, c.req.param("sid"), String((await body(c)).contact_id ?? ""), c.get("actor"))));
+  app.get("/api/people/:cid", async (c) => { const p = await personDetail(db, c.req.param("cid")); return p ? c.json(p) : bad("That person is not on the list.", 404); });
   app.get("/api/motion/replies/:rid", async (c) => { const r = await replyDetail(db, c.req.param("rid")); return r ? c.json(r) : bad("That reply does not exist.", 404); });
   app.get("/api/motion/meetings/:mid", async (c) => { const m = await meetingDetail(db, c.req.param("mid")); return m ? c.json(isLead(c.get("actor")) ? m : { ...m, deals: [] }) : bad("That meeting does not exist.", 404); });
   // A credited deal: from the written scorecard, or the live reading while the event closes. Leadership's and GTM's only.
