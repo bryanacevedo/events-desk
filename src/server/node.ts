@@ -101,6 +101,8 @@ if (!demoMotionReady) void (async () => {
       if (!f) break;
       if (f.stage === "delivered") {
         for (let k = 0; k < 5 && (await db.query<{ motion: string }>("SELECT motion FROM events WHERE id = $1", [f.id]))[0].motion !== "in_market"; k++) await demoAdvance(db, lifecycle!, demoSetup!.tools, f.id);
+        // Live is not the end: people answer, meet, and walk up to the booth.
+        await demoAdvance(db, lifecycle!, demoSetup!.tools, f.id);
         const [rep] = await db.query<{ rep: string }>("SELECT requester AS rep FROM seat_requests WHERE event_id = $1 AND status = 'approved' ORDER BY (requester = 'Maya Ortiz') DESC, requester LIMIT 1", [f.id]);
         if (rep) await addSlots(db, f.id, "GTM Team", { rep: rep.rep, day: "2027-03-02", from: "09:00", to: "12:00", minutes: 30, location: "Booth 12" });
         break;
