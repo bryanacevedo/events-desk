@@ -11,6 +11,7 @@ import { SideSheet } from "./SideSheet";
 import { stepAt, type NeedItem } from "./waiting";
 import { city, daysTo, money, num, plural, shortDate, todayYmd } from "./words";
 import { AFTER, afterStep, deliveredWords } from "./stages";
+import { isGtm } from "../shared/roles";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const monthKey = (ymd: string) => ymd.slice(0, 7);
@@ -262,7 +263,7 @@ export function Overview({ go, sheetId }: { go: (to: string) => void; sheetId: s
             ) : <p className="mute tray-empty">No lists delivered yet.</p>}
           </section>
 
-          {ov && ov.results.length > 0 && (
+          {ov && ov.results.length > 0 && (needs.approvers.includes(actor) || isGtm(actor)) && (
             <section className="ov" aria-label="Did it pay?">
               <div className="ov-h"><h2 className="display">Did it pay?</h2></div>
               <div className="tray">

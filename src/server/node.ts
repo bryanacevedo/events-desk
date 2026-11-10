@@ -27,7 +27,7 @@ import { seed } from "./seed.ts";
 import { simDeps } from "./sim-vendors.ts";
 import { demoConnectors, liveConnectors } from "./connectors/setup.ts";
 import { lifecycleTick } from "./lifecycle-tick.ts";
-import { demoAdvance, withDemoCrm } from "./demo-run.ts";
+import { demoAdvance, seedDemoStages, withDemoCrm } from "./demo-run.ts";
 import { addSlots } from "./rep-day.ts";
 import type { LifecycleDeps } from "./lifecycle-deps.ts";
 import { slackNotifier } from "./slack.ts";
@@ -111,8 +111,12 @@ if (!demoMotionReady) void (async () => {
         for (let k = 0; k < 5 && (await db.query<{ motion: string }>("SELECT motion FROM events WHERE id = $1", [f.id]))[0].motion !== "in_market"; k++) await demoAdvance(db, lifecycle!, demoSetup!.tools, f.id, { pressFollowUp: true });
         // Live is not the end: people answer, meet, and walk up to the booth.
         await demoAdvance(db, lifecycle!, demoSetup!.tools, f.id, { pressFollowUp: true });
-        const [rep] = await db.query<{ rep: string }>("SELECT requester AS rep FROM seat_requests WHERE event_id = $1 AND status = 'approved' ORDER BY (requester = 'Maya Ortiz') DESC, requester LIMIT 1", [f.id]);
-        if (rep) await addSlots(db, f.id, "GTM Team", { rep: rep.rep, day: "2027-03-02", from: "09:00", to: "12:00", minutes: 30, location: "Booth 12" });
+        // Every other step after delivery gets an event of its own, so each can be opened.
+        await seedDemoStages(db, lifecycle!, demoSetup!.tools);
+        // Free meeting slots belong to an event still to come: the one in market before it starts.
+        const tokyo = "evt_salesforce-world-tour-tokyo-2026";
+        const [rep] = await db.query<{ rep: string }>("SELECT requester AS rep FROM seat_requests WHERE event_id = $1 AND status = 'approved' ORDER BY (requester = 'Maya Ortiz') DESC, requester LIMIT 1", [tokyo]);
+        if (rep) await addSlots(db, tokyo, "GTM Team", { rep: rep.rep, day: "2026-11-18", from: "09:00", to: "12:00", minutes: 30, location: "Booth 4" });
         break;
       }
       await new Promise((r) => setTimeout(r, 1000));

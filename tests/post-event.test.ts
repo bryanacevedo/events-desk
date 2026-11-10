@@ -179,3 +179,12 @@ describe("the people list tells attendees from prospects", () => {
     expect(everyone.total).toBe(prospects.total + attendees.total);
   });
 });
+
+describe("My day", () => {
+  it("offers a free slot only while its event can still happen", async () => {
+    const h = await threeDay("2027-01-20T12:00:00Z");
+    const { repDay } = await import("../src/server/rep-day.ts");
+    await db.query("INSERT INTO meeting_slots (id, event_id, rep, starts_at, ends_at, location) VALUES ('s_on', $1, 'Rep A', '2027-02-02T10:00:00Z', '2027-02-02T10:30:00Z', 'Booth'), ('s_after', $1, 'Rep A', '2027-03-02T10:00:00Z', '2027-03-02T10:30:00Z', 'Booth')", [h.id]);
+    expect((await repDay(db, h.deps, "Rep A")).slots.map((s) => (s as { id: string }).id)).toEqual(["s_on"]);
+  });
+});

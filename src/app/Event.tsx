@@ -679,6 +679,8 @@ function DeliveredViews({ id, started, views, onChange }: { id: string; started:
   const [next, setNext] = useState<{ text: string; tab: View; action?: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const loadNext = async () => setNext((await get<{ next: typeof next }>(`/api/events/${id}/next`))?.next ?? null);
+  // A link to another view of this same event (#outreach from Overview, a Slack card) switches the view without reloading the page.
+  useEffect(() => { const on = () => { const v = fromHash(); if (v) setView(v); }; window.addEventListener("hashchange", on); window.addEventListener("popstate", on); return () => { window.removeEventListener("hashchange", on); window.removeEventListener("popstate", on); }; }, []);
   useEffect(() => { loadNext(); }, [id]);
   const pick = (v: View) => { setView(v); history.replaceState(null, "", `${location.pathname}${location.search}#${v}`); };
   const go = async () => {
@@ -860,7 +862,9 @@ export function Event({ id, go }: { id: string; go: (to: string) => void }) {
   const d = ev.data, e = d.event, stage: Stage = e.stage;
   const going = (needs?.requests ?? []).filter((r) => r.event_id === e.id && r.status === "approved");
   // The server decides; the screen only hides the control from people it would refuse, and while a run is going.
-  const canDelete = (isGtm(actor) || Boolean(needs?.approvers.includes(actor))) && !isRunning(stage);
+  // Company spend is leadership's and GTM Engineering's, as on Budget and Usage.
+  const lead = isGtm(actor) || Boolean(needs?.approvers.includes(actor));
+  const canDelete = lead && !isRunning(stage);
   const place = [e.venue, e.country && !(e.venue ?? "").includes(e.country) ? e.country : ""].filter(Boolean).join(", ");
   const placeParts = place.split(", ").filter(Boolean);
   const away = daysTo(e.starts_on);
@@ -899,7 +903,7 @@ export function Event({ id, go }: { id: string; go: (to: string) => void }) {
             </summary>
             <Story activity={d.activity} now={stage === "declined" ? -1 : stepAt(e, ev.open.length)} />
           </details>
-          {cards.length > 0 && (
+          {lead && cards.length > 0 && (
             <details className="fold">
               <summary>
                 <Icon.cost />

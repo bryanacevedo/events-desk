@@ -55,7 +55,7 @@ const PLAN: Record<number, [Upto, number, number, number?, string?]> = {
   11: ["delivered", 2, 0, 40, "Tomas Berg"], 12: ["delivered", 4, 0, 70], 13: ["delivered", 15, 0, 140, "Priya Nair"],
   14: ["delivered", 1, 0, 25], // about 25 rows
   15: ["review", 13, 0, 0], // the flagship: the whole of attendees-large.csv, research done, its cases open
-  16: ["approved", 2, 0], 17: ["mapped", 4, 0, 45], 18: ["quoted", 10, 0, 120], 19: ["requested", 0, 2],
+  16: ["approved", 2, 0], 17: ["delivered", 4, 0, 70, "Maya Ortiz"], 18: ["quoted", 10, 0, 120], 19: ["requested", 0, 2],
   20: ["paused", 12, 0, 140], 21: ["outreach", 10, 0, 100], 22: ["requested", 0, 6], 23: ["approved", 10, 2], 25: ["requested", 0, 3],
   27: ["approved", 4, 0], 28: ["mapped", 10, 0, 100], 29: ["requested", 0, 5], 31: ["approved", 3, 0], 32: ["mapped", 10, 0, 100],
   34: ["requested", 0, 2], 36: ["approved", 4, 0], 37: ["requested", 0, 6], 39: ["declined", 0, 3],

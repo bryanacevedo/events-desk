@@ -17,6 +17,7 @@ import { Settings } from "./Settings";
 import { PERSONAS } from "../shared/roles";
 import { loadNeeds, type Needs } from "./waiting";
 import { isGtm } from "../shared/roles";
+import { setDemoCalendar } from "./stages";
 
 export const PEOPLE = PERSONAS.map((p) => p.name);
 interface Ctx { actor: string; demo: boolean; needs: Needs | null; refresh: () => Promise<void> }
@@ -42,7 +43,8 @@ export function usePath() {
     addEventListener("popstate", on);
     return () => removeEventListener("popstate", on);
   }, []);
-  const go = (raw: string) => { const to = canonical(raw); history.pushState(null, "", to); setPath(to); if (!to.includes("?event=")) scrollTo(0, 0); };
+  // pushState does not announce a new #view, so a link to another view of the page already open says so itself.
+  const go = (raw: string) => { const to = canonical(raw); history.pushState(null, "", to); setPath(to); if (to.includes("#")) window.dispatchEvent(new HashChangeEvent("hashchange")); if (!to.includes("?event=")) scrollTo(0, 0); };
   return [path, go] as const;
 }
 
@@ -82,6 +84,7 @@ export function App() {
   const count = needs?.approvals.length ?? 0;
   // Seats is where leadership decides seat requests. Everyone else follows their own requests on My day, so the tab is only in the approvers' menu.
   // Budget and Usage are company spend: leadership's and GTM Engineering's, not an SDR's day.
+  setDemoCalendar(Boolean(demo));
   const approver = Boolean(needs?.approvers.includes(actor)), lead = approver || isGtm(actor);
   const navAt = ["overview", "myday", "events", ...(approver ? ["seats"] : []), ...(lead ? ["budget", "usage"] : [])].indexOf(place);
   if (demo === null) return null;

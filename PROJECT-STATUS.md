@@ -6,7 +6,7 @@
 
 Built 2026-11-09 from `docs/LIFECYCLE.md`: owner say, the connector contract with four tools, the sending layer, the gate, replies, meetings and on-site capture, CRM campaign and trail, scorecard and ROI, debrief, learning, integrity, the Outreach section and My day. Decisions in `docs/DECISIONS.md`, section 33. The gap list from the two outside reviews is kept privately, outside the repo.
 
-Waiting on Bryan: review of the branch, then merge and redeploy. Open calls: whether My day gets a sidebar place (it is under More on phones, and linked from nowhere else yet), and the requirements doc.
+v2 merged to main and deployed 2026-11-09 (`1aed654`), checked on the live link. Next: the three-voice video (new file beside v1), then the requirements docs. Open calls: whether My day gets a sidebar place (it is under More on phones, and linked from nowhere else yet), and the requirements doc.
 
 ## Where it stands
 

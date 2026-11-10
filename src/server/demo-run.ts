@@ -13,7 +13,8 @@ import { openOwnerDecisions, sendOwnerCards, ownerSweep } from "./owners.ts";
 import { ingestEvents, processInbound } from "./replies.ts";
 import { approveTemplate, attachCampaign, confirmLaunchChecklist, createDrafts, drainOps, observeSequences, recordLegalBasis, setTools } from "./sequences.ts";
 import { recordConsent, recordPlacement } from "./sending.ts";
-import { recordEventCost } from "./closeout.ts";
+import { recordEventCost, writeScorecards } from "./closeout.ts";
+import { moveMotion } from "./motion-state.ts";
 import { loadPeople, regionOf } from "./gate.ts";
 import type { LifecycleDeps } from "./lifecycle-deps.ts";
 import type { Crm, CrmOpportunity } from "./providers.ts";
@@ -136,3 +137,34 @@ export async function demoAdvance(db: Db, deps: LifecycleDeps, tools: Record<str
 }
 
 export const withDemoCrm = (crm: Crm | undefined, db: Db, now: () => Date): Crm | undefined => (crm ? { ...crm, opportunities: demoOpportunities(db, now) } : crm);
+
+/* The sample year shows every step after delivery, so a visitor can open each one. Run once at boot, after the flagship is in market. */
+type DemoStage = "owners" | "sequencing" | "follow_up_ready" | "in_market" | "closing" | "scored";
+export const DEMO_STAGES: [string, DemoStage][] = [
+  ["evt_nrf-2026-retail-s-big-show", "scored"],
+  ["evt_shoptalk-spring-2026", "closing"],
+  ["evt_money20-20-europe-2026", "follow_up_ready"],
+  ["evt_dreamforce-2026", "sequencing"],
+  ["evt_finnosummit-2026", "owners"],
+  ["evt_salesforce-world-tour-tokyo-2026", "in_market"],
+];
+
+export async function seedDemoStages(db: Db, deps: LifecycleDeps, tools: Record<string, FakeTool>) {
+  const motion = async (id: string) => (await db.query<{ motion: string; stage: string }>("SELECT motion, stage FROM events WHERE id = $1", [id]))[0];
+  // Each event waits until its list is delivered by the background build.
+  for (const [id] of DEMO_STAGES) for (let i = 0; i < 240 && (await motion(id))?.stage !== "delivered"; i++) await new Promise((r) => setTimeout(r, 1000));
+  const toMarket = async (id: string) => {
+    for (let k = 0; k < 6 && (await motion(id))?.motion !== "in_market"; k++) await demoAdvance(db, deps, tools, id, { pressFollowUp: true });
+    await demoAdvance(db, deps, tools, id, { pressFollowUp: true });
+  };
+  for (const [id, stage] of DEMO_STAGES) {
+    if ((await motion(id))?.stage !== "delivered") continue;
+    if (stage === "owners") { await demoAdvance(db, deps, tools, id); continue; }
+    if (stage === "follow_up_ready") { for (let k = 0; k < 3 && (await motion(id)).motion !== "sequencing"; k++) await demoAdvance(db, deps, tools, id); continue; }
+    if (stage === "sequencing") { for (let k = 0; k < 3 && (await motion(id)).motion !== "sequencing"; k++) await demoAdvance(db, deps, tools, id); await demoAdvance(db, deps, tools, id, { pressFollowUp: true }); continue; }
+    await toMarket(id);
+    if (stage === "closing" || stage === "scored") await db.tx((q) => moveMotion(q, id, "closing", "Events Desk", "Fourteen days after the event"));
+    // The scorecards run before Shoptalk closes, so NRF is scored and Shoptalk stays in closing.
+    if (stage === "scored") await writeScorecards(db, deps);
+  }
+}

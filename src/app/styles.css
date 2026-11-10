@@ -1698,3 +1698,131 @@ body.dlg-open { overflow: hidden; }
 .ehero.mini .stages .now .st-label, .ehero.mini .stages .done:last-child .st-label { display: inline-flex; position: absolute; left: 0; top: 16px; font: 600 15px/20px var(--display); color: var(--ink); white-space: nowrap; }
 .ehero.mini .st-who { position: absolute; left: 0; top: 37px; margin: 0; font-size: 13px; line-height: 16px; white-space: nowrap; }
 .sheet .sheet-open-full { align-self: flex-start; }
+
+/* My day. It opens like an event: a tinted header with the day's three figures. Replies are cards with a face and the event's mark, the words
+   they wrote largest, a mark on the left edge for how soon. Meetings are an agenda whose prep opens in place. Colour stays on marks, never on words. */
+.md-hero { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 24px 40px; padding: 28px 32px; border-radius: 22px; background: color-mix(in srgb, var(--green) 9%, white); }
+.md-hello p { margin: 0 0 6px; font-size: 15px; color: var(--mute); }
+.md-hello h1 { margin: 0; font: 500 36px/42px var(--display); color: var(--ink); }
+.md-figs { display: flex; gap: 32px; }
+.md-figs p { display: grid; gap: 4px; margin: 0; }
+.md-figs b { font: 500 44px/1 var(--display); color: var(--ink); }
+.md-figs span { font-size: 13px; line-height: 16px; color: var(--mute); }
+.md-figs .zero b { color: var(--line-2); }
+.md-h { margin: 0 0 12px; font: 500 20px/26px var(--display); }
+.md-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+.md-card { display: grid; align-content: space-between; gap: 14px; padding: 18px 20px 16px 24px; border-radius: 18px; background: var(--ground); box-shadow: inset 4px 0 0 var(--line-2), 0 0 0 1px var(--line); transition: transform 200ms var(--ease), box-shadow 200ms ease-out; }
+.md-card.urgent { box-shadow: inset 4px 0 0 var(--orange), 0 0 0 1px var(--line); }
+.md-card:hover { transform: translateY(-2px); box-shadow: inset 4px 0 0 var(--line-2), 0 0 0 1px var(--line), 0 14px 24px -16px rgba(21, 35, 27, 0.35); }
+.md-card.urgent:hover { box-shadow: inset 4px 0 0 var(--orange), 0 0 0 1px var(--line), 0 14px 24px -16px rgba(21, 35, 27, 0.35); }
+.md-card header { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; }
+.md-card header div { display: grid; min-width: 0; }
+.md-card header b { font-weight: 500; font-size: 15px; line-height: 20px; }
+.md-card header span { font-size: 13px; line-height: 18px; color: var(--mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.md-card blockquote { margin: 0; font: 500 19px/27px var(--display); color: var(--ink); quotes: "\201C" "\201D"; }
+.md-card blockquote::before { content: open-quote; }
+.md-card blockquote::after { content: close-quote; }
+.md-card footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.md-by { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: var(--ink); white-space: nowrap; }
+.md-by i { width: 8px; height: 8px; border-radius: 50%; background: var(--line-2); }
+.md-card.urgent .md-by i { background: var(--orange); }
+.md-agenda { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.md-meet { border-radius: 16px; background: var(--ground); box-shadow: 0 0 0 1px var(--line); }
+.md-meet summary { display: grid; grid-template-columns: auto auto auto minmax(0, 1fr) auto; align-items: center; gap: 16px; padding: 12px 16px; cursor: pointer; list-style: none; }
+.md-meet summary::-webkit-details-marker { display: none; }
+.md-day { display: inline-flex; align-items: center; gap: 8px; }
+.md-day b { font: 500 30px/1 var(--display); }
+.md-day span { font-size: 12px; line-height: 14px; color: var(--mute); }
+.md-time { font: 500 17px/22px var(--display); color: var(--ink); }
+.md-who { display: grid; min-width: 0; }
+.md-who b { font-weight: 500; font-size: 15px; }
+.md-who span { font-size: 13px; color: var(--mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.md-prep { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: var(--mute); }
+.md-prep svg { transition: transform 200ms var(--ease); }
+.md-meet[open] .md-prep svg { transform: rotate(180deg); }
+.md-brief { display: grid; margin: 0; padding: 4px 20px 16px 20px; }
+.md-brief > div { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.md-brief dt { color: var(--mute); }
+.md-brief dd { margin: 0; color: var(--ink); }
+.md-brief .said dd { font: 500 17px/24px var(--display); }
+.md-clear { font: 500 20px/28px var(--display); color: var(--mute); }
+.clamp2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+@media (max-width: 760px) {
+  .md-hero { grid-template-columns: minmax(0, 1fr); padding: 22px 20px; border-radius: 18px; }
+  .md-hello h1 { font-size: 28px; line-height: 34px; }
+  .md-figs { gap: 22px; }
+  .md-figs b { font-size: 34px; }
+  .md-cards { grid-template-columns: minmax(0, 1fr); }
+  .md-meet summary { grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; }
+  .md-meet summary > :nth-child(3) { display: none; }
+  .md-meet summary { grid-template-columns: auto auto minmax(0, 1fr) auto; }
+  .md-brief > div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+}
+/* Past the first four, replies are one line each: face, who, what they wrote, when, and the button. */
+.md-rest { margin-top: 18px; }
+.md-rest h3 { margin: 0 0 6px; font: 500 15px/20px var(--sans); color: var(--mute); }
+.md-rest ul { display: grid; margin: 0; padding: 0; list-style: none; }
+.md-rest li { display: grid; grid-template-columns: auto minmax(120px, 0.8fr) minmax(0, 1.4fr) auto auto; align-items: center; gap: 14px; min-height: 56px; padding: 0 4px; border-top: 1px solid var(--line); }
+.md-rest-who { display: grid; min-width: 0; }
+.md-rest-who b { font-weight: 500; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.md-rest-who span { font-size: 12px; color: var(--mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.md-rest q { font-size: 14px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; quotes: "\201C" "\201D"; }
+.md-rest li.urgent .md-by i { background: var(--orange); }
+@media (max-width: 760px) {
+  .md-rest li { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "av who btn" "av q q" "av by by"; row-gap: 2px; padding: 10px 0; }
+  .md-rest li > :nth-child(1) { grid-area: av; align-self: start; }
+  .md-rest-who { grid-area: who; }
+  .md-rest q { grid-area: q; }
+  .md-rest .md-by { grid-area: by; }
+  .md-rest li > button { grid-area: btn; }
+}
+
+
+/* Sequences as a grid: rows are who, columns are channels. A cell is a count and a state; its regions and inboxes open below it. */
+.sq { display: grid; gap: 18px; }
+.sq-phase { display: grid; gap: 10px; }
+.sq-phase h4 { margin: 0; font: 500 14px/20px var(--sans); color: var(--mute); }
+.sq-grid { display: grid; gap: 8px; align-items: stretch; }
+.sq-col { font-size: 13px; color: var(--mute); padding: 0 4px; }
+.sq-label { display: flex; align-items: center; font-size: 14px; color: var(--ink); }
+.sq-cell { display: grid; gap: 2px; justify-items: start; text-align: left; padding: 12px 14px; border: 0; border-radius: 14px; background: var(--well); color: var(--ink); font: inherit; cursor: pointer; transition: background-color 160ms ease-out, box-shadow 160ms ease-out; }
+.sq-cell:hover { background: color-mix(in srgb, var(--green) 8%, var(--well)); }
+.sq-cell.on { background: var(--ground); box-shadow: 0 0 0 1.5px var(--green); }
+.sq-cell b { font: 500 24px/28px var(--display); }
+.sq-cell span { font-size: 13px; line-height: 18px; color: var(--ink); }
+.sq-cell i { font-style: normal; font-size: 12px; line-height: 16px; color: var(--mute); }
+.sq-cell.empty { display: flex; align-items: center; cursor: default; background: transparent; box-shadow: inset 0 0 0 1px var(--line); color: var(--mute); font-size: 13px; }
+.sq-detail { display: grid; gap: 6px; padding: 12px 16px; border-radius: 14px; background: var(--ground); box-shadow: 0 0 0 1px var(--line); }
+.sq-detail header { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; font-size: 14px; }
+.sq-detail header .m-act, .sq-detail header > button { margin-left: auto; }
+.sq-senders { margin: 0; font-size: 13px; line-height: 19px; color: var(--ink); overflow-wrap: anywhere; }
+@media (max-width: 760px) { .sq-grid { grid-template-columns: minmax(0, 1fr) !important; } .sq-col { display: none; } .sq-label { padding-top: 6px; font-weight: 500; } }
+
+/* The Outreach folds, each in the shape of what it holds. */
+.m-fold { display: grid; gap: 16px; }
+.mt-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px 28px; }
+.mt-col h4, .sl-day h4 { display: flex; align-items: baseline; gap: 8px; margin: 0 0 6px; font: 500 14px/20px var(--sans); color: var(--mute); }
+.mt-col h4 span { font-family: var(--display); color: var(--ink); }
+.mt-col ul, .mc-list { display: grid; margin: 0; padding: 0; list-style: none; }
+.mt-col li, .mc-list li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 52px; border-top: 1px solid var(--line); }
+.mt-who { display: grid; min-width: 0; }
+.mt-who b { font-weight: 500; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mt-who span { font-size: 12px; color: var(--mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mt-when, .mc-rep { font-size: 13px; color: var(--ink); white-space: nowrap; }
+.mc-rep { display: inline-flex; align-items: center; gap: 6px; color: var(--mute); }
+.mc-rep i { width: 8px; height: 8px; border-radius: 50%; background: var(--orange); }
+.mc-list li.hot .mc-rep { color: var(--ink); font-weight: 500; }
+.rg-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
+.rg-tile { display: grid; grid-template-columns: auto 1fr; align-items: baseline; gap: 2px 8px; padding: 14px 16px; border-radius: 14px; background: var(--well); }
+.rg-name { grid-column: 1 / -1; font-size: 14px; font-weight: 500; }
+.rg-tile b { font: 500 26px/30px var(--display); }
+.rg-tile button { grid-column: 1 / -1; justify-self: start; margin-top: 8px; }
+.sl-days { display: grid; gap: 16px; }
+.sl-line { display: grid; grid-template-columns: minmax(140px, auto) minmax(0, 1fr) auto; align-items: center; gap: 16px; margin: 0; padding: 8px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.sl-rep { display: inline-flex; align-items: center; gap: 8px; }
+.sl-times { display: flex; flex-wrap: wrap; gap: 4px 14px; font-variant-numeric: tabular-nums; color: var(--ink); }
+.m-fold > .btn { justify-self: start; }
+@media (max-width: 760px) { .sl-line { grid-template-columns: minmax(0, 1fr); gap: 4px; } }
+
+/* People view: the list's brief sits under its figures with room to breathe. */
+.delivered-lead + .brief { margin-top: 28px; }

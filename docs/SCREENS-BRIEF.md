@@ -121,4 +121,8 @@ Bryan's pointers that shaped the app as it looks now. Read these before any new 
 - Overview answers three questions across every event: where is each one (the rail, with the same step words as the event header), what needs someone (replies waiting first, then the follow-up, paused sending, meetings to record, then the list's own risks), and is it working (Outreach: each delivered event's step with reached, replied and meetings; Did it pay: pipeline for every dollar, final or so far).
 - Long tables page at 12 rows, with search and filters above them.
 - The menu follows the person's job. A page full of buttons someone cannot use is clutter for them: Seats is in the approvers' menu only, and everyone else follows their own seat requests on My day (Bryan, 2026-11-09).
+- A fold shows its content in the shape of that content, never as label-and-value rows: sequences are a grid of who by channel, meetings are columns by what happened, slots read across by day, people met lead with faces. Forms sit behind a button until needed.
+- Company money (event cost, AI and credits, "Did it pay?") is shown to leadership and GTM Engineering only, as Budget and Usage are. The cost card an uploader must confirm stays theirs.
+- My day opens like an event: a tinted header with the day's figures; the four most urgent replies are cards with a face, the rest one line each.
+- The demo shows every step after delivery on a real sample event, so each screen can be opened as it really looks.
 

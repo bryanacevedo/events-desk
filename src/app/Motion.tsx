@@ -5,10 +5,12 @@ import { get, send } from "./api";
 import { useActor } from "./App";
 import { Chevron, ExpandRow } from "./Patterns";
 import { Icon } from "./icons";
+import { PersonAvatar } from "./PersonAvatar";
 import { money, num, plural, shortDate } from "./words";
+import { isGtm } from "../shared/roles";
 
 interface Sender { address: string; role: "primary" | "spare"; daily_share: number; health: number | null }
-interface Sequence { id: string; name: string; channel: "email" | "linkedin"; priority: string; connector: string; state: string; pause_reason: string | null; senders_needed: number | null; peak_daily: number | null; sender_status: "ok" | "short" | "not_visible" | null; sender_excluded: { address: string; reason: string }[]; enrolled: number; paused: number; senders: Sender[]; timing_note: string | null; external_id: string | null; checklist_at: string | null }
+interface Sequence { id: string; name: string; channel: "email" | "linkedin"; priority: string; phase?: "pre" | "post"; zone_group?: string; adding?: number; connector: string; state: string; pause_reason: string | null; senders_needed: number | null; peak_daily: number | null; sender_status: "ok" | "short" | "not_visible" | null; sender_excluded: { address: string; reason: string }[]; enrolled: number; paused: number; senders: Sender[]; timing_note: string | null; external_id: string | null; checklist_at: string | null }
 interface Reply { id: string; code: string | null; doubtful: boolean; body: string | null; contact_id: string | null; full_name: string | null; company: string | null }
 interface Meeting { id: string; contact_id?: string; status: string; scheduled_at: string; rep: string | null; full_name: string | null; company: string | null }
 interface Score { held_all: number; logged_outside: number; cost: { dollars_cents: number }; cost_per_held_cents: number | null; influence: { available: boolean; sourced: { n: number; cents: number }; influenced: { n: number; cents: number }; won: { n: number; cents: number } }; control: { available: boolean; met_accounts: number; met_with_pipeline: number; control_accounts: number; control_with_pipeline: number }; roi: { pipeline_per_dollar: number | null; cost_missing: string[] } }
@@ -16,7 +18,7 @@ interface Overview {
   motion: string; capacity: { needed: number; healthy: number } | null;
   card: { status: string; llm_cap: number; est_cents: number } | null;
   sequences: Sequence[]; funnel: { kept: number; enrolled: number; sent: number; replied: number; booked: number; held: number } | null; owners: { status: string; n: number }[]; replies: Reply[]; meetings: Meeting[];
-  captures: { id: string; full_name: string | null; company: string | null; rep: string }[]; regions: { region: string; people: number; basis: string | null }[]; live_score: Score | null;
+  captures: { id: string; full_name: string | null; company: string | null; rep: string; temperature?: string }[]; regions: { region: string; people: number; basis: string | null }[]; live_score: Score | null;
   post_event: { window: "before" | "during" | "after" | "closed"; last_day: string; last_press: string | null; started_at: string | null; started_by: string | null; groups: Record<string, number> } | null;
 }
 type Act = (m: "POST", p: string, b?: unknown, say?: string) => void;
@@ -25,6 +27,9 @@ const CODE: Record<string, string> = { interested: "interested", meeting_request
 const REASON: Record<string, string> = { not_connected: "Not connected", health_unknown: "Health not reported", low_health: "Health too low", still_warming: "Still warming up", high_bounce: "Bounces too high", high_spam: "Spam too high", fully_booked: "Used by other sequences", domain_full: "Domain has enough", no_auth: "Domain not set up to send", failed_placement: "Landing in spam", stale_placement: "Not tested lately", not_tested: "Not tested", warmup_off: "Warmup off", burned: "Domain resting", primary_domain: "Company's own domain", no_consent: "Rep has not agreed" };
 const when = (iso: string) => new Date(iso).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "UTC" });
 const FOLLOW_UP = [["scanned", "Scanned at the booth"], ["reached", "Reached before, no reply"], ["not_reached", "Not reached before"]] as const;
+/** Meeting and slot times in the reader's own clock. */
+const shortWhen = (iso: string) => new Date(iso).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+const clockOf = (iso: string) => new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 const STATE: Record<string, string> = { active: "Live", paused: "Paused", archived: "Ended", draft: "Draft" };
 
 /** The brief's row: what it is, a thin bar for how much, the number. */
@@ -36,39 +41,92 @@ function Fold({ icon, title, peek, children }: { icon: React.ReactNode; title: s
   return <details className="fold"><summary>{icon}<span className="fold-t">{title}</span><span className="fold-peek">{peek}</span><Chevron /></summary><div className="m-fold">{children}</div></details>;
 }
 
-function SequenceRow({ s, act, busy }: { s: Sequence; act: Act; busy: boolean }) {
+const REGION: Record<string, string> = { americas: "Americas", emea: "EMEA", apac: "APAC", event: "Event's region" };
+const GROUP_WORDS: Record<string, string> = { scanned: "Scanned at the booth", reached: "Reached before", not_reached: "Not reached before" };
+const GROUP_ORDER = ["scanned", "reached", "not_reached"];
+const peopleIn = (s: Sequence) => s.enrolled + s.paused + (s.adding ?? 0);
+
+/** One region's sequence, opened from its cell: its state, its sending accounts, and what it still needs before it goes out. */
+function SequenceDetail({ s, act, busy }: { s: Sequence; act: Act; busy: boolean }) {
   const [campaign, setCampaign] = useState("");
   const words = s.channel === "email" ? "inboxes" : "accounts";
   const primary = s.senders.filter((x) => x.role === "primary"), spare = s.senders.filter((x) => x.role === "spare");
   const short = s.sender_status === "short" ? Math.max(1, (s.senders_needed ?? 0) - primary.length) : 0;
-  const side = !s.external_id
+  const action = !s.external_id
     ? <form className="m-act" onSubmit={(e) => { e.preventDefault(); act("POST", `/api/motion/sequences/${s.id}/campaign`, { external_id: campaign }); }}><input aria-label="Its campaign in the tool" placeholder="Campaign id" value={campaign} onChange={(e) => setCampaign(e.target.value)} required /><button className="btn small line" disabled={busy}>Connect</button></form>
     : s.state === "draft" && !s.checklist_at ? <button className="btn small line" disabled={busy} onClick={() => act("POST", `/api/motion/sequences/${s.id}/checklist`)}>Ready to launch</button> : null;
   return (
-    <ExpandRow className="m-seq" label={s.name} side={side}
-      head={<span className="m-seqhead"><span className="xrow-title">{s.name.replace(/ [a-z0-9]{6}$/, "")}</span><span className="mute">{STATE[s.state] ?? s.state}, {plural(s.enrolled, "person", "people")}</span>{short > 0 && <span className="fig over"><b>{short}</b> {words} short</span>}</span>}>
-      <ul className="m-rows">
-        {s.peak_daily !== null && <li><span>Sends on the busiest day</span><b>{num(s.peak_daily)}</b></li>}
-        <li><span>Healthiest {words}, chosen</span><b>{primary.length}{spare.length ? ` and ${spare.length} spare` : ""}</b></li>
-        {s.sender_status === "not_visible" && <li><span>This tool does not show its {words}</span><b>Not checked</b></li>}
-        {s.pause_reason && <li><span>Paused</span><b className="m-text">{s.pause_reason}</b></li>}
-        {s.timing_note && <li><span>Timing</span><b className="m-text">{s.timing_note}</b></li>}
-        {s.external_id && s.state === "draft" && !s.checklist_at && <li><span>Before launch</span><b className="m-text">Sending domain signed, one-click unsubscribe on, the tool's limits set</b></li>}
-      </ul>
-      {s.senders.length > 0 && <ul className="m-rows">{s.senders.map((x) => <li key={x.address}><span>{x.address}</span><b>{x.role === "spare" ? "Spare" : `${x.daily_share} a day`}</b></li>)}</ul>}
-      {s.sender_excluded.length > 0 && <ul className="m-rows mute">{s.sender_excluded.slice(0, 8).map((x) => <li key={x.address}><span>{x.address}</span><b>{REASON[x.reason] ?? x.reason}</b></li>)}</ul>}
-    </ExpandRow>
+    <div className="sq-detail">
+      <header>
+        <b>{REGION[s.zone_group ?? "event"] ?? s.zone_group}</b>
+        <span className="mute">{STATE[s.state] ?? s.state} · {plural(peopleIn(s), "person", "people")}{s.peak_daily !== null ? ` · ${num(s.peak_daily)} on the busiest day` : ""}</span>
+        {short > 0 && <span className="fig over"><b>{short}</b> {words} short</span>}
+        {action}
+      </header>
+      {(s.pause_reason || s.timing_note) && <p className="mute small">{s.pause_reason ?? s.timing_note}</p>}
+      {s.senders.length > 0 && <p className="sq-senders"><span className="mute">{primary.length} {words}{spare.length ? `, ${spare.length} spare` : ""}:</span> {s.senders.map((x) => `${x.address.replace(/^https:\/\/www\.linkedin\.com\/in\//, "")}${x.role === "spare" ? " (spare)" : ` (${x.daily_share} a day)`}`).join(", ")}</p>}
+    </div>
+  );
+}
+
+/** The sequences as a grid: who (rows, by what happened or by priority) by channel (columns). Each cell is a count and a state; regions and inboxes open from it. */
+function SequenceGrid({ sequences, act, busy }: { sequences: Sequence[]; act: Act; busy: boolean }) {
+  const [open, setOpen] = useState<string | null>(null);
+  const shown = sequences.filter((s) => peopleIn(s) > 0 || s.state === "draft");
+  const phases = (["pre", "post"] as const).filter((p) => shown.some((s) => (s.phase ?? "pre") === p));
+  const channels = (["email", "linkedin"] as const).filter((c) => shown.some((s) => s.channel === c));
+  return (
+    <div className="sq">
+      {phases.map((phase) => {
+        const mine = shown.filter((s) => (s.phase ?? "pre") === phase);
+        const groups = [...new Set(mine.map((s) => s.priority))].sort((a, b) => (GROUP_ORDER.indexOf(a) + 1 || 99) - (GROUP_ORDER.indexOf(b) + 1 || 99) || a.localeCompare(b));
+        return (
+          <div key={phase} className="sq-phase">
+            {phases.length > 1 && <h4>{phase === "pre" ? "Before the event" : "After the event"}</h4>}
+            <div className="sq-grid" style={{ gridTemplateColumns: `minmax(120px, 1fr) repeat(${channels.length}, minmax(0, 1.2fr))` }}>
+              <span />
+              {channels.map((c) => <span key={c} className="sq-col">{c === "email" ? "Email" : "LinkedIn"}</span>)}
+              {groups.map((g) => (
+                <div key={g} className="sq-row" style={{ display: "contents" }}>
+                  <span className="sq-label">{GROUP_WORDS[g] ?? `Priority ${g}`}</span>
+                  {channels.map((c) => {
+                    const cell = mine.filter((s) => s.priority === g && s.channel === c);
+                    const key = `${phase}|${g}|${c}`;
+                    if (!cell.length) return <span key={c} className="sq-cell empty">None</span>;
+                    const people = cell.reduce((n, s) => n + peopleIn(s), 0);
+                    const states = [...new Set(cell.map((s) => STATE[s.state] ?? s.state))];
+                    const toCheck = cell.filter((s) => s.state === "draft" && !s.checklist_at).length;
+                    const short = cell.some((s) => s.sender_status === "short");
+                    return (
+                      <button key={c} type="button" className={`sq-cell${open === key ? " on" : ""}`} aria-expanded={open === key} onClick={() => setOpen(open === key ? null : key)}>
+                        <b>{num(people)}</b>
+                        <span>{toCheck ? `${toCheck} to check` : states.join(", ")}{short ? " · short of inboxes" : ""}</span>
+                        <i>{cell.map((s) => REGION[s.zone_group ?? "event"] ?? s.zone_group).join(" · ")}</i>
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+            {mine.filter((s) => open === `${phase}|${s.priority}|${s.channel}`).map((s) => <SequenceDetail key={s.id} s={s} act={act} busy={busy} />)}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
 export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
-  const { actor, demo } = useActor();
+  const { actor, demo, needs } = useActor();
+  // What the event cost and returned is leadership's and GTM Engineering's view, as on Budget.
+  const lead = isGtm(actor) || Boolean(needs?.approvers.includes(actor));
   const [o, setO] = useState<Overview | null>(null);
   const [slots, setSlots] = useState<{ roster: { rep: string }[]; slots: { id: string; rep: string; starts_at: string; location: string; meeting_id: string | null }[] }>({ roster: [], slots: [] });
   const [busy, setBusy] = useState(false), [error, setError] = useState(""), [note, setNote] = useState("");
   const [cap, setCap] = useState({ name: "", email: "", company: "", note: "", hot: false });
   const [slot, setSlot] = useState({ rep: "", day: "", from: "09:00", to: "17:00", minutes: 30, location: "Booth" });
   const [cost, setCost] = useState({ category: "", amount: "" });
+  const [slotForm, setSlotForm] = useState(false), [capForm, setCapForm] = useState(false);
   const load = async () => {
     setO(await get<Overview>(`/api/events/${id}/motion`));
     const r = await get<typeof slots>(`/api/events/${id}/motion/roster`);
@@ -142,11 +200,12 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
               <Row label="In sequences" n={f.enrolled} of={f.kept} />
               <Row label="Reached" n={f.sent} of={f.kept} />
               <Row label="Replied" n={f.replied} of={f.kept} />
+              <Row label="Meetings booked" n={o.meetings.filter((m) => ["booked", "rescheduled", "held", "no_show"].includes(m.status)).length} of={f.kept} />
               <Row label="Meetings held" n={s?.held_all ?? f.held} of={f.kept} />
               {mine > 0 && <Row label="Kept by account owners" n={mine} of={f.kept} tone="t3" />}
             </ul>
           </div>
-          {s && (
+          {s && lead && (
             <div>
               <h3>Did it pay for itself?<span>{s.roi.pipeline_per_dollar === null ? "" : `${s.roi.pipeline_per_dollar}x`}</span></h3>
               <ul className="money">
@@ -193,42 +252,87 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
       <div className="folds">
         {o.sequences.length > 0 && (
           <Fold icon={<Icon.lists />} title="Sequences" peek={<>{short > 0 && <span className="fig over"><b>{short}</b> short of inboxes</span>}<i>{live} of {o.sequences.length} live</i></>}>
-            <div>{o.sequences.map((x) => <SequenceRow key={x.id} s={x} busy={busy} act={act} />)}</div>
+            <SequenceGrid sequences={o.sequences} busy={busy} act={act} />
           </Fold>
         )}
         {started && missingRegions.length > 0 && (
           <Fold icon={<Icon.pin />} title="Who we may contact" peek={<span className="fig over"><b>{missingRegions.length}</b> regions to confirm</span>}>
-            <ul className="m-rows">{missingRegions.map((r) => <li key={r.region}><span className="m-cap">{r.region}, {plural(r.people, "person", "people")}</span><button className="btn small line" disabled={busy} onClick={() => act("POST", `/api/events/${id}/motion/legal-basis`, { region: r.region, basis: "Legitimate interest" })}>Confirm</button></li>)}</ul>
+            <p className="mute small">Nobody in these regions is contacted until someone records the basis for it.</p>
+            <div className="rg-tiles">{missingRegions.map((r) => (
+              <div key={r.region} className="rg-tile">
+                <span className="rg-name">{r.region === "unknown" ? "Region unknown" : r.region[0].toUpperCase() + r.region.slice(1)}</span>
+                <b>{num(r.people)}</b><span className="mute">{r.people === 1 ? "person" : "people"}</span>
+                <button className="btn small line" disabled={busy} onClick={() => act("POST", `/api/events/${id}/motion/legal-basis`, { region: r.region, basis: "Legitimate interest" })}>Confirm</button>
+              </div>
+            ))}</div>
           </Fold>
         )}
         {o.meetings.length > 0 && (
-          <Fold icon={<Icon.calendar />} title="Meetings" peek={<>{num(o.meetings.filter((m) => m.status === "held").length)} held<i>{num(o.meetings.length)} in all</i></>}>
-            <ul className="m-rows">{o.meetings.slice(0, 40).map((m) => <li key={m.id}><span>{m.full_name ?? "Someone"}, {m.company}</span><b>{m.status === "no_show" ? "No-show" : m.status[0].toUpperCase() + m.status.slice(1)}, {when(m.scheduled_at)}</b></li>)}</ul>
+          <Fold icon={<Icon.calendar />} title="Meetings" peek={<>{num(o.meetings.filter((m) => m.status === "held").length)} held<i>{num(o.meetings.filter((m) => ["booked", "rescheduled"].includes(m.status)).length)} coming up</i></>}>
+            <div className="mt-cols">
+              {([["Coming up", (m: Meeting) => ["booked", "rescheduled"].includes(m.status)], ["Held", (m: Meeting) => m.status === "held"], ["Did not happen", (m: Meeting) => ["no_show", "cancelled"].includes(m.status)]] as const).map(([title, test]) => {
+                const rows = o.meetings.filter(test);
+                if (!rows.length) return null;
+                return (
+                  <div key={title} className="mt-col">
+                    <h4>{title}<span>{rows.length}</span></h4>
+                    <ul>{rows.slice(0, 20).map((m) => (
+                      <li key={m.id}>
+                        <PersonAvatar name={m.full_name ?? "Someone"} size={30} />
+                        <span className="mt-who"><b>{m.full_name ?? "Someone"}</b><span>{m.company}{m.rep ? ` · with ${m.rep.split(" ")[0]}` : ""}</span></span>
+                        <span className="mt-when">{shortWhen(m.scheduled_at)}{m.status === "no_show" ? " · no-show" : m.status === "cancelled" ? " · cancelled" : ""}</span>
+                      </li>
+                    ))}</ul>
+                  </div>
+                );
+              })}
+            </div>
           </Fold>
         )}
         {started && roster.length > 0 && (
           <Fold icon={<Icon.seats />} title="Meeting slots" peek={free.length ? <>{num(free.length)} free</> : "None open"}>
-            <form className="m-form" onSubmit={(e) => { e.preventDefault(); act("POST", `/api/events/${id}/motion/slots`, slot, "Slots opened."); }}>
-              <label>Who<select value={slot.rep} onChange={(e) => setSlot({ ...slot, rep: e.target.value })}>{roster.map((x) => <option key={x}>{x}</option>)}</select></label>
-              <label>Day<input type="date" value={slot.day} onChange={(e) => setSlot({ ...slot, day: e.target.value })} required /></label>
-              <label>From<input type="time" value={slot.from} onChange={(e) => setSlot({ ...slot, from: e.target.value })} /></label>
-              <label>To<input type="time" value={slot.to} onChange={(e) => setSlot({ ...slot, to: e.target.value })} /></label>
-              <label>Where<input value={slot.location} onChange={(e) => setSlot({ ...slot, location: e.target.value })} /></label>
-              <button className="btn small" disabled={busy}>Open slots</button>
-            </form>
+            {free.length > 0 ? (
+              <div className="sl-days">{[...new Set(free.map((x) => x.starts_at.slice(0, 10)))].map((day) => (
+                <div key={day} className="sl-day">
+                  <h4>{new Date(`${day}T12:00:00Z`).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}</h4>
+                  {[...new Set(free.filter((x) => x.starts_at.startsWith(day)).map((x) => x.rep))].map((rep) => {
+                    const mine = free.filter((x) => x.starts_at.startsWith(day) && x.rep === rep);
+                    return <p key={rep} className="sl-line"><span className="sl-rep"><PersonAvatar name={rep} size={24} />{rep}</span><span className="sl-times">{mine.map((x) => <span key={x.id}>{clockOf(x.starts_at)}</span>)}</span><span className="mute">{mine[0].location}</span></p>;
+                  })}
+                </div>
+              ))}</div>
+            ) : <p className="mute">No free slots. Open some for the reps going.</p>}
+            {slotForm ? (
+              <form className="m-form" onSubmit={(e) => { e.preventDefault(); act("POST", `/api/events/${id}/motion/slots`, slot, "Slots opened."); setSlotForm(false); }}>
+                <label>Who<select value={slot.rep} onChange={(e) => setSlot({ ...slot, rep: e.target.value })}>{roster.map((x) => <option key={x}>{x}</option>)}</select></label>
+                <label>Day<input type="date" value={slot.day} onChange={(e) => setSlot({ ...slot, day: e.target.value })} required /></label>
+                <label>From<input type="time" value={slot.from} onChange={(e) => setSlot({ ...slot, from: e.target.value })} /></label>
+                <label>To<input type="time" value={slot.to} onChange={(e) => setSlot({ ...slot, to: e.target.value })} /></label>
+                <label>Where<input value={slot.location} onChange={(e) => setSlot({ ...slot, location: e.target.value })} /></label>
+                <button className="btn small" disabled={busy}>Open slots</button>
+              </form>
+            ) : <button type="button" className="btn small line" onClick={() => setSlotForm(true)}>Open slots</button>}
           </Fold>
         )}
         {started && (
           <Fold icon={<Icon.people />} title="Met at the event" peek={o.captures.length ? num(o.captures.length) : undefined}>
-            <form className="m-form" onSubmit={(e) => { e.preventDefault(); act("POST", `/api/events/${id}/motion/capture`, { full_name: cap.name, email: cap.email, company: cap.company, note: cap.note, met: true, temperature: cap.hot ? "hot" : "warm" }, cap.hot ? "Saved. Their outreach is stopped, and a task for today is in the CRM." : "Saved. Their outreach is stopped."); setCap({ name: "", email: "", company: "", note: "", hot: false }); }}>
-              <label>Name<input value={cap.name} onChange={(e) => setCap({ ...cap, name: e.target.value })} /></label>
-              <label>Email<input type="email" value={cap.email} onChange={(e) => setCap({ ...cap, email: e.target.value })} /></label>
-              <label>Company<input value={cap.company} onChange={(e) => setCap({ ...cap, company: e.target.value })} /></label>
-              <label>What they said<input value={cap.note} onChange={(e) => setCap({ ...cap, note: e.target.value })} /></label>
-              <label className="check"><input type="checkbox" checked={cap.hot} onChange={(e) => setCap({ ...cap, hot: e.target.checked })} /><span>Hot, follow up today</span></label>
-              <button className="btn small" disabled={busy}>Save</button>
-            </form>
-            {o.captures.length > 0 && <ul className="m-rows">{o.captures.slice(0, 12).map((c) => <li key={c.id}><span>{c.full_name ?? "Someone"}, {c.company}</span><b>{c.rep}</b></li>)}</ul>}
+            {o.captures.length > 0 && <ul className="mc-list">{o.captures.slice(0, 24).map((c) => (
+              <li key={c.id} className={c.temperature === "hot" ? "hot" : undefined}>
+                <PersonAvatar name={c.full_name ?? "Someone"} size={30} />
+                <span className="mt-who"><b>{c.full_name ?? "Someone"}</b><span>{c.company ?? "Company not given"}</span></span>
+                <span className="mc-rep">{c.temperature === "hot" && <i aria-hidden="true" />}{c.temperature === "hot" ? "Hot · " : ""}met by {c.rep.split(" ")[0]}</span>
+              </li>
+            ))}</ul>}
+            {capForm ? (
+              <form className="m-form" onSubmit={(e) => { e.preventDefault(); act("POST", `/api/events/${id}/motion/capture`, { full_name: cap.name, email: cap.email, company: cap.company, note: cap.note, met: true, temperature: cap.hot ? "hot" : "warm" }, cap.hot ? "Saved. Their outreach is stopped, and a task for today is in the CRM." : "Saved. Their outreach is stopped."); setCap({ name: "", email: "", company: "", note: "", hot: false }); setCapForm(false); }}>
+                <label>Name<input value={cap.name} onChange={(e) => setCap({ ...cap, name: e.target.value })} /></label>
+                <label>Email<input type="email" value={cap.email} onChange={(e) => setCap({ ...cap, email: e.target.value })} /></label>
+                <label>Company<input value={cap.company} onChange={(e) => setCap({ ...cap, company: e.target.value })} /></label>
+                <label>What they said<input value={cap.note} onChange={(e) => setCap({ ...cap, note: e.target.value })} /></label>
+                <label className="check"><input type="checkbox" checked={cap.hot} onChange={(e) => setCap({ ...cap, hot: e.target.checked })} /><span>Hot, follow up today</span></label>
+                <button className="btn small" disabled={busy}>Save</button>
+              </form>
+            ) : <button type="button" className="btn small line" onClick={() => setCapForm(true)}>Log someone you met</button>}
           </Fold>
         )}
       </div>

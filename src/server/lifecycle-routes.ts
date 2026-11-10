@@ -33,8 +33,9 @@ export async function motionOverview(db: Db, deps: LifecycleDeps, id: string) {
   const [captures, unplaced, sequences, funnel, owners, replies, meetings, scorecards, debriefs, card, bases, cases] = await Promise.all([
     db.query("SELECT id, full_name, email, company, title, note, temperature, rep, source, captured_at::text AS captured_at FROM onsite_captures WHERE event_id = $1 ORDER BY captured_at DESC LIMIT 100", [id]),
     db.query("SELECT id, connector, channel, body, received_at::text AS received_at FROM inbound_messages WHERE status = 'unmatched' ORDER BY received_at DESC LIMIT 20"),
-    db.query(`SELECT s.id, s.name, s.channel, s.priority, s.connector, s.state, s.launched_at::text AS launched_at, s.pause_reason, s.senders_needed, s.peak_daily, s.sender_status, s.sender_excluded, s.timing_note, s.external_id, s.checklist_at::text AS checklist_at,
+    db.query(`SELECT s.id, s.name, s.channel, s.priority, s.phase, s.zone_group, s.connector, s.state, s.launched_at::text AS launched_at, s.pause_reason, s.senders_needed, s.peak_daily, s.sender_status, s.sender_excluded, s.timing_note, s.external_id, s.checklist_at::text AS checklist_at,
                 (SELECT count(*)::int FROM enrollments n WHERE n.sequence_id = s.id AND n.state = 'enrolled') AS enrolled,
+                (SELECT count(*)::int FROM enrollments n WHERE n.sequence_id = s.id AND n.state = 'adding') AS adding,
                 (SELECT count(*)::int FROM enrollments n WHERE n.sequence_id = s.id AND n.state = 'paused') AS paused,
                 (SELECT count(*)::int FROM enrollments n WHERE n.sequence_id = s.id AND n.state = 'removed') AS removed,
                 coalesce((SELECT json_agg(json_build_object('address', x.address, 'role', x.role, 'daily_share', x.daily_share, 'health', x.health_at_pick) ORDER BY x.role, x.address) FROM sequence_senders x WHERE x.sequence_id = s.id AND x.dropped_at IS NULL), '[]') AS senders
