@@ -1825,4 +1825,5 @@ body.dlg-open { overflow: hidden; }
 @media (max-width: 760px) { .sl-line { grid-template-columns: minmax(0, 1fr); gap: 4px; } }
 
 /* People view: the list's brief sits under its figures with room to breathe. */
-.delivered-lead + .brief { margin-top: 28px; }
+.delivered-lead + .brief { margin-top: 40px; }
+.seg.list-by { justify-self: start; align-self: start; width: max-content; margin-top: 8px; }

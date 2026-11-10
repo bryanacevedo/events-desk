@@ -234,18 +234,43 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
 
       {hot.length > 0 && (
         <div className="m-group">
-          <h3>Waiting on a rep</h3>
-          {hot.slice(0, 10).map((r) => (
-            <div key={r.id} className="xrow m-reply">
-              <div className="m-who"><span className="xrow-title">{r.full_name ?? "Someone"}</span><span className="mute">{r.company}, {CODE[r.code ?? ""] ?? "replied"}</span>{r.body && <q>{r.body}</q>}</div>
-              {free.length > 0 && r.contact_id && !booked.has(r.contact_id) && (
-                <form className="m-act xrow-side" onSubmit={(e) => { e.preventDefault(); const sel = (e.currentTarget.elements.namedItem("slot") as HTMLSelectElement).value; act("POST", `/api/motion/slots/${sel}/book`, { contact_id: r.contact_id }, "Booked."); }}>
-                  <select name="slot" aria-label="Slot">{free.slice(0, 40).map((x) => <option key={x.id} value={x.id}>{x.rep}, {when(x.starts_at)}</option>)}</select>
-                  <button className="btn small" disabled={busy}>Book</button>
-                </form>
-              )}
+          <h3>Waiting on a rep<span className="mute"> · {hot.length}</span></h3>
+          {/* The same shape as My day: the newest four as cards with a face and their words, the rest one line each. */}
+          <div className="md-cards">{hot.slice(0, 4).map((r) => {
+            const bookable = free.length > 0 && r.contact_id && !booked.has(r.contact_id);
+            return (
+              <article key={r.id} className={`md-card${r.code === "meeting_request" ? " urgent" : ""}`}>
+                <header>
+                  <PersonAvatar name={r.full_name ?? "Someone"} size={40} />
+                  <div><b>{r.full_name ?? "Someone"}</b><span>{r.company} · {CODE[r.code ?? ""] ?? "replied"}</span></div>
+                </header>
+                {r.body && <blockquote>{r.body}</blockquote>}
+                <footer>
+                  {r.contact_id && booked.has(r.contact_id) ? <span className="md-by"><i aria-hidden="true" />Meeting booked</span>
+                    : bookable ? (
+                      <form className="m-act" onSubmit={(e) => { e.preventDefault(); const sel = (e.currentTarget.elements.namedItem("slot") as HTMLSelectElement).value; act("POST", `/api/motion/slots/${sel}/book`, { contact_id: r.contact_id }, "Booked."); }}>
+                        <select name="slot" aria-label="Slot">{free.slice(0, 40).map((x) => <option key={x.id} value={x.id}>{x.rep.split(" ")[0]}, {shortWhen(x.starts_at)}</option>)}</select>
+                        <button className="btn small" disabled={busy}>Book</button>
+                      </form>
+                    ) : <span className="md-by"><i aria-hidden="true" />With the account owner</span>}
+                </footer>
+              </article>
+            );
+          })}</div>
+          {hot.length > 4 && (
+            <div className="md-rest">
+              <h3>{hot.length - 4} more</h3>
+              <ul>{hot.slice(4, 40).map((r) => (
+                <li key={r.id}>
+                  <PersonAvatar name={r.full_name ?? "Someone"} size={30} />
+                  <span className="md-rest-who"><b>{r.full_name ?? "Someone"}</b><span>{r.company}</span></span>
+                  <q>{r.body ?? (CODE[r.code ?? ""] ?? "replied")}</q>
+                  <span className="md-by"><i aria-hidden="true" />{CODE[r.code ?? ""] ?? "replied"}</span>
+                  <span />
+                </li>
+              ))}</ul>
             </div>
-          ))}
+          )}
         </div>
       )}
 

@@ -83,7 +83,8 @@ function useUrlState(keys: string[], defaults: Record<string, string>) {
     setSt(next);
     const p = new URLSearchParams(location.search);
     for (const k of keys) { if (next[k] && next[k] !== (defaults[k] ?? "")) p.set(k, next[k]); else p.delete(k); }
-    history.replaceState(null, "", `${location.pathname}${p.toString() ? `?${p}` : ""}`);
+    // The view (#people, #outreach) stays: a filter change must not send a reload back to another view.
+    history.replaceState(null, "", `${location.pathname}${p.toString() ? `?${p}` : ""}${location.hash}`);
   };
   return [st, set] as const;
 }
@@ -474,6 +475,21 @@ function PeopleTable({ id, hasPriorities, reloadKey }: { id: string; hasPrioriti
 }
 
 /** The companies, after research: tier, what was known, people. */
+/** The delivered list, by person or by company: one table at a time, chosen with the same switch as the views. The choice stays in the link. */
+function ListTables({ id, hasPriorities, reloadKey }: { id: string; hasPriorities: boolean; reloadKey: number }) {
+  const [f, setF] = useUrlState(["by"], {});
+  const by = f.by === "companies" ? "companies" : "people";
+  return (
+    <>
+      <div className="seg list-by" role="group" aria-label="List by">
+        <button type="button" aria-pressed={by === "people"} onClick={() => setF({ by: "" })}>People</button>
+        <button type="button" aria-pressed={by === "companies"} onClick={() => setF({ by: "companies" })}>Companies</button>
+      </div>
+      {by === "people" ? <PeopleTable id={id} hasPriorities={hasPriorities} reloadKey={reloadKey} /> : <CompaniesTable id={id} reloadKey={reloadKey} />}
+    </>
+  );
+}
+
 function CompaniesTable({ id, reloadKey }: { id: string; reloadKey: number }) {
   const [f, setF] = useUrlState(["cq", "ct", "cpage"], {});
   const [typed, setTyped] = useState(f.cq);
@@ -653,7 +669,7 @@ export function StageBlock({ ev, go, compact }: { ev: EventState; go: (to: strin
             <>
               <ListBrief d={d} />
               <Cases eventId={e.id} cases={ev.cases} onChange={reload} />
-              <PeopleTable id={e.id} hasPriorities={d.list.priorities.length > 0} reloadKey={reloads} />
+              <ListTables id={e.id} hasPriorities={d.list.priorities.length > 0} reloadKey={reloads} />
             </>
           )}
         </>
