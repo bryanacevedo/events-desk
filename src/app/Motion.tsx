@@ -14,7 +14,7 @@ import { isGtm } from "../shared/roles";
 interface Sender { address: string; role: "primary" | "spare"; daily_share: number; health: number | null }
 interface Sequence { id: string; name: string; channel: "email" | "linkedin"; priority: string; phase?: "pre" | "post"; zone_group?: string; adding?: number; connector: string; state: string; pause_reason: string | null; senders_needed: number | null; peak_daily: number | null; sender_status: "ok" | "short" | "not_visible" | null; sender_excluded: { address: string; reason: string }[]; enrolled: number; paused: number; senders: Sender[]; timing_note: string | null; external_id: string | null; checklist_at: string | null }
 interface Reply { id: string; connector?: string; thread_url?: string | null; code: string | null; doubtful: boolean; waiting?: boolean; body: string | null; contact_id: string | null; full_name: string | null; company: string | null }
-interface Meeting { id: string; contact_id?: string; status: string; scheduled_at: string; rep: string | null; full_name: string | null; company: string | null }
+interface Meeting { id: string; contact_id?: string; from_reply?: boolean; status: string; scheduled_at: string; rep: string | null; full_name: string | null; company: string | null }
 interface Score { held_all: number; logged_outside: number; cost: { dollars_cents: number }; cost_per_held_cents: number | null; influence: { available: boolean; sourced: { n: number; cents: number }; influenced: { n: number; cents: number }; won: { n: number; cents: number } }; control: { available: boolean; met_accounts: number; met_with_pipeline: number; control_accounts: number; control_with_pipeline: number }; roi: { pipeline_per_dollar: number | null; cost_missing: string[] } }
 interface Overview {
   motion: string; capacity: { needed: number; healthy: number } | null;
@@ -39,10 +39,18 @@ const openFold = (title: string) => {
   const d = [...document.querySelectorAll<HTMLDetailsElement>("section.motion details.fold")].find((x) => x.querySelector(".fold-t")?.textContent === title);
   if (d) { d.open = true; d.scrollIntoView({ behavior: "smooth", block: "start" }); }
 };
+/** The meetings behind each funnel row, by the same rules as the funnel (migrations/0041 event_funnel). */
+const MEET_VIEWS = {
+  reply: ["Booked from a reply", (m: Meeting) => Boolean(m.from_reply) && ["booked", "held", "no_show", "rescheduled"].includes(m.status)],
+  booth: ["Met at the booth", (m: Meeting) => m.status === "held" && !m.from_reply],
+  held: ["Meetings held", (m: Meeting) => m.status === "held"],
+} as const;
 const STATE: Record<string, string> = { active: "Live", paused: "Paused", archived: "Ended", draft: "Draft" };
 
 /** The brief's row: what it is, a thin bar for how much, the number. */
-function Row({ label, n, of, tone = "t1", shown, onOpen }: { label: string; n: number; of: number; tone?: string; shown?: string; onOpen?: () => void }) {
+function Row({ label, n, of, tone = "t1", shown, onOpen: given }: { label: string; n: number; of: number; tone?: string; shown?: string; onOpen?: () => void }) {
+  // A row with nothing behind it leads nowhere: no arrow, no click.
+  const onOpen = n > 0 ? given : undefined;
   return <li className={`brow${onOpen ? " opens" : ""}`} onClick={onOpen} role={onOpen ? "button" : undefined} tabIndex={onOpen ? 0 : undefined} onKeyDown={onOpen ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(); } } : undefined}><span>{label}</span><i aria-hidden="true"><u className={tone} style={{ width: `${of > 0 ? Math.min(100, (100 * n) / of) : 0}%` }} /></i><b>{shown ?? num(n)}</b></li>;
 }
 
@@ -136,6 +144,9 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
   const [slot, setSlot] = useState({ rep: "", day: "", from: "09:00", to: "17:00", minutes: 30, location: "Booth" });
   const [cost, setCost] = useState({ category: "", amount: "" });
   const [slotForm, setSlotForm] = useState(false), [capForm, setCapForm] = useState(false);
+  // Which meetings a funnel row asked for: the Meetings fold shows only those until "All meetings".
+  const [meetView, setMeetView] = useState<keyof typeof MEET_VIEWS | null>(null);
+  const showMeetings = (v: keyof typeof MEET_VIEWS) => { setMeetView(v); requestAnimationFrame(() => openFold("Meetings")); };
   const load = async () => {
     setO(await get<Overview>(`/api/events/${id}/motion`));
     const r = await get<typeof slots>(`/api/events/${id}/motion/roster`);
@@ -223,9 +234,9 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
               <Row label="Reached" n={f.sent} of={f.kept} />
               <Row label="Replied" n={f.replied} of={f.kept} onOpen={hot.length ? () => document.querySelector(".m-replies")?.scrollIntoView({ behavior: "smooth", block: "start" }) : undefined} />
               {/* Where meetings came from, then every meeting held: the same total as every other screen. */}
-              <Row label="Booked from a reply" onOpen={() => openFold("Meetings")} n={f.booked} of={f.kept} />
-              {(f.held_all ?? f.held) > f.held && <Row label="Met at the booth" n={(f.held_all ?? f.held) - f.held} of={f.kept} onOpen={() => openFold("Meetings")} />}
-              <Row label="Meetings held" n={f.held_all ?? f.held} of={f.kept} onOpen={() => openFold("Meetings")} />
+              <Row label="Booked from a reply" onOpen={() => showMeetings("reply")} n={f.booked} of={f.kept} />
+              {(f.held_all ?? f.held) > f.held && <Row label="Met at the booth" n={(f.held_all ?? f.held) - f.held} of={f.kept} onOpen={() => showMeetings("booth")} />}
+              <Row label="Meetings held" n={f.held_all ?? f.held} of={f.kept} onOpen={() => showMeetings("held")} />
               {mine > 0 && <Row label="Held back by account owners" n={mine} of={f.kept} tone="t3" />}
             </ul>
           </div>
@@ -258,6 +269,15 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
         )}
         {o.meetings.length > 0 && (
           <Fold icon={<Icon.calendar />} title="Meetings" peek={<>{num(o.meetings.filter((m) => m.status === "held").length)} held<i>{num(o.meetings.filter((m) => ["booked", "rescheduled"].includes(m.status)).length)} coming up</i></>}>
+            {meetView ? (() => {
+              const [title, test] = MEET_VIEWS[meetView], rows = o.meetings.filter(test);
+              return (
+                <div className="mt-col mt-only">
+                  <h4>{title}<span>{rows.length}</span><button type="button" className="btn line small" onClick={() => setMeetView(null)}>All meetings</button></h4>
+                  {rows.length ? <MeetingRows rows={rows.slice(0, 40)} open={sheet.meeting} withRep /> : <p className="mute">None.</p>}
+                </div>
+              );
+            })() : (
             <div className="mt-cols">
               {([["Coming up", (m: Meeting) => ["booked", "rescheduled"].includes(m.status)], ["Held", (m: Meeting) => m.status === "held"], ["Did not happen", (m: Meeting) => ["no_show", "cancelled"].includes(m.status)]] as const).map(([title, test]) => {
                 const rows = o.meetings.filter(test);
@@ -270,6 +290,7 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
                 );
               })}
             </div>
+            )}
           </Fold>
         )}
         {started && roster.length > 0 && (

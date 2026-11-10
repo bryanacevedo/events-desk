@@ -8,6 +8,7 @@ import { daysPast, LAST_DAY_SQL, SCORE_DAYS } from "./motion.ts";
 import { heldOut } from "./sequences.ts";
 import { newId, RuleError } from "./events.ts";
 import { spend, spendByStep } from "./ledger.ts";
+import { withAiCents } from "./ai-cost.ts";
 import { DESK, nowOf, type LifecycleDeps } from "./lifecycle-deps.ts";
 import { moveMotion } from "./motion-state.ts";
 import { paidCall, parseJson } from "./paid.ts";
@@ -92,7 +93,11 @@ export async function eventCost(db: Db, eventId: string) {
             coalesce((SELECT sum(travel_cents) FROM seat_requests WHERE event_id = $1 AND status = 'approved'), 0)::int AS travel,
             (SELECT count(*) FROM seat_requests WHERE event_id = $1 AND status = 'approved')::int AS approved,
             coalesce((SELECT seat_price_cents FROM events WHERE id = $1), 0)::int AS list`, [eventId]);
-  const ai_cents = (await spend(db, eventId)).llm * s.llm_call_cents;
+  // AI is priced the way Usage prices it: from the tokens each call reported, the flat rate only for calls with none (a simulated run).
+  // Calls on no card (none today) count at the flat rate, so the total never loses a call.
+  const priced = (await withAiCents(db, eventId, await spendByStep(db, eventId), s.llm_call_cents)).filter((r) => r.unit === "llm");
+  const pricedCalls = priced.reduce((n, r) => n + r.n, 0), allCalls = (await spend(db, eventId)).llm;
+  const ai_cents = Math.round((priced.reduce((n, r) => n + (r.cents ?? 0), 0) + Math.max(0, allCalls - pricedCalls) * s.llm_call_cents) * 100) / 100;
   const extras = await db.query<{ category: string; amount_cents: number; note: string; recorded_by: string; recorded_at: string }>("SELECT category, amount_cents, note, recorded_by, recorded_at::text AS recorded_at FROM event_costs WHERE event_id = $1 ORDER BY amount_cents DESC, category", [eventId]);
   const other_cents = extras.reduce((n, e) => n + e.amount_cents, 0);
   // Approved seats with no ticket recorded yet are still owed: at list price, shown as such, not added to what was spent.

@@ -44,7 +44,7 @@ export function nextLine(e: EventRow): string {
   switch (e.stage) {
     case "requested": return `Waiting on a decision: ${plural(e.seat_count, "seat request")}.`;
     case "approved": return "Seats approved. Add the attendee list.";
-    case "mapped": return "Attendee list in. Ask for the cost card.";
+    case "mapped": return "Attendee list in. Pricing the cost card.";
     case "quoted": return "Ready to run.";
     case "tiering": case "enriching": case "flagging": case "researching": case "finding_people": return "Making the outreach list.";
     case "ready_for_review": return "Settle open cases, then verify and find contacts.";

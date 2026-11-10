@@ -2336,3 +2336,7 @@ section.more[aria-label="More"] { max-width: none; }
 .m-started-at { display: grid; gap: 2px; justify-items: end; text-align: right; }
 .m-started-at b { font: 500 15px/20px var(--sans); color: var(--ink); font-variant-numeric: tabular-nums; }
 .m-started-at span { font-size: 12px; line-height: 16px; color: var(--mute); }
+/* Meetings fold: each meeting row fills its column (the column's own list rule is for plain lists); a filtered view names itself with a way back. */
+.mt-col .ob-tray li { display: block; min-height: 0; border-top: 0; }
+.mt-only h4 { align-items: center; }
+.mt-only h4 .btn { margin-left: auto; }

@@ -6,6 +6,7 @@ import { createApp } from "../src/server/app.ts";
 import type { Db } from "../src/server/db.ts";
 import { priceAi } from "../src/server/ai-cost.ts";
 import { usageView } from "../src/server/usage.ts";
+import { eventCost } from "../src/server/closeout.ts";
 import { modelCostUsd } from "../src/shared/model-pricing.ts";
 import { defaultSettings } from "../src/server/approvals.ts";
 import { deliverEvent, freshDb } from "./helpers.ts";
@@ -72,6 +73,8 @@ describe("Usage and the event page", () => {
     expect(llmSteps.every((s) => typeof s.cents === "number")).toBe(true);
     expect(llmSteps.reduce((n, s) => n + s.cents!, 0)).toBeCloseTo(after.ai.month_cents, 1);
     expect(page.spend_by_step.filter((s) => s.unit === "credits").every((s) => s.cents === undefined)).toBe(true);
+    // The event's cost (Cost tab, Result, scorecards) carries the same AI dollars as Usage, not a flat rate per call.
+    expect((await eventCost(db, id)).ai_cents).toBeCloseTo(after.ai.month_cents, 1);
   });
 
   it("keeps the same AI dollars after the event is deleted", async () => {
