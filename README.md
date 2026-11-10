@@ -10,9 +10,9 @@ You ask for a seat. Someone approves it. You upload the attendee list. The desk 
 
 It is a portfolio project. Read "What is proven and what is not" below before you trust any number in it.
 
-[![Watch the 3-minute walkthrough](docs/video/poster.jpg)](https://bryanacevedo.github.io/events-desk-site/video/events-desk.mp4)
+[![Watch the walkthrough (3:41)](docs/video/poster.jpg)](https://bryanacevedo.github.io/events-desk-site/video/events-desk.mp4)
 
-The walkthrough covers the whole system, following one list from the demo: invented people, simulated vendors.
+The walkthrough covers the whole system, from the seat request to the result. It follows one company on the demo's attendee list and one person the desk found there, through a reply and a meeting to a deal. The people, vendors, CRM and AI calls in the demo are simulated.
 
 ## What it does for you
 
