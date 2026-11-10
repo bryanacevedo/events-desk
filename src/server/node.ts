@@ -91,17 +91,25 @@ const demoSetup = mode.demo ? await demoConnectors(db) : undefined;
 const lifecycle: LifecycleDeps | undefined = demoSetup
   ? { crm: withDemoCrm(deps.crm, db, () => new Date()), connectors: demoSetup.connectors, llm: deps.llm }
   : Object.keys(live).length ? { crm: deps.crm, connectors: live, llm: deps.llm, notify: slack ? slackNotifier(slack) : undefined, userMap: slack?.userMap } : undefined;
-// The demo opens with one event already in market, so the after-delivery screens have something in them. The others wait for a visitor to press.
-if (mode.demo && !fromSnapshot && demoSetup && lifecycle) {
-  const [flagship] = await db.query<{ id: string }>("SELECT id FROM events WHERE id = 'evt_money20-20-usa-2026' AND stage = 'delivered'");
-  if (flagship) {
-    try {
-      for (let i = 0; i < 5; i++) await demoAdvance(db, lifecycle, demoSetup.tools, flagship.id);
-      const [rep] = await db.query<{ rep: string }>("SELECT requester AS rep FROM seat_requests WHERE event_id = $1 AND status = 'approved' ORDER BY (requester = 'Maya Ortiz') DESC, requester LIMIT 1", [flagship.id]);
-      if (rep) await addSlots(db, flagship.id, "GTM Team", { rep: rep.rep, day: "2027-03-02", from: "09:00", to: "12:00", minutes: 30, location: "Booth 12" });
-    } catch (e) { console.error("demo motion", (e as Error).message); }
-  }
-}
+// The demo opens with one event already in market, so the after-delivery screens have something in them. The sample events finish building in the
+// background, so this waits for the flagship to be delivered. The others wait for a visitor to press.
+let demoMotionReady = !(mode.demo && !fromSnapshot && demoSetup && lifecycle);
+if (!demoMotionReady) void (async () => {
+  try {
+    for (let i = 0; i < 240; i++) {
+      const [f] = await db.query<{ id: string; stage: string; motion: string }>("SELECT id, stage, motion FROM events WHERE id = 'evt_money20-20-usa-2026'");
+      if (!f) break;
+      if (f.stage === "delivered") {
+        for (let k = 0; k < 5 && (await db.query<{ motion: string }>("SELECT motion FROM events WHERE id = $1", [f.id]))[0].motion !== "in_market"; k++) await demoAdvance(db, lifecycle!, demoSetup!.tools, f.id);
+        const [rep] = await db.query<{ rep: string }>("SELECT requester AS rep FROM seat_requests WHERE event_id = $1 AND status = 'approved' ORDER BY (requester = 'Maya Ortiz') DESC, requester LIMIT 1", [f.id]);
+        if (rep) await addSlots(db, f.id, "GTM Team", { rep: rep.rep, day: "2027-03-02", from: "09:00", to: "12:00", minutes: 30, location: "Booth 12" });
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+  } catch (e) { console.error("demo motion", (e as Error).message); }
+  demoMotionReady = true;
+})();
 const api = createApp(db, { lifecycle, demoTools: demoSetup?.tools, writeKey: mode.demo ? undefined : process.env.WRITE_KEY, demo: mode.demo, publicDemo: mode.demo && process.env.PUBLIC_DEMO === "1", kick, slack, sheets: deps.sheets, llm: deps.llm, dns: mode.liveSpend ? systemDns : exampleDns, crm: deps.crm });
 // Write-back to the CRM runs here and never from a run, so a failed write cannot touch a delivery. A CRM that cannot write (noCrm) makes this do nothing.
 if (mayRun && canWrite(deps.crm)) {
