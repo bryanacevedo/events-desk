@@ -1,6 +1,6 @@
 # After delivery: the rest of an event's life (v2 spec)
 
-Status: reviewed spec, 2026-11-09. Two fresh-eyes reviews (29 findings, then 15), every finding resolved below. Nothing here is built.
+Status: built on branch `v2`, 2026-11-09, on simulated tools and fakes; none of it has run against a real sequencer, CRM or calendar account. Decisions taken while building are in `docs/DECISIONS.md`, section 33.
 
 v1 ends at a delivered list. This covers what happens until the event has a score and its lessons reach the next event.
 

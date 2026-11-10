@@ -50,6 +50,20 @@ Where AI runs: reading the ICP document, company tiering, reading a company webs
 
 The full behavior is in [docs/SPEC.md](docs/SPEC.md). The reasons behind the design are in [docs/DECISIONS.md](docs/DECISIONS.md). Reuse, CRM checks and the person record are in [docs/DATA-HYGIENE.md](docs/DATA-HYGIENE.md), and late registrations are in [docs/NEW-REGISTRATIONS.md](docs/NEW-REGISTRATIONS.md).
 
+## After the list is delivered
+
+On the `v2` branch, the desk carries an event to the end of its life:
+
+- **Account owners first.** Each account's owner can keep it before anyone is sequenced. Silence includes it after two business days, but only once a message really reached them.
+- **Any sequencer.** One connector contract, with Instantly, HeyReach, Smartlead and Apollo written against their public docs and a scripted fake of each. The demo runs the real Instantly and HeyReach connector code over stand-in tools.
+- **Healthy inboxes.** Each sequence is sized for its busiest day. The healthiest inboxes are picked and spread across domains, and a sequence that is short does not go out.
+- **A gate at every moment.** Opt-outs, owner decisions, verification age, holds, other cadences, the CRM and a recorded contact basis are checked again at adding, at launch and at every resume.
+- **Replies.** Every reply stops the person's whole cadence before anything reads it. Code catches bounces and opt-outs; a model chooses one code; anything doubtful waits for a person. Hot replies go to the account's owner, on a clock.
+- **Meetings, on site too.** Booking holds the whole company. People met at the booth stop getting automated outreach, and badge scans get their own follow-up. Reps get slots, a day view and a brief for each meeting.
+- **Did it pay for itself.** New pipeline, pipeline it moved, closed-won, full event cost, and accounts nobody reached for comparison.
+
+None of it has run against a real sequencer, CRM or calendar account.
+
 ## What makes it careful
 
 **It is built not to pay for the same data twice, and it shows what that saved.** Company facts are kept for 90 days. A company's tier is kept by domain and ICP version. Title readings, paid person lookups, Apollo email-waterfall results and LinkedIn lookups are kept, and email check results are reused for 30 days, good or bad. A person lookup older than 180 days is bought again. If a stored record older than 30 days shows the person changed jobs, it is bought once, fresh. Each time a stored answer replaces a call that would have been paid, the desk writes it down at the cost it avoided. Usage shows that as "saved" on each provider's own pool, and for AI as dollars. A stored answer counts as saved only when another event, or this event before its first card was approved, wrote it.
@@ -109,7 +123,7 @@ The company-tier report also shows the second look, a second model that checked 
 
 The Summary check has seen three real model calls. Eight of the nine parts passed the checks first time, and the ninth was a false rejection that is fixed. Three calls is too few to call a rate.
 
-**Tests.** `npx vitest run` passes 827 tests with 8 skipped, across 54 files (835 in all), and `npx tsc --noEmit` is clean. Seven of the skipped tests need a real Postgres and run in CI, which starts one; the whole suite has also passed on real Postgres. The other skipped test is the `NOT MEASURED` check in `tests/company-tier-evals.test.ts`, which runs only when that recording is stale. Continuous integration runs the type check, the tests with evals held strict, the build and a boot smoke test on every push.
+**Tests.** `npx vitest run` passes every test on both PGlite and real Postgres, and `npx tsc --noEmit` is clean. Seven of the skipped tests need a real Postgres and run in CI, which starts one; the whole suite has also passed on real Postgres. The other skipped test is the `NOT MEASURED` check in `tests/company-tier-evals.test.ts`, which runs only when that recording is stale. Continuous integration runs the type check, the tests with evals held strict, the build and a boot smoke test on every push.
 
 ## Run the demo
 

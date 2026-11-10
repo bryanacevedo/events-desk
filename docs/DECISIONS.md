@@ -204,3 +204,17 @@ The plan called for two videos, a short one for visitors and a narrated one for 
 
 Cloudflare Workers and Vercel run code in short requests. This app runs long jobs and keeps its demo database in the process, so either would have needed a port and a separate database. Render runs it unchanged as a normal server, on the free plan. Three things make it fit in 512 MB: prebuilt sample data, small Postgres caches, and Node 26, which alone cut startup from about 840 MB to about 300. With no login, whatever one visitor uploaded the next could read, so the hosted demo takes no files.
 
+## 33. Everything after delivery, as built (2026-11-09)
+
+Built on branch `v2` from `docs/LIFECYCLE.md`. What changed from the spec while building, and why:
+
+- **Free placement by email domain was built and backed out.** In the authored world it raised false merges from 2 to 6, because a work address can be a former employer's. Every person with no company gets the paid lookup; the domain places them only when the lookup finds nothing.
+- **A sending layer was added (section 5a).** The first spec covered who may be contacted and left inboxes to the tool. Two outside reviews, one against an older production system and one against current practice, found 48 gaps, 15 of them blockers. The desk now sizes inboxes, picks the healthiest, requires placement tests, and stops a sequence that is short.
+- **Gong is refused for sending.** It reports no replies or opt-outs, so stopping someone the moment they answer cannot work there. Bryan, 2026-11-09.
+- **LinkedIn accounts need their rep's consent.** LinkedIn's terms prohibit automation and the accounts are real people's. The risk is recorded per account.
+- **A tool that cannot hold a person is never re-added mid-sequence.** Re-adding would restart them at step 1, so once anything has gone out, a stop on such a tool is final.
+- **List terms are not checked.** Skipped by Bryan, 2026-11-09.
+- **Reply text is cleaned before anything reads it**, so "unsubscribe" in a quoted footer cannot opt out someone who said yes.
+- **ROI has written definitions.** New pipeline: created within 30 days after a held meeting, with no open deal before it. Pipeline it moved: already open and moved forward within 90 days after one. One deal counts for one event. Accounts nobody reached are shown beside the accounts met.
+- **Testing is tiered.** Touched files while building, the full suite in the background before a commit, real Postgres once per batch and in CI.
+
