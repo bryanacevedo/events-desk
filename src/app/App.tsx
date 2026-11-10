@@ -71,12 +71,15 @@ export function App() {
   const pathname = path.split("?")[0];
   useEffect(() => { get<{ demo: boolean }>("/api/health").then((h) => setDemo(Boolean(h?.demo))); }, []);
   useEffect(() => { refresh(); }, [pathname, refresh]);
+  // How many people are waiting on whoever is acting, across events.
+  const [waiting, setWaiting] = useState(0);
+  useEffect(() => { get<{ replies: unknown[] }>(`/api/motion/my-day?rep=${encodeURIComponent(actor)}`).then((d) => setWaiting(d?.replies.length ?? 0)); }, [actor, pathname]);
 
   const search = new URLSearchParams(path.split("?")[1] ?? "");
   const eventId = pathname.match(/^\/event\/([^/]+)/)?.[1];
   const place = placeOf(pathname);
   const count = needs?.approvals.length ?? 0;
-  const navAt = ["overview", "events", "seats", "budget", "usage"].indexOf(place);
+  const navAt = ["overview", "myday", "events", "seats", "budget", "usage"].indexOf(place);
   if (demo === null) return null;
 
   const item = (to: string, p: Place, label: string, icon: ReactNode, cls: string, badge?: number) => (
@@ -94,6 +97,7 @@ export function App() {
           <Link to="/" go={go} className="brand"><Mark /><span>Events Desk</span></Link>
           <div className="navlist" style={{ "--at": navAt } as React.CSSProperties} data-on={navAt >= 0 ? "" : undefined}>
             {item("/", "overview", "Overview", <Icon.overview />, "navitem")}
+            {item("/my-day", "myday", "My day", <Icon.calendar />, "navitem", waiting)}
             {item("/events", "events", "Events", <Icon.events />, "navitem")}
             {item("/seats", "seats", "Seats", <Icon.seats />, "navitem", count)}
             {item("/budget", "budget", "Budget", <Icon.budget />, "navitem")}

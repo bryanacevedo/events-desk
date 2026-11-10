@@ -97,7 +97,7 @@ if (mode.demo && !fromSnapshot && demoSetup && lifecycle) {
   if (flagship) {
     try {
       for (let i = 0; i < 5; i++) await demoAdvance(db, lifecycle, demoSetup.tools, flagship.id);
-      const [rep] = await db.query<{ rep: string }>("SELECT requester AS rep FROM seat_requests WHERE event_id = $1 AND status = 'approved' ORDER BY requester LIMIT 1", [flagship.id]);
+      const [rep] = await db.query<{ rep: string }>("SELECT requester AS rep FROM seat_requests WHERE event_id = $1 AND status = 'approved' ORDER BY (requester = 'Maya Ortiz') DESC, requester LIMIT 1", [flagship.id]);
       if (rep) await addSlots(db, flagship.id, "GTM Team", { rep: rep.rep, day: "2027-03-02", from: "09:00", to: "12:00", minutes: 30, location: "Booth 12" });
     } catch (e) { console.error("demo motion", (e as Error).message); }
   }

@@ -20,6 +20,7 @@ import type { Crm, CrmOpportunity } from "./providers.ts";
 
 const u = (s: string) => parseInt(createHash("sha256").update(s).digest("hex").slice(0, 8), 16) / 0xffffffff;
 const GTM = "GTM Team";
+const REP = "Maya Ortiz";
 
 const REPLIES: { share: number; body: string; signal?: ToolEvent["signal"] }[] = [
   { share: 0.12, body: "Sounds good, tell me more about how this works." },
@@ -104,17 +105,22 @@ export async function demoAdvance(db: Db, deps: LifecycleDeps, tools: Record<str
       for (const x of REPLIES) { if (r < x.share) { add(p.connector, { ...base, provider_message_id: `reply:${p.contact_id}`, signal: x.signal ?? "reply", body: x.body || null }); break; } r -= x.share; }
     }
     for (const [name, events] of by) await ingestEvents(db, deps, deps.connectors[name], events);
-    await processInbound(db, deps, 2000); await drainNotifications(db, deps);
+    await processInbound(db, deps, 2000);
+    // In the sample, Maya covers these accounts, so her day has something in it whoever owns them in the sample CRM.
+    await db.query("UPDATE inbound_messages SET owner = $2 WHERE event_id = $1 AND respond_by IS NOT NULL", [eventId, REP]);
+    await drainNotifications(db, deps);
     // Most of the people who said yes end up in a meeting.
     const hot = await db.query<{ contact_id: string }>("SELECT contact_id FROM inbound_messages WHERE event_id = $1 AND code IN ('interested', 'meeting_request') AND NOT EXISTS (SELECT 1 FROM meetings m WHERE m.contact_id = inbound_messages.contact_id) ORDER BY id", [eventId]);
     let held = 0;
     for (const h of hot) {
       if (u(`meet|${h.contact_id}`) > 0.75) continue;
-      const m = await bookMeeting(db, deps, { contact_id: h.contact_id, scheduled_at: new Date(Date.now() - 86_400_000).toISOString(), source: "reply", rep: "Priya Nair" }, "Priya Nair");
-      await recordOutcome(db, deps, m.id, "held", "Priya Nair"); held++;
+      // Most held already; the rest are coming up, so a rep's day has meetings with briefs in it.
+      const upcoming = u(`soon|${h.contact_id}`) < 0.4;
+      const m = await bookMeeting(db, deps, { contact_id: h.contact_id, scheduled_at: new Date(Date.now() + (upcoming ? 2 : -1) * 86_400_000).toISOString(), source: "reply", rep: REP }, REP);
+      if (!upcoming) { await recordOutcome(db, deps, m.id, "held", REP); held++; }
     }
     const [firstCap] = await db.query("SELECT 1 FROM onsite_captures WHERE event_id = $1 LIMIT 1", [eventId]);
-    if (!firstCap) for (let i = 1; i <= 3; i++) await captureOnsite(db, deps, eventId, "Tomas Berg", { full_name: `Booth Visitor ${i}`, email: `visitor${i}@walkup${i}.example`, company: `Walk-up Co ${i}`, title: "Head of Payments", note: "Stopped by the booth, asked for a demo.", temperature: "hot", met: true });
+    if (!firstCap) for (let i = 1; i <= 3; i++) await captureOnsite(db, deps, eventId, REP, { full_name: `Booth Visitor ${i}`, email: `visitor${i}@walkup${i}.example`, company: `Walk-up Co ${i}`, title: "Head of Payments", note: "Stopped by the booth, asked for a demo.", temperature: "hot", met: true });
     await recordEventCost(db, eventId, GTM, "sponsorship", 1_500_000, "Sample figure");
     await recordEventCost(db, eventId, GTM, "booth", 400_000, "Sample figure");
     return { did: `Sends went out and people answered. ${held} meetings held, plus 3 walk-ups at the booth.` };

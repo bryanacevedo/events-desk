@@ -16,7 +16,7 @@ Bryan's decisions on the web app, 2026-11-08. This replaces earlier instructions
 
 ## Sidebar
 
-Top: Overview, Events, Seats, Budget, Usage. Bottom, in this order: Request seats button, then Settings, then Acting as, then the quiet demo note. Brand mark and icons stay. Phone bar: Overview, Events, Seats, Budget, More (Usage, Settings); Request seats reachable from Seats and Events.
+Top: Overview, My day, Events, Seats, Budget, Usage. My day (added 2026-11-09) is each rep's start: people waiting on them, meetings with briefs, free slots, with a count like Seats. Bottom, in this order: Request seats button, then Settings, then Acting as, then the quiet demo note. Brand mark and icons stay. Phone bar: Overview, Events, Seats, Budget, More (Usage, Settings); Request seats reachable from Seats and Events.
 
 Calendar and All events are merged into **Events**. Approvals is replaced by **Seats**.
 
