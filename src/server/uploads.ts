@@ -104,11 +104,12 @@ export async function listSummary(db: Db, eventId: string): Promise<ListSummary>
   const [upload] = await db.query<ListSummary["upload"] & object>("SELECT filename, (SELECT sum(x.row_count)::int FROM uploads x WHERE x.event_id = $1) AS row_count, mapping, ignored, uploaded_by FROM uploads WHERE event_id = $1 ORDER BY created_at, id LIMIT 1", [eventId]);
   const [counts] = await db.query<{ companies: number; people: number; company_only: number }>(
     `SELECT (SELECT count(*)::int FROM companies WHERE event_id = $1) AS companies,
-            (SELECT count(*)::int FROM contacts WHERE event_id = $1 AND dropped_at IS NULL) AS people,
+            (SELECT count(*)::int FROM contacts WHERE event_id = $1 AND dropped_at IS NULL AND source IS DISTINCT FROM 'onsite') AS people,
             (SELECT count(*)::int FROM source_rows WHERE event_id = $1 AND kind = 'company_only' AND dropped_at IS NULL) AS company_only`,
     [eventId],
   );
-  // People are counted on contacts; rows with no person are counted on source rows.
+  // People are counted on contacts; rows with no person are counted on source rows. Someone met at the booth is not on the list, so
+  // the list's count leaves them out and matches the outreach figure (43 to reach, not 43 plus three walk-ups).
   const dropped = await db.query<{ reason: string; n: number }>(
     `SELECT reason, sum(n)::int AS n FROM (
        SELECT drop_reason AS reason, count(*) AS n FROM contacts WHERE event_id = $1 AND dropped_at IS NOT NULL GROUP BY 1

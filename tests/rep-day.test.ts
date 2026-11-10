@@ -5,6 +5,7 @@ import type { Db } from "../src/server/db.ts";
 import { captureOnsite } from "../src/server/operating.ts";
 import { addSlots, bookSlot, meetingDetail, prepBrief, repDay, replyDetail } from "../src/server/rep-day.ts";
 import { bookMeeting } from "../src/server/meetings.ts";
+import { listSummary } from "../src/server/uploads.ts";
 import { approveTemplate, createDrafts } from "../src/server/sequences.ts";
 import { freshDb } from "./helpers.ts";
 import { clock, deliveredInMotion, enrollmentStates, MAYA, personAt } from "./lifecycle-harness.ts";
@@ -100,5 +101,17 @@ describe("a reply and a meeting, each as its own thing", () => {
     expect(await replyDetail(db, "inb_b1")).toBeNull();
     expect(await replyDetail(db, "inb_nope")).toBeNull();
     expect(await meetingDetail(db, "mtg_nope")).toBeNull();
+  });
+});
+
+describe("the list's count", () => {
+  it("leaves out people met at the booth, who were never on the list", async () => {
+    const h = await deliveredInMotion(db);
+    const before = (await listSummary(db, h.id)).people;
+    const prioritised = (await listSummary(db, h.id)).priorities.reduce((n, p) => n + p.n, 0);
+    expect(before).toBe(prioritised);
+    await captureOnsite(db, h.deps, h.id, "Rep A", { full_name: "Walk Up", email: "walk.up@booth-only.example", company: "Booth Only Ltd", note: "Stopped by", met: true, temperature: "warm" });
+    expect(await db.query("SELECT 1 FROM contacts WHERE event_id = $1 AND source = 'onsite'", [h.id])).toHaveLength(1);
+    expect((await listSummary(db, h.id)).people).toBe(before);
   });
 });
