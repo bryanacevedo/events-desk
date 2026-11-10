@@ -92,9 +92,9 @@ export function Person({ c, eventId, onClose, onChange }: { c: PersonRow; eventI
     <article className="panel" aria-label={c.full_name ?? "Person"} data-person={c.id}>
       <div className="col">
         <h2>{c.full_name ?? "No name on the row"}</h2>
-        <p style={{ fontSize: 16 }}>{c.title ?? "No title"}{c.company ? <>, <To to={eventId ? companyHref(eventId, c.company) : null} className="u">{c.company}</To></> : ""}</p>
+        <p style={{ fontSize: 16 }}>{c.title ?? "No title"}{c.company ? <>, <To to={eventId ? companyHref(eventId, c.company) : null}>{c.company}</To></> : ""}</p>
         <p className="mute">{c.source === "prospect" ? "Found at the company, not on the attendee list." : "On the attendee list."}{c.employer && c.employer !== c.company ? ` Vendor says ${c.employer}.` : ""}</p>
-        {c.linkedin && <a className="mute u wrap-any" href={c.linkedin} target="_blank" rel="noopener noreferrer">{c.linkedin.replace(/^https?:\/\/(www\.)?/, "")}</a>}
+        {c.linkedin && <a className="mute to wrap-any" href={c.linkedin} target="_blank" rel="noopener noreferrer">{c.linkedin.replace(/^https?:\/\/(www\.)?/, "")}</a>}
         <div className="actions panel-acts">
           <button className="btn line small" type="button" onClick={onClose}>Close</button>
           {canOptOut && <OptOut c={c} onDone={() => { setOptedOut(true); onChange?.(); }} />}

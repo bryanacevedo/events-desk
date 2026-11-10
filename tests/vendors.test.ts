@@ -74,7 +74,7 @@ describe("no vendor credit carries a dollar figure", () => {
     await ingestUpload(db, id, "Maya Ortiz", "a.csv", CSV);
     await requestResearchCard(db, id, "Maya Ortiz");
     const app = createApp(db, { demo: true });
-    const get = async (p: string) => (await app.request(p)).json() as Promise<any>;
+    const get = async (p: string) => (await app.request(p, { headers: { "x-actor": "GTM%20Team" } })).json() as Promise<any>;
 
     const usage = await get("/api/usage");
     expect(usage.vendors.length).toBe(2);

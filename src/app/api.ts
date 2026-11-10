@@ -64,7 +64,9 @@ export type Result<T = unknown> = { ok: true; data: T } | { ok: false; error: st
 
 export async function get<T>(path: string): Promise<T | null> {
   try {
-    const r = await fetch(path);
+    // Who is acting rides along on reads too, so the server can keep company money to leadership and GTM.
+    let actor = ""; try { actor = localStorage.getItem("actor") ?? ""; } catch { /* private window */ }
+    const r = await fetch(path, actor ? { headers: { "x-actor": encodeURIComponent(actor) } } : undefined);
     // A route that does not exist on this server falls through to the app's HTML; that is "nothing here", not data.
     if (!r.ok || !(r.headers.get("content-type") ?? "").includes("json")) return null;
     return (await r.json()) as T;

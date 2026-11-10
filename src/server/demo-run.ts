@@ -204,7 +204,7 @@ export async function seedDemoStages(db: Db, deps: LifecycleDeps, tools: Record<
 const DEMO_NOTES: Record<string, { status: "accepted" | "answered"; body: string; facts: [string, string, string][] }> = {
   "evt_nrf-2026-retail-s-big-show": {
     status: "accepted",
-    body: "Busy floor, short conversations. The retail ops people all have the same problem: the week after a show goes into rebuilding the list in a spreadsheet. Two accounts already scan badges with an app and asked what happens after the scan. Budgets close in March. New logos came from the email before the show, not the booth; the booth was mostly customers.",
+    body: "Busy floor, short conversations. The retail ops people all said some version of \"We spend the week after a show rebuilding the list in a spreadsheet.\" Two accounts already scan badges with an app; one put it as \"We have the scanner. What we don't have is anything after the scan.\" Budgets close in March: \"If it isn't in the plan by March, it waits a year.\" New logos came from the email before the show, not the booth; the booth was mostly customers.",
     facts: [
       ["pain", "Retail ops teams rebuild their event list by hand the week after a show.", "We spend the week after a show rebuilding the list in a spreadsheet."],
       ["competitor", "Accounts that already scan badges want this behind their scanner, not instead of it.", "We have the scanner. What we don't have is anything after the scan."],
@@ -214,7 +214,7 @@ const DEMO_NOTES: Record<string, { status: "accepted" | "answered"; body: string
   },
   "evt_shoptalk-spring-2026": {
     status: "answered",
-    body: "Smaller crowd than NRF but the right titles: heads of ecommerce and growth. Three asked whether we sync to Marketing Cloud, not just the CRM. One competitor demoed next to us all week; buyers compared us on the follow-up, which is where we won. Next time book dinners before the show, the evenings were where the long conversations happened.",
+    body: "Smaller crowd than NRF but the right titles: heads of ecommerce and growth. Three asked whether we sync to Marketing Cloud, not just the CRM: \"Our nurture lives in Marketing Cloud, not Sales Cloud.\" One competitor demoed next to us all week, and a buyer summed it up: \"Theirs stops at the scan. Yours keeps going.\" Next time book dinners before the show, the evenings were where the long conversations happened.",
     facts: [
       ["product_gap", "Buyers asked for a Marketing Cloud sync; the desk writes only to the CRM.", "Our nurture lives in Marketing Cloud, not Sales Cloud."],
       ["competitor", "A competitor demoed beside us; buyers compared the two on the follow-up.", "Theirs stops at the scan. Yours keeps going."],

@@ -10,8 +10,8 @@ import { EventLogo } from "./EventLogo";
 import { isGtm } from "../shared/roles";
 import { money, num, shortDate } from "./words";
 
-interface Row { id: string; name: string; starts_on: string; venue: string | null; website: string | null; final: boolean; window_days: number | null; cost_cents: number; pipeline_cents: number; won_cents: number; per_dollar: number | null; held: number; deals: number; scored: boolean; notes: { asked: number; written: number } }
-interface Learning { table: { group_kind: string; group_value: string; people: number; held: number; rate: number | null; enough: boolean }[]; dropped_who_dealt: { domain: string; name: string; dropped: number; opportunities: number }[] | null; proposals: { id: string; kind: string; subject: string; evidence: string; status: string }[] }
+interface Row { id: string; name: string; starts_on: string; venue: string | null; website: string | null; final: boolean; window_days: number | null; cost_cents: number; pipeline_cents: number; won_cents: number; per_dollar: number | null; held: number; deals: number; scored: boolean; costs_missing: number; notes: { asked: number; written: number } }
+interface Learning { table: { group_kind: string; group_value: string; people: number; held: number; rate: number | null; enough: boolean }[]; dropped_who_dealt: { domain: string; name: string; dropped: number; opportunities: number }[] | null; proposals: { id: string; kind: string; subject: string; evidence: { people: number; held: number; rate: number | null; overall_rate: number }; edit: { verdict: "raise" | "lower" }; status: string }[] }
 
 const GROUPS: [string, string, (v: string) => string][] = [
   ["company_tier", "By company tier", (v) => (v === "unknown" ? "No tier" : `Tier ${v}`)],
@@ -42,7 +42,7 @@ export function Results({ go }: { go: (to: string) => void }) {
         <>
           <header className="md-hero rs-hero">
             <div className="md-hello">
-              <p>{rows.length === 1 ? "One event" : `${rows.length} events`} done sending</p>
+              <p>{[`${rows.length === 1 ? "One event" : `${rows.length} events`} done sending`, rows.some((r) => !r.final) ? `${rows.filter((r) => !r.final).length} still counting` : null, rows.some((r) => r.costs_missing) ? `costs not all entered on ${rows.filter((r) => r.costs_missing).length}` : null].filter(Boolean).join(", ")}</p>
               <h2>{money(pipeline)} in pipeline for {money(cost)}</h2>
             </div>
             <div className="md-figs">
@@ -103,8 +103,10 @@ export function Results({ go }: { go: (to: string) => void }) {
           <h3 className="rs-h">Suggested ICP changes<span>{isGtm(actor) ? "yours to decide" : "GTM Engineering decides"}</span></h3>
           {open.map((p) => (
             <article key={p.id} className="rs-review">
-              <p className="rs-review-body">{p.subject}</p>
-              <p className="rs-review-k">{p.evidence}</p>
+              {(() => { const g = GROUPS.find(([k]) => k === p.kind), label = g ? g[2](p.subject) : p.subject, e = p.evidence; return <>
+                <p className="rs-review-body">{p.edit.verdict === "raise" ? "Raise" : "Lower"} {label}</p>
+                <p className="rs-review-k">{e.held} of {e.people} held a meeting{e.rate !== null ? `, ${Math.round(e.rate * 100)}%` : ""}, against {Math.round(e.overall_rate * 100)}% overall.</p>
+              </>; })()}
               {isGtm(actor) && <div className="ob-acts"><button className="btn small" disabled={busy} onClick={() => decide(p.id, "accepted")}>Accept</button><button className="btn small line" disabled={busy} onClick={() => decide(p.id, "rejected")}>Leave it</button></div>}
             </article>
           ))}

@@ -1,6 +1,8 @@
 # Screens brief
 
-Bryan's decisions on the web app, 2026-11-08. This replaces earlier instructions where they conflict. Work is split into rounds at the bottom.
+Bryan's decisions on the web app, 2026-11-08 to 11-10. This replaces earlier instructions where they conflict. Work is split into rounds at the bottom.
+
+**Terms.** *Leadership*: the seat approvers (from `config/defaults.json`) and the GTM team. *Bar rows*: the brief's rows of label, thin bar and figure. *Folds*: the collapsible sections at the bottom of a page. *Tier*: a company's fit, 1 to 3, and a title's, from the ICP. *A, B, C*: a person's outreach priority. *Two-card flow*: research and outreach each get their own cost card.
 
 ## Look and copy
 
@@ -11,12 +13,12 @@ Bryan's decisions on the web app, 2026-11-08. This replaces earlier instructions
 - **No red or orange text, no pill tags.** Bryan, 2026-11-09: "get rid of that red in fonts across the app" and, on a filled "over Q4" pill, "i hate these". Color lives on marks, bars and fills; words stay ink or mute. Money in a header is a large Plex figure on the right with a plain label: green when there is room, ink when over. Errors are ink behind one small mark.
 - **No underlined words as controls.** Secondary controls are real quiet buttons. Opening an outreach list is always `SheetButton`.
 - **It should feel alive.** Cards lean to the mouse, rows and logos answer hover, bars draw in, screens rise in, the sidebar pill slides. All of it stops under reduced motion.
-- Two named lists, never the bare word "list" where either could be meant. **Attendee list**: the upload. **Outreach list**: the delivered Google Sheet. Tight spaces: "Attendees in", "Outreach ready". "Open the sheet" is fine on a button.
+- Two named lists, never the bare word "list" where either could be meant. **Attendee list**: the upload. **Outreach list**: the delivered Google Sheet. Tight spaces: "Attendees in", "Outreach ready". "Open the sheet" is fine on a button. The stage names "Building the list" and "List ready" are the one exception: they name a step, and only one list can be meant there.
 - Filters and search where they make sense: Events, Seats, the people and companies on an event, Budget and Usage by-event tables. Quiet controls, counts that update, URL-held so a filtered view can be shared. Not on short pages.
 
 ## Sidebar
 
-Top: Overview, My day, Events, Seats, Budget, Usage. My day (added 2026-11-09) is each rep's start: people waiting on them, meetings with briefs, free slots, with a count like Seats. Bottom, in this order: Request seats button, then Settings, then Acting as, then the quiet demo note. Brand mark and icons stay. Phone bar: Overview, Events, Seats, Budget, More (Usage, Settings); Request seats reachable from Seats and Events.
+The menu follows the person's job. Top: Overview; My day for reps (and for anyone in leadership who has a reply, meeting or person met on it); Events; Seats for approvers only; Budget, Results and Usage for leadership only. My day is each rep's start: replies waiting on them, meetings with briefs, free slots, with a count. Bottom, in this order: Request seats button, then Settings (the GTM team only), then Acting as, then the quiet demo note. Brand mark and icons stay. Phone bar: Overview, Events, then Seats for an approver or My day for a rep, Budget for leadership, and More (Results, Usage, Settings, as each applies) only when it holds something.
 
 Calendar and All events are merged into **Events**. Approvals is replaced by **Seats**.
 
@@ -54,11 +56,11 @@ Not an approval. The person who uploaded the current attendee list confirms the 
 
 ## Event page
 
-Full redesign, large case first, at four volumes: flagship (full attendees-large.csv, about 1,650 rows, 420 companies, 40-plus cases, 10 to 15 approved people), about 200 rows, about 25 rows, and no attendee list yet. The stage decides what leads. Shape of a big list in compact form (A/B/C, tier spread, drop reasons, top companies). Rows never render unbounded: search, filters by priority, tier and status, paging with "showing 50 of 1,650". Cases grouped so 40-plus clear quickly. Activity collapsed. Delivered primary action is Open the sheet in a new tab; Excel download only when there is no link, quietly, with the error. Optional `SAMPLE_SHEET_URL` env var gives seeded delivered events a link; never hard-code one. Record ticket cost per seat. Audit covers all four volumes on desktop and phone, render under about 1 second after data loads.
+Full redesign, large case first, at four volumes: flagship (full attendees-large.csv, about 1,650 rows, 420 companies, 40-plus cases, 10 to 15 approved people), about 200 rows, about 25 rows, and no attendee list yet. The stage decides what leads. Shape of a big list in compact form (A/B/C, tier spread, drop reasons, top companies). Rows never render unbounded: search, filters by priority, tier and status, paging with "showing 12 of 1,650". Cases grouped so 40-plus clear quickly. Activity collapsed. Delivered primary action is Open the sheet in a new tab; Excel download only when there is no link, quietly, with the error. Optional `SAMPLE_SHEET_URL` env var gives seeded delivered events a link; never hard-code one. Record ticket cost per seat. Audit covers all four volumes on desktop and phone, render under about 1 second after data loads.
 
 ## Settings
 
-Only GTM Team can open it. Anyone else clicking it gets one line telling them to contact GTM Engineering. Enforce on the server too: settings and ICP write routes refuse anyone else. Acting as is not security; real Google login comes later.
+Only the GTM team sees it in the menu. Anyone else who opens it by its address gets one line telling them to contact GTM Engineering. Enforce on the server too: settings and ICP write routes refuse anyone else. Acting as is not security; real Google login comes later.
 
 Settings has its own second-level nav like the sidebar, with these sections:
 
@@ -114,7 +116,7 @@ Bryan's pointers that shaped the app as it looks now. Read these before any new 
 - More decoration is not better: if an addition makes a place noisier, take it out.
 - Long is a failure: a screen or a message that reads long gets cut.
 - New sections are built from the shared parts: the brief's bar rows, rows that open with a chevron, folds, figures in set form ("4 costs to add").
-- A page shows one layer at a time. Throwing every layer of data at once is hard to use and hard to adopt (Bryan, 2026-11-09). A delivered event is the header, then one line for the one thing that needs someone (with its button, and nothing when nothing does), then three views: Outreach, People, Details. The view lives in the link (`#outreach`, `#people`, `#details`) so a Slack card can open it.
+- A page shows one layer at a time. Throwing every layer of data at once is hard to use and hard to adopt (Bryan, 2026-11-09). A delivered event is the header, then one line for the one thing that needs someone (with its button, and nothing when nothing does), then its views: Result (only once sending is done, and then first), Outreach, People, Details, each in the address (`#result`, `#outreach`, `#people`, `#details`). The view lives in the link so a Slack card can open it.
 - Tabs are fine when a page holds several jobs. Do not force everything onto one page.
 - The header timeline names every phase a person would name: after delivery it reads List ready, Owners, Sequences, In market, Follow-up, Closing, Scored. If a phase happens, it has a step.
 - New data replaces a weaker thing on a screen; it never piles on. "Smartly designed, not more crowded" (Bryan, 2026-11-09).

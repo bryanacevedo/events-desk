@@ -167,7 +167,7 @@ export function Overview({ go, sheetId }: { go: (to: string) => void; sheetId: s
             );
           })}
           {firstUpcoming === -1 && <div className="c-today end" ref={todayMark}><span>Today</span></div>}
-          {!all.length && <p className="mute">No events yet. <Link to="/events?request=1" go={go} className="u">Request seats</Link> to start one.</p>}
+          {!all.length && <p className="mute">No events yet. <Link to="/events?request=1" go={go} className="to">Request seats</Link> to start one.</p>}
         </div>
       </section>
 
@@ -271,8 +271,8 @@ export function Overview({ go, sheetId }: { go: (to: string) => void; sheetId: s
                   {ov.results.map((r) => (
                     <li key={r.id}>
                       <EventLogo name={r.name} website={r.website} size={34} />
-                      <div className="who-text"><p className="name"><Link to={`/event/${r.id}#outreach`} go={go} title={r.name}>{r.name.replace(/\s+20\d\d$/, "")}</Link></p><p className="small mute">{money(r.pipeline_cents)} pipeline for {money(r.cost_cents)}{r.final ? "" : ", so far"}</p></div>
-                      <p className="paid-x">{r.cost_cents > 0 ? <><b>{(r.pipeline_cents / r.cost_cents).toFixed(1)}</b>x</> : <span className="mute">no cost yet</span>}</p>
+                      <div className="who-text"><p className="name"><Link to={`/event/${r.id}#${["closing", "scored"].includes(r.motion) ? "result" : "outreach"}`} go={go} title={r.name}>{r.name.replace(/\s+20\d\d$/, "")}</Link></p><p className="small mute">{money(r.pipeline_cents)} pipeline for {money(r.cost_cents)}{r.final ? "" : ", so far"}</p></div>
+                      <p className={`paid-x${r.scored ? "" : " thin"}`}>{r.per_dollar !== null ? <><b>{r.per_dollar.toFixed(1)}</b>x</> : <span className="mute">no cost yet</span>}</p>
                     </li>
                   ))}
                 </ul>

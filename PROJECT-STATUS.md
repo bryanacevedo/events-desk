@@ -2,7 +2,7 @@
 
 **Updated:** 2026-11-09. **Spec:** `docs/SPEC.md`, goldfish-reviewed 2026-11-08 before any code (12 Major, 13 Nit, no Blocker; 24 fixed, 1 moot because a clause gate was closed). It has been edited to match the code since. **Decisions:** `docs/DECISIONS.md`, 1 to 30.
 
-## v2, after delivery (branch `v2`, not merged)
+## v2, after delivery (built on `v2`, merged into `main` 2026-11-09)
 
 Built 2026-11-09 from `docs/LIFECYCLE.md`: owner say, the connector contract with four tools, the sending layer, the gate, replies, meetings and on-site capture, CRM campaign and trail, scorecard and ROI, debrief, learning, integrity, the Outreach section and My day. Decisions in `docs/DECISIONS.md`, section 33. The gap list from the two outside reviews is kept privately, outside the repo.
 

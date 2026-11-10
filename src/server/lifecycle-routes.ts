@@ -19,6 +19,7 @@ import { recordConsent, recordPlacement, setDomainStatus } from "./sending.ts";
 import { captureOnsite, forgetPerson, markHandled } from "./operating.ts";
 import { addSlots, bookSlot, meetingDetail, prepBrief, repDay, replyDetail, roster } from "./rep-day.ts";
 import { isGtm } from "../shared/roles.ts";
+import { isLead, MONEY_REFUSAL, withoutMoney } from "./money.ts";
 import { MOTION_LABEL } from "../shared/motion.ts";
 import { pickSenders, planCapacity } from "../shared/sending.ts";
 import { nextStep, postEventState } from "./post-event.ts";
@@ -86,7 +87,13 @@ export function mountLifecycle(app: App, db: Db, deps: LifecycleDeps, opts: { ba
   if (opts.demoTools) app.post("/api/demo/motion/:id/advance", guarded(async (c) => demoAdvance(db, deps, opts.demoTools!, c.req.param("id"))));
 
   app.get("/api/events/:id/next", async (c) => c.json({ next: await nextStep(db, deps, c.req.param("id")) }));
-  app.get("/api/events/:id/motion", async (c) => { const o = await motionOverview(db, deps, c.req.param("id")); return o ? c.json(o) : bad("That event does not exist.", 404); });
+  app.get("/api/events/:id/motion", async (c) => {
+    const o = await motionOverview(db, deps, c.req.param("id"));
+    if (!o) return bad("That event does not exist.", 404);
+    if (isLead(c.get("actor"))) return c.json(o);
+    // Anyone else gets the same event with every dollar taken out: the cost card's estimate, the live reading and the written scorecards.
+    return c.json({ ...o, card: o.card ? { ...(o.card as object), est_cents: null } : null, live_score: withoutMoney(o.live_score as never), scorecards: (o.scorecards as { metrics: never }[]).map((x) => ({ ...x, metrics: withoutMoney(x.metrics) })) });
+  });
   app.post("/api/events/:id/motion/start", guarded(async (c) => { const b = await body(c); return requestMotionCard(db, deps, c.req.param("id"), c.get("actor"), { purpose: b.purpose, verify_once: b.verify_once, write_leads: b.write_leads, holdout_percent: Number(b.holdout_percent ?? 0) }); }));
   app.post("/api/events/:id/motion/tools", guarded(async (c) => setTools(db, c.req.param("id"), c.get("actor"), (await body(c)).tools ?? {}, deps)));
   app.post("/api/events/:id/motion/legal-basis", guarded(async (c) => { const b = await body(c); return recordLegalBasis(db, c.req.param("id"), c.get("actor"), String(b.region ?? ""), String(b.basis ?? "")); }));
@@ -101,7 +108,7 @@ export function mountLifecycle(app: App, db: Db, deps: LifecycleDeps, opts: { ba
   app.post("/api/motion/domains", guarded(async (c) => { if (!isGtm(c.get("actor"))) throw new RuleError("Sending domains are GTM Engineering's to mark."); const b = await body(c); return setDomainStatus(db, String(b.domain), String(b.status), String(b.reason ?? ""), c.get("actor")); }));
   app.post("/api/motion/sequences/:sid/placement-override", guarded(async (c) => { if (!isGtm(c.get("actor"))) throw new RuleError("Only GTM Engineering can send without a placement test."); await db.query("UPDATE sequences SET placement_override_by = $2 WHERE id = $1", [c.req.param("sid"), c.get("actor")]); }));
   app.get("/api/motion/alerts", async (c) => c.json({ alerts: await db.query("SELECT key, day::text AS day, text, created_at::text AS created_at FROM alerts ORDER BY created_at DESC LIMIT 50"), controls: (await db.query("SELECT sending_stopped_at::text AS stopped_at, stopped_by, reason FROM desk_controls"))[0] }));
-  app.post("/api/events/:id/motion/costs", guarded(async (c) => { const b = await body(c); return recordEventCost(db, c.req.param("id"), c.get("actor"), String(b.category), Number(b.amount_cents), String(b.note ?? "")); }));
+  app.post("/api/events/:id/motion/costs", guarded(async (c) => { if (!isLead(c.get("actor"))) throw new RuleError(MONEY_REFUSAL); const b = await body(c); return recordEventCost(db, c.req.param("id"), c.get("actor"), String(b.category), Number(b.amount_cents), String(b.note ?? "")); }));
   app.get("/api/motion/sequences/:sid/preview", async (c) => {
     const [s] = await db.query<{ event_id: string; name: string; steps: TemplateStep[]; event: string }>("SELECT q.event_id, q.name, t.steps, e.name AS event FROM sequences q JOIN sequence_templates t ON t.id = q.template_id JOIN events e ON e.id = q.event_id WHERE q.id = $1", [c.req.param("sid")]);
     if (!s) return bad("That sequence does not exist.", 404);
@@ -125,7 +132,8 @@ export function mountLifecycle(app: App, db: Db, deps: LifecycleDeps, opts: { ba
   app.post("/api/motion/meetings/:mid/release", guarded(async (c) => confirmRelease(db, deps, c.req.param("mid"), c.get("actor"))));
   app.post("/api/motion/owners/:did", guarded(async (c) => decideOwner(db, deps, c.req.param("did"), c.get("actor"), (await body(c)).status)));
   app.post("/api/motion/debriefs/:did/answer", guarded(async (c) => answerDebrief(db, c.req.param("did"), c.get("actor"), String((await body(c)).body ?? ""))));
-  app.post("/api/motion/debriefs/:did/review", guarded(async (c) => reviewDebrief(db, c.req.param("did"), c.get("actor"), (await body(c)).status)));
+  // Leadership or GTM Engineering decides what joins "what we learned", and never on their own notes.
+  app.post("/api/motion/debriefs/:did/review", guarded(async (c) => { if (!isLead(c.get("actor"))) throw new RuleError("Debriefs are reviewed by leadership or GTM Engineering."); return reviewDebrief(db, c.req.param("did"), c.get("actor"), (await body(c)).status); }));
 
   app.get("/api/motion/templates", async (c) => c.json({ templates: await db.query("SELECT id, name, version, channel, phase, steps, external_id, approved_by, approved_at::text AS approved_at FROM sequence_templates WHERE retired_at IS NULL ORDER BY channel, phase") }));
   app.post("/api/motion/templates", guarded(async (c) => { if (!isGtm(c.get("actor"))) throw new RuleError("Templates are GTM Engineering's to approve."); const b = await body(c); return approveTemplate(db, c.get("actor"), { name: String(b.name ?? ""), channel: b.channel, phase: b.phase, steps: Array.isArray(b.steps) ? b.steps : [], external_id: b.external_id ?? null }); }));
@@ -142,8 +150,13 @@ export function mountLifecycle(app: App, db: Db, deps: LifecycleDeps, opts: { ba
     for (const e of events) {
       const m = e.card?.metrics ?? await computeScorecard(db, deps, e.id, 30, { write: false }).catch(() => null);
       if (!m) continue;
+      // Once a scorecard is written, the money comes from the deal ledger, where each deal belongs to one event: a deal a later event
+      // took over is not counted twice in the totals. A written card itself stays as it was written.
+      const [led] = e.card ? await db.query<{ cents: number; won: number; n: number }>("SELECT coalesce(sum(amount_cents), 0)::bigint AS cents, coalesce(sum(amount_cents) FILTER (WHERE won), 0)::bigint AS won, count(*)::int AS n FROM attribution_claims WHERE event_id = $1", [e.id]) : [];
+      const pipeline = led ? Number(led.cents) : m.influence.pipeline_cents, cost = m.cost.dollars_cents;
       rows.push({ id: e.id, name: e.name, starts_on: e.starts_on, venue: e.venue, website: e.website, brand_color: e.brand_color, final: e.motion === "scored", window_days: e.card?.window_days ?? null,
-        cost_cents: m.cost.dollars_cents, pipeline_cents: m.influence.pipeline_cents, won_cents: m.influence.won.cents, per_dollar: m.roi.pipeline_per_dollar, held: m.held_all, deals: m.influence.opportunities, control: m.control, scored: Boolean(m.score), notes: { asked: e.asked, written: e.written } });
+        cost_cents: cost, pipeline_cents: pipeline, won_cents: led ? Number(led.won) : m.influence.won.cents, per_dollar: m.influence.available && cost ? Math.round((pipeline / cost) * 100) / 100 : null,
+        held: m.held_all, deals: led ? led.n : m.influence.opportunities, control: m.control, scored: Boolean(m.score), costs_missing: m.roi.cost_missing.length, notes: { asked: e.asked, written: e.written } });
     }
     return c.json({ events: rows });
   });

@@ -24,6 +24,7 @@ import { benchToExample, cancelCompile, confirmCompile, reopenCompile, editDraft
 import { mockLlm, type Crm, type Dns, type Llm } from "./providers.ts";
 import type { Settings } from "../shared/cost.ts";
 import { isGtm, SETTINGS_REFUSAL } from "../shared/roles.ts";
+import { isLead, MONEY_REFUSAL } from "./money.ts";
 import { mountSettingsView } from "./settings-view.ts";
 import { mountSeatRoutes } from "./seat-routes.ts";
 import { mountBudgetRoutes } from "./budget-routes.ts";
@@ -45,6 +46,11 @@ export function createApp(db: Db, cfg: AppConfig) {
   const app = new Hono<Ctx>();
 
   app.use("/api/*", async (c, next) => {
+    if (c.req.method === "GET") {
+      // Reads say who is acting too. Budget, Usage and Results are company money: leadership's and GTM Engineering's.
+      c.set("actor", decodeURIComponent(c.req.header("x-actor") ?? "").trim().slice(0, 60));
+      if (/^\/api\/(budget|usage|results)(\/|$)/.test(c.req.path) && !isLead(c.get("actor"))) return bad(MONEY_REFUSAL, 403);
+    }
     if (c.req.method !== "GET") {
       if (cfg.writeKey && c.req.header("x-write-key") !== cfg.writeKey) return bad("This desk needs the team write key to make changes.", 401);
       const actor = decodeURIComponent(c.req.header("x-actor") ?? "").trim();
@@ -99,7 +105,8 @@ export function createApp(db: Db, cfg: AppConfig) {
   mountSeatRoutes(app, db, cfg);
   mountBudgetRoutes(app, db, cfg);
   mountEventViews(app, db);
-  app.get("/api/overview", async (c) => c.json(await overview(db, cfg.lifecycle)));
+  // "Did it pay?" is company money: anyone else gets the overview without it.
+  app.get("/api/overview", async (c) => { const o = await overview(db, cfg.lifecycle); return c.json(isLead(c.get("actor")) ? o : { ...o, results: [] }); });
 
   /* The ICP: one seller per install, one line of versions. A document is uploaded, a person sees the cost and starts the compile,
      confirms the draft, tests it on companies with known answers, and publishes. Nothing here is used for tiering until published. */

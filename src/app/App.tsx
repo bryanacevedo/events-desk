@@ -135,9 +135,9 @@ export function App() {
           {place === "overview" && <Overview go={go} sheetId={search.get("event")} />}
           {place === "events" && <Events go={go} sheetId={search.get("event")} requesting={search.get("request") === "1"} preselect={search.get("catalog")} search={search} />}
           {place === "seats" && <Seats go={go} search={search} requesting={search.get("request") === "1"} preselect={search.get("catalog")} />}
-          {place === "budget" && <Budget go={go} search={search} />}
-          {place === "results" && lead && <Results go={go} />}
-          {place === "usage" && <Usage go={go} search={search} />}
+          {place === "budget" && (lead ? <Budget go={go} search={search} /> : <p className="md-clear">Budget is for leadership and GTM Engineering.</p>)}
+          {place === "results" && (lead ? <Results go={go} /> : <p className="md-clear">Results are for leadership and GTM Engineering.</p>)}
+          {place === "usage" && (lead ? <Usage go={go} search={search} /> : <p className="md-clear">Usage is for leadership and GTM Engineering.</p>)}
           {place === "myday" && <MyDay />}
           {place === "more" && <More go={go} showDay={approver && showDay} />}
           {place === "settings" && <Settings go={go} compileId={search.get("compile")} section={search.get("section")} />}

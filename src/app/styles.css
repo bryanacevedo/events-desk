@@ -549,7 +549,7 @@ details summary::-webkit-details-marker { display: none; }
 .pmail { font-size: 14px; }
 .prow.off { color: var(--mute); }
 .prow.off .pname b { font-weight: 400; }
-.prow.corow { grid-template-columns: 12px minmax(0, 1.6fr) minmax(0, 1fr) 120px; cursor: default; }
+.prow.corow { grid-template-columns: 36px minmax(0, 1.6fr) minmax(0, 1fr) 120px; cursor: default; }
 .prow.corow .pmail { text-align: right; }
 .prows .panel { margin: 4px 0 18px; }
 .prows li.open { border-bottom: 1px solid var(--line); }
@@ -684,7 +684,7 @@ button.chevbtn:hover { background: var(--well); color: var(--ink); }
   .prow .pco, .prow .pmail { grid-column: 2; }
   .prow .pprio { grid-column: 3; grid-row: 1; }
   .pco { grid-template-columns: minmax(0, 1fr) auto; gap: 0 8px; }
-  .prow.corow { grid-template-columns: 12px minmax(0, 1fr); }
+  .prow.corow { grid-template-columns: 36px minmax(0, 1fr); }
   .prow.corow .tdot { grid-row: 1; align-self: center; }
   .prow.corow .pmail { text-align: left; }
   .crow { grid-template-columns: minmax(0, 1fr); gap: 12px; }
@@ -2012,3 +2012,10 @@ div.rs-deal:hover { transform: none; box-shadow: none; }
 .m-replies.flush { padding-left: 0; padding-right: 0; max-width: none; }
 .m-replies.flush .ob-tray { max-width: none; }
 .result-view { display: grid; gap: 28px; margin-top: 36px; }
+
+/* The timeline marks an event's day with a tick, not a dot: the bar's colours already say where it stands. */
+.tl-dot, .tl-dot.ok, .tl-dot.wait, .tl-dot.off { top: 9px; width: 2px; height: 18px; border-radius: 1px; background: var(--ink); box-shadow: none; }
+.tl-dot.listed, .tl-dot.none { background: var(--line-2); box-shadow: none; }
+.tl-row.past .tl-dot, .tl-row.past .tl-dot.ok { top: 10px; width: 2px; height: 16px; background: var(--mute); opacity: 1; }
+.paid-x.thin b { color: var(--mute); }
+.u { text-decoration: none; }

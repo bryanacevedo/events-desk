@@ -4,6 +4,7 @@ import type { Db } from "./db.ts";
 import { crmConnected } from "./crm-checks.ts";
 import { getSettings } from "./approvals.ts";
 import { daysPast, LAST_DAY_SQL, SCORE_DAYS } from "./motion.ts";
+import { heldOut } from "./sequences.ts";
 import { newId, RuleError } from "./events.ts";
 import { spend, spendByStep } from "./ledger.ts";
 import { DESK, nowOf, type LifecycleDeps } from "./lifecycle-deps.ts";
@@ -22,6 +23,7 @@ const SOURCED_DAYS = 30;
 export const COST_CATEGORIES = ["sponsorship", "booth", "dinners", "swag", "tools", "rep_time"];
 
 export async function recordEventCost(db: Db, eventId: string, actor: string, category: string, amountCents: number, note: string) {
+  if (![...COST_CATEGORIES, "other"].includes(category)) throw new RuleError(`A cost is one of: ${[...COST_CATEGORIES, "other"].join(", ")}.`);
   if (!Number.isInteger(amountCents) || amountCents < 0) throw new RuleError("Give an amount in cents, zero or more.");
   await db.query("INSERT INTO event_costs (id, event_id, category, amount_cents, note, recorded_by) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (event_id, category) DO UPDATE SET amount_cents = $4, note = $5, recorded_by = $6, recorded_at = now()", [newId("cst"), eventId, category, amountCents, note.slice(0, 300), actor]);
 }
@@ -36,7 +38,7 @@ export interface Scorecard {
   cost_per_held_cents: number | null;
   /** One written definition each. Sourced: created within 30 days after a held meeting, with no open deal before it. Influenced: already open and moved forward within 90 days after one. Each opportunity counts for one event. */
   influence: { available: boolean; opportunities: number; pipeline_cents: number; sourced: { n: number; cents: number }; influenced: { n: number; cents: number }; won: { n: number; cents: number }; stale: number; deals?: Deal[] };
-  control: { available: boolean; met_accounts: number; met_with_pipeline: number; control_accounts: number; control_with_pipeline: number };
+  control: { available: boolean; basis?: "holdout" | "untouched"; met_accounts: number; met_with_pipeline: number; control_accounts: number; control_with_pipeline: number };
   roi: { pipeline_per_dollar: number | null; won_per_dollar: number | null; cost_missing: string[] };
   score: { held_per_thousand: number; pipeline_per_dollar: number | null } | null;
   past: { held_per_thousand: number | null; pipeline_per_dollar: number | null };
@@ -48,7 +50,7 @@ export async function computeScorecard(db: Db, deps: LifecycleDeps, eventId: str
   const s = await getSettings(db.query, eventId);
   const [c] = await db.query<{ tickets: number; travel: number }>(
     `SELECT coalesce((SELECT sum(p.amount_cents) FROM ticket_purchases p JOIN seat_requests r ON r.id = p.seat_request_id WHERE r.event_id = $1), 0)::int AS tickets,
-            coalesce((SELECT sum(travel_cents) FROM seat_requests WHERE event_id = $1 AND status <> 'declined'), 0)::int AS travel`, [eventId]);
+            coalesce((SELECT sum(travel_cents) FROM seat_requests WHERE event_id = $1 AND status = 'approved'), 0)::int AS travel`, [eventId]);
   const ai_cents = (await spend(db, eventId)).llm * s.llm_call_cents;
   const extras = await db.query<{ category: string; amount_cents: number }>("SELECT category, amount_cents FROM event_costs WHERE event_id = $1", [eventId]);
   const other_cents = extras.reduce((n, e) => n + e.amount_cents, 0);
@@ -84,7 +86,7 @@ export async function computeScorecard(db: Db, deps: LifecycleDeps, eventId: str
           detail.set(o.id, deal);
           if (!write) { const [other] = await q<{ event_id: string; meeting_at: string }>("SELECT event_id, meeting_at::text AS meeting_at FROM attribution_claims WHERE opportunity_id = $1", [o.id]); if (!other || other.event_id === eventId || Date.parse(other.meeting_at) < held) { counted.push(deal); influence[kind].n++; influence[kind].cents += o.amount_cents ?? 0; if (o.is_won) { influence.won.n++; influence.won.cents += o.amount_cents ?? 0; } } continue; }
           await q(`INSERT INTO attribution_claims (opportunity_id, event_id, kind, meeting_at, moved_at, amount_cents, won) VALUES ($1, $2, $3, $4, $5, $6, $7)
-                   ON CONFLICT (opportunity_id) DO UPDATE SET event_id = CASE WHEN EXCLUDED.meeting_at > attribution_claims.meeting_at THEN EXCLUDED.event_id ELSE attribution_claims.event_id END, kind = CASE WHEN EXCLUDED.meeting_at > attribution_claims.meeting_at THEN EXCLUDED.kind ELSE attribution_claims.kind END, meeting_at = greatest(EXCLUDED.meeting_at, attribution_claims.meeting_at), amount_cents = EXCLUDED.amount_cents, won = EXCLUDED.won, updated_at = now()`,
+                   ON CONFLICT (opportunity_id) DO UPDATE SET event_id = CASE WHEN EXCLUDED.meeting_at > attribution_claims.meeting_at THEN EXCLUDED.event_id ELSE attribution_claims.event_id END, kind = CASE WHEN EXCLUDED.meeting_at > attribution_claims.meeting_at THEN EXCLUDED.kind ELSE attribution_claims.kind END, moved_at = CASE WHEN EXCLUDED.meeting_at > attribution_claims.meeting_at THEN EXCLUDED.moved_at ELSE attribution_claims.moved_at END, meeting_at = greatest(EXCLUDED.meeting_at, attribution_claims.meeting_at), amount_cents = EXCLUDED.amount_cents, won = EXCLUDED.won, updated_at = now()`,
             [o.id, eventId, kind, new Date(held).toISOString(), movedAt, o.amount_cents ?? 0, Boolean(o.is_won)]);
         }
       }
@@ -98,12 +100,18 @@ export async function computeScorecard(db: Db, deps: LifecycleDeps, eventId: str
     influence.opportunities = influence.sourced.n + influence.influenced.n;
     influence.deals = counted.sort((a, b) => b.amount_cents - a.amount_cents);
     influence.pipeline_cents = influence.sourced.cents + influence.influenced.cents;
-    // The control: accounts kept on this list that nobody reached, against the accounts met. An honest comparison, not proof of cause.
-    const others = await db.query<{ domain: string; name: string }>(
-      `SELECT DISTINCT co.primary_domain AS domain, co.name FROM companies co JOIN contacts k ON k.company_id = co.id WHERE co.event_id = $1 AND k.priority IS NOT NULL AND co.primary_domain IS NOT NULL
-         AND NOT EXISTS (SELECT 1 FROM touches t WHERE t.domain = co.primary_domain AND t.kind IN ('send', 'sequence_add', 'met_onsite', 'meeting_booked', 'owner_mine', 'badge_scan'))`, [eventId]);
+    // The comparison. With a holdout, the accounts held out at random: the fair group. Without one, accounts kept on this list that
+    // nobody reached, which is not random (the desk chose whom to reach), so the screen names which it is. Not proof of cause either way.
+    const [ev] = await db.query<{ holdout_percent: number | null }>("SELECT holdout_percent FROM events WHERE id = $1", [eventId]);
+    const pct = Number(ev?.holdout_percent ?? 0);
+    const listed = await db.query<{ domain: string; name: string; touched: boolean }>(
+      `SELECT DISTINCT co.primary_domain AS domain, co.name, EXISTS (SELECT 1 FROM touches t WHERE t.domain = co.primary_domain AND t.kind IN ('send', 'sequence_add', 'met_onsite', 'meeting_booked', 'owner_mine', 'badge_scan')) AS touched
+       FROM companies co JOIN contacts k ON k.company_id = co.id WHERE co.event_id = $1 AND k.priority IS NOT NULL AND co.primary_domain IS NOT NULL`, [eventId]);
+    const heldOutHere = pct > 0 ? listed.filter((r) => heldOut(r.domain, pct) && !r.touched) : [];
+    const basis: "holdout" | "untouched" = heldOutHere.length ? "holdout" : "untouched";
+    const others = basis === "holdout" ? heldOutHere : listed.filter((r) => !r.touched);
     const theirs = others.length ? await deps.crm.opportunities(others.map((m) => ({ ref: m.domain, domain: m.domain, name: m.name }))) : {};
-    control = { available: true, met_accounts: met.length, met_with_pipeline: met.filter((m) => (opps[m.domain] ?? []).length).length, control_accounts: others.length, control_with_pipeline: others.filter((m) => (theirs[m.domain] ?? []).length).length };
+    control = { available: true, basis, met_accounts: met.length, met_with_pipeline: met.filter((m) => (opps[m.domain] ?? []).length).length, control_accounts: others.length, control_with_pipeline: others.filter((m) => (theirs[m.domain] ?? []).length).length };
   }
   const roi: Scorecard["roi"] = { pipeline_per_dollar: influence.available && dollars_cents ? Math.round((influence.pipeline_cents / dollars_cents) * 100) / 100 : null, won_per_dollar: influence.available && dollars_cents ? Math.round((influence.won.cents / dollars_cents) * 100) / 100 : null, cost_missing: COST_CATEGORIES.filter((k) => !extras.some((e) => e.category === k)) };
   // A conference mostly produces meetings that never came from a sequence. The score counts every held meeting, and the funnel keeps its own honest count.
@@ -115,7 +123,7 @@ export async function computeScorecard(db: Db, deps: LifecycleDeps, eventId: str
   return { funnel, logged_outside, held_all, cost: { tickets_cents: c.tickets, travel_cents: c.travel, ai_cents, other_cents, dollars_cents, credits_by_step }, control, roi, cost_per_held_cents: f.held_all ? Math.round(dollars_cents / f.held_all) : null, influence, score, past: { held_per_thousand: median(held), pipeline_per_dollar: median(pipe) } };
 }
 
-/** First score 30 days after the event's last day, revised at 60 and 90, each version kept. */
+/** First score 30 days after the event's last day, then again at 60, 90, 180 and 365; each version is kept as written. */
 export async function writeScorecards(db: Db, deps: LifecycleDeps) {
   const now = nowOf(deps);
   let written = 0;
@@ -158,13 +166,13 @@ export async function sendDebriefPrompts(db: Db, deps: LifecycleDeps) {
     const due = addDays(e.last_day > e.delivered_on ? e.last_day : e.delivered_on, 2);
     if (localDay(now, e.country) < due) continue;
     const reps = await db.query<{ rep: string; n: number }>("SELECT rep, count(*)::int AS n FROM meetings m WHERE event_id = $1 AND status = 'held' AND rep IS NOT NULL AND NOT EXISTS (SELECT 1 FROM debriefs d WHERE d.event_id = m.event_id AND d.author = m.rep) GROUP BY rep", [e.id]);
+    // Every rep who held a meeting is asked, and can answer on the event's Result tab. Slack, where it is set up, adds the nudge.
     for (const r of reps) {
-      const slackId = deps.userMap?.[r.rep];
-      if (!slackId || !deps.notify) continue;
       const id = newId("dbf");
       const ins = await db.query("INSERT INTO debriefs (id, event_id, author, prompted_at) VALUES ($1, $2, $3, $4) ON CONFLICT (event_id, author) DO NOTHING RETURNING id", [id, e.id, r.rep, now.toISOString()]);
       if (!ins.length) continue;
-      if (await postToEvent(db, deps, e.id, debriefCard({ event: e.name, meetings: r.n, debrief_id: id }), [slackId])) sent++;
+      const slackId = deps.userMap?.[r.rep];
+      if (slackId && deps.notify && await postToEvent(db, deps, e.id, debriefCard({ event: e.name, meetings: r.n, debrief_id: id }), [slackId])) sent++;
     }
   }
   return { sent };
@@ -211,6 +219,8 @@ export async function extractDebriefs(db: Db, deps: LifecycleDeps) {
 }
 
 export async function reviewDebrief(db: Db, debriefId: string, actor: string, decision: "accepted" | "rejected") {
+  const [mine] = await db.query("SELECT 1 FROM debriefs WHERE id = $1 AND author = $2", [debriefId, actor]);
+  if (mine) throw new RuleError("Someone else reviews your own notes.");
   const rows = await db.query("UPDATE debriefs SET status = $2, decided_by = $3 WHERE id = $1 AND status = 'answered' RETURNING id", [debriefId, decision, actor]);
   if (!rows.length) throw new RuleError("That debrief is not waiting for a decision.");
   return { status: decision };
@@ -246,7 +256,9 @@ export async function droppedWhoDealt(db: Db, deps: LifecycleDeps) {
   const rows = await db.query<{ domain: string; name: string; dropped: number }>(
     `SELECT co.primary_domain AS domain, min(co.name) AS name, count(*)::int AS dropped FROM contacts k JOIN companies co ON co.id = k.company_id WHERE k.drop_reason IN ('low_tier', 'tiering_failed') AND co.primary_domain IS NOT NULL GROUP BY co.primary_domain`);
   const opps = await deps.crm.opportunities(rows.map((r) => ({ ref: r.domain, domain: r.domain, name: r.name })));
-  return rows.filter((r) => (opps[r.domain] ?? []).length).map((r) => ({ ...r, opportunities: opps[r.domain].length }));
+  // A lost deal is not a miss. Open and won deals are.
+  const live = (d: string) => (opps[d] ?? []).filter((o) => !o.is_closed || o.is_won);
+  return rows.filter((r) => live(r.domain).length).map((r) => ({ ...r, opportunities: live(r.domain).length }));
 }
 
 /** A suggested edit, with its evidence, for a person to accept. Nothing changes the ICP from here: an accepted one goes through the ICP confirm screen as a new version. */

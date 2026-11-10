@@ -19,7 +19,7 @@ export interface Metrics {
   funnel: { kept: number; sent: number; replied: number; booked: number }; held_all: number;
   cost: { dollars_cents: number }; cost_per_held_cents: number | null;
   influence: { available: boolean; pipeline_cents: number; sourced: { n: number; cents: number }; influenced: { n: number; cents: number }; won: { n: number; cents: number }; deals?: Deal[] };
-  control: { available: boolean; met_accounts: number; met_with_pipeline: number; control_accounts: number; control_with_pipeline: number };
+  control: { available: boolean; basis?: "holdout" | "untouched"; met_accounts: number; met_with_pipeline: number; control_accounts: number; control_with_pipeline: number };
   roi: { pipeline_per_dollar: number | null; cost_missing: string[] };
   score: { held_per_thousand: number; pipeline_per_dollar: number | null } | null;
   past: { pipeline_per_dollar: number | null };
@@ -67,11 +67,11 @@ export function Result({ eventId, eventName, motion, lastDay, live, scorecards, 
           <p>{kicker}</p>
           {lead && m.influence.available
             ? <h2><b className={thin ? "thin" : undefined}>{ratio === null ? "None" : times(ratio)}</b><span>{money(m.influence.pipeline_cents)} in pipeline for {money(m.cost.dollars_cents)}{thin ? ", too few meetings to rank" : ""}</span></h2>
-            : <h2><b>{num(m.held_all)}</b><span>{m.held_all === 1 ? "meeting held" : "meetings held"}, from {num(m.funnel.sent)} people reached</span></h2>}
+            : <h2><b>{num(m.held_all)}</b><span>{m.held_all === 1 ? "meeting held" : "meetings held"}</span></h2>}
         </div>
         <div className="md-figs">
           {lead ? <><p><b>{num(m.held_all)}</b><span>{m.held_all === 1 ? "meeting held" : "meetings held"}</span></p><p><b>{num(deals.length)}</b><span>{deals.length === 1 ? "deal" : "deals"}</span></p></>
-            : <><p><b>{num(m.funnel.replied)}</b><span>{m.funnel.replied === 1 ? "reply" : "replies"}</span></p></>}
+            : <><p><b>{num(m.funnel.sent)}</b><span>reached</span></p><p><b>{num(m.funnel.replied)}</b><span>{m.funnel.replied === 1 ? "reply" : "replies"}</span></p></>}
         </div>
       </header>
 
@@ -147,6 +147,7 @@ export function ResultEvidence({ eventId, motion, lastDay, live, scorecards, onC
   const next = lastDay ? WINDOWS.find((w) => !written.some((x) => x.window_days === w)) : undefined;
   const add = async () => { setBusy(true); try { await send("POST", `/api/events/${eventId}/motion/costs`, actor, { category: cost.category || m.roi.cost_missing[0], amount_cents: Math.round(Number(cost.amount) * 100) }); setCost({ category: "", amount: "" }); onChange(); } finally { setBusy(false); } };
   const top = Math.max(1, ...values);
+  const credits = Object.values((m.cost as { credits_by_step?: Record<string, number> }).credits_by_step ?? {}).reduce((n, x) => n + x, 0);
   return (
     <div className="rs-evidence">
       <div className="brief">
@@ -155,7 +156,7 @@ export function ResultEvidence({ eventId, motion, lastDay, live, scorecards, onC
             <h3>Accounts with pipeline</h3>
             <ul>
               <li className="brow"><span>Ones we met</span><i aria-hidden="true"><u className="t1" style={{ width: `${pct(c.met_with_pipeline, c.met_accounts)}%` }} /></i><b>{pct(c.met_with_pipeline, c.met_accounts)}%</b></li>
-              <li className="brow"><span>Ones like them we never reached</span><i aria-hidden="true"><u className="t3" style={{ width: `${pct(c.control_with_pipeline, c.control_accounts)}%` }} /></i><b>{pct(c.control_with_pipeline, c.control_accounts)}%</b></li>
+              <li className="brow"><span>{c.basis === "holdout" ? "Ones held out at random" : "Ones on the list we never reached"}</span><i aria-hidden="true"><u className="t3" style={{ width: `${pct(c.control_with_pipeline, c.control_accounts)}%` }} /></i><b>{pct(c.control_with_pipeline, c.control_accounts)}%</b></li>
             </ul>
           </div>
         )}
@@ -187,7 +188,7 @@ export function ResultEvidence({ eventId, motion, lastDay, live, scorecards, onC
         ))}
 
       <dl className="sheet-facts rs-cost">
-        <div><dt>Cost</dt><dd>{money(m.cost.dollars_cents)}{m.cost_per_held_cents !== null ? `, ${money(m.cost_per_held_cents)} per meeting held` : ""}</dd></div>
+        <div><dt>Cost</dt><dd>{money(m.cost.dollars_cents)}{m.cost_per_held_cents !== null ? `, ${money(m.cost_per_held_cents)} per meeting held` : ""}{credits > 0 ? `, plus ${num(credits)} prepaid data credits` : ""}</dd></div>
         {m.roi.cost_missing.length > 0 && (
           <div><dt>Not entered</dt><dd>
             <form className="m-act" onSubmit={(e) => { e.preventDefault(); add(); }}>

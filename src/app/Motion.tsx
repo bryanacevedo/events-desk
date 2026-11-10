@@ -18,7 +18,7 @@ interface Meeting { id: string; contact_id?: string; status: string; scheduled_a
 interface Score { held_all: number; logged_outside: number; cost: { dollars_cents: number }; cost_per_held_cents: number | null; influence: { available: boolean; sourced: { n: number; cents: number }; influenced: { n: number; cents: number }; won: { n: number; cents: number } }; control: { available: boolean; met_accounts: number; met_with_pipeline: number; control_accounts: number; control_with_pipeline: number }; roi: { pipeline_per_dollar: number | null; cost_missing: string[] } }
 interface Overview {
   motion: string; capacity: { needed: number; healthy: number } | null;
-  card: { status: string; llm_cap: number; est_cents: number } | null;
+  card: { status: string; llm_cap: number; est_cents: number | null } | null;
   sequences: Sequence[]; funnel: { kept: number; enrolled: number; sent: number; replied: number; booked: number; held: number } | null; owners: { status: string; n: number }[]; replies: Reply[]; meetings: Meeting[];
   captures: { id: string; contact_id?: string | null; full_name: string | null; company: string | null; rep: string; temperature?: string }[]; regions: { region: string; people: number; basis: string | null }[]; live_score: Score | null;
   post_event: { window: "before" | "during" | "after" | "closed"; last_day: string; last_press: string | null; started_at: string | null; started_by: string | null; groups: Record<string, number> } | null;
@@ -182,7 +182,7 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
 
       {(o.card?.status === "pending" || (!started && o.capacity)) && (
         <ul className="m-rows m-wide">
-          {o.card?.status === "pending" && <li><span>Reading replies, waiting on the uploader</span><b>Up to {plural(o.card.llm_cap, "AI call")}, about {money(o.card.est_cents)}</b></li>}
+          {o.card?.status === "pending" && <li><span>Reading replies, waiting on the uploader</span><b>Up to {plural(o.card.llm_cap, "AI call")}{o.card.est_cents !== null ? `, about ${money(o.card.est_cents)}` : ""}</b></li>}
           {!started && o.capacity && <li><span>Healthy inboxes</span><b>{o.capacity.healthy < o.capacity.needed ? <span className="fig over"><b>{o.capacity.needed - o.capacity.healthy}</b> short of {o.capacity.needed}</span> : `${o.capacity.healthy} for ${o.capacity.needed} needed`}</b></li>}
         </ul>
       )}

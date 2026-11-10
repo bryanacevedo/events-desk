@@ -1,6 +1,6 @@
 # After delivery: the rest of an event's life (v2 spec)
 
-Status: built on branch `v2`, 2026-11-09, on simulated tools and fakes; none of it has run against a real sequencer, CRM or calendar account. Decisions taken while building are in `docs/DECISIONS.md`, section 33.
+Status: built on branch `v2`, 2026-11-09, on simulated tools and fakes; none of it has run against a real sequencer, CRM or calendar account. Decisions taken while building are in `docs/DECISIONS.md`, sections 33 to 38.
 
 v1 ends at a delivered list. This covers what happens until the event has a score and its lessons reach the next event.
 
@@ -17,13 +17,14 @@ A delivered event keeps stage `delivered`. A new column `events.motion` runs bes
 | `none` | `owners` | The uploader starts outreach, and a CRM is connected |
 | `none` | `sequencing` | The uploader starts outreach, and no CRM is connected |
 | `none` | `closing` | No outreach was started by 14 days after the event's last day |
+| `owners` | `closing` | Owner decisions still open 14 days after the last day |
 | `owners` | `sequencing` | Every decision is in, defaulted, or handed to the uploader |
 | `sequencing` | `in_market` | The desk observes a launch |
 | `sequencing` | `closing` | Nothing launched by 14 days after the last day |
 | `in_market` | `closing` | 14 days after the last day |
 | `closing` | `scored` | The 30-day scorecard is written, with or without a score |
 
-`scored` is terminal; the 60 and 90-day revisions are versions of the scorecard.
+`scored` is terminal. Scorecards are written at 30, 60, 90, 180 and 365 days after the last day; each is kept as written, and the 30-day one moves the event to `scored`.
 
 **Clocks** read `catalog_events.ends_on`, falling back to `events.starts_on`. A date is the event's local day where the country is known, otherwise UTC, and the screen says which. An event **delivered after it ended** goes through the same motion with post-event templates only, and its debrief date is delivery plus 2 days.
 
@@ -92,6 +93,7 @@ Connector {
 4. `preSendCheck` passes, extended with account do-not-prospect and wrong-person suppressions.
 5. Not in another cadence, active or paused.
 6. No hold applies (section 6), and no CRM activity in the last 14 days that the desk did not cause, unless the owner said include after that date.
+6a. Not in a **cool-off**: someone who answered "not now" is not contacted again for 90 days, and "not interested" for 180, across every event (`NOT_NOW_COOL_OFF_DAYS`, `NOT_INTERESTED_COOL_OFF_DAYS` in `src/shared/policy.ts`). This is separate from the 14-day rule above.
 7. A legal basis is recorded for the person's region (below).
 8. Named, because templates need a name. A person with `person_id` missing is linked first.
 
@@ -116,11 +118,13 @@ A sequence that does not have enough healthy senders does not go out. Built in `
 - **While it runs.** Every sweep re-reads every sender. One that goes bad is dropped and a spare takes over. With no spare left, the sequence pauses and a person hears.
 - **What a tool cannot do.** A tool that does not show its accounts (Gong) is marked "not visible" and the screen says the desk cannot vouch for them. A tool that shows them but cannot be told which to use (HeyReach) gets a named list for a person to attach.
 
+Also in the sending layer: an inbox warmed for under 30 days gets half the daily cap; LinkedIn sizing counts only a sequence's first step; and the bounce pause needs at least 50 sends before it can trip (`BOUNCE_MIN_SENDS`).
+
 ## 5b. The post-event wave
 
 Status: built on `v2`, 2026-11-09, in `src/server/post-event.ts`, tested in `tests/post-event.test.ts`. Before it, pre-event sequences ended on the event's first day and nothing started the follow-up: a person had to remember to press set up again, and a press on day one already counted as "post". A fresh review of the spec found nine gaps before building; each is answered below.
 
-**When.** An event's days are its catalog dates, or its own `ends_on` for a custom multi-day event, or its start date for a one-day event, in the event's local time. Pre-event sequences end on the first day. While the event is on, set up refuses. The day after the last day, the event's channel gets a card for the person who uploaded the list: who goes into the follow-up, in groups, **after every check has run**, with the reasons the rest are held back, and one button when anyone is ready. In Slack, anyone mapped in `SLACK_USER_MAP` can press it; on the web, it is on the Outreach screen and the event page. Nothing starts without a press. One business day without a press brings one reminder. The button works until 10 days after the last day; after that, set up says the window has closed. An event whose owners are still deciding gets its card once they are done, if the window is still open.
+**When.** An event's first day is its own start date; its last day is the catalog's end date, or its own `ends_on` for a custom multi-day event, or its start date for a one-day event, in the event's local time. Pre-event sequences end on the first day. While the event is on, set up refuses. The day after the last day, the event's channel gets a card for the person who uploaded the list: who goes into the follow-up, in groups, **after every check has run**, with the reasons the rest are held back, and one button when anyone is ready. In Slack, anyone mapped in `SLACK_USER_MAP` can press it; on the web, it is on the Outreach screen and the event page. Nothing starts without a press. One business day without a press brings one reminder. The button works until 10 days after the last day; after that, set up says the window has closed. An event whose owners are still deciding gets its card once they are done, if the window is still open.
 
 **Who, by what happened at the event.** After the event, that matters more than the tier did. Each person is in the first group that fits:
 
@@ -172,7 +176,7 @@ Inbound goes to `inbound_messages` first, unique on the provider's message id, a
 - One model call classifies into: interested, meeting request, referral, not now, not interested, out of office, unsubscribe, bounced, wrong person, departed, other. Output is a code from the list. **Reply text is untrusted data, fenced, and can only choose a code.**
 - **Code runs first.** An explicit bounce signal from the provider, and unsubscribe keywords, are matched before any model call.
 - **Stop before thinking.** Every inbound message immediately pauses that person's whole cadence on every channel, before classification. It resumes only if the classification says so and the gate passes.
-- Confidence is not a model score. A reply is **doubtful** when the classification fails validation, is `other`, the card has run out, or the model contradicts a code match. **A code match for unsubscribe always acts**, doubtful or not. Doubtful replies stay stopped until a person decides, and nothing expires that.
+- Confidence is not a model score. A reply is **doubtful** when the classification fails validation, is `other`, the card has run out, the model contradicts a code match, it may have been written by someone else, or nothing is left once quoted text is removed. **A code match for unsubscribe always acts**, doubtful or not. Doubtful replies stay stopped until a person decides, and nothing expires that.
 - **Consequences, in code, and only after the checks above:**
 
 | Code | What happens |
@@ -184,7 +188,7 @@ Inbound goes to `inbound_messages` first, unique on the provider's message id, a
 | Out of office | Resumes after the stated return date, or 7 days |
 | Referral | Case with the named person |
 | Interested, meeting request | Stays paused for a rep, posted to the event's Slack channel with the account owner @-mentioned |
-| Not now, not interested | Removed from this sequence, recorded |
+| Not now, not interested | Removed from this sequence, recorded, and a cool-off starts (90 or 180 days, gate 6a); "not now" also queues a CRM task due in 90 days |
 
 A suppression caused by a model label alone (no code match) is marked `needs_confirmation` and a person sees it, while the person stays stopped. The model never drafts or sends.
 
@@ -195,6 +199,7 @@ Reply rates read a single view that excludes the carve-out codes.
 Three ways in: a rep marks a reply booked, the Sheet's Meetings tab, or a calendar webhook through a `Calendar` seam. Meetings rows gain a hidden id so a reschedule updates a row. Times are stored with a timezone.
 
 - Booking pauses the booked person and every other contact at the domain, kept and never deleted, with a hold.
+- Booking also answers that person's open reply, so it stops waiting on a rep everywhere.
 - Status: proposed, booked, held, no-show, cancelled, rescheduled. **Cancelled or no-show releases the hold** after a rep confirms, and paused people resume.
 - A rep who cancels without recording it is caught by the 30-day expiry in section 6.
 - A prep brief is a new Concierge tool, reading only delivered facts through its existing views. It adds no CRM fields beyond those already on the delivered list.
@@ -211,7 +216,7 @@ The outbox's retry safety rests on writes that only fill blanks. Creates are dif
 
 ## 10. Debrief
 
-Two days after the event's last day, or delivery if later, anyone with a held meeting gets a short Slack prompt. One model call, on the Motion card, extracts facts. With no approved Motion card the prompt still goes out and the answer is kept, unread by any model. **Every fact must quote the debrief as a literal substring or it is discarded.** A person accepts or rejects each debrief, and only accepted ones aggregate. Re-running accumulates.
+Two days after the event's last day, or delivery if later, everyone with a held meeting is asked for a debrief, which they can write on the event's Result tab; with Slack set up they also get a short prompt in the event's channel. Leadership or GTM Engineering accepts or leaves out each one, never their own; only accepted notes show in "What we learned". One model call, on the Motion card, extracts facts. With no approved Motion card the prompt still goes out and the answer is kept, unread by any model. **Every fact must quote the debrief as a literal substring or it is discarded.** A person accepts or rejects each debrief, and only accepted ones aggregate. Re-running accumulates.
 
 ## 11. Scorecard
 
@@ -219,9 +224,11 @@ One SQL view defines each funnel step. Enrollment funnel: kept, enrolled, sent, 
 
 - **Pipeline:** an opportunity counts only if its account had a held meeting credited to this event. **New pipeline** is created within 30 days after that meeting, with no open deal at the account at the time. **Pipeline it moved** was already open and moved forward within 90 days after. One opportunity is credited to one event. It is influence, never sole credit, and needs `opportunities()`. With no CRM the line reads "not available".
 - Cost stays apart: tickets, and travel from seat requests, in dollars; AI in dollars; credits per provider in credits. Cost per held meeting uses dollars only and says it excludes credits.
-- **Timing:** first score 30 days after the event's last day, revised at 60 and 90, each version kept.
+- **Timing:** first score 30 days after the event's last day, then at 60, 90, 180 and 365, each kept as written. Results totals read money from the deal ledger (`attribution_claims`), where each deal belongs to one event, so a deal a later event takes over is counted once; the earlier event's written card stays as it was.
+- **Comparison:** accounts met against accounts not met, the share of each with a deal. When outreach ran with a holdout (`holdout_percent`, set when outreach starts), the comparison is the accounts held out at random; otherwise it is the accounts on the list nobody reached, which is not random, and the screen says which. Not proof of cause either way.
 - **Score:** held meetings per thousand dollars, and influenced pipeline per dollar, each shown beside the median of past events. No blended number until real outcomes justify weights. An event with fewer than 5 held meetings shows its counts and no score.
 - Past scores appear where a seat request for the same conference is decided.
+- **Who sees it:** money (cost, pipeline, deals, the return, AI spend) is leadership's and GTM Engineering's on every screen and every read; a rep gets the same event with the dollars taken out (`src/server/money.ts`). A finished event opens on its Result tab (DECISIONS §38).
 
 ## 12. Learning
 
@@ -264,4 +271,4 @@ Real Postgres in CI. Intake. Motion and Motion card. Touch log and holds. Owner 
 
 - Each tool's real payloads, plan requirements and limits: webhooks on Instantly reportedly need a higher plan, and none of this has run against a real account.
 - Real Salesforce stage names, custom fields and Lead rules.
-- Whether a thread per event suits a real team better than a channel per event. Built as a thread first.
+- How a real team takes to a channel per event (section 12a); threads were replaced by channels on 2026-11-09 (DECISIONS §34).

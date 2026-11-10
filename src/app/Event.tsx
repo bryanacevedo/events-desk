@@ -269,7 +269,7 @@ function DeleteEvent({ e, hasSheet, go }: { e: EventRow; hasSheet: boolean; go: 
 
 /** The Run step: the person who uploaded the attendee list confirms a paid step. Others read it. */
 function RunStep({ d, card, onChange, onError, compact }: { d: EventPayload; card: Card; onChange: () => Promise<void>; onError: (m: string) => void; compact?: boolean }) {
-  const { actor, demo } = useActor();
+  const { actor, demo, needs } = useActor();
   const [busy, setBusy] = useState(false);
   const [stopping, setStopping] = useState(false);
   const [reason, setReason] = useState("");
@@ -296,7 +296,7 @@ function RunStep({ d, card, onChange, onError, compact }: { d: EventPayload; car
     <section className={`run${compact ? " compact" : ""}`} aria-label="Review cost and run" data-run={kind}>
       <div className="runhead">
         <h2 className="display">{kind === "research" ? "Research" : kind === "outreach" ? "Verify and find contacts" : "The run"}</h2>
-        <p className="runmoney"><b>{money(bd.ai_cents)}</b><span className="mute">AI, estimated</span></p>
+        {(mine || isGtm(actor) || needs?.approvers.includes(actor)) && <p className="runmoney"><b>{money(bd.ai_cents)}</b><span className="mute">AI, estimated</span></p>}
       </div>
       <Figures items={what.filter(([n], i) => n > 0 || i === 0)} small />
       <dl className="caps">
@@ -335,7 +335,7 @@ function Progress({ d }: { d: EventPayload }) {
   const total = two ? 2 : 3;
   const prio = Object.fromEntries(d.list.priorities.map((p) => [p.priority, p.n]));
   const items: (readonly [number, string])[] = e.stage === "researching"
-    ? [[d.list.companies, "companies"], [d.list.people, "people on the list"]]
+    ? [[d.list.companies, "companies"], [d.list.people, "people on the outreach list"]]
     : [[d.list.people, "people so far"], ...(["A", "B", "C"] as const).filter((p) => prio[p]).map((p) => [prio[p], p] as const)];
   return (
     <section className="progress" aria-live="polite" aria-label="Running">
@@ -519,10 +519,10 @@ function CompaniesTable({ id, reloadKey }: { id: string; reloadKey: number }) {
         {rows.map((r) => (
           <li key={r.id}>
             <div className={`prow corow${r.list_status || !r.in_research ? " off" : ""}`}>
-              <span className={`tdot t${r.tier ?? "u"}`} aria-hidden="true" />
+              <PersonAvatar name={r.name} size={30} />
               <span className="pname"><b>{r.name}</b><span className="mute">{[r.industry, r.employees ? `${num(Number(r.employees))} people` : null, r.country].filter(Boolean).join(", ") || r.primary_domain || ""}</span></span>
               <span className="pco"><span>{status(r)}</span>{r.tier_fact && <span className="mute">{r.tier_fact}</span>}</span>
-              <span className="pmail mute">{r.people > 0 ? <To to={`/event/${id}?q=${encodeURIComponent(r.name)}#people`} className="u">{r.people === r.rows_total ? plural(r.people, "person", "people") : `${r.people} of ${r.rows_total} kept`}</To> : r.people === r.rows_total ? plural(r.people, "person", "people") : `${r.people} of ${r.rows_total} kept`}</span>
+              <span className="pmail mute">{r.people > 0 ? <To to={`/event/${id}?q=${encodeURIComponent(r.name)}#people`} >{r.people === r.rows_total ? plural(r.people, "person", "people") : `${r.people} of ${r.rows_total} kept`}</To> : r.people === r.rows_total ? plural(r.people, "person", "people") : `${r.people} of ${r.rows_total} kept`}</span>
             </div>
           </li>
         ))}
@@ -878,7 +878,7 @@ export function Event({ id, go }: { id: string; go: (to: string) => void }) {
   // New registrations are not an event. Anyone who lands on one is sent to the event they belong to.
   const parent = ev.data?.event.parent_event_id;
   useEffect(() => { if (parent) go(`/event/${parent}`); }, [parent]);
-  if (ev.missing) return <div className="empty" data-ready="1">That event does not exist. <Link to="/events" go={go} className="u">Back to Events</Link></div>;
+  if (ev.missing) return <div className="empty" data-ready="1">That event does not exist. <Link to="/events" go={go} className="to">Back to Events</Link></div>;
   if (!ev.data || parent) return null;
   const d = ev.data, e = d.event, stage: Stage = e.stage;
   const going = (needs?.requests ?? []).filter((r) => r.event_id === e.id && r.status === "approved");
@@ -929,11 +929,11 @@ export function Event({ id, go }: { id: string; go: (to: string) => void }) {
               <summary>
                 <Icon.cost />
                 <span className="fold-t">Cost</span>
-                <span className="fold-peek">{money(e.seat_count * e.seat_price_cents)} tickets<i>{moneyFine(cards.reduce((n, c) => n + usedCents(c), 0))} AI</i></span>
+                <span className="fold-peek">{money(e.seat_count * e.seat_price_cents)} tickets at list price<i>{moneyFine(cards.reduce((n, c) => n + usedCents(c), 0))} AI</i></span>
                 <Chevron />
               </summary>
               <div className="cost-figs">
-                <p><b>{money(e.seat_count * e.seat_price_cents)}</b><span>Tickets, {plural(e.seat_count, "seat")}</span></p>
+                <p><b>{money(e.seat_count * e.seat_price_cents)}</b><span>Tickets at list price, {plural(e.seat_count, "seat")}</span></p>
                 <p><b>{moneyFine(cards.reduce((n, c) => n + usedCents(c), 0))}</b><span>AI, of {moneyFine(cards.reduce((n, c) => n + c.llm_cap, 0) * aiCents)} estimated</span></p>
               </div>
               <div className="costs">
