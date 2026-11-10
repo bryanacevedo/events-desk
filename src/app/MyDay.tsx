@@ -16,13 +16,15 @@ const time = (iso: string) => new Date(iso).toLocaleString("en-GB", { weekday: "
 const CODE: Record<string, string> = { interested: "Interested", meeting_request: "Wants a meeting", referral: "Referred us" };
 
 export function MyDay() {
-  const { actor } = useActor();
+  const { actor, needs } = useActor();
+  // Your own seat requests: where each one stands. Approvers decide them on Seats; everyone follows theirs here.
+  const mySeats = (needs?.requests ?? []).filter((r) => r.requester === actor && (r.status === "pending" || (r.status === "approved" && r.ticket_cents === null) || r.status === "declined"));
   const [d, setD] = useState<Day | null>(null), [busy, setBusy] = useState(false);
   const load = async () => setD(await get<Day>(`/api/motion/my-day?rep=${encodeURIComponent(actor)}`));
   useEffect(() => { load(); }, [actor]);
   if (!d) return null;
   const handled = async (id: string) => { setBusy(true); await send("POST", `/api/motion/replies/${id}/handled`, actor); await load(); setBusy(false); };
-  const nothing = !d.replies.length && !d.meetings.length && !d.slots.length && !d.captures.length;
+  const nothing = !d.replies.length && !d.meetings.length && !d.slots.length && !d.captures.length && !mySeats.length;
   return (
     <section className="myday" data-ready="1">
       <h1 className="display">My day</h1>
@@ -34,6 +36,9 @@ export function MyDay() {
             <div className="m-who"><span className="xrow-title">{r.full_name ?? "Someone"}</span><span className="mute">{r.company}, {(CODE[r.code ?? ""] ?? "Replied").toLowerCase()}, {r.event}. Answer by {time(r.respond_by)}</span>{r.body && <q>{r.body}</q>}</div>
             <button className="btn small line xrow-side" disabled={busy} onClick={() => handled(r.id)}>Answered</button>
           </div>))}</div></div>}
+
+      {mySeats.length > 0 && <div className="m-sec"><h3>Your seat requests</h3>
+        <ul className="m-senders">{mySeats.map((r) => <li key={r.id}><span>{r.name}</span><b>{r.status === "pending" ? "Waiting on leadership" : r.status === "declined" ? `Declined${r.decline_reason ? `: ${r.decline_reason}` : ""}` : "Approved, ticket not bought yet"}</b></li>)}</ul></div>}
 
       {d.meetings.length > 0 && <div className="m-sec"><h3>Your meetings</h3>
         <div className="briefs">{d.meetings.map((m) => (

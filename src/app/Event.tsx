@@ -6,6 +6,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { OLD_SHEET_ERROR, type EventRow, type Stage } from "../shared/domain";
+import { AFTER, afterStep } from "./stages";
 import { get, send, type Card, type CompanyRow, type EventPayload, type Page, type Pending, type PersonRow, type ReviewCase, type SeatRequest, type Spread, type TopUpCounts, type TopUpItem, type UploadItem } from "./api";
 import { Link, useActor } from "./App";
 import { Cases, openCases } from "./Cases";
@@ -22,7 +23,8 @@ import { cardBreakdown, creditWork } from "../shared/vendors";
 
 const XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 const fileType = (name: string) => (name.toLowerCase().endsWith(".xlsx") ? XLSX : "text/csv");
-const PAGE = 50;
+/** Rows per page in the people and company tables: a page fits on a screen, and search, filters and pages do the rest. */
+const PAGE = 12;
 const CASE_STAGES: Stage[] = ["ready_for_review", "finding_people", "flagging", "delivered", "paused"];
 const uploaderOf = (d: EventPayload) => d.list.upload?.uploaded_by ?? d.event.requested_by;
 const pendingCard = (d: EventPayload) => (d.cards ?? (d.card ? [d.card] : [])).find((c) => c.status === "pending") ?? null;
@@ -57,11 +59,14 @@ export function useEvent(id: string): EventState {
   let note = "";
   if (data) {
     const e = data.event, who = firstName(uploaderOf(data)), card = pendingCard(data);
-    const MOTION_NOTE: Record<string, string> = { owners: "Account owners are deciding.", sequencing: "Sequences are being set up.", in_market: "In market.", closing: "Closing out.", scored: "Scored." };
-    if (e.stage === "delivered" && e.motion && MOTION_NOTE[e.motion]) note = `${MOTION_NOTE[e.motion]}${open.length ? ` ${open.length} to settle.` : ""}`;
+    const MOTION_NOTE: Record<string, string> = { owners: "Account owners are deciding.", sequencing: "Sequences are being set up.", in_market: "In market.", follow_up: "Following up after the event.", closing: "Closing out.", scored: "Scored." };
+    const k = e.stage === "delivered" ? afterStep(e) : null;
+    if (k?.key === "follow_up" && !e.post_started_at) note = "The event is over. The follow-up is ready to start.";
+    else if (k && MOTION_NOTE[k.key]) note = `${MOTION_NOTE[k.key]}${open.length ? ` ${open.length} to settle.` : ""}`;
     else if (e.stage === "delivered") note = `Outreach list ready. ${plural(data.list.people, "person", "people")} to reach${open.length ? `, ${open.length} to settle` : ""}.`;
     else if (e.stage === "quoted") note = `${card?.kind === "research" ? "Research card" : "Cost card"} waiting on ${who}.`;
     else if (e.stage === "ready_for_review") note = card ? `Companies researched. Waiting on ${who} to verify and find contacts.` : (data.open_cases ?? 0) > 0 ? `Research done. ${plural(data.open_cases ?? 0, "case")} to settle before verifying contacts.` : "Research done. Ready for the Outreach card.";
+    else if (e.stage === "paused") { const why = data.activity.find((a) => a.kind === "stage" && /failing|Paused before/.test(a.detail))?.detail; note = why ? `Paused: ${why.replace(/\.$/, "")}.` : stageSentence(e, data.settings); }
     else note = stageSentence(e, data.settings);
   }
   return { id, data, cases, missing, load, open, rows, note };
@@ -412,7 +417,7 @@ function Pager({ total, offset, limit, onPage }: { total: number; offset: number
 
 /** The people on the list: searched, filtered and paged on the server. A row opens the person. */
 function PeopleTable({ id, hasPriorities, reloadKey }: { id: string; hasPriorities: boolean; reloadKey: number }) {
-  const [f, setF] = useUrlState(["q", "p", "t", "s", "page"], { s: "kept" });
+  const [f, setF] = useUrlState(["q", "p", "t", "s", "src", "page"], { s: "kept" });
   const [typed, setTyped] = useState(f.q);
   const [page, setPage] = useState<Page<PersonRow> | null>(null);
   const [open, setOpen] = useState<string | null>(null);
@@ -424,10 +429,10 @@ function PeopleTable({ id, hasPriorities, reloadKey }: { id: string; hasPrioriti
   useEffect(() => { const t = setTimeout(() => { if (typed !== f.q) setF({ q: typed, page: "" }); }, 250); return () => clearTimeout(t); }, [typed]);
   useEffect(() => {
     let live = true;
-    const qs = new URLSearchParams({ q: f.q, priority: f.p, tier: f.t, status: f.s || "kept", offset: String(offset), limit: String(PAGE) });
+    const qs = new URLSearchParams({ q: f.q, priority: f.p, tier: f.t, status: f.s || "kept", source: f.src, offset: String(offset), limit: String(PAGE) });
     get<Page<PersonRow>>(`/api/events/${id}/people?${qs}`).then((p) => { if (live) setPage(p); });
     return () => { live = false; };
-  }, [id, f.q, f.p, f.t, f.s, offset, reloadKey, stale]);
+  }, [id, f.q, f.p, f.t, f.s, f.src, offset, reloadKey, stale]);
   const rows = page?.rows ?? [];
   return (
     <section className="plist" aria-label="People" data-people={page?.total ?? ""}>
@@ -442,6 +447,9 @@ function PeopleTable({ id, hasPriorities, reloadKey }: { id: string; hasPrioriti
         <label className="filter"><span className="sr-only">Company tier</span>
           <select value={f.t} onChange={(ev) => setF({ t: ev.target.value, page: "" })}><option value="">Any tier</option><option value="1">Tier 1</option><option value="2">Tier 2</option><option value="3">Tier 3</option><option value="unknown">No tier</option></select>
         </label>
+        <label className="filter"><span className="sr-only">Attendees or prospects</span>
+          <select value={f.src} onChange={(ev) => setF({ src: ev.target.value, page: "" })}><option value="">Everyone</option><option value="attendee">Attendees</option><option value="prospect">Prospects</option></select>
+        </label>
         <label className="filter"><span className="sr-only">Kept or dropped</span>
           <select value={f.s || "kept"} onChange={(ev) => setF({ s: ev.target.value, page: "" })}><option value="kept">Kept</option><option value="dropped">Dropped</option><option value="all">Kept and dropped</option></select>
         </label>
@@ -451,8 +459,8 @@ function PeopleTable({ id, hasPriorities, reloadKey }: { id: string; hasPrioriti
           <li key={c.id} className={open === c.id ? "open" : undefined}>
             <button type="button" className={`prow${c.drop_reason ? " off" : ""}`} aria-expanded={open === c.id} onClick={() => (open === c.id ? close() : setOpen(c.id))}>
               <span className={`av sm ${c.drop_reason ? "off" : c.priority === "A" ? "a" : c.priority === "C" ? "c" : c.priority === "B" ? "b" : "none"}`} aria-hidden="true">{initials(c.full_name)}</span>
-              <span className="pname"><b>{c.full_name ?? "No name"}</b><span className="mute">{c.title ?? "No title"}</span></span>
-              <span className="pco"><span>{c.company ?? "No company"}</span><span className="mute">{c.company_tier ? `Tier ${c.company_tier}` : "No tier"}{c.source === "prospect" ? ", found" : ""}</span></span>
+              <span className="pname"><b>{c.full_name ?? "No name"}</b><span className="mute">{c.source === "prospect" && <span className="psrc">Prospect</span>}{c.title ?? "No title"}</span></span>
+              <span className="pco"><span>{c.company ?? "No company"}</span><span className="mute">{c.company_tier ? `Tier ${c.company_tier}` : "No tier"}</span></span>
               <span className="pprio" aria-label={c.priority ? `Priority ${c.priority}` : undefined}>{c.priority ?? ""}</span>
               <span className={`pmail${c.drop_reason ? " orange" : c.email ? "" : " mute"}`}>{c.drop_reason ? dropWords(c.drop_reason) : c.email ?? "No email"}</span>
             </button>
@@ -565,7 +573,7 @@ export function StageBlock({ ev, go, compact }: { ev: EventState; go: (to: strin
     <>
       {stage === "requested" && (
         <section className="actions" aria-label="Seat requests">
-          {asked.length > 0 && <span className="mute">{asked.map((r) => r.requester).join(", ")}</span>}
+          {asked.length > 0 && !compact && <span className="mute">{asked.map((r) => r.requester).join(", ")}</span>}
           {approver && <Link to="/seats" go={go} className="btn">Decide the seat requests</Link>}
         </section>
       )}
@@ -581,7 +589,7 @@ export function StageBlock({ ev, go, compact }: { ev: EventState; go: (to: strin
       {stage === "paused" && (
         <section className="actions" aria-label="Resume">
           <button className="btn" type="button" disabled={busy} onClick={() => act(() => send("POST", `/api/events/${e.id}/resume`, actor))}>Resume</button>
-          <span className="mute">{d.activity.find((a) => a.kind === "stage" && /failing|Paused before/.test(a.detail))?.detail ?? `${plural(d.list.people, "person", "people")} so far.`}</span>
+          <span className="mute">{plural(d.list.people, "person", "people")} so far.</span>
         </section>
       )}
 
@@ -589,11 +597,13 @@ export function StageBlock({ ev, go, compact }: { ev: EventState; go: (to: strin
         <>
           {card ? <RunStep d={d} card={card} onChange={reload} onError={setError} compact={compact} /> : (
             <div className="actions">
-              <button className="btn" type="button" disabled={busy || blockingOpen > 0} title={blockingOpen > 0 ? `${plural(blockingOpen, "case")} to settle first` : undefined} onClick={() => act(() => send("POST", `/api/events/${e.id}/quote`, actor))}>Review the cost to verify and find contacts</button>
+              {compact && blockingOpen > 0
+                ? <Link to={`/event/${e.id}`} go={go} className="btn">Settle the cases</Link>
+                : <button className="btn" type="button" disabled={busy || blockingOpen > 0} title={blockingOpen > 0 ? `${plural(blockingOpen, "case")} to settle first` : undefined} onClick={() => act(() => send("POST", `/api/events/${e.id}/quote`, actor))}>Review the cost to verify and find contacts</button>}
             </div>
           )}
           <Cases eventId={e.id} cases={ev.cases} onChange={reload} compact={compact && !topUp} />
-          {!topUp && d.spread && (
+          {!topUp && !compact && d.spread && (
             <section aria-label="Companies by tier" className="tiers-sec">
               <div className="grp"><h2 className="display">{plural(d.spread.counts.total, "company", "companies")} researched</h2></div>
               <Tiers spread={d.spread} compact={compact} />
@@ -641,7 +651,6 @@ export function StageBlock({ ev, go, compact }: { ev: EventState; go: (to: strin
           </section>
           {!compact && (
             <>
-              <Motion id={e.id} onChange={reload} />
               <ListBrief d={d} />
               <Cases eventId={e.id} cases={ev.cases} onChange={reload} />
               <PeopleTable id={e.id} hasPriorities={d.list.priorities.length > 0} reloadKey={reloads} />
@@ -654,6 +663,41 @@ export function StageBlock({ ev, go, compact }: { ev: EventState; go: (to: strin
 
       {stage === "declined" && <p className="mute">{e.decline_reason ?? "Ended."}</p>}
       {error && <p role="alert" className="error">{error}</p>}
+    </>
+  );
+}
+
+type View = "outreach" | "people" | "details";
+const VIEWS: [View, string][] = [["outreach", "Outreach"], ["people", "People"], ["details", "Details"]];
+
+/** A delivered event, one layer at a time: what needs someone now, on one line, then the work in motion, the list, and the event's details as views.
+    The view is in the link (#outreach, #people, #details), so a Slack card can point straight at it. */
+function DeliveredViews({ id, started, views, onChange }: { id: string; started: boolean; views: Record<View, React.ReactNode>; onChange: () => void }) {
+  const { actor } = useActor();
+  const fromHash = (): View | null => { const h = location.hash.slice(1); return VIEWS.some(([k]) => k === h) ? (h as View) : null; };
+  const [view, setView] = useState<View>(() => fromHash() ?? (started ? "outreach" : "people"));
+  const [next, setNext] = useState<{ text: string; tab: View; action?: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const loadNext = async () => setNext((await get<{ next: typeof next }>(`/api/events/${id}/next`))?.next ?? null);
+  useEffect(() => { loadNext(); }, [id]);
+  const pick = (v: View) => { setView(v); history.replaceState(null, "", `${location.pathname}${location.search}#${v}`); };
+  const go = async () => {
+    if (!next) return;
+    if (next.action === "post_event_start") { setBusy(true); await send("POST", `/api/events/${id}/motion/sequences`, actor); setBusy(false); await loadNext(); onChange(); }
+    pick(next.tab);
+  };
+  return (
+    <>
+      {next && (
+        <div className="next-up" role="status">
+          <p>{next.text}</p>
+          {(next.action || view !== next.tab) && <button type="button" className="btn small" disabled={busy} onClick={go}>{next.action === "post_event_start" ? "Start the follow-up" : `Go to ${VIEWS.find(([k]) => k === next.tab)![1]}`}</button>}
+        </div>
+      )}
+      <div className="seg views" role="tablist" aria-label="View">
+        {VIEWS.map(([k, label]) => <button key={k} type="button" role="tab" aria-selected={view === k} aria-pressed={view === k} onClick={() => pick(k)}>{label}</button>)}
+      </div>
+      <div role="tabpanel" aria-label={VIEWS.find(([k]) => k === view)![1]}>{views[view]}</div>
     </>
   );
 }
@@ -742,16 +786,15 @@ function Meter({ label, used, cap, unit, money: asMoney = false }: { label: stri
 }
 
 /** After delivery the steps that built the list fold into one, and the same bar carries on. One timeline for the whole life of the event. */
-const AFTER: [string, string, string][] = [["none", "List ready", "Ready for outreach"], ["owners", "Owners", "With account owners"], ["sequencing", "Sequences", "Being set up"], ["in_market", "In market", "Live"], ["closing", "Closing", "Closing out"], ["scored", "Scored", ""]];
-
 /** Where the event is, readable from across the room: named steps, the one it is on lit, and who it is with. */
-function Stages({ e, approvers, cases }: { e: EventRow; approvers: string[]; cases: number }) {
+export function Stages({ e, approvers, cases }: { e: EventRow; approvers: string[]; cases: number }) {
   const ended = e.stage === "declined", paused = e.stage === "paused", running = isRunning(e.stage);
   const after = e.stage === "delivered";
-  const at = ended ? -1 : after ? Math.max(0, AFTER.findIndex(([k]) => k === (e.motion ?? "none"))) : stepAt(e, cases);
+  const step = after ? afterStep(e) : null;
+  const at = ended ? -1 : step ? Math.max(0, AFTER.findIndex(([k]) => k === step.key)) : stepAt(e, cases);
   const labels = after ? AFTER.map(([, l]) => l) : [...STEPS, "Outreach"];
   const w = waitingOn(e, approvers);
-  const caption = after ? AFTER[at][2] : ended ? "" : e.stage === "ready_for_review" && cases > 0 ? plural(cases, "case") + " to settle" : paused ? "Paused" : running ? "Running now" : w.who ? `With ${w.who}` : "";
+  const caption = step ? step.caption ?? AFTER[at][2] : ended ? "" : e.stage === "ready_for_review" && cases > 0 ? plural(cases, "case") + " to settle" : paused ? "Paused" : running ? "Running now" : w.who ? `With ${w.who}` : "";
   return (
     <ol className={`stages${ended ? " ended" : ""}${paused ? " paused" : ""}${running ? " running" : ""}`} aria-label="Stage">
       {labels.map((label, i) => {
@@ -829,19 +872,7 @@ export function Event({ id, go }: { id: string; go: (to: string) => void }) {
   // AI spent is real dollars from the tokens each call reported; a call with none (a simulated run) counts at the flat rate. What a card allows stays an estimate at the flat rate.
   const usedCents = (c: Card) => (d.spend_by_step ?? []).filter((s) => s.card_id === c.id && s.unit === "llm").reduce((n, s) => n + (s.cents ?? s.n * aiCents), 0);
   const history = [...d.activity].sort((a, b) => b.created_at.localeCompare(a.created_at));
-  return (
-    <>
-      <nav className="crumbs" aria-label="Breadcrumb"><Link to="/events" go={go}>Events</Link><span>/</span><span>{e.name}</span></nav>
-      <header className="event-head" data-ready="1" data-stage={stage}>
-        <div className="ehero" style={{ "--brand": e.brand_color ?? "#1F5D3F" } as React.CSSProperties}>
-          <EventLogo name={e.name} website={e.website} size={64} />
-          <div className="ehero-text">
-            <h1>{e.name}</h1>
-            {ev.note && <p className="stage-note"><Icon.next />{ev.note}</p>}
-          </div>
-          <p className="ehero-count" aria-label={countdown(e.starts_on)}>{away === 0 ? <b>Today</b> : <><b>{Math.abs(away)}</b><span>{Math.abs(away) === 1 ? "day" : "days"} {away > 0 ? "to go" : "ago"}</span></>}</p>
-          <Stages e={e} approvers={needs?.approvers ?? []} cases={ev.open.length} />
-        </div>
+  const facts = (
         <dl className="efacts">
           <div>
             <dt><Icon.calendar /><span className="sr-only">When</span></dt>
@@ -855,12 +886,8 @@ export function Event({ id, go }: { id: string; go: (to: string) => void }) {
           )}
           {going.length > 0 && <Going people={going} />}
         </dl>
-      </header>
-
-      <AttendeeList d={d} go={go} onChange={ev.load} />
-
-      <StageBlock ev={ev} go={go} />
-
+  );
+  const more = (
       <section className="more" aria-label="More">
         <div className="folds">
           <details className="fold">
@@ -907,6 +934,37 @@ export function Event({ id, go }: { id: string; go: (to: string) => void }) {
           </div>
         )}
       </section>
+  );
+  // A delivered event shows one layer at a time; before that there is one job to do, so the page stays whole.
+  const delivered = stage === "delivered";
+  return (
+    <>
+      <nav className="crumbs" aria-label="Breadcrumb"><Link to="/events" go={go}>Events</Link><span>/</span><span>{e.name}</span></nav>
+      <header className="event-head" data-ready="1" data-stage={stage}>
+        <div className="ehero" style={{ "--brand": e.brand_color ?? "#1F5D3F" } as React.CSSProperties}>
+          <EventLogo name={e.name} website={e.website} size={64} />
+          <div className="ehero-text">
+            <h1>{e.name}</h1>
+            {ev.note && <p className="stage-note"><Icon.next />{ev.note}</p>}
+          </div>
+          <p className="ehero-count" aria-label={countdown(e.starts_on)}>{away === 0 ? <b>Today</b> : <><b>{Math.abs(away)}</b><span>{Math.abs(away) === 1 ? "day" : "days"} {away > 0 ? "to go" : "ago"}</span></>}</p>
+          <Stages e={e} approvers={needs?.approvers ?? []} cases={ev.open.length} />
+        </div>
+        {!delivered && facts}
+      </header>
+      {delivered ? (
+        <DeliveredViews id={e.id} started={Boolean(e.motion && e.motion !== "none")} onChange={ev.load} views={{
+          outreach: <Motion id={e.id} onChange={ev.load} />,
+          people: <StageBlock ev={ev} go={go} />,
+          details: <>{facts}<AttendeeList d={d} go={go} onChange={ev.load} />{more}</>,
+        }} />
+      ) : (
+        <>
+          <AttendeeList d={d} go={go} onChange={ev.load} />
+          <StageBlock ev={ev} go={go} />
+          {more}
+        </>
+      )}
     </>
   );
 }

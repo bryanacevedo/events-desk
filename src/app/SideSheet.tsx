@@ -3,12 +3,13 @@
    Closes on a click outside, Esc and the close control. Focus moves in, stays in, and goes back to the card. */
 
 import { SheetButton } from "./Patterns";
-import { useEffect, useRef } from "react";
-import { StageBlock, useEvent } from "./Event";
+import { useEffect, useRef, type CSSProperties } from "react";
+import { StageBlock, Stages, useEvent } from "./Event";
 import { useActor } from "./App";
 import { EventLogo } from "./EventLogo";
 import { PersonAvatar } from "./PersonAvatar";
-import { countdown, longDate, plural } from "./words";
+import { city, countdown, daysTo, plural, shortDate } from "./words";
+import { deliveredWords } from "./stages";
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"])';
 
@@ -53,7 +54,6 @@ export function SideSheet({ id, go, close }: { id: string; go: (to: string) => v
 
   const top = (
     <div className="sheet-top">
-      <button className="btn line small" type="button" onClick={() => go(`/event/${id}`)}>Open the full page</button>
       <span className="spacer" />
       <button className="sheet-x" type="button" data-close aria-label="Close" onClick={close}>&times;</button>
     </div>
@@ -62,44 +62,47 @@ export function SideSheet({ id, go, close }: { id: string; go: (to: string) => v
   if (!ev.data) return <aside className="sheet" ref={ref} role="dialog" aria-label="Event">{top}</aside>;
 
   const { event: e, list } = ev.data;
-  const sheet_url = e.sheet_url;
   const going = (needs?.requests ?? []).filter((r) => r.event_id === id && r.status === "approved");
   const waiting = (needs?.requests ?? []).filter((r) => r.event_id === id && r.status === "pending").length;
   const names = going.map((r) => r.requester);
   const prio = Object.fromEntries(list.priorities.map((p) => [p.priority, p.n]));
-  const place = [e.venue, e.country && !e.venue.includes(e.country) ? e.country : ""].filter(Boolean).join(", ");
+  const where = [city(e.venue), e.country && !e.venue.includes(e.country) ? e.country : ""].filter(Boolean).join(", ");
+  const away = daysTo(e.starts_on);
 
+  // A small version of the event's own header: who it is, where it stands, the one thing to do, and a few quiet facts. The rest is a click away.
   return (
     <aside className="sheet" ref={ref} role="dialog" aria-label={e.name} data-sheet={id}>
       {top}
-      <div className="event-head compact" data-stage={e.stage}>
-        <div className="event-title"><EventLogo name={e.name} website={e.website} size={40} /><h2 className="display">{e.name}</h2></div>
-        <p>{longDate(e.starts_on)}, {countdown(e.starts_on)}</p>
-        {place && <p className="mute">{place}</p>}
-      </div>
+      <header className="ehero mini" style={{ "--brand": e.brand_color ?? "#1F5D3F" } as CSSProperties}>
+        <EventLogo name={e.name} website={e.website} size={48} />
+        <div className="ehero-text">
+          <h2>{e.name}</h2>
+          <p className="mute">{[shortDate(e.starts_on), where].filter(Boolean).join(" · ")}</p>
+        </div>
+        <p className="ehero-count" aria-label={countdown(e.starts_on)}>{away === 0 ? <b>Today</b> : <><b>{Math.abs(away)}</b><span>{Math.abs(away) === 1 ? "day" : "days"} {away > 0 ? "to go" : "ago"}</span></>}</p>
+        <Stages e={e} approvers={needs?.approvers ?? []} cases={ev.open.length} />
+      </header>
 
-      <div data-stage={e.stage} className="sheet-state"><p>{ev.note}</p></div>
-
-      {(going.length > 0 || waiting > 0) && (
-        <section className="sheet-going" aria-label="Who is going">
-          <div className="going">
-            {names.length > 0 && <span className="faces">{names.slice(0, 8).map((n) => <PersonAvatar key={n} name={n} size={30} />)}</span>}
-            <p><b>{going.length} going</b>{waiting > 0 && <span className="mute">, {waiting} waiting</span>}</p>
-          </div>
-          {names.length > 0 && <p className="mute small">{names.slice(0, 8).join(", ")}{names.length > 8 ? `, and ${names.length - 8} more` : ""}</p>}
-        </section>
-      )}
-
-      {list.upload && (
-        <dl className="facts sheet-counts" aria-label="Attendee list">
-          <div><dt>Attendees in</dt><dd>{list.upload.row_count.toLocaleString("en-US")} rows, {plural(list.companies, "company", "companies")}</dd></div>
-          {e.stage === "delivered" && <div><dt>Outreach list</dt><dd>{plural(list.people, "person", "people")}: {prio.A ?? 0} A, {prio.B ?? 0} B, {prio.C ?? 0} C</dd></div>}
-        </dl>
-      )}
-
+      {ev.note && <p className="sheet-next">{ev.note}</p>}
       {e.stage === "delivered"
-        ? sheet_url && <div className="actions"><SheetButton href={sheet_url} /></div>
+        ? e.sheet_url && <div className="actions"><SheetButton href={e.sheet_url} /></div>
         : <StageBlock ev={ev} go={go} compact />}
+
+      <dl className="sheet-facts">
+        {(going.length > 0 || waiting > 0) && (
+          <div>
+            <dt>Going</dt>
+            <dd>
+              {names.length > 0 && <span className="faces">{names.slice(0, 6).map((n) => <PersonAvatar key={n} name={n} size={26} />)}</span>}
+              <span>{going.length ? `${going.length} going` : "Nobody yet"}{waiting > 0 ? `, ${waiting} waiting` : ""}</span>
+            </dd>
+          </div>
+        )}
+        {list.upload && <div><dt>Attendees</dt><dd>{list.upload.row_count.toLocaleString("en-US")} rows, {plural(list.companies, "company", "companies")}</dd></div>}
+        {e.stage === "delivered" && <div><dt>Outreach</dt><dd>{deliveredWords(e).words}, {plural(list.people, "person", "people")} ({prio.A ?? 0} A, {prio.B ?? 0} B, {prio.C ?? 0} C)</dd></div>}
+      </dl>
+
+      <button className="btn line sheet-open-full" type="button" onClick={() => go(`/event/${id}`)}>Open the full page</button>
     </aside>
   );
 }

@@ -3,7 +3,7 @@
 import type { ActivityRow, EventRow } from "../shared/domain";
 import type { CardLines, Settings } from "../shared/cost";
 import type { ListSummary } from "../server/uploads";
-import type { DeliveredLately } from "../server/overview";
+import type { DeliveredLately, LiveRow, OutreachNeed, ResultRow } from "../server/overview";
 import type { Spread } from "../shared/tiering";
 import type { CompanyRow, PersonRow } from "../server/event-views";
 
@@ -34,7 +34,7 @@ export interface Pending {
   id: string; kind: "seats" | "card" | "research" | "outreach"; requested_by: string; event_id: string; name: string; seat_count: number; seat_price_cents: number;
   lines: CardLines | null; credits_cap: number | null; llm_cap: number | null; est_cents: number | null;
 }
-export type { DeliveredLately };
+export type { DeliveredLately, LiveRow, OutreachNeed, ResultRow };
 
 /** An event people can ask for a seat at. `event_id` is the live event row, when someone has asked. */
 export interface CatalogEntry {

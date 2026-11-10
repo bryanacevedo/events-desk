@@ -259,3 +259,49 @@ describe("real sending", () => {
     expect(liveConnectors({})).toEqual({});
   });
 });
+
+/* Each of these protections had no test of its own: switching it off in the code went unnoticed (mutation check, 2026-11-09). */
+describe("each protection, on its own", () => {
+  it("the gate refuses someone opted out by name at their company, on LinkedIn where there is no email to match", async () => {
+    const h = await deliveredInMotion(db);
+    const ana = await personAt(db, h.id, "Ana Ruiz");
+    const [k] = await db.query<{ name_key: string; company_key: string }>("SELECT lower(regexp_replace(k.full_name, '\\s+', ' ', 'g')) AS name_key, co.key AS company_key FROM contacts k JOIN companies co ON co.id = k.company_id WHERE k.id = $1", [ana.id]);
+    const { nameKey } = await import("../src/shared/email.ts");
+    await db.query("INSERT INTO suppressions (id, kind, name_key, company_key, reason) VALUES ('sn', 'opt_out', $1, $2, 'x')", [nameKey("Ana Ruiz"), k.company_key]);
+    expect((await runGate(db, h.deps, h.id, [ana.id], "linkedin", "add"))[0].reason).toBe("opted_out");
+  });
+
+  it("the gate refuses people at an account its owner kept", async () => {
+    const h = await deliveredInMotion(db, { crm: fakeCrm() });
+    const ana = await personAt(db, h.id, "Ana Ruiz");
+    await openOwnerDecisions(db, h.deps, h.id);
+    await db.query("UPDATE owner_decisions SET status = 'mine', via = 'owner' WHERE event_id = $1", [h.id]);
+    expect((await runGate(db, h.deps, h.id, [ana.id], "email", "add"))[0].reason).toBe("owner_mine");
+  });
+
+  it("someone paused for a meeting stays paused for the meeting when they also reply", async () => {
+    const h = await deliveredInMotion(db);
+    await launched(h);
+    const ana = await personAt(db, h.id, "Ana Ruiz");
+    await db.query("UPDATE enrollments SET state = 'paused', cause = 'meeting', cause_id = 'm1' WHERE contact_id = $1", [ana.id]);
+    await db.tx((q) => stopContacts(q, [ana.id], "pause", "inbound", "r1"));
+    expect((await enrollmentStates(db, ana.id)).every((x) => x.cause === "meeting")).toBe(true);
+  });
+
+  it("a changed daily limit in the tool reads as changed", async () => {
+    const { sameSettings, settingsFor } = await import("../src/server/sending.ts");
+    const want = settingsFor("americas" as never, "United States", 40);
+    expect(sameSettings({ ...want, days: [...want.days].reverse() }, want)).toBe(true);
+    expect(sameSettings({ ...want, daily_limit: 400 }, want)).toBe(false);
+  });
+
+  it("after the event, someone who replied is not followed up, even with nothing else holding them back", async () => {
+    const h = await deliveredInMotion(db);
+    await db.query("UPDATE events SET starts_on = '2027-01-08' WHERE id = $1", [h.id]);
+    const ben = await personAt(db, h.id, "Ben Ode");
+    await db.query("INSERT INTO inbound_messages (id, connector, provider_message_id, event_id, contact_id, channel, signal, received_at, status, code) VALUES ('ir', 'instantly', 'pr', $1, $2, 'email', 'reply', '2026-12-01T00:00:00Z', 'done', 'interested')", [h.id, ben.id]);
+    expect((await runGate(db, h.deps, h.id, [ben.id], "email", "add"))[0].passed).toBe(true);
+    await createDrafts(db, h.deps, h.id, MAYA);
+    expect(await db.query("SELECT 1 FROM enrollments WHERE contact_id = $1", [ben.id])).toHaveLength(0);
+  });
+});

@@ -5,6 +5,8 @@ const WORDS: Record<string, string> = {
   no_email: "no email", not_verified_enough: "email not verified", verification_stale: "email checked too long ago", crm_bounced: "bounced in the CRM",
   no_linkedin: "no LinkedIn", name_unknown: "name unknown", no_domain: "no company domain", no_legal_basis: "no contact basis for their region",
   in_another_cadence: "in another sequence", cool_off: "said no recently", reply_waiting: "reply waiting on a person", met_in_person: "met in person",
+  event_started: "the event started", event_closed: "the event closed", campaign_ended: "the campaign ended", cannot_resume_mid_sequence: "the tool cannot restart mid-sequence",
+  unsubscribe: "asked to stop", not_interested: "not interested", not_now: "not now", bounced: "email bounced", departed: "has left the company",
   account_do_not_prospect: "account marked do not prospect", crm_recent_activity: "recent CRM activity", desk_stopped: "all sending stopped", not_found: "not found",
 };
 

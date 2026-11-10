@@ -37,6 +37,9 @@ export const DEFAULT_FLOW: Flow = "two_card";
 export interface EventRow {
   /** Where the event is after delivery. */
   motion?: string;
+  /** The event's last day, and when its post-event follow-up started. */
+  last_day?: string;
+  post_started_at?: string | null;
   id: string;
   name: string;
   venue: string;

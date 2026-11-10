@@ -99,7 +99,7 @@ export function createApp(db: Db, cfg: AppConfig) {
   mountSeatRoutes(app, db, cfg);
   mountBudgetRoutes(app, db, cfg);
   mountEventViews(app, db);
-  app.get("/api/overview", async (c) => c.json(await overview(db)));
+  app.get("/api/overview", async (c) => c.json(await overview(db, cfg.lifecycle)));
 
   /* The ICP: one seller per install, one line of versions. A document is uploaded, a person sees the cost and starts the compile,
      confirms the draft, tests it on companies with known answers, and publishes. Nothing here is used for tiering until published. */

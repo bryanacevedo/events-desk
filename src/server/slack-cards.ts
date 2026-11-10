@@ -113,7 +113,7 @@ export const scoreCard = (s: { event: string; held: number; line: string; url?: 
 /* ------------------------------------------------------------ after the event */
 
 const POST_WORDS: Record<string, string> = { scanned: "Scanned at the booth", reached: "Reached before, no reply", not_reached: "Not reached before" };
-const WITH_REP: Record<string, string> = { met: "met a rep or had a meeting", hot: "hot scans", replied: "replied before the event" };
+const WITH_REP: Record<string, string> = { met: "met", hot: "hot", replied: "replied" };
 const day = (ymd: string) => new Date(`${ymd}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 const channelWords = (c: string) => (c === "email" ? "by email" : "on LinkedIn");
 
@@ -130,12 +130,11 @@ export function postEventCard(w: { event: string; event_id: string; counts: { ch
     text: `${w.event} is over. ${ready} people are ready for the follow-up.`,
     blocks: [
       header(`Follow up on ${w.event}`),
-      say(ready ? `*${ready} people are ready for the follow-up*, each group with its own message.` : "*Nobody is ready for the follow-up yet.* The reasons are below."),
+      say(ready ? `*${ready} people are ready for the follow-up*` : "*Nobody is ready for the follow-up yet.* The reasons are below."),
       ...(groups.length ? [{ type: "section", fields: groups }] : []),
-      ...(withRep.length ? [small(`With a rep, not sequenced  ·  ${withRep.join("  ·  ")}`)] : []),
-      ...(held.length ? [small(`Held back by the checks  ·  ${held.join("  ·  ")}`)] : []),
+      ...(withRep.length || held.length ? [small([withRep.length ? `With a rep: ${withRep.join(", ")}` : "", held.length ? `Held back: ${held.join(", ")}` : ""].filter(Boolean).join("  ·  "))] : []),
       ...(ready ? [{ type: "actions", elements: [button("Start the follow-up", "post_event_start", w.event_id, "primary")] }] : []),
-      small(`The button works until ${day(w.last_press)}. Nothing starts until someone presses it.`),
+      small(`Each group gets its own message. Works until ${day(w.last_press)}.`),
     ],
   };
 }

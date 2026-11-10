@@ -21,7 +21,7 @@ import { addSlots, bookSlot, prepBrief, repDay, roster } from "./rep-day.ts";
 import { isGtm } from "../shared/roles.ts";
 import { MOTION_LABEL } from "../shared/motion.ts";
 import { pickSenders, planCapacity } from "../shared/sending.ts";
-import { postEventState } from "./post-event.ts";
+import { nextStep, postEventState } from "./post-event.ts";
 
 type App = Hono<{ Variables: { actor: string } }>;
 /** A webhook is outside input: bounded in size and in how many events one call can carry. */
@@ -84,6 +84,7 @@ export function mountLifecycle(app: App, db: Db, deps: LifecycleDeps, opts: { ba
   // The simulator's one button. This route does not exist outside demo mode.
   if (opts.demoTools) app.post("/api/demo/motion/:id/advance", guarded(async (c) => demoAdvance(db, deps, opts.demoTools!, c.req.param("id"))));
 
+  app.get("/api/events/:id/next", async (c) => c.json({ next: await nextStep(db, deps, c.req.param("id")) }));
   app.get("/api/events/:id/motion", async (c) => { const o = await motionOverview(db, deps, c.req.param("id")); return o ? c.json(o) : bad("That event does not exist.", 404); });
   app.post("/api/events/:id/motion/start", guarded(async (c) => { const b = await body(c); return requestMotionCard(db, deps, c.req.param("id"), c.get("actor"), { purpose: b.purpose, verify_once: b.verify_once, write_leads: b.write_leads, holdout_percent: Number(b.holdout_percent ?? 0) }); }));
   app.post("/api/events/:id/motion/tools", guarded(async (c) => setTools(db, c.req.param("id"), c.get("actor"), (await body(c)).tools ?? {}, deps)));

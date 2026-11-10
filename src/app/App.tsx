@@ -16,6 +16,7 @@ import { PersonAvatar } from "./PersonAvatar";
 import { Settings } from "./Settings";
 import { PERSONAS } from "../shared/roles";
 import { loadNeeds, type Needs } from "./waiting";
+import { isGtm } from "../shared/roles";
 
 export const PEOPLE = PERSONAS.map((p) => p.name);
 interface Ctx { actor: string; demo: boolean; needs: Needs | null; refresh: () => Promise<void> }
@@ -79,7 +80,10 @@ export function App() {
   const eventId = pathname.match(/^\/event\/([^/]+)/)?.[1];
   const place = placeOf(pathname);
   const count = needs?.approvals.length ?? 0;
-  const navAt = ["overview", "myday", "events", "seats", "budget", "usage"].indexOf(place);
+  // Seats is where leadership decides seat requests. Everyone else follows their own requests on My day, so the tab is only in the approvers' menu.
+  // Budget and Usage are company spend: leadership's and GTM Engineering's, not an SDR's day.
+  const approver = Boolean(needs?.approvers.includes(actor)), lead = approver || isGtm(actor);
+  const navAt = ["overview", "myday", "events", ...(approver ? ["seats"] : []), ...(lead ? ["budget", "usage"] : [])].indexOf(place);
   if (demo === null) return null;
 
   const item = (to: string, p: Place, label: string, icon: ReactNode, cls: string, badge?: number) => (
@@ -99,9 +103,9 @@ export function App() {
             {item("/", "overview", "Overview", <Icon.overview />, "navitem")}
             {item("/my-day", "myday", "My day", <Icon.calendar />, "navitem", waiting)}
             {item("/events", "events", "Events", <Icon.events />, "navitem")}
-            {item("/seats", "seats", "Seats", <Icon.seats />, "navitem", count)}
-            {item("/budget", "budget", "Budget", <Icon.budget />, "navitem")}
-            {item("/usage", "usage", "Usage", <Icon.usage />, "navitem")}
+            {approver && item("/seats", "seats", "Seats", <Icon.seats />, "navitem", count)}
+            {lead && item("/budget", "budget", "Budget", <Icon.budget />, "navitem")}
+            {lead && item("/usage", "usage", "Usage", <Icon.usage />, "navitem")}
           </div>
           <span className="spacer" />
           <div className="side-foot">
@@ -134,8 +138,8 @@ export function App() {
         <nav className="tabs" aria-label="Events Desk">
           {item("/", "overview", "Overview", <Icon.overview />, "tab")}
           {item("/events", "events", "Events", <Icon.events />, "tab")}
-          {item("/seats", "seats", "Seats", <Icon.seats />, "tab", count)}
-          {item("/budget", "budget", "Budget", <Icon.budget />, "tab")}
+          {approver ? item("/seats", "seats", "Seats", <Icon.seats />, "tab", count) : item("/my-day", "myday", "My day", <Icon.calendar />, "tab", waiting)}
+          {lead && item("/budget", "budget", "Budget", <Icon.budget />, "tab")}
           <Link to="/more" go={go} className="tab" aria-current={["more", "usage", "settings"].includes(place) ? "page" : undefined}><span className="ico"><Icon.more /></span><span className="lbl">More</span></Link>
         </nav>
       </div>

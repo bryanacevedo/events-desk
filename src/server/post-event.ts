@@ -8,6 +8,7 @@ import { LAST_DAY_SQL } from "./motion.ts";
 import { queueEvent } from "./operating.ts";
 import { postEventCard, postEventReminderCard } from "./slack-cards.ts";
 import { addBusinessDays, addDays, localDay, type Channel } from "../shared/motion.ts";
+import { POST_START_LATEST_DAYS, POST_TEMPLATE_MAX_DAYS, POST_WAVE_END_DAYS } from "../shared/policy.ts";
 
 type Q = Db["query"];
 
@@ -21,12 +22,7 @@ export const GROUP_WORDS: Record<PostGroup, string> = {
   scanned: "scanned at the booth", reached: "reached before, no reply", not_reached: "not reached before",
 };
 
-/** The press works until this many days after the last day. Later, the moment has passed. */
-export const POST_START_LATEST_DAYS = 10;
-/** Post-event sequences end this many days after the last day, so one started on the last allowed day still finishes its steps. */
-export const POST_WAVE_END_DAYS = 24;
-/** A post-event template's last step comes no later than this many days after its first. */
-export const POST_TEMPLATE_MAX_DAYS = 10;
+export { POST_START_LATEST_DAYS, POST_TEMPLATE_MAX_DAYS, POST_WAVE_END_DAYS };
 
 export type EventWindow = "before" | "during" | "after" | "closed";
 
@@ -35,6 +31,12 @@ export function eventWindow(today: string, firstDay: string, lastDay: string): E
   if (today < firstDay) return "before";
   if (today <= lastDay) return "during";
   return today <= addDays(lastDay, POST_START_LATEST_DAYS) ? "after" : "closed";
+}
+
+/** Where an event stands for this desk. The demo runs over conferences that already happened, on today's date: there a past event is always in its follow-up window, and the screens say the tools are simulated. */
+export function windowFor(deps: LifecycleDeps, today: string, firstDay: string, lastDay: string): EventWindow {
+  const w = eventWindow(today, firstDay, lastDay);
+  return deps.demoCalendar && w === "closed" ? "after" : w;
 }
 
 export async function eventDays(q: Q, eventId: string) {
@@ -90,7 +92,7 @@ export async function postEventStep(db: Db, deps: LifecycleDeps) {
      FROM events e WHERE e.motion IN ('sequencing', 'in_market') AND e.post_started_at IS NULL`);
   let posted = 0;
   for (const e of events) {
-    if (eventWindow(localDay(now, e.country), e.first_day, e.last_day) !== "after") continue;
+    if (windowFor(deps, localDay(now, e.country), e.first_day, e.last_day) !== "after") continue;
     const mention = [e.uploader ? deps.userMap?.[e.uploader] : null];
     if (!e.post_card_at) {
       const { counts, held, ready } = await waveCounts(db, deps, e.id);
@@ -116,8 +118,34 @@ export async function postEventState(db: Db, deps: LifecycleDeps, eventId: strin
     "SELECT country, post_started_at::text AS post_started_at, post_started_by, post_card_at::text AS post_card_at FROM events WHERE id = $1", [eventId]);
   if (!e) return null;
   const days = await eventDays(db.query, eventId);
-  const window = eventWindow(localDay(nowOf(deps), e.country), days.first_day, days.last_day);
+  const window = windowFor(deps, localDay(nowOf(deps), e.country), days.first_day, days.last_day);
   const groups: Partial<Record<PostGroup, number>> = {};
   if (window === "after" || e.post_started_at) for (const g of (await postGroups(db.query, eventId)).values()) groups[g] = (groups[g] ?? 0) + 1;
-  return { window, first_day: days.first_day, last_day: days.last_day, last_press: addDays(days.last_day, POST_START_LATEST_DAYS), started_at: e.post_started_at, started_by: e.post_started_by, card_at: e.post_card_at, groups };
+  // The demo keeps past events open, so a deadline there would be a date already gone.
+  return { window, first_day: days.first_day, last_day: days.last_day, last_press: deps.demoCalendar ? null : addDays(days.last_day, POST_START_LATEST_DAYS), started_at: e.post_started_at, started_by: e.post_started_by, card_at: e.post_card_at, groups };
+}
+
+export interface NextStep { text: string; tab: "outreach" | "people" | "details"; action?: "post_event_start" }
+
+/** The one thing on a delivered event that needs a person now, or null. Cheap counts, in the order a person should take them. */
+export async function nextStep(db: Db, deps: LifecycleDeps, eventId: string): Promise<NextStep | null> {
+  const now = nowOf(deps).toISOString();
+  const [c] = await db.query<{ cases: number; card: number; replies: number; drafts: number; meetings: number; motion: string }>(
+    `SELECT (SELECT count(*)::int FROM review_cases WHERE event_id = $1 AND status = 'open') AS cases,
+       (SELECT count(*)::int FROM approvals WHERE event_id = $1 AND kind = 'motion' AND status = 'pending') AS card,
+       (SELECT count(*)::int FROM inbound_messages WHERE event_id = $1 AND respond_by IS NOT NULL AND handled_at IS NULL) AS replies,
+       (SELECT count(*)::int FROM sequences WHERE event_id = $1 AND state = 'draft' AND checklist_at IS NULL) AS drafts,
+       (SELECT count(*)::int FROM meetings WHERE event_id = $1 AND status IN ('booked', 'rescheduled') AND outcome_at IS NULL AND scheduled_at < $2::timestamptz) AS meetings,
+       (SELECT motion FROM events WHERE id = $1) AS motion`, [eventId, now]);
+  if (!c) return null;
+  const n = (k: number, one: string, many: string) => `${k} ${k === 1 ? one : many}`;
+  if (c.cases) return { text: `${n(c.cases, "case", "cases")} to settle on the list`, tab: "people" };
+  if (c.card) return { text: "The outreach card is waiting to be confirmed", tab: "outreach" };
+  if (c.replies) return { text: `${n(c.replies, "reply is", "replies are")} waiting on a rep`, tab: "outreach" };
+  const pe = await postEventState(db, deps, eventId);
+  if (pe?.window === "after" && !pe.started_at && ["sequencing", "in_market"].includes(c.motion)) return { text: "The event is over. The follow-up is ready to start", tab: "outreach", action: "post_event_start" };
+  if (c.drafts) return { text: `${n(c.drafts, "sequence", "sequences")} to check before ${c.drafts === 1 ? "it goes" : "they go"} out`, tab: "outreach" };
+  if (c.meetings) return { text: `${n(c.meetings, "meeting", "meetings")} to record`, tab: "outreach" };
+  if (c.motion === "none") return { text: "The list is ready. Outreach has not started", tab: "outreach" };
+  return null;
 }

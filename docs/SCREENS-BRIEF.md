@@ -114,3 +114,11 @@ Bryan's pointers that shaped the app as it looks now. Read these before any new 
 - More decoration is not better: if an addition makes a place noisier, take it out.
 - Long is a failure: a screen or a message that reads long gets cut.
 - New sections are built from the shared parts: the brief's bar rows, rows that open with a chevron, folds, figures in set form ("4 costs to add").
+- A page shows one layer at a time. Throwing every layer of data at once is hard to use and hard to adopt (Bryan, 2026-11-09). A delivered event is the header, then one line for the one thing that needs someone (with its button, and nothing when nothing does), then three views: Outreach, People, Details. The view lives in the link (`#outreach`, `#people`, `#details`) so a Slack card can open it.
+- Tabs are fine when a page holds several jobs. Do not force everything onto one page.
+- The header timeline names every phase a person would name: after delivery it reads List ready, Owners, Sequences, In market, Follow-up, Closing, Scored. If a phase happens, it has a step.
+- New data replaces a weaker thing on a screen; it never piles on. "Smartly designed, not more crowded" (Bryan, 2026-11-09).
+- Overview answers three questions across every event: where is each one (the rail, with the same step words as the event header), what needs someone (replies waiting first, then the follow-up, paused sending, meetings to record, then the list's own risks), and is it working (Outreach: each delivered event's step with reached, replied and meetings; Did it pay: pipeline for every dollar, final or so far).
+- Long tables page at 12 rows, with search and filters above them.
+- The menu follows the person's job. A page full of buttons someone cannot use is clutter for them: Seats is in the approvers' menu only, and everyone else follows their own seat requests on My day (Bryan, 2026-11-09).
+

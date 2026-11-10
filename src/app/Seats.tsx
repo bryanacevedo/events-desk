@@ -103,7 +103,7 @@ export function Seats({ go, search, requesting, preselect }: { go: (to: string) 
         <Link to="/seats?request=1" go={go} className="btn phone-only">Request seats</Link>
       </header>
 
-      {requesting && <RequestSeats preselect={preselect} onDone={() => go("/seats?mine=1&status=all")} onClose={() => go("/seats")} />}
+      {requesting && <RequestSeats preselect={preselect} onDone={() => go(needs?.approvers.includes(actor) ? "/seats?mine=1&status=all" : "/my-day")} onClose={() => go("/seats")} />}
 
       <div className="filters" role="group" aria-label="Filter seat requests">
         <div className="seg" role="group" aria-label="Status">

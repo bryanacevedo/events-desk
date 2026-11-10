@@ -90,7 +90,7 @@ let live: Awaited<ReturnType<typeof liveConnectors>> = {};
 try { live = liveConnectors(env); } catch (e) { console.error((e as Error).message); process.exit(1); }
 const demoSetup = mode.demo ? await demoConnectors(db) : undefined;
 const lifecycle: LifecycleDeps | undefined = demoSetup
-  ? { crm: withDemoCrm(deps.crm, db, () => new Date()), connectors: demoSetup.connectors, llm: deps.llm }
+  ? { crm: withDemoCrm(deps.crm, db, () => new Date()), connectors: demoSetup.connectors, llm: deps.llm, demoCalendar: true }
   : Object.keys(live).length ? {
       crm: deps.crm, connectors: live, llm: deps.llm, notify: slack ? slackNotifier(slack) : undefined, userMap: slack?.userMap,
       // Every protection the sending layer has is on for real sending, read from the environment.
@@ -108,9 +108,9 @@ if (!demoMotionReady) void (async () => {
       const [f] = await db.query<{ id: string; stage: string; motion: string }>("SELECT id, stage, motion FROM events WHERE id = 'evt_money20-20-usa-2026'");
       if (!f) break;
       if (f.stage === "delivered") {
-        for (let k = 0; k < 5 && (await db.query<{ motion: string }>("SELECT motion FROM events WHERE id = $1", [f.id]))[0].motion !== "in_market"; k++) await demoAdvance(db, lifecycle!, demoSetup!.tools, f.id);
+        for (let k = 0; k < 5 && (await db.query<{ motion: string }>("SELECT motion FROM events WHERE id = $1", [f.id]))[0].motion !== "in_market"; k++) await demoAdvance(db, lifecycle!, demoSetup!.tools, f.id, { pressFollowUp: true });
         // Live is not the end: people answer, meet, and walk up to the booth.
-        await demoAdvance(db, lifecycle!, demoSetup!.tools, f.id);
+        await demoAdvance(db, lifecycle!, demoSetup!.tools, f.id, { pressFollowUp: true });
         const [rep] = await db.query<{ rep: string }>("SELECT requester AS rep FROM seat_requests WHERE event_id = $1 AND status = 'approved' ORDER BY (requester = 'Maya Ortiz') DESC, requester LIMIT 1", [f.id]);
         if (rep) await addSlots(db, f.id, "GTM Team", { rep: rep.rep, day: "2027-03-02", from: "09:00", to: "12:00", minutes: 30, location: "Booth 12" });
         break;

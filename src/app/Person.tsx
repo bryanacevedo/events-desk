@@ -8,6 +8,7 @@ import { useActor } from "./App";
 import { send, type PersonRow } from "./api";
 import { ConfirmDialog } from "./Patterns";
 import { dropWords } from "./words";
+import { gateWords } from "../shared/gate-words";
 
 const GRID: Record<1 | 2 | 3, Record<1 | 2 | 3, "A" | "B" | "C">> = { 1: { 1: "A", 2: "B", 3: "C" }, 2: { 1: "B", 2: "C", 3: "C" }, 3: { 1: "C", 2: "C", 3: "C" } };
 
@@ -64,6 +65,23 @@ function OptOut({ c, onDone }: { c: PersonRow; onDone: () => void }) {
   );
 }
 
+const REPLY: Record<string, string> = { interested: "interested", meeting_request: "wants a meeting", referral: "pointed to someone else", not_now: "not now", not_interested: "not interested", unsubscribe: "asked to stop", wrong_person: "wrong person", departed: "has left", out_of_office: "out of office", question: "asked a question" };
+const PAUSE: Record<string, string> = { meeting: "a meeting is booked", inbound: "they replied", waiting_for_rep: "waiting on a rep", colleague_replied: "a colleague replied", met_onsite: "met at the event", out_of_office: "out of office" };
+
+/** Where this person is in outreach, in one line: what happened last that matters most. */
+function outreachWords(c: PersonRow): string {
+  if (c.meeting === "held") return "Meeting held";
+  if (c.meeting === "booked" || c.meeting === "rescheduled") return "Meeting booked";
+  if (c.reply_code) return `Replied: ${REPLY[c.reply_code] ?? "replied"}`;
+  const o = c.outreach;
+  if (!o) return c.drop_reason ? "Not in outreach" : "Not in outreach yet";
+  const by = o.channel === "linkedin" ? "on LinkedIn" : "by email";
+  if (o.state === "enrolled") return `In a sequence ${by}`;
+  if (o.state === "adding") return `Going into a sequence ${by}`;
+  if (o.state === "paused") return `Paused ${by}: ${PAUSE[o.cause ?? ""] ?? "held for now"}`;
+  return `Out of outreach: ${o.cause ? gateWords(o.cause) : "removed"}`;
+}
+
 export function Person({ c, onClose, onChange }: { c: PersonRow; onClose: () => void; onChange?: () => void }) {
   const [optedOut, setOptedOut] = useState(false);
   const notes = c.flags.filter((f) => f !== "not_reviewed");
@@ -91,8 +109,8 @@ export function Person({ c, onClose, onChange }: { c: PersonRow; onClose: () => 
         </div>
       </div>
       <div className="col">
-        <p style={{ fontSize: 16 }}>{c.email ? "Email confirmed" : "No email"}</p>
-        {c.email && <p className="mute wrap-any">{c.email}</p>}
+        <p style={{ fontSize: 16 }}>{outreachWords(c)}</p>
+        <p className="mute wrap-any">{c.email ? `Email confirmed, ${c.email}` : "No email"}</p>
         {c.last_verified_at && <p className="mute">Last verified {new Date(c.last_verified_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</p>}
         {c.seen_at > 1 && <p className="mute">Seen at {c.seen_at} events</p>}
         {notes.map((f) => <p key={f} className="mute">{FLAG_WORDS[f] ?? f.replace(/_/g, " ")}.</p>)}

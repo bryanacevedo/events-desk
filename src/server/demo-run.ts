@@ -17,6 +17,7 @@ import { recordEventCost } from "./closeout.ts";
 import { loadPeople, regionOf } from "./gate.ts";
 import type { LifecycleDeps } from "./lifecycle-deps.ts";
 import type { Crm, CrmOpportunity } from "./providers.ts";
+import { postEventState } from "./post-event.ts";
 
 const u = (s: string) => parseInt(createHash("sha256").update(s).digest("hex").slice(0, 8), 16) / 0xffffffff;
 const GTM = "GTM Team";
@@ -59,7 +60,8 @@ async function ensureSetup(db: Db, deps: LifecycleDeps, tools: Record<string, Fa
 }
 
 /** Moves the event one step. Says what it did. */
-export async function demoAdvance(db: Db, deps: LifecycleDeps, tools: Record<string, FakeTool>, eventId: string): Promise<{ did: string }> {
+/** One step of the demo. `opts.pressFollowUp` lets the demo's own seeding press Start the follow-up; a visitor presses it themselves, because that is a person's call. */
+export async function demoAdvance(db: Db, deps: LifecycleDeps, tools: Record<string, FakeTool>, eventId: string, opts: { pressFollowUp?: boolean } = {}): Promise<{ did: string }> {
   const [e] = await db.query<{ motion: string; stage: string }>("SELECT motion, stage FROM events WHERE id = $1", [eventId]);
   if (!e) throw new RuleError("That event does not exist.");
   if (e.stage !== "delivered") throw new RuleError("The list has to be delivered first.");
@@ -82,7 +84,12 @@ export async function demoAdvance(db: Db, deps: LifecycleDeps, tools: Record<str
   if (e.motion === "sequencing") {
     await ensureSetup(db, deps, tools, eventId, up.uploaded_by);
     const seqs = await db.query<{ id: string }>("SELECT id FROM sequences WHERE event_id = $1 AND state = 'draft'", [eventId]);
-    if (!seqs.length) { const r = await createDrafts(db, deps, eventId, up.uploaded_by); return { did: `Sequences are set up: ${r.added} people added. Inboxes were sized and chosen.` }; }
+    if (!seqs.length) {
+      const pe = await postEventState(db, deps, eventId);
+      if (pe?.window === "after" && !pe.started_at && !opts.pressFollowUp) return { did: "The event is over. Press Start the follow-up to send it, group by group." };
+      const r = await createDrafts(db, deps, eventId, up.uploaded_by);
+      return { did: `Sequences are set up: ${r.added} people added. Inboxes were sized and chosen.` };
+    }
     for (const s of await db.query<{ id: string; external_id: string | null; connector: string }>("SELECT id, external_id, connector FROM sequences WHERE event_id = $1 AND state = 'draft'", [eventId])) {
       if (!s.external_id) await attachCampaign(db, deps, s.id, tools[s.connector].newSeq(), up.uploaded_by);
       await confirmLaunchChecklist(db, s.id, up.uploaded_by);

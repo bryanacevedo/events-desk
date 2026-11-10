@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "../src/server/db.ts";
 import { bookMeeting } from "../src/server/meetings.ts";
 import { captureOnsite, drainNotifications } from "../src/server/operating.ts";
-import { eventWindow, postEventStep, postGroups } from "../src/server/post-event.ts";
+import { eventWindow, nextStep, postEventStep, postGroups, windowFor } from "../src/server/post-event.ts";
 import { approveTemplate, calendarSweep, createDrafts, drainOps } from "../src/server/sequences.ts";
 import { ingestEvents, processInbound } from "../src/server/replies.ts";
 import { freshDb } from "./helpers.ts";
@@ -31,6 +31,13 @@ describe("when the follow-up can start", () => {
     expect(eventWindow("2027-02-04", "2027-02-01", "2027-02-03")).toBe("after");
     expect(eventWindow("2027-02-13", "2027-02-01", "2027-02-03")).toBe("after");
     expect(eventWindow("2027-02-14", "2027-02-01", "2027-02-03")).toBe("closed");
+  });
+
+  it("only the demo keeps a past event in its window, so its visitors can press through past conferences", () => {
+    const live = { connectors: {}, llm: {} } as never, demo = { connectors: {}, llm: {}, demoCalendar: true } as never;
+    expect(windowFor(live, "2026-11-09", "2026-10-18", "2026-10-21")).toBe("closed");
+    expect(windowFor(demo, "2026-11-09", "2026-10-18", "2026-10-21")).toBe("after");
+    expect(windowFor(demo, "2026-10-19", "2026-10-18", "2026-10-21")).toBe("during");
   });
 
   it("refuses while a multi-day event is on, and after the window closes", async () => {
@@ -142,5 +149,33 @@ describe("found by the spec review", () => {
     expect(h.notify.sent.filter((x) => x.to === "UREPA" && /Hot from the booth: Cleo Park/.test(x.card.text))).toHaveLength(1);
     expect(await db.query("SELECT 1 FROM crm_outbox WHERE kind = 'task' AND desk_key LIKE 'hot:%'")).toHaveLength(1);
     expect((await postGroups(db.query, h.id)).get(cleo.id)).toBe("hot");
+  });
+});
+
+describe("what needs someone now, on the event page", () => {
+  it("names one thing, in order: a waiting reply before the follow-up, and the follow-up with its button", async () => {
+    const h = await threeDay("2027-02-04T09:00:00Z");
+    await db.query("UPDATE events SET motion = 'in_market' WHERE id = $1", [h.id]);
+    await db.query("UPDATE review_cases SET status = 'done' WHERE event_id = $1", [h.id]).catch(() => {});
+    expect(await nextStep(db, h.deps, h.id)).toMatchObject({ tab: "outreach", action: "post_event_start" });
+    const ana = await personAt(db, h.id, "Ana Ruiz");
+    await db.query("INSERT INTO inbound_messages (id, connector, provider_message_id, event_id, contact_id, channel, signal, received_at, status, respond_by) VALUES ('im1', 'instantly', 'p1', $1, $2, 'email', 'reply', $3, 'done', $3)", [h.id, ana.id, h.time.now.toISOString()]);
+    expect(await nextStep(db, h.deps, h.id)).toEqual({ text: "1 reply is waiting on a rep", tab: "outreach" });
+  });
+});
+
+
+describe("the people list tells attendees from prospects", () => {
+  it("filters by where a person came from, and says so on each row", async () => {
+    const h = await deliveredInMotion(db);
+    const ana = await personAt(db, h.id, "Ana Ruiz");
+    await db.query("UPDATE contacts SET source = 'prospect' WHERE id = $1", [ana.id]);
+    const { createApp } = await import("../src/server/app.ts");
+    const http = createApp(db, { demo: true });
+    const read = async (source: string) => (await (await http.request(`/api/events/${h.id}/people?source=${source}`)).json()) as { total: number; rows: { id: string; source: string }[] };
+    const prospects = await read("prospect"), attendees = await read("attendee"), everyone = await read("");
+    expect(prospects.rows.map((r) => r.id)).toEqual([ana.id]);
+    expect(attendees.rows.every((r) => r.source === "attendee")).toBe(true);
+    expect(everyone.total).toBe(prospects.total + attendees.total);
   });
 });

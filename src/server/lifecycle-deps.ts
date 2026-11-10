@@ -25,6 +25,8 @@ export interface LifecycleDeps {
   userMap?: Record<string, string>;
   now?: () => Date;
   holidays?: string[];
+  /** The demo only: past conferences stay in their follow-up window. Never set for real sending. */
+  demoCalendar?: boolean;
   /** The sequence launch checks poll this often, and the screen states it. */
   pollMinutes?: number;
   sendingRules?: Partial<SendingRules>;

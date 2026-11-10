@@ -20,5 +20,10 @@ export const REGATE_AFTER_MINUTES = 15;
 export const BOUNCE_PAUSE_RATE = 0.03;
 export const BOUNCE_MIN_SENDS = 50;
 
+/** The post-event wave (LIFECYCLE §5b): the press works until this many days after the last day; its sequences end this many days after; a template's steps span at most this many days. */
+export const POST_START_LATEST_DAYS = 10;
+export const POST_WAVE_END_DAYS = 24;
+export const POST_TEMPLATE_MAX_DAYS = 10;
+
 /** CRM deal stages late enough that the owner should hear before anyone is sequenced. */
 export const DEFAULT_LATE_STAGES = ["proposal", "negotiation", "contract", "closing", "verbal"];

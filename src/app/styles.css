@@ -361,7 +361,7 @@ details summary::-webkit-details-marker { display: none; }
   .side { display: none; }
   .main { padding: 0 16px 96px; gap: 24px; }
   .phone-top { display: flex; }
-  .tabs { display: grid; position: fixed; left: 0; right: 0; bottom: 0; grid-template-columns: repeat(5, 1fr); height: 64px; padding-bottom: env(safe-area-inset-bottom); background: var(--well); border-top: 1px solid var(--line); z-index: 10; }
+  .tabs { display: grid; position: fixed; left: 0; right: 0; bottom: 0; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); height: 64px; padding-bottom: env(safe-area-inset-bottom); background: var(--well); border-top: 1px solid var(--line); z-index: 10; }
   .tab { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: var(--mute); font: 500 11px/14px var(--sans); }
   .tab .ico { display: inline-flex; width: 20px; height: 20px; }
   .tab[aria-current="page"] { color: var(--ink); }
@@ -1075,7 +1075,7 @@ select:not([multiple]) {
 
 /* ------------------------------------------------- event page, stage tracker */
 
-.stages { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; margin-top: 8px; }
+.stages { grid-column: 1 / -1; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; margin-top: 8px; }
 .stages li { display: grid; gap: 8px; align-content: start; }
 .st-bar { display: block; height: 10px; border-radius: 5px; overflow: hidden; background: color-mix(in srgb, var(--ink) 9%, transparent); }
 .st-bar i { display: block; height: 100%; border-radius: 5px; transform-origin: left center; }
@@ -1301,7 +1301,9 @@ select:not([multiple]) {
 .brow i { display: block; height: 4px; border-radius: 2px; background: var(--well); overflow: hidden; }
 .brow u { display: block; height: 100%; border-radius: 2px; transform-origin: left center; animation: fill 620ms var(--ease) 120ms backwards; }
 .brow .t1 { background: var(--green); } .brow .t2 { background: #86B39A; } .brow .t3 { background: var(--line-2); } .brow .t0 { background: var(--sand); }
-.brow b { font: 500 15px/20px var(--display); color: var(--ink); text-align: right; }
+.brow b { font: 500 15px/20px var(--display); color: var(--ink); text-align: right; white-space: nowrap; }
+/* Dollar figures need more room than counts. One width for the whole list keeps its bars lined up. */
+.brief ul.money .brow { grid-template-columns: minmax(0, 1fr) 80px 96px; }
 .brief .xmore { justify-self: start; }
 
 @media (max-width: 1024px) {
@@ -1658,3 +1660,41 @@ body.dlg-open { overflow: hidden; }
 .brief-card dl > div + div { border-top: 1px solid var(--line); }
 .brief-card dt { color: var(--mute); flex: none; }
 .brief-card dd { color: var(--ink); text-align: right; overflow-wrap: anywhere; }
+
+/* ------------------------------------------------- a delivered event, in views */
+/* The one thing that needs someone, above the views. One sentence and one button; nothing when nothing does. */
+.next-up { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 14px 16px 14px 20px; border-radius: 14px; background: var(--well); }
+.next-up p { margin: 0; font: 500 15px/22px var(--sans); color: var(--ink); }
+.seg.views { justify-self: start; align-self: start; width: max-content; }
+
+/* Did it pay: one figure per event, pipeline for every dollar spent. */
+.lately.paid li { grid-template-columns: auto minmax(0, 1fr) auto; }
+.paid-x { margin: 0; padding-right: 6px; font: 500 14px/1 var(--display); color: var(--mute); white-space: nowrap; }
+.paid-x b { font: 600 22px/1 var(--display); color: var(--ink); }
+
+/* A prospect was found at the company, not on the attendee list: one quiet word before the title says so. */
+.psrc { color: var(--ink); font-weight: 500; }
+.psrc::after { content: "·"; margin: 0 6px; color: var(--mute); font-weight: 400; }
+/* In the people and company tables the search takes whatever room the filters leave, so the bar stays one line. */
+.plist .filters .search { flex: 1 1 220px; width: auto; min-width: 200px; max-width: 360px; }
+
+/* The side sheet: a small version of the event's header, then the one thing to do, a few quiet facts, and the way to the full page. */
+.ehero.mini { gap: 14px 16px; padding: 18px 20px; border-radius: 18px; }
+.ehero.mini h2 { font: 500 22px/28px var(--display); margin: 0; }
+.ehero.mini .ehero-count b { font-size: 36px; line-height: 38px; }
+.ehero.mini .stages { margin-top: 4px; }
+.sheet-next { margin: 4px 0 0; font: 500 17px/24px var(--sans); color: var(--ink); }
+.sheet-facts { display: grid; margin: 0; }
+.sheet-facts > div { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; align-items: center; min-height: 44px; border-top: 1px solid var(--line); font-size: 14px; }
+.sheet-facts dt { color: var(--mute); }
+.sheet-facts dd { margin: 0; display: flex; align-items: center; gap: 10px; color: var(--ink); }
+.sheet-facts .faces { display: inline-flex; }
+.sheet-facts .faces > * { margin-left: -6px; box-shadow: 0 0 0 2px var(--ground); border-radius: 50%; }
+.sheet-facts .faces > *:first-child { margin-left: 0; }
+.sheet-open-full { justify-self: start; }
+/* In the sheet the timeline is the phone's: the whole life as bars, and only the current step named. */
+.ehero.mini .stages { gap: 4px; position: relative; padding-bottom: 44px; }
+.ehero.mini .st-label { display: none; }
+.ehero.mini .stages .now .st-label, .ehero.mini .stages .done:last-child .st-label { display: inline-flex; position: absolute; left: 0; top: 16px; font: 600 15px/20px var(--display); color: var(--ink); white-space: nowrap; }
+.ehero.mini .st-who { position: absolute; left: 0; top: 37px; margin: 0; font-size: 13px; line-height: 16px; white-space: nowrap; }
+.sheet .sheet-open-full { align-self: flex-start; }

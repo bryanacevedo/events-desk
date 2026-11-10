@@ -17,13 +17,14 @@ interface Overview {
   card: { status: string; llm_cap: number; est_cents: number } | null;
   sequences: Sequence[]; funnel: { kept: number; enrolled: number; sent: number; replied: number; booked: number; held: number } | null; owners: { status: string; n: number }[]; replies: Reply[]; meetings: Meeting[];
   captures: { id: string; full_name: string | null; company: string | null; rep: string }[]; regions: { region: string; people: number; basis: string | null }[]; live_score: Score | null;
-  post_event: { window: "before" | "during" | "after" | "closed"; last_day: string; last_press: string; started_at: string | null; started_by: string | null; groups: Record<string, number> } | null;
+  post_event: { window: "before" | "during" | "after" | "closed"; last_day: string; last_press: string | null; started_at: string | null; started_by: string | null; groups: Record<string, number> } | null;
 }
 type Act = (m: "POST", p: string, b?: unknown, say?: string) => void;
 
 const CODE: Record<string, string> = { interested: "interested", meeting_request: "wants a meeting", referral: "pointed us to someone" };
 const REASON: Record<string, string> = { not_connected: "Not connected", health_unknown: "Health not reported", low_health: "Health too low", still_warming: "Still warming up", high_bounce: "Bounces too high", high_spam: "Spam too high", fully_booked: "Used by other sequences", domain_full: "Domain has enough", no_auth: "Domain not set up to send", failed_placement: "Landing in spam", stale_placement: "Not tested lately", not_tested: "Not tested", warmup_off: "Warmup off", burned: "Domain resting", primary_domain: "Company's own domain", no_consent: "Rep has not agreed" };
 const when = (iso: string) => new Date(iso).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "UTC" });
+const FOLLOW_UP = [["scanned", "Scanned at the booth"], ["reached", "Reached before, no reply"], ["not_reached", "Not reached before"]] as const;
 const STATE: Record<string, string> = { active: "Live", paused: "Paused", archived: "Ended", draft: "Draft" };
 
 /** The brief's row: what it is, a thin bar for how much, the number. */
@@ -65,7 +66,7 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
   const [o, setO] = useState<Overview | null>(null);
   const [slots, setSlots] = useState<{ roster: { rep: string }[]; slots: { id: string; rep: string; starts_at: string; location: string; meeting_id: string | null }[] }>({ roster: [], slots: [] });
   const [busy, setBusy] = useState(false), [error, setError] = useState(""), [note, setNote] = useState("");
-  const [cap, setCap] = useState({ name: "", email: "", company: "", note: "" });
+  const [cap, setCap] = useState({ name: "", email: "", company: "", note: "", hot: false });
   const [slot, setSlot] = useState({ rep: "", day: "", from: "09:00", to: "17:00", minutes: 30, location: "Booth" });
   const [cost, setCost] = useState({ category: "", amount: "" });
   const load = async () => {
@@ -98,12 +99,13 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
   const pe = o.post_event, g = pe?.groups ?? {};
   const canFollowUp = Boolean(pe && pe.window === "after" && !pe.started_at && ["sequencing", "in_market"].includes(o.motion));
   const withRep = (g.met ?? 0) + (g.hot ?? 0) + (g.replied ?? 0);
+  const followUp = FOLLOW_UP.reduce((n, [k]) => n + (g[k] ?? 0), 0);
 
   return (
     <section className="motion" aria-label="Outreach" data-ready="1">
       <div className="m-head">
-        <h2 className="display">Outreach</h2>
-        {demo && !["closing", "scored"].includes(o.motion) && <button className="btn small" disabled={busy} onClick={() => act("POST", `/api/demo/motion/${id}/advance`)}>{o.motion === "in_market" ? "Simulate replies" : "Next step"}</button>}
+        <h2 className="sr-only">Outreach</h2>
+        {demo && !canFollowUp && !["closing", "scored"].includes(o.motion) && <button className="btn small" disabled={busy} onClick={() => act("POST", `/api/demo/motion/${id}/advance`)}>{o.motion === "in_market" ? "Simulate replies" : "Next step"}</button>}
         {!demo && !started && (!o.card || o.card.status === "declined") && <button className="btn small" disabled={busy} onClick={() => act("POST", `/api/events/${id}/motion/start`)}>Start outreach</button>}
         {canFollowUp && <button className="btn small" disabled={busy} onClick={() => act("POST", `/api/events/${id}/motion/sequences`, undefined, "The follow-up is set up. Each sequence waits for its launch checklist.")}>Start the follow-up</button>}
       </div>
@@ -119,20 +121,23 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
 
       {pe && started && pe.window === "during" && <p className="m-line">The event is on. The follow-up can start the day after it ends, {shortDate(pe.last_day)}.</p>}
       {canFollowUp && (
-        <ul className="m-rows m-wide" aria-label="Follow-up after the event">
-          <li><span>Scanned at the booth</span><b>{num(g.scanned ?? 0)}</b></li>
-          <li><span>Reached before, no reply</span><b>{num(g.reached ?? 0)}</b></li>
-          <li><span>Not reached before</span><b>{num(g.not_reached ?? 0)}</b></li>
-          {withRep > 0 && <li><span>With a rep, not sequenced</span><b>{num(withRep)}</b></li>}
-          <li><span>The button works until</span><b>{shortDate(pe!.last_press)}</b></li>
-        </ul>
+        <section className="brief" aria-label="Follow-up after the event">
+          <div>
+            <h3>After the event<span>{num(followUp + withRep)}</span></h3>
+            <ul>
+              {FOLLOW_UP.filter(([k]) => (g[k] ?? 0) > 0).map(([k, label]) => <Row key={k} label={label} n={g[k]!} of={followUp + withRep} />)}
+              {withRep > 0 && <Row label="With a rep, not sequenced" n={withRep} of={followUp + withRep} tone="t3" />}
+            </ul>
+            {pe!.last_press && <p className="m-line">Each group gets its own message. The button works until {shortDate(pe!.last_press)}.</p>}
+          </div>
+        </section>
       )}
-      {pe?.started_at && <p className="m-line">Follow-up started by {pe.started_by ?? "someone"} on {when(pe.started_at)}</p>}
+      {pe?.started_at && <p className="m-line">Follow-up started by {pe.started_by ?? "someone"} on {shortDate(pe.started_at.slice(0, 10))}</p>}
 
       {started && f && (
         <section className="brief" aria-label="Outreach in brief">
           <div>
-            <h3>Outreach<span>{num(f.kept)}</span></h3>
+            <h3>People<span>{num(f.kept)}</span></h3>
             <ul>
               <Row label="In sequences" n={f.enrolled} of={f.kept} />
               <Row label="Reached" n={f.sent} of={f.kept} />
@@ -144,7 +149,7 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
           {s && (
             <div>
               <h3>Did it pay for itself?<span>{s.roi.pipeline_per_dollar === null ? "" : `${s.roi.pipeline_per_dollar}x`}</span></h3>
-              <ul>
+              <ul className="money">
                 <Row label="Cost" n={s.cost.dollars_cents} of={top} tone="t3" shown={money(s.cost.dollars_cents)} />
                 {s.influence.available && <>
                   <Row label="New pipeline" n={s.influence.sourced.cents} of={top} shown={money(s.influence.sourced.cents)} />
@@ -215,11 +220,12 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
         )}
         {started && (
           <Fold icon={<Icon.people />} title="Met at the event" peek={o.captures.length ? num(o.captures.length) : undefined}>
-            <form className="m-form" onSubmit={(e) => { e.preventDefault(); act("POST", `/api/events/${id}/motion/capture`, { full_name: cap.name, email: cap.email, company: cap.company, note: cap.note, met: true }, "Saved. Their outreach is stopped."); setCap({ name: "", email: "", company: "", note: "" }); }}>
+            <form className="m-form" onSubmit={(e) => { e.preventDefault(); act("POST", `/api/events/${id}/motion/capture`, { full_name: cap.name, email: cap.email, company: cap.company, note: cap.note, met: true, temperature: cap.hot ? "hot" : "warm" }, cap.hot ? "Saved. Their outreach is stopped, and a task for today is in the CRM." : "Saved. Their outreach is stopped."); setCap({ name: "", email: "", company: "", note: "", hot: false }); }}>
               <label>Name<input value={cap.name} onChange={(e) => setCap({ ...cap, name: e.target.value })} /></label>
               <label>Email<input type="email" value={cap.email} onChange={(e) => setCap({ ...cap, email: e.target.value })} /></label>
               <label>Company<input value={cap.company} onChange={(e) => setCap({ ...cap, company: e.target.value })} /></label>
               <label>What they said<input value={cap.note} onChange={(e) => setCap({ ...cap, note: e.target.value })} /></label>
+              <label className="check"><input type="checkbox" checked={cap.hot} onChange={(e) => setCap({ ...cap, hot: e.target.checked })} /><span>Hot, follow up today</span></label>
               <button className="btn small" disabled={busy}>Save</button>
             </form>
             {o.captures.length > 0 && <ul className="m-rows">{o.captures.slice(0, 12).map((c) => <li key={c.id}><span>{c.full_name ?? "Someone"}, {c.company}</span><b>{c.rep}</b></li>)}</ul>}

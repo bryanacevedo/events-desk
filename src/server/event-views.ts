@@ -16,6 +16,8 @@ export interface PersonRow {
   company: string | null; company_id: string | null; company_tier: 1 | 2 | 3 | null; flags: string[];
   /** How many events this person has been on, from the shared record. 0 when they have none. */
   seen_at: number; last_verified_at: string | null;
+  /** Where this person is in outreach: their latest enrollment, latest reply and latest meeting. Null where there is none. */
+  outreach: { state: string; cause: string | null; channel: string } | null; reply_code: string | null; meeting: string | null;
 }
 export interface CompanyRow {
   id: string; name: string; tier: 1 | 2 | 3 | null; tier_fact: string | null; industry: string | null; employees: string | null; country: string | null;
@@ -27,6 +29,7 @@ export function mountEventViews(app: Hono<{ Variables: { actor: string } }>, db:
     const id = c.req.param("id");
     const q = like(c.req.query("q")), priority = ["A", "B", "C"].includes(c.req.query("priority") ?? "") ? c.req.query("priority")! : "";
     const tier = tierOf(c.req.query("tier")), status = ["all", "dropped"].includes(c.req.query("status") ?? "") ? c.req.query("status")! : "kept";
+    const source = ["attendee", "prospect"].includes(c.req.query("source") ?? "") ? c.req.query("source")! : "";
     const limit = Math.min(MAX, int(c.req.query("limit"), PAGE) || PAGE), offset = int(c.req.query("offset"), 0);
     const rows = await db.query<PersonRow & { total: number }>(
       `SELECT c.id, c.full_name, c.title, c.email, c.priority, c.title_tier, c.drop_reason, c.source, c.linkedin, c.employer,
@@ -34,6 +37,9 @@ export function mountEventViews(app: Hono<{ Variables: { actor: string } }>, db:
               coalesce((SELECT array_agg(f.flag ORDER BY f.flag) FROM review_flags f WHERE f.contact_id = c.id), '{}') AS flags,
               (SELECT count(DISTINCT coalesce(ev.parent_event_id, ev.id))::int FROM contacts x JOIN events ev ON ev.id = x.event_id WHERE x.person_id = c.person_id) AS seen_at,
               (SELECT p.last_verified_at FROM people p WHERE p.id = c.person_id) AS last_verified_at,
+              (SELECT json_build_object('state', n.state, 'cause', n.cause, 'channel', n.channel) FROM enrollments n WHERE n.contact_id = c.id ORDER BY n.changed_at DESC LIMIT 1) AS outreach,
+              (SELECT m.code FROM inbound_messages m WHERE m.contact_id = c.id AND m.signal = 'reply' ORDER BY m.received_at DESC LIMIT 1) AS reply_code,
+              (SELECT mt.status FROM meetings mt WHERE mt.contact_id = c.id ORDER BY mt.scheduled_at DESC LIMIT 1) AS meeting,
               count(*) OVER()::int AS total
        FROM contacts c LEFT JOIN companies co ON co.id = c.company_id
        WHERE c.event_id = $1
@@ -41,8 +47,9 @@ export function mountEventViews(app: Hono<{ Variables: { actor: string } }>, db:
          AND ($3::text = '' OR c.priority = $3)
          AND ($4::int = 0 OR ($4 = -1 AND co.tier IS NULL) OR co.tier = $4)
          AND ($5::text = 'all' OR ($5 = 'kept' AND c.dropped_at IS NULL) OR ($5 = 'dropped' AND c.dropped_at IS NOT NULL))
+         AND ($8::text = '' OR c.source = $8)
        ORDER BY c.dropped_at IS NOT NULL, c.priority NULLS LAST, co.tier NULLS LAST, co.name NULLS LAST, c.full_name, c.id
-       LIMIT $6 OFFSET $7`, [id, q, priority, tier, status, limit, offset]);
+       LIMIT $6 OFFSET $7`, [id, q, priority, tier, status, limit, offset, source]);
     const total = rows[0]?.total ?? 0;
     return c.json({ total, offset, limit, rows: rows.map(({ total: _t, ...r }) => r) });
   });

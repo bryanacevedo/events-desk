@@ -18,7 +18,7 @@ import { cleanNames, lintTemplate, type TemplateStep } from "../shared/template-
 import { applySendSettings, launchAllowed, planSenders, settingsConfirmed } from "./sending.ts";
 import { isGtm } from "../shared/roles.ts";
 import { addDays, localDay, zoneGroupOf, type Channel, type ZoneGroup } from "../shared/motion.ts";
-import { eventDays, eventWindow, POST_START_LATEST_DAYS, POST_TEMPLATE_MAX_DAYS, POST_WAVE_END_DAYS, postGroups, SEQUENCED_GROUPS } from "./post-event.ts";
+import { eventDays, POST_START_LATEST_DAYS, windowFor, POST_TEMPLATE_MAX_DAYS, POST_WAVE_END_DAYS, postGroups, SEQUENCED_GROUPS } from "./post-event.ts";
 
 const ACCOUNT_DAILY = 2;
 /** A share of accounts nobody contacts, always the same ones, so the scorecard has something to compare against. */
@@ -107,7 +107,7 @@ export async function createDrafts(db: Db, deps: LifecycleDeps, eventId: string,
   if (crmConnected(deps.crm)) await openOwnerDecisions(db, deps, eventId);
   // Before the event, its pre-event copy. While it is on, nothing new starts. After it, the post-event wave, until the window closes.
   const days = await eventDays(db.query, eventId);
-  const window = eventWindow(localDay(nowOf(deps), e.country), days.first_day, days.last_day);
+  const window = windowFor(deps, localDay(nowOf(deps), e.country), days.first_day, days.last_day);
   if (window === "during") throw new RuleError(`${e.name} is on. The follow-up starts the day after its last day, ${days.last_day}.`);
   if (window === "closed") throw new RuleError(`The follow-up for ${e.name} could start until ${addDays(days.last_day, POST_START_LATEST_DAYS)}. That window has closed.`);
   const phase = window === "before" ? "pre" : "post";
