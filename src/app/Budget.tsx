@@ -134,7 +134,7 @@ export function Budget({ go, search }: { go: (to: string) => void; search: URLSe
         <div className="rows" role="table" aria-label="Ticket budget by event">
           <div className="rrow head" role="row"><span role="columnheader">Event</span><span role="columnheader">Qtr</span><span role="columnheader">Seats</span><span role="columnheader">Spent</span><span role="columnheader">Committed</span><span role="columnheader">Waiting</span></div>
           {v.events.map((e) => (
-            <div className="rrow" role="row" key={e.event_id}>
+            <div className={`rrow${(e as { gone?: boolean }).gone ? "" : " opens"}`} role="row" key={e.event_id} onClick={(ev) => { if (!(e as { gone?: boolean }).gone && !(ev.target as HTMLElement).closest("a")) go(`/event/${e.event_id}`); }}>
               <span role="cell" className="who-text"><p className="name">{(e as { gone?: boolean }).gone ? e.name : <a href={`/event/${e.event_id}`} onClick={(ev) => { ev.preventDefault(); go(`/event/${e.event_id}`); }}>{e.name}</a>}</p><p className="small mute">{shortDate(e.starts_on)}</p></span>
               <span role="cell" data-l="Qtr">Q{e.quarter}</span><span role="cell" data-l="Seats">{e.seats}</span><span role="cell" data-l="Spent">{money(e.spent)}</span><span role="cell" data-l="Committed">{money(e.committed)}</span><span role="cell" data-l="Waiting" className={e.waiting ? "" : "mute"}>{money(e.waiting)}</span>
             </div>
@@ -150,7 +150,8 @@ export function Budget({ go, search }: { go: (to: string) => void; search: URLSe
         {([["By team", v.by_team], ["By region", v.by_region]] as const).map(([title, rows]) => (
           <section key={title} aria-label={title}>
             <div className="grp"><h2 className="display">{title}</h2></div>
-            <div className="rows">{rows.map((r) => <div className="srow" key={r.name}><span>{r.name}</span><span>{k(r.spent + r.committed)}{r.waiting ? <span className="mute"> + {k(r.waiting)} waiting</span> : null}</span></div>)}</div>
+            {/* Each row carries its share of the biggest one, so the list reads as sizes before the figures are read. */}
+            <div className="rows">{rows.map((r) => { const top = Math.max(1, ...rows.map((x) => x.spent + x.committed + x.waiting)); return <div className="srow share" key={r.name} style={{ "--s": (r.spent + r.committed + r.waiting) / top } as React.CSSProperties}><span>{r.name}</span><span>{k(r.spent + r.committed)}{r.waiting ? <span className="mute"> + {k(r.waiting)} waiting</span> : null}</span></div>; })}</div>
           </section>
         ))}
       </div>

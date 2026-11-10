@@ -8,7 +8,7 @@ import { EventBanner } from "./EventBanner";
 import { ExpandRow, Flag } from "./Patterns";
 import { PersonAvatar } from "./PersonAvatar";
 import { RequestSeats } from "./RequestForm";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Icon } from "./icons";
 import { firstName, money, shortDate } from "./words";
 
@@ -18,16 +18,25 @@ function Decide({ r, onDone }: { r: SeatRequest; onDone: () => void }) {
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
   if (!demo) return <p className="small mute">Decided in Slack.</p>;
   if (!needs?.approvers.includes(actor) || r.requester === actor) return null;
   const decide = async (decision: "approve" | "decline") => {
     setBusy(true);
     const x = await send("POST", `/api/seat-requests/${r.id}/decision`, actor, { decision, reason });
     setBusy(false);
-    if (x.ok) onDone(); else setError(x.error);
+    if (!x.ok) { setError(x.error); return; }
+    // The row leaves where it was decided: it slides out and the gap closes, then the list redraws.
+    const row = ref.current?.closest<HTMLElement>(".xrow");
+    if (row && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      row.style.height = `${row.offsetHeight}px`; void row.offsetHeight;
+      row.classList.add("leaving", decision === "approve" ? "yes" : "no");
+      await new Promise((ok) => setTimeout(ok, 380));
+    }
+    onDone();
   };
   return (
-    <div style={{ display: "grid", gap: 10 }}>
+    <div ref={ref} style={{ display: "grid", gap: 10 }}>
       {declining && <label className="field"><span>Why are you declining?</span><input className="input" value={reason} onChange={(ev) => setReason(ev.target.value)} autoFocus /></label>}
       {error && <p role="alert" className="error small">{error}</p>}
       <div className="actions">

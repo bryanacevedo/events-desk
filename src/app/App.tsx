@@ -75,8 +75,8 @@ export function App() {
   useEffect(() => { get<{ demo: boolean }>("/api/health").then((h) => setDemo(Boolean(h?.demo))); }, []);
   useEffect(() => { refresh(); }, [pathname, refresh]);
   // How many people are waiting on whoever is acting, across events.
-  const [waiting, setWaiting] = useState(0);
-  useEffect(() => { get<{ replies: unknown[] }>(`/api/motion/my-day?rep=${encodeURIComponent(actor)}`).then((d) => setWaiting(d?.replies.length ?? 0)); }, [actor, pathname]);
+  const [waiting, setWaiting] = useState(0), [dayHas, setDayHas] = useState(false);
+  useEffect(() => { get<{ replies: unknown[]; meetings: unknown[]; captures: unknown[] }>(`/api/motion/my-day?rep=${encodeURIComponent(actor)}`).then((d) => { setWaiting(d?.replies.length ?? 0); setDayHas(Boolean(d && (d.replies.length || d.meetings.length || d.captures.length))); }); }, [actor, pathname]);
 
   const search = new URLSearchParams(path.split("?")[1] ?? "");
   const eventId = pathname.match(/^\/event\/([^/]+)/)?.[1];
@@ -86,7 +86,9 @@ export function App() {
   // Budget and Usage are company spend: leadership's and GTM Engineering's, not an SDR's day.
   setDemoCalendar(Boolean(demo));
   const approver = Boolean(needs?.approvers.includes(actor)), lead = approver || isGtm(actor);
-  const navAt = ["overview", "myday", "events", ...(approver ? ["seats"] : []), ...(lead ? ["budget", "usage"] : [])].indexOf(place);
+  // My day is the rep's page: replies, meetings, people met. Leadership's day is the seat queue on Overview and Seats, so an empty My day stays out of their menu.
+  const showDay = !lead || dayHas;
+  const navAt = ["overview", ...(showDay ? ["myday"] : []), "events", ...(approver ? ["seats"] : []), ...(lead ? ["budget", "usage"] : [])].indexOf(place);
   if (demo === null) return null;
 
   const item = (to: string, p: Place, label: string, icon: ReactNode, cls: string, badge?: number) => (
@@ -104,7 +106,7 @@ export function App() {
           <Link to="/" go={go} className="brand"><Mark /><span>Events Desk</span></Link>
           <div className="navlist" style={{ "--at": navAt } as React.CSSProperties} data-on={navAt >= 0 ? "" : undefined}>
             {item("/", "overview", "Overview", <Icon.overview />, "navitem")}
-            {item("/my-day", "myday", "My day", <Icon.calendar />, "navitem", waiting)}
+            {showDay && item("/my-day", "myday", "My day", <Icon.calendar />, "navitem", waiting)}
             {item("/events", "events", "Events", <Icon.events />, "navitem")}
             {approver && item("/seats", "seats", "Seats", <Icon.seats />, "navitem", count)}
             {lead && item("/budget", "budget", "Budget", <Icon.budget />, "navitem")}
@@ -113,7 +115,7 @@ export function App() {
           <span className="spacer" />
           <div className="side-foot">
             <Link to="/events?request=1" go={go} className="btn side-cta">Request seats</Link>
-            {item("/settings", "settings", "Settings", <Icon.settings />, "navitem")}
+            {isGtm(actor) && item("/settings", "settings", "Settings", <Icon.settings />, "navitem")}
             <label className="acting"><PersonAvatar name={actor} size={28} /><span>Acting as</span>
               <select value={actor} onChange={pick}>{PEOPLE.map((p) => <option key={p}>{p}</option>)}</select>
             </label>
@@ -133,7 +135,7 @@ export function App() {
           {place === "budget" && <Budget go={go} search={search} />}
           {place === "usage" && <Usage go={go} search={search} />}
           {place === "myday" && <MyDay />}
-          {place === "more" && <More go={go} />}
+          {place === "more" && <More go={go} showDay={approver && showDay} />}
           {place === "settings" && <Settings go={go} compileId={search.get("compile")} section={search.get("section")} />}
           {place === "event" && <Event key={eventId} id={eventId!} go={go} />}
         </main>
@@ -141,9 +143,10 @@ export function App() {
         <nav className="tabs" aria-label="Events Desk">
           {item("/", "overview", "Overview", <Icon.overview />, "tab")}
           {item("/events", "events", "Events", <Icon.events />, "tab")}
-          {approver ? item("/seats", "seats", "Seats", <Icon.seats />, "tab", count) : item("/my-day", "myday", "My day", <Icon.calendar />, "tab", waiting)}
+          {approver ? item("/seats", "seats", "Seats", <Icon.seats />, "tab", count) : showDay && item("/my-day", "myday", "My day", <Icon.calendar />, "tab", waiting)}
           {lead && item("/budget", "budget", "Budget", <Icon.budget />, "tab")}
-          <Link to="/more" go={go} className="tab" aria-current={["more", "usage", "settings"].includes(place) ? "page" : undefined}><span className="ico"><Icon.more /></span><span className="lbl">More</span></Link>
+          {/* More holds Usage and Settings, which are leadership's and GTM's. For anyone else it would be an empty page. */}
+          {lead && <Link to="/more" go={go} className="tab" aria-current={["more", "usage", "settings"].includes(place) ? "page" : undefined}><span className="ico"><Icon.more /></span><span className="lbl">More</span></Link>}
         </nav>
       </div>
     </AppCtx.Provider>

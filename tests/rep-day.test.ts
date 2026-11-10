@@ -3,7 +3,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "../src/server/db.ts";
 import { captureOnsite } from "../src/server/operating.ts";
-import { addSlots, bookSlot, prepBrief, repDay } from "../src/server/rep-day.ts";
+import { addSlots, bookSlot, meetingDetail, prepBrief, repDay, replyDetail } from "../src/server/rep-day.ts";
+import { bookMeeting } from "../src/server/meetings.ts";
 import { approveTemplate, createDrafts } from "../src/server/sequences.ts";
 import { freshDb } from "./helpers.ts";
 import { clock, deliveredInMotion, enrollmentStates, MAYA, personAt } from "./lifecycle-harness.ts";
@@ -67,5 +68,37 @@ describe("after the event", () => {
     await captureOnsite(db, h.deps, h.id, "Rep A", { email: ana.email, met: true, note: "Wants pricing" });
     await createDrafts(db, h.deps, h.id, MAYA);
     expect(await db.query("SELECT 1 FROM enrollments WHERE contact_id = $1", [ana.id])).toHaveLength(0);
+  });
+});
+
+describe("a reply and a meeting, each as its own thing", () => {
+  it("a reply carries its whole message, its thread, its clock, the meeting it led to, and every step so far", async () => {
+    const h = await deliveredInMotion(db, { time: clock("2026-12-31T08:00:00Z") });
+    const ana = await personAt(db, h.id, "Ana Ruiz");
+    const body = "Happy to book a call. Thursday afternoon works for me, and my colleague would like to join.";
+    const touch = (kind: string, at: string) => db.query("INSERT INTO touches (id, contact_id, event_id, kind, channel, at, source, dedup_key) VALUES ($1, $2, $3, $4, 'email', $5, 'test', $1)", [`t_${kind}`, ana.id, h.id, kind, at]);
+    await touch("send", "2026-12-20T09:00:00Z");
+    await touch("reply_meeting_request", "2026-12-22T10:00:00Z");
+    await db.query("INSERT INTO inbound_messages (id, connector, provider_message_id, event_id, contact_id, channel, signal, body, received_at, code, owner, respond_by, thread_url) VALUES ('inb_t1', 'instantly', 'p1', $1, $2, 'email', 'reply', $3, '2026-12-22T10:00:00Z', 'meeting_request', 'Rep A', '2026-12-23T10:00:00Z', 'https://app.instantly.ai/app/unibox')", [h.id, ana.id, body]);
+    await db.query("INSERT INTO inbound_messages (id, connector, provider_message_id, event_id, contact_id, channel, signal, received_at) VALUES ('inb_b1', 'instantly', 'p2', $1, $2, 'email', 'bounce', '2026-12-22T11:00:00Z')", [h.id, ana.id]);
+    const m = await bookMeeting(db, h.deps, { contact_id: ana.id, scheduled_at: "2027-01-07T15:00:00Z", source: "reply", rep: "Rep A" }, MAYA);
+
+    const r = await replyDetail(db, "inb_t1");
+    expect(r).toMatchObject({ full_name: "Ana Ruiz", company: "Tallgrass Software", body, code: "meeting_request", thread_url: "https://app.instantly.ai/app/unibox", rep: "Rep A", handled_at: null });
+    expect(r!.meeting).toMatchObject({ id: m.id, status: "booked" });
+    const kinds = r!.path.map((p) => p.kind);
+    // Oldest first. Booking stamps the real clock, so only the order of the dated steps is fixed here.
+    expect(kinds.indexOf("send")).toBeLessThan(kinds.indexOf("reply_meeting_request"));
+    expect(kinds).toEqual(expect.arrayContaining(["send", "reply_meeting_request", "meeting_booked"]));
+
+    const d = await meetingDetail(db, m.id);
+    expect(d).toMatchObject({ full_name: "Ana Ruiz", status: "booked", rep: "Rep A" });
+    expect(d!.reply).toMatchObject({ id: "inb_t1", body });
+    expect(d!.brief?.said).toBe(body);
+
+    // Only replies are replies, and an unknown id is nothing, not an error.
+    expect(await replyDetail(db, "inb_b1")).toBeNull();
+    expect(await replyDetail(db, "inb_nope")).toBeNull();
+    expect(await meetingDetail(db, "mtg_nope")).toBeNull();
   });
 });

@@ -1,15 +1,15 @@
 /* A rep's day, across every event, made to be read on a phone between meetings. It opens like an event does: a tinted header with the day's
-   three figures. Then the replies as cards with a face and the event's mark, the words they wrote largest. Then the meetings as an agenda,
-   each one's prep a tap away. Everything else is folded at the bottom. */
+   three figures. Then the replies and the meetings as rows on a tray, each one opening in a side sheet with the whole of it. Everything else
+   is folded at the bottom. */
 
-import { useEffect, useState, type CSSProperties } from "react";
-import { get, send } from "./api";
+import { useEffect, useState } from "react";
+import { get } from "./api";
 import { useActor } from "./App";
-import { EventLogo } from "./EventLogo";
 import { Icon } from "./icons";
+import { MeetingRows, ObjectSheets, openObject, ReplyRows } from "./Objects";
 import { Chevron } from "./Patterns";
 import { PersonAvatar } from "./PersonAvatar";
-import { companyHref, eventHref, personHref, To } from "./To";
+import { eventHref, personHref, To } from "./To";
 import { plural } from "./words";
 
 interface Brief { person: string; title: string | null; company: string; tier: number | null; why: string | null; industry: string | null; employees: string | null; owner: string | null; deal: string | null; said: string | null; met_note: string | null }
@@ -23,29 +23,19 @@ interface Day {
 const when = (iso: string) => new Date(iso).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 const clock = (iso: string) => new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 const dayKey = (d: Date) => d.toLocaleDateString("en-CA");
-/** How soon a reply needs its answer, against the reader's own day. */
-function answerBy(iso: string): { text: string; urgent: boolean } {
-  const due = new Date(iso), now = new Date(), tomorrow = new Date(now.getTime() + 86_400_000);
-  if (due < now) return { text: "Late", urgent: true };
-  if (dayKey(due) === dayKey(now)) return { text: "Answer today", urgent: true };
-  if (dayKey(due) === dayKey(tomorrow)) return { text: "Answer tomorrow", urgent: false };
-  return { text: `Answer by ${due.toLocaleDateString("en-GB", { weekday: "short" })}`, urgent: false };
-}
-/** The most urgent replies get a card; the rest are one line each, so thirteen replies still read at a glance. */
-const CARDS = 4;
-const TOOL_NAME: Record<string, string> = { instantly: "Instantly", heyreach: "HeyReach", smartlead: "Smartlead", apollo: "Apollo" };
-const CODE: Record<string, string> = { interested: "is interested", meeting_request: "wants a meeting", referral: "pointed us to someone" };
+/** The most urgent replies show first; the rest are one press away, so thirteen replies still read at a glance. */
+const SHOWN = 6;
 const greeting = () => { const h = new Date().getHours(); return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening"; };
 
 export function MyDay() {
   const { actor, needs } = useActor();
   // Seat requests still open for this person. Buying the ticket is the approvers' job, so an approval leaves this page.
   const mySeats = (needs?.requests ?? []).filter((r) => r.requester === actor && (r.status === "pending" || r.status === "declined"));
-  const [d, setD] = useState<Day | null>(null), [busy, setBusy] = useState(false);
+  const [d, setD] = useState<Day | null>(null), [allReplies, setAllReplies] = useState(false);
+  const sheet = openObject();
   const load = async () => setD(await get<Day>(`/api/motion/my-day?rep=${encodeURIComponent(actor)}`));
   useEffect(() => { load(); }, [actor]);
   if (!d) return null;
-  const handled = async (id: string) => { setBusy(true); await send("POST", `/api/motion/replies/${id}/handled`, actor); await load(); setBusy(false); };
   const today = new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
   const figures: [number, string][] = [[d.replies.length, d.replies.length === 1 ? "reply to answer" : "replies to answer"], [d.meetings.length, d.meetings.length === 1 ? "meeting" : "meetings"], [d.captures.length, d.captures.length === 1 ? "person met" : "people met"]];
 
@@ -61,76 +51,16 @@ export function MyDay() {
 
       {d.replies.length > 0 && (
         <div className="m-sec">
-          <h2 className="md-h">Answer these first</h2>
-          <div className="md-cards">{d.replies.slice(0, CARDS).map((r) => {
-            const by = answerBy(r.respond_by);
-            return (
-              <article key={r.id} className={`md-card${by.urgent ? " urgent" : ""}`} style={{ "--brand": r.brand_color ?? "#1F5D3F" } as CSSProperties}>
-                <header>
-                  <To to={personHref(r.event_id, r.contact_id, r.full_name)} label={`Open ${r.full_name ?? "this person"}`}><PersonAvatar name={r.full_name ?? "Someone"} size={40} /></To>
-                  <div><To to={personHref(r.event_id, r.contact_id, r.full_name)}><b>{r.full_name ?? "Someone"}</b></To><span><To to={companyHref(r.event_id, r.company)}>{r.company}</To> · {CODE[r.code ?? ""] ?? "replied"}</span></div>
-                  <To to={eventHref(r.event_id, "outreach")} label={`Open ${r.event}`}><EventLogo name={r.event} website={r.website} size={28} /></To>
-                </header>
-                {r.body && <blockquote>{r.body}</blockquote>}
-                <footer>
-                  <span className="md-by"><i aria-hidden="true" />{by.text}</span>
-                  <span className="md-acts">
-                    {r.thread_url && <a className="btn small line" href={r.thread_url} target="_blank" rel="noopener noreferrer">Open in {TOOL_NAME[r.connector ?? ""] ?? "the tool"}</a>}
-                    <button className="btn small" disabled={busy} onClick={() => handled(r.id)}>Answered</button>
-                  </span>
-                </footer>
-              </article>
-            );
-          })}</div>
-          {d.replies.length > CARDS && (
-            <div className="md-rest">
-              <h3>{d.replies.length - CARDS} more</h3>
-              <ul>{d.replies.slice(CARDS).map((r) => {
-                const by = answerBy(r.respond_by);
-                return (
-                  <li key={r.id} className={by.urgent ? "urgent" : undefined}>
-                    <PersonAvatar name={r.full_name ?? "Someone"} size={30} />
-                    <span className="md-rest-who"><To to={personHref(r.event_id, r.contact_id, r.full_name)}><b>{r.full_name ?? "Someone"}</b></To><span><To to={companyHref(r.event_id, r.company)}>{r.company}</To></span></span>
-                    <q>{r.body ?? (CODE[r.code ?? ""] ?? "replied")}</q>
-                    <span className="md-by"><i aria-hidden="true" />{by.text}</span>
-                    <span className="md-acts">{r.thread_url && <a className="btn small line" href={r.thread_url} target="_blank" rel="noopener noreferrer" aria-label={`Open in ${TOOL_NAME[r.connector ?? ""] ?? "the tool"}`}>Open</a>}<button className="btn small line" disabled={busy} onClick={() => handled(r.id)}>Answered</button></span>
-                  </li>
-                );
-              })}</ul>
-            </div>
-          )}
+          <h2 className="md-h">Answer these first<span>{d.replies.length}</span></h2>
+          <ReplyRows rows={(allReplies ? d.replies : d.replies.slice(0, SHOWN))} open={sheet.reply} />
+          {d.replies.length > SHOWN && <button type="button" className="xmore" onClick={() => setAllReplies(!allReplies)}>{allReplies ? "Fewer" : `All ${d.replies.length}`}<Chevron /></button>}
         </div>
       )}
 
       {d.meetings.length > 0 && (
         <div className="m-sec">
-          <h2 className="md-h">Your meetings</h2>
-          <ol className="md-agenda">{d.meetings.map((m) => {
-            const at = new Date(m.scheduled_at);
-            return (
-              <li key={m.id}>
-                <details className="md-meet" style={{ "--brand": m.brand_color ?? "#1F5D3F" } as CSSProperties}>
-                  <summary>
-                    <span className="md-day"><b>{at.getDate()}</b><span>{at.toLocaleDateString("en-GB", { month: "short" })}<br />{at.toLocaleDateString("en-GB", { weekday: "short" })}</span></span>
-                    <span className="md-time">{clock(m.scheduled_at)}</span>
-                    <PersonAvatar name={m.full_name ?? "Someone"} size={36} />
-                    <span className="md-who"><b>{m.full_name ?? "Someone"}</b><span>{[m.company, m.location].filter(Boolean).join(" · ")}</span></span>
-                    <span className="md-prep">Prep<Chevron /></span>
-                  </summary>
-                  <p className="md-links"><To to={personHref(m.event_id, m.contact_id, m.full_name)} className="u">Open {m.full_name ?? "their"} record</To><To to={companyHref(m.event_id, m.company)} className="u">{m.company}</To><To to={eventHref(m.event_id, "outreach")} className="u">{m.event}</To></p>
-                  {m.brief && <dl className="md-brief">
-                    {m.brief.said && <div className="said"><dt>They wrote</dt><dd>“{m.brief.said}”</dd></div>}
-                    {m.brief.title && <div><dt>Role</dt><dd>{m.brief.title}</dd></div>}
-                    <div><dt>Company</dt><dd>{m.brief.company}{m.brief.tier ? `, tier ${m.brief.tier}` : ""}</dd></div>
-                    {(m.brief.industry || m.brief.employees) && <div><dt>Size</dt><dd>{[m.brief.industry, m.brief.employees && `${m.brief.employees} people`].filter(Boolean).join(", ")}</dd></div>}
-                    {m.brief.deal && <div><dt>Open deal</dt><dd>{m.brief.deal}{m.brief.owner ? `, owned by ${m.brief.owner}` : ""}</dd></div>}
-                    {m.brief.met_note && <div><dt>Met at the event</dt><dd>{m.brief.met_note}</dd></div>}
-                    {m.brief.why && m.brief.why.length > 30 && !/^employees:/i.test(m.brief.why) && <div><dt>Why they fit</dt><dd className="clamp2">{m.brief.why}</dd></div>}
-                  </dl>}
-                </details>
-              </li>
-            );
-          })}</ol>
+          <h2 className="md-h">Your meetings<span>{d.meetings.length}</span></h2>
+          <MeetingRows rows={d.meetings} open={sheet.meeting} />
         </div>
       )}
 
@@ -164,7 +94,7 @@ export function MyDay() {
                       <li key={c.id}>
                         <PersonAvatar name={c.full_name ?? "Someone"} size={30} />
                         <span className="mt-who"><To to={c.contact_id ? personHref(c.event_id, c.contact_id, c.full_name) : null}><b>{c.full_name ?? "Someone"}</b></To><span>{c.company}</span></span>
-                        <span className="md-note">{c.temperature === "hot" && <i aria-label="Hot" />}{c.note}</span>
+                        <span className="md-note">{c.temperature === "hot" && <b className="md-hot">Hot</b>}{c.note}</span>
                       </li>
                     ))}</ul>
                   </div>
@@ -180,6 +110,7 @@ export function MyDay() {
           )}
         </div>
       )}
+      <ObjectSheets changed={load} />
     </section>
   );
 }

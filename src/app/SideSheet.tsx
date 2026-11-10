@@ -13,9 +13,9 @@ import { deliveredWords } from "./stages";
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"])';
 
-export function SideSheet({ id, go, close }: { id: string; go: (to: string) => void; close: () => void }) {
-  const ev = useEvent(id);
-  const { needs } = useActor();
+/** What every side sheet does: focus moves in and stays in, Esc and a click outside close it, and focus goes back to the row that opened it.
+    Anything marked data-opens-sheet switches the sheet instead of closing it. */
+export function useSheet(close: () => void) {
   const ref = useRef<HTMLElement>(null);
   const closeRef = useRef(close);
   closeRef.current = close;
@@ -51,6 +51,13 @@ export function SideSheet({ id, go, close }: { id: string; go: (to: string) => v
       back?.focus();
     };
   }, []);
+  return ref;
+}
+
+export function SideSheet({ id, go, close }: { id: string; go: (to: string) => void; close: () => void }) {
+  const ev = useEvent(id);
+  const { needs } = useActor();
+  const ref = useSheet(close);
 
   const top = (
     <div className="sheet-top">

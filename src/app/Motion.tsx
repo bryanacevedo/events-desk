@@ -7,6 +7,7 @@ import { Chevron, ExpandRow } from "./Patterns";
 import { Icon } from "./icons";
 import { PersonAvatar } from "./PersonAvatar";
 import { companyHref, personHref, To } from "./To";
+import { CODE_WORDS, MeetingRows, ObjectSheets, openObject, ReplyRows } from "./Objects";
 import { money, num, plural, shortDate } from "./words";
 import { isGtm } from "../shared/roles";
 
@@ -154,6 +155,7 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
   const free = slots.slots.filter((x) => !x.meeting_id), roster = slots.roster.map((x) => x.rep);
   const booked = new Set(o.meetings.map((m) => m.contact_id).filter(Boolean) as string[]);
   const doubtful = o.replies.filter((r) => r.doubtful).length;
+  const sheet = openObject();
   const mine = o.owners.find((x) => x.status === "mine")?.n ?? 0;
   const missingRegions = o.regions.filter((r) => !r.basis);
   const live = o.sequences.filter((x) => x.state === "active").length;
@@ -241,44 +243,8 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
 
       {hot.length > 0 && (
         <div className="m-group m-replies">
-          <h3>Waiting on a rep<span className="mute"> · {hot.length}</span></h3>
-          {/* The same shape as My day: the newest four as cards with a face and their words, the rest one line each. */}
-          <div className="md-cards">{hot.slice(0, 4).map((r) => {
-            const bookable = free.length > 0 && r.contact_id && !booked.has(r.contact_id);
-            return (
-              <article key={r.id} className={`md-card${r.code === "meeting_request" ? " urgent" : ""}`}>
-                <header>
-                  <To to={r.contact_id ? personHref(id, r.contact_id, r.full_name) : null} label={`Open ${r.full_name ?? "this person"}`}><PersonAvatar name={r.full_name ?? "Someone"} size={40} /></To>
-                  <div><To to={r.contact_id ? personHref(id, r.contact_id, r.full_name) : null}><b>{r.full_name ?? "Someone"}</b></To><span><To to={r.company ? companyHref(id, r.company) : null}>{r.company}</To> · {CODE[r.code ?? ""] ?? "replied"}</span></div>
-                </header>
-                {r.body && <blockquote>{r.body}</blockquote>}
-                <footer>
-                  {r.thread_url && <a className="btn small line" href={r.thread_url} target="_blank" rel="noopener noreferrer">Open in {TOOL_NAME[r.connector ?? ""] ?? "the tool"}</a>}
-                  {r.contact_id && booked.has(r.contact_id) ? <span className="md-by"><i aria-hidden="true" />Meeting booked</span>
-                    : bookable ? (
-                      <form className="m-act" onSubmit={(e) => { e.preventDefault(); const sel = (e.currentTarget.elements.namedItem("slot") as HTMLSelectElement).value; act("POST", `/api/motion/slots/${sel}/book`, { contact_id: r.contact_id }, "Booked."); }}>
-                        <select name="slot" aria-label="Slot">{free.slice(0, 40).map((x) => <option key={x.id} value={x.id}>{x.rep.split(" ")[0]}, {shortWhen(x.starts_at)}</option>)}</select>
-                        <button className="btn small" disabled={busy}>Book</button>
-                      </form>
-                    ) : <span className="md-by"><i aria-hidden="true" />With the account owner</span>}
-                </footer>
-              </article>
-            );
-          })}</div>
-          {hot.length > 4 && (
-            <div className="md-rest">
-              <h3>{hot.length - 4} more</h3>
-              <ul>{hot.slice(4, 40).map((r) => (
-                <li key={r.id}>
-                  <PersonAvatar name={r.full_name ?? "Someone"} size={30} />
-                  <span className="md-rest-who"><To to={r.contact_id ? personHref(id, r.contact_id, r.full_name) : null}><b>{r.full_name ?? "Someone"}</b></To><span><To to={r.company ? companyHref(id, r.company) : null}>{r.company}</To></span></span>
-                  <q>{r.body ?? (CODE[r.code ?? ""] ?? "replied")}</q>
-                  <span className="md-by"><i aria-hidden="true" />{CODE[r.code ?? ""] ?? "replied"}</span>
-                  {r.thread_url ? <a className="btn small line" href={r.thread_url} target="_blank" rel="noopener noreferrer" aria-label={`Open in ${TOOL_NAME[r.connector ?? ""] ?? "the tool"}`}>Open</a> : <span />}
-                </li>
-              ))}</ul>
-            </div>
-          )}
+          <h3>Waiting on a rep<span className="mute">{hot.length}</span></h3>
+          <ReplyRows rows={hot.slice(0, 40)} open={sheet.reply} state={(r) => booked.has((r as Reply).contact_id ?? "") ? { text: "Meeting booked", soon: false } : { text: CODE_WORDS[r.code ?? ""] ?? "Replied", soon: r.code === "meeting_request" }} />
         </div>
       )}
 
@@ -309,13 +275,7 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
                 return (
                   <div key={title} className="mt-col">
                     <h4>{title}<span>{rows.length}</span></h4>
-                    <ul>{rows.slice(0, 20).map((m) => (
-                      <li key={m.id}>
-                        <PersonAvatar name={m.full_name ?? "Someone"} size={30} />
-                        <span className="mt-who"><To to={m.contact_id ? personHref(id, m.contact_id, m.full_name) : null}><b>{m.full_name ?? "Someone"}</b></To><span><To to={m.company ? companyHref(id, m.company) : null}>{m.company}</To>{m.rep ? ` · with ${m.rep.split(" ")[0]}` : ""}</span></span>
-                        <span className="mt-when">{shortWhen(m.scheduled_at)}{m.status === "no_show" ? " · no-show" : m.status === "cancelled" ? " · cancelled" : ""}</span>
-                      </li>
-                    ))}</ul>
+                    <MeetingRows rows={rows.slice(0, 20)} open={sheet.meeting} withRep />
                   </div>
                 );
               })}
@@ -353,7 +313,7 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
               <li key={c.id} className={c.temperature === "hot" ? "hot" : undefined}>
                 <PersonAvatar name={c.full_name ?? "Someone"} size={30} />
                 <span className="mt-who"><To to={c.contact_id ? personHref(id, c.contact_id, c.full_name) : null}><b>{c.full_name ?? "Someone"}</b></To><span>{c.company ? <To to={companyHref(id, c.company)}>{c.company}</To> : "Company not given"}</span></span>
-                <span className="mc-rep">{c.temperature === "hot" && <i aria-hidden="true" />}{c.temperature === "hot" ? "Hot · " : ""}met by {c.rep.split(" ")[0]}</span>
+                <span className="mc-rep">{c.temperature === "hot" && <b className="md-hot">Hot</b>}met by {c.rep.split(" ")[0]}</span>
               </li>
             ))}</ul>}
             {capForm ? (
@@ -369,6 +329,7 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
           </Fold>
         )}
       </div>
+      <ObjectSheets changed={() => { load(); onChange(); }} />
     </section>
   );
 }

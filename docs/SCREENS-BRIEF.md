@@ -123,6 +123,10 @@ Bryan's pointers that shaped the app as it looks now. Read these before any new 
 - The menu follows the person's job. A page full of buttons someone cannot use is clutter for them: Seats is in the approvers' menu only, and everyone else follows their own seat requests on My day (Bryan, 2026-11-09).
 - A fold shows its content in the shape of that content, never as label-and-value rows: sequences are a grid of who by channel, meetings are columns by what happened, slots read across by day, people met lead with faces. Forms sit behind a button until needed.
 - Company money (event cost, AI and credits, "Did it pay?") is shown to leadership and GTM Engineering only, as Budget and Usage are. The cost card an uploader must confirm stays theirs.
-- My day opens like an event: a tinted header with the day's figures; the four most urgent replies are cards with a face, the rest one line each.
+- My day opens like an event: a tinted header with the day's figures, then replies and meetings as rows on a tray.
+- Replies and meetings are things of their own (Bryan, 2026-11-10). On a page each is one row: a face, who, their words on one line, and the clock. The row opens a side sheet with the whole of it: the message in full, time left to answer, the thread in its tool, the meeting it led to, who they are, and every step so far. Nothing is squeezed into a card.
+- Motion follows the Overview, the page Bryan rates highest: lists arrive a row at a time, figures settle in from a soft blur, bars draw after their rows, and a row that leads somewhere slides over and lifts, its face or logo tilts, and "Open" takes the place of its time. Every page has it, and it all stops for reduced motion.
+- Never an underline to say "this is clickable", and never a coloured status dot (both read as machine-made, Bryan 2026-11-10). A name sweeps a soft wash in behind itself; urgency and "hot" are words.
+- A page someone cannot use or that would be empty stays out of their menu: My day only for people who work replies and meetings (or anyone who has one), Settings for GTM Engineering only, and the phone's More only when it holds something.
 - The demo shows every step after delivery on a real sample event, so each screen can be opened as it really looks.
 

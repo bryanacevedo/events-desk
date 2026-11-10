@@ -71,3 +71,35 @@ export async function repDay(db: Db, deps: LifecycleDeps, rep: string) {
   const briefs = await Promise.all(meetings.map(async (m) => ({ ...m, brief: await prepBrief(db, m.id) })));
   return { rep, replies, meetings: briefs, captures, slots };
 }
+
+const BRAND = `(SELECT c.website FROM catalog_events c WHERE c.id = e.catalog_id) AS website, (SELECT c.brand_color FROM catalog_events c WHERE c.id = e.catalog_id) AS brand_color`;
+
+/** Everything the desk did with this person at this event, oldest first: added to a sequence, each send, the reply, the meeting and how it went. */
+const pathOf = (db: Db, contactId: string, eventId: string) => db.query<{ kind: string; channel: string | null; at: string }>(
+  `SELECT kind, channel, at::text AS at FROM touches WHERE contact_id = $1 AND event_id = $2 AND (kind IN ('sequence_add', 'send', 'meeting_booked', 'met_onsite', 'badge_scan') OR kind LIKE 'reply_%' OR kind LIKE 'meeting_%') ORDER BY at, kind LIMIT 40`, [contactId, eventId]);
+
+/** One reply as its own thing: who wrote it and what, where the thread lives, how long is left to answer, who they are, and what has happened since. */
+export async function replyDetail(db: Db, replyId: string) {
+  const [r] = await db.query<{ id: string; event_id: string; contact_id: string | null }>(
+    `SELECT m.id, m.event_id, e.name AS event, ${BRAND}, m.contact_id, k.full_name, k.title, co.name AS company, co.tier, co.tier_fact AS why,
+            co.firmo->>'industry' AS industry, co.firmo->>'employees' AS employees, co.account_owner AS owner, nullif(concat_ws(', ', co.deal_name, co.deal_stage), '') AS deal,
+            m.code, m.body, m.channel, m.connector, m.thread_url, m.received_at::text AS received_at, m.respond_by::text AS respond_by, m.owner AS rep, m.handled_at::text AS handled_at
+     FROM inbound_messages m JOIN events e ON e.id = m.event_id LEFT JOIN contacts k ON k.id = m.contact_id LEFT JOIN companies co ON co.id = k.company_id
+     WHERE m.id = $1 AND m.signal = 'reply'`, [replyId]);
+  if (!r) return null;
+  const [meeting] = r.contact_id ? await db.query("SELECT id, status, scheduled_at::text AS scheduled_at, rep FROM meetings WHERE contact_id = $1 AND event_id = $2 ORDER BY scheduled_at DESC LIMIT 1", [r.contact_id, r.event_id]) : [];
+  const path = r.contact_id ? await pathOf(db, r.contact_id, r.event_id) : [];
+  return { ...r, meeting: meeting ?? null, path };
+}
+
+/** One meeting as its own thing: when and with whom, the prep, the reply that led to it, and how it went. */
+export async function meetingDetail(db: Db, meetingId: string) {
+  const [m] = await db.query<{ id: string; event_id: string; contact_id: string | null }>(
+    `SELECT m.id, m.event_id, e.name AS event, ${BRAND}, m.contact_id, k.full_name, co.name AS company, m.status, m.scheduled_at::text AS scheduled_at, m.timezone, m.source, m.rep, s.location
+     FROM meetings m JOIN events e ON e.id = m.event_id LEFT JOIN contacts k ON k.id = m.contact_id LEFT JOIN companies co ON co.id = k.company_id LEFT JOIN meeting_slots s ON s.meeting_id = m.id
+     WHERE m.id = $1`, [meetingId]);
+  if (!m) return null;
+  const [reply] = m.contact_id ? await db.query("SELECT id, body, code, received_at::text AS received_at FROM inbound_messages WHERE contact_id = $1 AND event_id = $2 AND signal = 'reply' ORDER BY received_at DESC LIMIT 1", [m.contact_id, m.event_id]) : [];
+  const path = m.contact_id ? await pathOf(db, m.contact_id, m.event_id) : [];
+  return { ...m, brief: await prepBrief(db, m.id), reply: reply ?? null, path };
+}

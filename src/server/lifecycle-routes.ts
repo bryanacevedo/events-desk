@@ -17,7 +17,7 @@ import { drainOps, releaseSequence, approveTemplate, attachCampaign, confirmLaun
 import { regionOf, loadPeople } from "./gate.ts";
 import { recordConsent, recordPlacement, setDomainStatus } from "./sending.ts";
 import { captureOnsite, forgetPerson, markHandled } from "./operating.ts";
-import { addSlots, bookSlot, prepBrief, repDay, roster } from "./rep-day.ts";
+import { addSlots, bookSlot, meetingDetail, prepBrief, repDay, replyDetail, roster } from "./rep-day.ts";
 import { isGtm } from "../shared/roles.ts";
 import { MOTION_LABEL } from "../shared/motion.ts";
 import { pickSenders, planCapacity } from "../shared/sending.ts";
@@ -114,6 +114,8 @@ export function mountLifecycle(app: App, db: Db, deps: LifecycleDeps, opts: { ba
   app.get("/api/events/:id/motion/roster", async (c) => c.json({ roster: await roster(db, c.req.param("id")), slots: await db.query("SELECT s.id, s.rep, s.starts_at::text AS starts_at, s.location, s.meeting_id, k.full_name FROM meeting_slots s LEFT JOIN meetings m ON m.id = s.meeting_id LEFT JOIN contacts k ON k.id = m.contact_id WHERE s.event_id = $1 ORDER BY s.starts_at, s.rep", [c.req.param("id")]) }));
   app.post("/api/events/:id/motion/slots", guarded(async (c) => { const b = await body(c); return addSlots(db, c.req.param("id"), c.get("actor"), { rep: String(b.rep ?? ""), day: String(b.day ?? ""), from: String(b.from ?? ""), to: String(b.to ?? ""), minutes: Number(b.minutes ?? 30), location: String(b.location ?? "") }); }));
   app.post("/api/motion/slots/:sid/book", guarded(async (c) => bookSlot(db, deps, c.req.param("sid"), String((await body(c)).contact_id ?? ""), c.get("actor"))));
+  app.get("/api/motion/replies/:rid", async (c) => { const r = await replyDetail(db, c.req.param("rid")); return r ? c.json(r) : bad("That reply does not exist.", 404); });
+  app.get("/api/motion/meetings/:mid", async (c) => { const m = await meetingDetail(db, c.req.param("mid")); return m ? c.json(m) : bad("That meeting does not exist.", 404); });
   app.get("/api/motion/meetings/:mid/brief", async (c) => { const b = await prepBrief(db, c.req.param("mid")); return b ? c.json(b) : bad("That meeting does not exist.", 404); });
   app.post("/api/motion/stop", guarded(async (c) => stopAllSending(db, deps, c.get("actor"), String((await body(c)).reason ?? "No reason given"))));
   app.post("/api/motion/restart", guarded(async (c) => restartSending(db, c.get("actor"))));
