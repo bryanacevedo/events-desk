@@ -23,7 +23,7 @@ export const heldOut = (domain: string, percent: number) => percent > 0 && parse
 export const STRICT_REGIONS = ["germany", "canada"];
 
 interface SeqRow { id: string; event_id: string; connector: string; channel: Channel; priority: string; phase: "pre" | "post"; zone_group: ZoneGroup; template_id: string; external_id: string | null; name: string; state: SequenceState; launched_at: string | null; pause_owed: boolean; settings_ok: boolean | null; checklist_at: string | null }
-interface Person { location: string | null; country: string | null; id: string; priority: string; full_name: string | null; title: string | null; email: string | null; linkedin: string | null; company: string; domain: string; verify_1: string | null; person_id: string | null }
+interface Person { followup_tier?: string | null; location: string | null; country: string | null; id: string; priority: string; full_name: string | null; title: string | null; email: string | null; linkedin: string | null; company: string; domain: string; verify_1: string | null; person_id: string | null }
 
 const toolFor = (deps: LifecycleDeps, name: string): Connector => {
   const c = deps.connectors[name];
@@ -54,14 +54,15 @@ export async function recordLegalBasis(db: Db, eventId: string, actor: string, r
   });
 }
 
-export async function approveTemplate(db: Db, actor: string, t: { name: string; channel: Channel; phase: "pre" | "post"; steps: TemplateStep[]; external_id?: string | null }) {
+export async function approveTemplate(db: Db, actor: string, t: { name: string; channel: Channel; phase: "pre" | "post"; steps: TemplateStep[]; external_id?: string | null; audience?: string }) {
   const lint = lintTemplate(t.channel, t.steps as TemplateStep[]);
   if (lint.errors.length) throw new RuleError(lint.errors.join(" "));
   return db.tx(async (q) => {
     const [{ v }] = await q<{ v: number }>("SELECT coalesce(max(version), 0)::int AS v FROM sequence_templates WHERE name = $1", [t.name]);
-    await q("UPDATE sequence_templates SET retired_at = now() WHERE channel = $1 AND phase = $2 AND retired_at IS NULL", [t.channel, t.phase]);
+    const audience = t.audience ?? "all";
+    await q("UPDATE sequence_templates SET retired_at = now() WHERE channel = $1 AND phase = $2 AND audience = $3 AND retired_at IS NULL", [t.channel, t.phase, audience]);
     const id = newId("tpl");
-    await q("INSERT INTO sequence_templates (id, name, version, channel, phase, steps, external_id, approved_by) VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8)", [id, t.name, v + 1, t.channel, t.phase, JSON.stringify(t.steps), t.external_id ?? null, actor]);
+    await q("INSERT INTO sequence_templates (id, name, version, channel, phase, steps, external_id, approved_by, audience) VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9)", [id, t.name, v + 1, t.channel, t.phase, JSON.stringify(t.steps), t.external_id ?? null, actor, audience]);
     return { id, version: v + 1 };
   });
 }
@@ -71,7 +72,8 @@ async function ensureSequence(db: Db, deps: LifecycleDeps, eventId: string, even
   const [existing] = await db.query<SeqRow>("SELECT * FROM sequences WHERE event_id = $1 AND channel = $2 AND priority = $3 AND phase = $4 AND zone_group = $5", [eventId, channel, priority, phase, zone]);
   let row = existing;
   if (!row) {
-    const [tpl] = await db.query<{ id: string; external_id: string | null; name: string }>("SELECT id, external_id, name FROM sequence_templates WHERE channel = $1 AND phase = $2 AND retired_at IS NULL ORDER BY approved_at DESC LIMIT 1", [channel, phase]);
+    // A template written for this audience wins over the general one.
+    const [tpl] = await db.query<{ id: string; external_id: string | null; name: string }>("SELECT id, external_id, name FROM sequence_templates WHERE channel = $1 AND phase = $2 AND retired_at IS NULL AND audience IN ($3, 'all') ORDER BY (audience = $3) DESC, approved_at DESC LIMIT 1", [channel, phase, priority]);
     if (!tpl) throw new RuleError(`Approve a ${phase === "pre" ? "pre-event" : "post-event"} ${channel} template in Settings first.`);
     const id = newId("seq");
     [row] = await db.query<SeqRow>("INSERT INTO sequences (id, event_id, connector, channel, priority, phase, zone_group, template_id, name) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) ON CONFLICT (event_id, channel, priority, phase, zone_group) DO UPDATE SET name = sequences.name RETURNING *",
@@ -98,12 +100,13 @@ export async function createDrafts(db: Db, deps: LifecycleDeps, eventId: string,
   if (crmConnected(deps.crm)) await openOwnerDecisions(db, deps, eventId);
   const phase = localDay(nowOf(deps), e.country) < e.starts_on ? "pre" : "post";
   const people = await db.query<Person>(
-    `SELECT k.id, k.priority, k.full_name, k.title, k.email, k.linkedin, co.name AS company, co.primary_domain AS domain, k.verify_1, k.person_id, k.person_location AS location, co.firmo->>'country' AS country
+    `SELECT k.id, k.priority, k.full_name, k.title, k.email, k.linkedin, co.name AS company, co.primary_domain AS domain, k.verify_1, k.person_id, k.person_location AS location, co.firmo->>'country' AS country, k.followup_tier
      FROM contacts k JOIN companies co ON co.id = k.company_id WHERE k.event_id = $1 AND k.dropped_at IS NULL AND k.priority IS NOT NULL AND co.primary_domain IS NOT NULL ORDER BY k.id`, [eventId]);
   const summary = { added: 0, refused: {} as Record<string, number> };
   for (const channel of channels) {
     const tool = e.tools[channel]!;
-    const reachable = people.filter((p) => (channel === "email" ? p.email && p.verify_1 : p.linkedin));
+    // After the event, people scanned at the booth get the follow-up written for them.
+    const reachable = people.filter((p) => (channel === "email" ? p.email && p.verify_1 : p.linkedin)).map((p) => (phase === "post" && p.followup_tier === "scanned" ? { ...p, priority: "scanned" } : p));
     const zoneOfPerson = (p: Person) => zoneGroupOf(p.location) === "event" ? zoneGroupOf(p.country) : zoneGroupOf(p.location);
     for (const [priority, zone] of [...new Set(reachable.map((p) => `${p.priority}|${zoneOfPerson(p)}`))].sort().map((k) => k.split("|") as [string, ZoneGroup])) {
       const inIt = new Set((await db.query<{ contact_id: string }>("SELECT contact_id FROM enrollments WHERE contact_id = ANY($1::text[]) AND event_id = $2 AND channel = $3 AND state <> 'removed'", [reachable.map((p) => p.id), eventId, channel])).map((r) => r.contact_id));

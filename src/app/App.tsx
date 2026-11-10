@@ -10,6 +10,7 @@ import { Overview } from "./Overview";
 import { Seats } from "./Seats";
 import { Budget } from "./Budget";
 import { Usage } from "./Usage";
+import { MyDay } from "./MyDay";
 import { More } from "./More";
 import { PersonAvatar } from "./PersonAvatar";
 import { Settings } from "./Settings";
@@ -48,13 +49,14 @@ export function Link({ to, go, className, children, ...rest }: { to: string; go:
   return <a href={to} className={className} {...rest} onClick={(ev) => { if (ev.metaKey || ev.ctrlKey || ev.button !== 0) return; ev.preventDefault(); go(to); }}>{children}</a>;
 }
 
-type Place = "overview" | "events" | "seats" | "budget" | "usage" | "more" | "settings" | "event";
+type Place = "overview" | "events" | "seats" | "budget" | "usage" | "more" | "settings" | "event" | "myday";
 function placeOf(pathname: string): Place {
   if (/^\/event\//.test(pathname)) return "event";
   if (pathname === "/events") return "events";
   if (pathname === "/seats") return "seats";
   if (pathname === "/budget") return "budget";
   if (pathname === "/usage") return "usage";
+  if (pathname === "/my-day") return "myday";
   if (pathname === "/more") return "more";
   if (pathname === "/settings") return "settings";
   return "overview";
@@ -74,7 +76,7 @@ export function App() {
   const eventId = pathname.match(/^\/event\/([^/]+)/)?.[1];
   const place = placeOf(pathname);
   const count = needs?.approvals.length ?? 0;
-  const navAt = ["overview", "events", "seats", "budget", "usage"].indexOf(place);
+  const navAt = ["overview", "events", "seats", "budget", "myday", "usage"].indexOf(place);
   if (demo === null) return null;
 
   const item = (to: string, p: Place, label: string, icon: ReactNode, cls: string, badge?: number) => (
@@ -95,6 +97,7 @@ export function App() {
             {item("/events", "events", "Events", <Icon.events />, "navitem")}
             {item("/seats", "seats", "Seats", <Icon.seats />, "navitem", count)}
             {item("/budget", "budget", "Budget", <Icon.budget />, "navitem")}
+            {item("/my-day", "myday", "My day", <Icon.overview />, "navitem")}
             {item("/usage", "usage", "Usage", <Icon.usage />, "navitem")}
           </div>
           <span className="spacer" />
@@ -119,6 +122,7 @@ export function App() {
           {place === "seats" && <Seats go={go} search={search} requesting={search.get("request") === "1"} preselect={search.get("catalog")} />}
           {place === "budget" && <Budget go={go} search={search} />}
           {place === "usage" && <Usage go={go} search={search} />}
+          {place === "myday" && <MyDay />}
           {place === "more" && <More go={go} />}
           {place === "settings" && <Settings go={go} compileId={search.get("compile")} section={search.get("section")} />}
           {place === "event" && <Event key={eventId} id={eventId!} go={go} />}

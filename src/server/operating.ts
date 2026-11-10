@@ -145,8 +145,12 @@ export async function captureOnsite(db: Db, deps: LifecycleDeps, eventId: string
     const capId = newId("cap");
     await q("INSERT INTO onsite_captures (id, event_id, contact_id, full_name, email, linkedin, company, title, note, temperature, rep, source, captured_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)",
       [capId, eventId, contact.id, name, email, linkedin, c.company ?? null, c.title ?? null, (c.note ?? "").slice(0, 4000), c.temperature ?? "warm", rep, c.source ?? "quick_add", now.toISOString()]);
-    await stopContacts(q, [contact.id], "pause", "met_onsite", capId);
-    if (contact.domain) {
+    // A badge scan is not a conversation: it changes the follow-up, it does not hand the person to a rep.
+    const scanOnly = c.source === "badge_scan" && !c.met;
+    if (scanOnly) await q("UPDATE contacts SET followup_tier = 'scanned' WHERE id = $1", [contact.id]);
+    else await stopContacts(q, [contact.id], "pause", "met_onsite", capId);
+    if (contact.domain && scanOnly) await addTouch(q, { domain: contact.domain, person_id: contact.person_id, contact_id: contact.id, event_id: eventId, kind: "badge_scan", source: rep, dedup_key: `onsite:${capId}` });
+    if (contact.domain && !scanOnly) {
       await addHold(q, { domain: contact.domain, person_id: contact.person_id, cause: "live_thread", cause_id: contact.id, expires_at: new Date(now.getTime() + 14 * 86_400_000) });
       await addTouch(q, { domain: contact.domain, person_id: contact.person_id, contact_id: contact.id, event_id: eventId, kind: "met_onsite", reason: c.note ?? "", source: rep, dedup_key: `onsite:${capId}` });
       if (c.met) await q("INSERT INTO meetings (id, event_id, contact_id, domain, external_key, status, scheduled_at, source, rep, outcome_at) VALUES ($1, $2, $3, $4, $5, 'held', $6, 'onsite', $7, $6)", [newId("mtg"), eventId, contact.id, contact.domain, `onsite:${capId}`, now.toISOString(), rep]);

@@ -1667,3 +1667,16 @@ body.dlg-open { overflow: hidden; }
 .m-channel { background: var(--well); border-radius: 16px; padding: 18px 22px; display: flex; flex-direction: column; gap: 10px; }
 .m-channel h4 { font-weight: 600; font-size: 15px; line-height: 21px; }
 @media (max-width: 760px) { .m-channels { grid-template-columns: minmax(0, 1fr); } }
+
+.myday { display: flex; flex-direction: column; gap: 24px; max-width: 900px; }
+.myday h1 { font-size: 30px; line-height: 36px; }
+.myday .m-replies li .btn { justify-self: start; grid-column: 1 / -1; }
+.briefs { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+.brief-card { border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; }
+.brief-card header { display: flex; flex-direction: column; gap: 2px; }
+.brief-card header b { font: 600 17px/22px var(--display); }
+.brief-card header span { font-size: 13px; }
+.brief-card dl { display: flex; flex-direction: column; gap: 8px; }
+.brief-card dt { font-size: 12px; line-height: 16px; color: var(--mute); }
+.brief-card dd { font-size: 14px; line-height: 20px; overflow-wrap: anywhere; }
+@media (max-width: 760px) { .briefs { grid-template-columns: minmax(0, 1fr); } }

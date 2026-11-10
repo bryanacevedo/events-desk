@@ -16,6 +16,7 @@ import { releaseSequence, approveTemplate, attachCampaign, confirmLaunchChecklis
 import { regionOf, loadPeople } from "./gate.ts";
 import { recordConsent, recordPlacement, setDomainStatus } from "./sending.ts";
 import { captureOnsite, forgetPerson, markHandled } from "./operating.ts";
+import { addSlots, bookSlot, prepBrief, repDay, roster } from "./rep-day.ts";
 import { isGtm } from "../shared/roles.ts";
 import { MOTION_LABEL } from "../shared/motion.ts";
 
@@ -90,6 +91,11 @@ export function mountLifecycle(app: App, db: Db, deps: LifecycleDeps, opts: { ba
   });
   app.post("/api/motion/sequences/:sid/release", guarded(async (c) => releaseSequence(db, deps, c.req.param("sid"), c.get("actor"))));
   app.post("/api/motion/account-domains", guarded(async (c) => { if (!isGtm(c.get("actor"))) throw new RuleError("Company domains are GTM Engineering's to link."); const b = await body(c); await db.query("INSERT INTO account_domains (domain, canonical, how, added_by) VALUES ($1, $2, $3, $4) ON CONFLICT (domain) DO UPDATE SET canonical = $2, how = $3, added_by = $4", [String(b.domain).toLowerCase(), String(b.canonical).toLowerCase(), String(b.how ?? "person"), c.get("actor")]); }));
+  app.get("/api/motion/my-day", async (c) => c.json(await repDay(db, deps, String(c.req.query("rep") ?? ""))));
+  app.get("/api/events/:id/motion/roster", async (c) => c.json({ roster: await roster(db, c.req.param("id")), slots: await db.query("SELECT s.id, s.rep, s.starts_at::text AS starts_at, s.location, s.meeting_id, k.full_name FROM meeting_slots s LEFT JOIN meetings m ON m.id = s.meeting_id LEFT JOIN contacts k ON k.id = m.contact_id WHERE s.event_id = $1 ORDER BY s.starts_at, s.rep", [c.req.param("id")]) }));
+  app.post("/api/events/:id/motion/slots", guarded(async (c) => { const b = await body(c); return addSlots(db, c.req.param("id"), c.get("actor"), { rep: String(b.rep ?? ""), day: String(b.day ?? ""), from: String(b.from ?? ""), to: String(b.to ?? ""), minutes: Number(b.minutes ?? 30), location: String(b.location ?? "") }); }));
+  app.post("/api/motion/slots/:sid/book", guarded(async (c) => bookSlot(db, deps, c.req.param("sid"), String((await body(c)).contact_id ?? ""), c.get("actor"))));
+  app.get("/api/motion/meetings/:mid/brief", async (c) => { const b = await prepBrief(db, c.req.param("mid")); return b ? c.json(b) : bad("That meeting does not exist.", 404); });
   app.post("/api/motion/stop", guarded(async (c) => stopAllSending(db, deps, c.get("actor"), String((await body(c)).reason ?? "No reason given"))));
   app.post("/api/motion/restart", guarded(async (c) => restartSending(db, c.get("actor"))));
   app.post("/api/events/:id/motion/contacts/:cid/resume", guarded(async (c) => resumePerson(db, deps, c.req.param("id"), c.req.param("cid"), c.get("actor"))));

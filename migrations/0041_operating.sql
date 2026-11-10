@@ -123,6 +123,23 @@ CREATE TABLE account_domains (
 );
 CREATE INDEX account_domains_canonical ON account_domains (canonical);
 
+-- A rep's bookable time at the event. One meeting per slot.
+CREATE TABLE meeting_slots (
+  id         text PRIMARY KEY,
+  event_id   text NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  rep        text NOT NULL,
+  starts_at  timestamptz NOT NULL,
+  ends_at    timestamptz NOT NULL,
+  location   text NOT NULL,
+  meeting_id text UNIQUE REFERENCES meetings(id) ON DELETE SET NULL
+);
+CREATE INDEX meeting_slots_rep ON meeting_slots (rep, starts_at);
+
+-- Who gets which follow-up after the event. Someone met has a rep; a badge scan gets its own copy.
+ALTER TABLE contacts ADD COLUMN followup_tier text CHECK (followup_tier IN ('scanned'));
+-- A template can be for one audience: a priority, or the people scanned at the booth.
+ALTER TABLE sequence_templates ADD COLUMN audience text NOT NULL DEFAULT 'all';
+
 -- Consent recorded per rep before their LinkedIn account sends anything.
 CREATE TABLE sender_consents (
   connector  text NOT NULL,
