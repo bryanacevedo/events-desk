@@ -80,7 +80,7 @@ const pathOf = (db: Db, contactId: string, eventId: string) => db.query<{ kind: 
 
 /** One reply as its own thing: who wrote it and what, where the thread lives, how long is left to answer, who they are, and what has happened since. */
 export async function replyDetail(db: Db, replyId: string) {
-  const [r] = await db.query<{ id: string; event_id: string; contact_id: string | null }>(
+  const [r] = await db.query<{ id: string; event_id: string; contact_id: string | null; handled_at: string | null }>(
     `SELECT m.id, m.event_id, e.name AS event, ${BRAND}, m.contact_id, k.full_name, k.title, co.name AS company, co.tier, co.tier_fact AS why,
             co.firmo->>'industry' AS industry, co.firmo->>'employees' AS employees, co.account_owner AS owner, nullif(concat_ws(', ', co.deal_name, co.deal_stage), '') AS deal,
             m.code, m.body, m.channel, m.connector, m.thread_url, m.received_at::text AS received_at, m.respond_by::text AS respond_by, m.owner AS rep, m.handled_at::text AS handled_at

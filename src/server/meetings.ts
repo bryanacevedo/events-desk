@@ -36,6 +36,8 @@ export async function bookMeeting(db: Db, deps: LifecycleDeps, m: MeetingInput, 
     await stopDomain(q, k.domain, "pause", "meeting", id);
     await addHold(q, { domain: k.domain, cause: "meeting", cause_id: id, expires_at: new Date(Date.parse(m.scheduled_at) + MEETING_HOLD_DAYS * DAY) });
     await addTouch(q, { domain: k.domain, person_id: k.person_id, contact_id: k.id, event_id: eventId, kind: "meeting_booked", source: actor, dedup_key: `mtg:${id}:${Date.parse(m.scheduled_at)}` });
+    // A booked meeting is the answer to their reply: it stops waiting on a rep everywhere (the event, Overview, My day).
+    await q("UPDATE inbound_messages SET handled_at = $2, handled_by = $3 WHERE contact_id = $1 AND handled_at IS NULL AND respond_by IS NOT NULL", [k.id, now.toISOString(), actor]);
     await logActivity(q, eventId, actor, "meeting", `${moved ? "Moved" : before ? "Updated" : "Booked"} a meeting with ${k.full_name ?? "someone"} at ${k.company}`);
     return { id, event_id: eventId, status: moved ? "rescheduled" : m.status ?? "booked" };
   });

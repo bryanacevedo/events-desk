@@ -45,7 +45,7 @@ export async function motionOverview(db: Db, deps: LifecycleDeps, id: string) {
     db.query(`SELECT m.id, m.channel, m.connector, m.thread_url, m.signal, m.code, m.doubtful, m.status, m.received_at::text AS received_at, m.body, k.id AS contact_id, k.full_name, co.name AS company FROM inbound_messages m LEFT JOIN contacts k ON k.id = m.contact_id LEFT JOIN companies co ON co.id = k.company_id WHERE m.event_id = $1 ORDER BY m.received_at DESC LIMIT 50`, [id]),
     db.query(`SELECT m.id, m.contact_id, m.status, m.scheduled_at::text AS scheduled_at, m.timezone, m.rep, m.source, m.enrolled, k.full_name, co.name AS company FROM meetings m LEFT JOIN contacts k ON k.id = m.contact_id LEFT JOIN companies co ON co.id = k.company_id WHERE m.event_id = $1 ORDER BY m.scheduled_at`, [id]),
     db.query("SELECT window_days, metrics, created_at::text AS created_at FROM scorecards WHERE event_id = $1 ORDER BY window_days", [id]),
-    db.query(`SELECT d.id, d.author, d.status, d.body, d.answered_at::text AS answered_at, coalesce((SELECT json_agg(json_build_object('theme', f.theme, 'fact', f.fact, 'quote', f.quote, 'account', f.account)) FROM debrief_facts f WHERE f.debrief_id = d.id AND d.status = 'accepted'), '[]') AS facts FROM debriefs d WHERE d.event_id = $1`, [id]),
+    db.query(`SELECT d.id, d.author, d.status, d.body, d.prompted_at::text AS prompted_at, d.answered_at::text AS answered_at, coalesce((SELECT json_agg(json_build_object('theme', f.theme, 'fact', f.fact, 'quote', f.quote, 'account', f.account)) FROM debrief_facts f WHERE f.debrief_id = d.id AND d.status = 'accepted'), '[]') AS facts FROM debriefs d WHERE d.event_id = $1`, [id]),
     db.query("SELECT k.id, k.status, k.lines, k.llm_cap, k.credits_cap, k.est_cents, k.inputs, (SELECT a.id FROM approvals a WHERE a.card_id = k.id AND a.status = 'pending' LIMIT 1) AS approval_id FROM cost_cards k WHERE k.event_id = $1 AND k.kind = 'motion' ORDER BY k.created_at DESC LIMIT 1", [id]),
     db.query<{ region: string; basis: string; recorded_by: string }>("SELECT region, basis, recorded_by FROM legal_bases WHERE event_id = $1", [id]),
     db.query<{ n: number }>("SELECT count(*)::int AS n FROM review_cases WHERE event_id = $1 AND status = 'open' AND NOT blocking", [id]),
@@ -130,6 +130,23 @@ export function mountLifecycle(app: App, db: Db, deps: LifecycleDeps, opts: { ba
   app.get("/api/motion/templates", async (c) => c.json({ templates: await db.query("SELECT id, name, version, channel, phase, steps, external_id, approved_by, approved_at::text AS approved_at FROM sequence_templates WHERE retired_at IS NULL ORDER BY channel, phase") }));
   app.post("/api/motion/templates", guarded(async (c) => { if (!isGtm(c.get("actor"))) throw new RuleError("Templates are GTM Engineering's to approve."); const b = await body(c); return approveTemplate(db, c.get("actor"), { name: String(b.name ?? ""), channel: b.channel, phase: b.phase, steps: Array.isArray(b.steps) ? b.steps : [], external_id: b.external_id ?? null }); }));
   app.post("/api/motion/placement", guarded(async (c) => { if (!isGtm(c.get("actor"))) throw new RuleError("Placement results are GTM Engineering's to record."); const b = await body(c); return recordPlacement(db, { domain: String(b.domain ?? ""), inbox_rate: Number(b.inbox_rate), tool: String(b.tool ?? "manual"), tested_at: String(b.tested_at ?? new Date().toISOString()) }); }));
+  // Every event whose sending is done, with its latest written scorecard, or its reading so far while it waits for day 30.
+  app.get("/api/results", async (c) => {
+    const events = await db.query<{ id: string; name: string; starts_on: string; venue: string | null; motion: string; website: string | null; brand_color: string | null; card: { window_days: number; metrics: any } | null; asked: number; written: number }>(
+      `SELECT e.id, e.name, e.starts_on::text AS starts_on, e.venue, e.motion,
+              (SELECT c.website FROM catalog_events c WHERE c.id = e.catalog_id) AS website, (SELECT c.brand_color FROM catalog_events c WHERE c.id = e.catalog_id) AS brand_color,
+              (SELECT json_build_object('window_days', s.window_days, 'metrics', s.metrics) FROM scorecards s WHERE s.event_id = e.id ORDER BY s.window_days DESC LIMIT 1) AS card,
+              (SELECT count(*)::int FROM debriefs d WHERE d.event_id = e.id) AS asked, (SELECT count(*)::int FROM debriefs d WHERE d.event_id = e.id AND d.status <> 'waiting') AS written
+       FROM events e WHERE e.stage = 'delivered' AND e.parent_event_id IS NULL AND e.motion IN ('closing', 'scored') ORDER BY e.starts_on DESC`);
+    const rows = [];
+    for (const e of events) {
+      const m = e.card?.metrics ?? await computeScorecard(db, deps, e.id, 30, { write: false }).catch(() => null);
+      if (!m) continue;
+      rows.push({ id: e.id, name: e.name, starts_on: e.starts_on, venue: e.venue, website: e.website, brand_color: e.brand_color, final: e.motion === "scored", window_days: e.card?.window_days ?? null,
+        cost_cents: m.cost.dollars_cents, pipeline_cents: m.influence.pipeline_cents, won_cents: m.influence.won.cents, per_dollar: m.roi.pipeline_per_dollar, held: m.held_all, deals: m.influence.opportunities, control: m.control, scored: Boolean(m.score), notes: { asked: e.asked, written: e.written } });
+    }
+    return c.json({ events: rows });
+  });
   app.get("/api/motion/learning", async (c) => {
     // People the desk dropped whose company later has a deal: the tiering's misses. Needs the CRM; when it cannot answer, the rest still loads.
     let dropped_who_dealt: Awaited<ReturnType<typeof droppedWhoDealt>> | null = null;

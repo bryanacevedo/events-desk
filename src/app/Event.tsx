@@ -11,6 +11,7 @@ import { get, send, type Card, type CompanyRow, type EventPayload, type Page, ty
 import { Link, useActor } from "./App";
 import { Cases, openCases } from "./Cases";
 import { Motion } from "./Motion";
+import { ResultView } from "./Result";
 import { To } from "./To";
 import { Chevron, FileButton, ShowMore, SheetButton } from "./Patterns";
 import { isGtm } from "../shared/roles";
@@ -685,15 +686,17 @@ export function StageBlock({ ev, go, compact }: { ev: EventState; go: (to: strin
   );
 }
 
-type View = "outreach" | "people" | "details";
-const VIEWS: [View, string][] = [["outreach", "Outreach"], ["people", "People"], ["details", "Details"]];
+type View = "result" | "outreach" | "people" | "details";
+/* Result comes first once sending is done (Closing, Scored); before that the event has no result, and the tab is not there. */
+const VIEWS: [View, string][] = [["result", "Result"], ["outreach", "Outreach"], ["people", "People"], ["details", "Details"]];
 
 /** A delivered event, one layer at a time: what needs someone now, on one line, then the work in motion, the list, and the event's details as views.
     The view is in the link (#outreach, #people, #details), so a Slack card can point straight at it. */
-function DeliveredViews({ id, started, views, onChange }: { id: string; started: boolean; views: Record<View, React.ReactNode>; onChange: () => void }) {
+function DeliveredViews({ id, started, closed, views, onChange }: { id: string; started: boolean; closed: boolean; views: Partial<Record<View, React.ReactNode>>; onChange: () => void }) {
+  const shown = VIEWS.filter(([k]) => views[k] !== undefined);
   const { actor } = useActor();
-  const fromHash = (): View | null => { const h = location.hash.slice(1); return VIEWS.some(([k]) => k === h) ? (h as View) : null; };
-  const [view, setView] = useState<View>(() => fromHash() ?? (started ? "outreach" : "people"));
+  const fromHash = (): View | null => { const h = location.hash.slice(1); return shown.some(([k]) => k === h) ? (h as View) : null; };
+  const [view, setView] = useState<View>(() => fromHash() ?? (closed ? "result" : started ? "outreach" : "people"));
   const [next, setNext] = useState<{ text: string; tab: View; action?: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const loadNext = async () => setNext((await get<{ next: typeof next }>(`/api/events/${id}/next`))?.next ?? null);
@@ -715,7 +718,7 @@ function DeliveredViews({ id, started, views, onChange }: { id: string; started:
         </div>
       )}
       <div className="seg views" role="tablist" aria-label="View">
-        {VIEWS.map(([k, label]) => <button key={k} type="button" role="tab" aria-selected={view === k} aria-pressed={view === k} onClick={() => pick(k)}>{label}</button>)}
+        {shown.map(([k, label]) => <button key={k} type="button" role="tab" aria-selected={view === k} aria-pressed={view === k} onClick={() => pick(k)}>{label}</button>)}
       </div>
       <div role="tabpanel" aria-label={VIEWS.find(([k]) => k === view)![1]}>{views[view]}</div>
     </>
@@ -975,7 +978,8 @@ export function Event({ id, go }: { id: string; go: (to: string) => void }) {
         {!delivered && facts}
       </header>
       {delivered ? (
-        <DeliveredViews id={e.id} started={Boolean(e.motion && e.motion !== "none")} onChange={ev.load} views={{
+        <DeliveredViews id={e.id} started={Boolean(e.motion && e.motion !== "none")} closed={["closing", "scored"].includes(e.motion ?? "")} onChange={ev.load} views={{
+          ...(["closing", "scored"].includes(e.motion ?? "") ? { result: <ResultView id={e.id} name={e.name} onChange={ev.load} /> } : {}),
           outreach: <Motion id={e.id} onChange={ev.load} />,
           people: <StageBlock ev={ev} go={go} />,
           details: <>{facts}<AttendeeList d={d} go={go} onChange={ev.load} />{more}</>,

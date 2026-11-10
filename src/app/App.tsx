@@ -11,6 +11,7 @@ import { Seats } from "./Seats";
 import { Budget } from "./Budget";
 import { Usage } from "./Usage";
 import { MyDay } from "./MyDay";
+import { Results } from "./Results";
 import { More } from "./More";
 import { PersonAvatar } from "./PersonAvatar";
 import { Settings } from "./Settings";
@@ -52,12 +53,13 @@ export function Link({ to, go, className, children, ...rest }: { to: string; go:
   return <a href={to} className={className} {...rest} onClick={(ev) => { if (ev.metaKey || ev.ctrlKey || ev.button !== 0) return; ev.preventDefault(); go(to); }}>{children}</a>;
 }
 
-type Place = "overview" | "events" | "seats" | "budget" | "usage" | "more" | "settings" | "event" | "myday";
+type Place = "overview" | "events" | "seats" | "budget" | "results" | "usage" | "more" | "settings" | "event" | "myday";
 function placeOf(pathname: string): Place {
   if (/^\/event\//.test(pathname)) return "event";
   if (pathname === "/events") return "events";
   if (pathname === "/seats") return "seats";
   if (pathname === "/budget") return "budget";
+  if (pathname === "/results") return "results";
   if (pathname === "/usage") return "usage";
   if (pathname === "/my-day") return "myday";
   if (pathname === "/more") return "more";
@@ -88,7 +90,7 @@ export function App() {
   const approver = Boolean(needs?.approvers.includes(actor)), lead = approver || isGtm(actor);
   // My day is the rep's page: replies, meetings, people met. Leadership's day is the seat queue on Overview and Seats, so an empty My day stays out of their menu.
   const showDay = !lead || dayHas;
-  const navAt = ["overview", ...(showDay ? ["myday"] : []), "events", ...(approver ? ["seats"] : []), ...(lead ? ["budget", "usage"] : [])].indexOf(place);
+  const navAt = ["overview", ...(showDay ? ["myday"] : []), "events", ...(approver ? ["seats"] : []), ...(lead ? ["budget", "results", "usage"] : [])].indexOf(place);
   if (demo === null) return null;
 
   const item = (to: string, p: Place, label: string, icon: ReactNode, cls: string, badge?: number) => (
@@ -110,6 +112,7 @@ export function App() {
             {item("/events", "events", "Events", <Icon.events />, "navitem")}
             {approver && item("/seats", "seats", "Seats", <Icon.seats />, "navitem", count)}
             {lead && item("/budget", "budget", "Budget", <Icon.budget />, "navitem")}
+            {lead && item("/results", "results", "Results", <Icon.results />, "navitem")}
             {lead && item("/usage", "usage", "Usage", <Icon.usage />, "navitem")}
           </div>
           <span className="spacer" />
@@ -133,6 +136,7 @@ export function App() {
           {place === "events" && <Events go={go} sheetId={search.get("event")} requesting={search.get("request") === "1"} preselect={search.get("catalog")} search={search} />}
           {place === "seats" && <Seats go={go} search={search} requesting={search.get("request") === "1"} preselect={search.get("catalog")} />}
           {place === "budget" && <Budget go={go} search={search} />}
+          {place === "results" && lead && <Results go={go} />}
           {place === "usage" && <Usage go={go} search={search} />}
           {place === "myday" && <MyDay />}
           {place === "more" && <More go={go} showDay={approver && showDay} />}

@@ -319,7 +319,7 @@ export interface Crm {
   /** Opportunities on each account, by `ref`. */
   opportunities?(accounts: CrmAccountQuery[]): Promise<Record<string, CrmOpportunity[]>>;
 }
-export interface CrmOpportunity { id: string; stage: string; amount_cents: number | null; created_date: string; stage_history: { stage: string; at: string }[]; close_date?: string | null; is_won?: boolean; is_closed?: boolean }
+export interface CrmOpportunity { id: string; name?: string | null; stage: string; amount_cents: number | null; created_date: string; stage_history: { stage: string; at: string }[]; close_date?: string | null; is_won?: boolean; is_closed?: boolean }
 export class CrmAlreadyExists extends Error {}
 
 const OWNERS = ["Priya Natarajan", "Tomas Lindqvist", "Adaeze Okonkwo", "Mateo Ruiz", "Hanna Berg"];

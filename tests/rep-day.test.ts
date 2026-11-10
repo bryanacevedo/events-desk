@@ -6,6 +6,7 @@ import { captureOnsite } from "../src/server/operating.ts";
 import { addSlots, bookSlot, meetingDetail, prepBrief, repDay, replyDetail } from "../src/server/rep-day.ts";
 import { bookMeeting } from "../src/server/meetings.ts";
 import { listSummary } from "../src/server/uploads.ts";
+import { nextStep } from "../src/server/post-event.ts";
 import { approveTemplate, createDrafts } from "../src/server/sequences.ts";
 import { freshDb } from "./helpers.ts";
 import { clock, deliveredInMotion, enrollmentStates, MAYA, personAt } from "./lifecycle-harness.ts";
@@ -85,7 +86,10 @@ describe("a reply and a meeting, each as its own thing", () => {
     const m = await bookMeeting(db, h.deps, { contact_id: ana.id, scheduled_at: "2027-01-07T15:00:00Z", source: "reply", rep: "Rep A" }, MAYA);
 
     const r = await replyDetail(db, "inb_t1");
-    expect(r).toMatchObject({ full_name: "Ana Ruiz", company: "Tallgrass Software", body, code: "meeting_request", thread_url: "https://app.instantly.ai/app/unibox", rep: "Rep A", handled_at: null });
+    expect(r).toMatchObject({ full_name: "Ana Ruiz", company: "Tallgrass Software", body, code: "meeting_request", thread_url: "https://app.instantly.ai/app/unibox", rep: "Rep A" });
+    // Booking the meeting answered the reply: it no longer waits on a rep anywhere.
+    expect(r!.handled_at).not.toBeNull();
+    expect((await nextStep(db, h.deps, h.id))?.text ?? "").not.toMatch(/waiting on a rep/);
     expect(r!.meeting).toMatchObject({ id: m.id, status: "booked" });
     const kinds = r!.path.map((p) => p.kind);
     // Oldest first. Booking stamps the real clock, so only the order of the dated steps is fixed here.

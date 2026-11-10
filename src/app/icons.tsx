@@ -7,6 +7,7 @@ export const Icon = {
   events: () => <svg {...base}><path d="M3.5 7.5V5.5a1 1 0 0 1 1-1h11a1 1 0 0 1 1 1v2a2 2 0 0 0 0 4v2a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1v-2a2 2 0 0 0 0-4Z" /><path d="M8 7.5v1M8 11.5v1" /></svg>,
   seats: () => <svg {...base}><circle cx="10" cy="10" r="7" /><path d="m6.8 10.2 2.2 2.2 4.4-4.8" /></svg>,
   budget: () => <svg {...base}><path d="M3 15.5h14" /><rect x="4.5" y="9" width="2.6" height="6.5" rx="0.6" /><rect x="8.7" y="5.5" width="2.6" height="10" rx="0.6" /><rect x="12.9" y="7.5" width="2.6" height="8" rx="0.6" /></svg>,
+  results: () => <svg {...base}><path d="M5.5 17V3.5" /><path d="M5.5 4h9.5l-2.2 3.2L15 10.5H5.5" /></svg>,
   usage: () => <svg {...base}><path d="M3 14.5 7.5 9l3 3 6-7" /><path d="M13.5 5h3v3" /></svg>,
   more: () => <svg {...base}><circle cx="5" cy="10" r="1.2" /><circle cx="10" cy="10" r="1.2" /><circle cx="15" cy="10" r="1.2" /></svg>,
   calendar: () => <svg {...base}><rect x="3" y="4.5" width="14" height="12.5" rx="2" /><path d="M3 8.5h14M7 2.8v3M13 2.8v3" /></svg>,

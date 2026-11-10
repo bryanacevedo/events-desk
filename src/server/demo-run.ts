@@ -8,7 +8,7 @@ import type { ToolEvent } from "./connectors/types.ts";
 import { RuleError } from "./events.ts";
 import { captureOnsite, drainNotifications } from "./operating.ts";
 import { bookMeeting, recordOutcome } from "./meetings.ts";
-import { requestMotionCard } from "./motion.ts";
+import { LAST_DAY_SQL, requestMotionCard } from "./motion.ts";
 import { openOwnerDecisions, sendOwnerCards, ownerSweep } from "./owners.ts";
 import { ingestEvents, processInbound } from "./replies.ts";
 import { approveTemplate, attachCampaign, confirmLaunchChecklist, createDrafts, drainOps, observeSequences, recordLegalBasis, setTools } from "./sequences.ts";
@@ -34,12 +34,13 @@ const REPLIES: { share: number; body: string; signal?: ToolEvent["signal"] }[] =
 ];
 
 /** Deals appear at some of the accounts that were met. */
-export const demoOpportunities = (db: Db, now: () => Date) => async (accounts: { ref: string }[]): Promise<Record<string, CrmOpportunity[]>> => {
+const DEMO_DEALS = ["platform pilot", "expansion", "new logo", "renewal"];
+export const demoOpportunities = (db: Db, now: () => Date) => async (accounts: { ref: string; name?: string | null }[]): Promise<Record<string, CrmOpportunity[]>> => {
   const met = new Set((await db.query<{ domain: string }>("SELECT DISTINCT domain FROM meetings WHERE status = 'held'")).map((m) => m.domain));
   return Object.fromEntries(accounts.map((a) => {
   if (u(`opp|${a.ref}`) > (met.has(a.ref) ? 0.7 : 0.2)) return [a.ref, []];
   const open = u(`old|${a.ref}`) < 0.3, today = now().toISOString();
-  return [a.ref, [{ id: `opp_${a.ref}`, stage: "Proposal", amount_cents: Math.round(2_000_000 + u(`amt|${a.ref}`) * 9_000_000), created_date: open ? new Date(now().getTime() - 80 * 86_400_000).toISOString() : today, stage_history: open ? [{ stage: "Proposal", at: today }] : [] } satisfies CrmOpportunity]];
+  return [a.ref, [{ id: `opp_${a.ref}`, name: `${a.name ?? a.ref} ${DEMO_DEALS[Math.floor(u(`deal|${a.ref}`) * DEMO_DEALS.length)]}`, stage: "Proposal", amount_cents: Math.round(2_000_000 + u(`amt|${a.ref}`) * 9_000_000), created_date: open ? new Date(now().getTime() - 80 * 86_400_000).toISOString() : today, stage_history: open ? [{ stage: "Proposal", at: today }] : [] } satisfies CrmOpportunity]];
   }));
 };
 
@@ -194,5 +195,41 @@ export async function seedDemoStages(db: Db, deps: LifecycleDeps, tools: Record<
     if (stage === "closing" || stage === "scored") await db.tx((q) => moveMotion(q, id, "closing", "Events Desk", "Fourteen days after the event"));
     // The scorecards run before Shoptalk closes, so NRF is scored and Shoptalk stays in closing.
     if (stage === "scored") await writeScorecards(db, deps);
+  }
+  await seedDemoDebriefs(db);
+}
+
+/* What the rep wrote after each finished sample event, so "What we learned" has something in it. Sample notes, like every attendee here:
+   NRF's are accepted and sorted into themes; Shoptalk's wait for leadership to review. */
+const DEMO_NOTES: Record<string, { status: "accepted" | "answered"; body: string; facts: [string, string, string][] }> = {
+  "evt_nrf-2026-retail-s-big-show": {
+    status: "accepted",
+    body: "Busy floor, short conversations. The retail ops people all have the same problem: the week after a show goes into rebuilding the list in a spreadsheet. Two accounts already scan badges with an app and asked what happens after the scan. Budgets close in March. New logos came from the email before the show, not the booth; the booth was mostly customers.",
+    facts: [
+      ["pain", "Retail ops teams rebuild their event list by hand the week after a show.", "We spend the week after a show rebuilding the list in a spreadsheet."],
+      ["competitor", "Accounts that already scan badges want this behind their scanner, not instead of it.", "We have the scanner. What we don't have is anything after the scan."],
+      ["timing", "Next year's budgets close in March, so follow-ups have to land before then.", "If it isn't in the plan by March, it waits a year."],
+      ["relationship", "New logos booked off the email before the show; the booth was mostly existing customers.", ""],
+    ],
+  },
+  "evt_shoptalk-spring-2026": {
+    status: "answered",
+    body: "Smaller crowd than NRF but the right titles: heads of ecommerce and growth. Three asked whether we sync to Marketing Cloud, not just the CRM. One competitor demoed next to us all week; buyers compared us on the follow-up, which is where we won. Next time book dinners before the show, the evenings were where the long conversations happened.",
+    facts: [
+      ["product_gap", "Buyers asked for a Marketing Cloud sync; the desk writes only to the CRM.", "Our nurture lives in Marketing Cloud, not Sales Cloud."],
+      ["competitor", "A competitor demoed beside us; buyers compared the two on the follow-up.", "Theirs stops at the scan. Yours keeps going."],
+      ["general", "Book dinners before the show: the long conversations happened in the evenings.", ""],
+    ],
+  },
+};
+async function seedDemoDebriefs(db: Db) {
+  for (const [eventId, n] of Object.entries(DEMO_NOTES)) {
+    const [have] = await db.query("SELECT 1 FROM debriefs WHERE event_id = $1", [eventId]);
+    if (have) continue;
+    const [last] = await db.query<{ day: string }>(`SELECT (${LAST_DAY_SQL} + 3)::text AS day FROM events e WHERE e.id = $1`, [eventId]);
+    if (!last) continue;
+    const id = `dbf_demo_${eventId.slice(4, 16)}`;
+    await db.query("INSERT INTO debriefs (id, event_id, author, prompted_at, body, answered_at, extracted, status, decided_by) VALUES ($1, $2, $3, $4, $5, $4, true, $6, $7)", [id, eventId, REP, `${last.day}T16:00:00Z`, n.body, n.status, n.status === "accepted" ? "Dan Whitlock" : null]);
+    for (const [i, [theme, fact, quote]] of n.facts.entries()) await db.query("INSERT INTO debrief_facts (id, debrief_id, account, theme, fact, quote) VALUES ($1, $2, NULL, $3, $4, $5)", [`${id}_${i}`, id, theme, fact, quote]);
   }
 }

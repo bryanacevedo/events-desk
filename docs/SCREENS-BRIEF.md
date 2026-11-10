@@ -129,4 +129,4 @@ Bryan's pointers that shaped the app as it looks now. Read these before any new 
 - Never an underline to say "this is clickable", and never a coloured status dot (both read as machine-made, Bryan 2026-11-10). A name sweeps a soft wash in behind itself; urgency and "hot" are words.
 - A page someone cannot use or that would be empty stays out of their menu: My day only for people who work replies and meetings (or anyone who has one), Settings for GTM Engineering only, and the phone's More only when it holds something.
 - The demo shows every step after delivery on a real sample event, so each screen can be opened as it really looks.
-
+- A finished event opens on its Result tab: one verdict, the deals, what we learned; the evidence folds below for leadership. Outreach and results never share a tab (Bryan, 2026-11-10). Results, in leadership's menu, ranks every finished event; an event under five held meetings shows its ratio in grey.

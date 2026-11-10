@@ -27,12 +27,15 @@ export async function recordEventCost(db: Db, eventId: string, actor: string, ca
 }
 const median = (xs: number[]) => { if (!xs.length) return null; const s = [...xs].sort((a, b) => a - b), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
 
+/** One credited opportunity: the account, the deal, its size and stage, new or moved, and the held meeting it is credited to. */
+export interface Deal { opportunity_id: string; account: string | null; domain: string | null; name: string | null; stage: string | null; amount_cents: number; kind: "sourced" | "influenced"; won: boolean; meeting_id: string | null; met: string | null; meeting_at: string | null; moved_at: string | null }
+
 export interface Scorecard {
   funnel: { kept: number; enrolled: number; sent: number; replied: number; booked: number; held: number }; logged_outside: number; held_all: number;
   cost: { tickets_cents: number; travel_cents: number; ai_cents: number; other_cents: number; dollars_cents: number; credits_by_step: Record<string, number> };
   cost_per_held_cents: number | null;
   /** One written definition each. Sourced: created within 30 days after a held meeting, with no open deal before it. Influenced: already open and moved forward within 90 days after one. Each opportunity counts for one event. */
-  influence: { available: boolean; opportunities: number; pipeline_cents: number; sourced: { n: number; cents: number }; influenced: { n: number; cents: number }; won: { n: number; cents: number }; stale: number };
+  influence: { available: boolean; opportunities: number; pipeline_cents: number; sourced: { n: number; cents: number }; influenced: { n: number; cents: number }; won: { n: number; cents: number }; stale: number; deals?: Deal[] };
   control: { available: boolean; met_accounts: number; met_with_pipeline: number; control_accounts: number; control_with_pipeline: number };
   roi: { pipeline_per_dollar: number | null; won_per_dollar: number | null; cost_missing: string[] };
   score: { held_per_thousand: number; pipeline_per_dollar: number | null } | null;
@@ -56,10 +59,11 @@ export async function computeScorecard(db: Db, deps: LifecycleDeps, eventId: str
   let influence: Scorecard["influence"] = { available: false, opportunities: 0, pipeline_cents: 0, sourced: { n: 0, cents: 0 }, influenced: { n: 0, cents: 0 }, won: { n: 0, cents: 0 }, stale: 0 };
   let control: Scorecard["control"] = { available: false, met_accounts: 0, met_with_pipeline: 0, control_accounts: 0, control_with_pipeline: 0 };
   if (crmConnected(deps.crm) && deps.crm.opportunities) {
-    const met = await db.query<{ domain: string; name: string; first_held: string }>(
-      `SELECT m.domain, min(co.name) AS name, min(m.scheduled_at)::text AS first_held FROM meetings m JOIN contacts k ON k.id = m.contact_id JOIN companies co ON co.id = k.company_id WHERE m.event_id = $1 AND m.status = 'held' GROUP BY m.domain`, [eventId]);
+    const met = await db.query<{ domain: string; name: string; first_held: string; meeting_id: string; person: string | null }>(
+      `SELECT m.domain, min(co.name) AS name, min(m.scheduled_at)::text AS first_held, (array_agg(m.id ORDER BY m.scheduled_at))[1] AS meeting_id, (array_agg(k.full_name ORDER BY m.scheduled_at))[1] AS person FROM meetings m JOIN contacts k ON k.id = m.contact_id JOIN companies co ON co.id = k.company_id WHERE m.event_id = $1 AND m.status = 'held' GROUP BY m.domain`, [eventId]);
     const opps = await deps.crm.opportunities(met.map((m) => ({ ref: m.domain, domain: m.domain, name: m.name })));
     influence = { ...influence, available: true };
+    const detail = new Map<string, Deal>(), counted: Deal[] = [];
     const nowMs = nowOf(deps).getTime();
     await db.tx(async (q) => {
       for (const m of met) {
@@ -76,18 +80,23 @@ export async function computeScorecard(db: Db, deps: LifecycleDeps, eventId: str
           if (!o.is_closed && o.close_date && Date.parse(o.close_date) < nowMs) influence.stale++;
           // A later meeting that still came before the deal moved is the closer cause, so it takes the credit. A deal never counts twice.
           const movedAt = new Date(kind === "sourced" ? created : moved).toISOString();
-          if (!write) { const [other] = await q<{ event_id: string; meeting_at: string }>("SELECT event_id, meeting_at::text AS meeting_at FROM attribution_claims WHERE opportunity_id = $1", [o.id]); if (!other || other.event_id === eventId || Date.parse(other.meeting_at) < held) { influence[kind].n++; influence[kind].cents += o.amount_cents ?? 0; if (o.is_won) { influence.won.n++; influence.won.cents += o.amount_cents ?? 0; } } continue; }
+          const deal: Deal = { opportunity_id: o.id, account: m.name, domain: m.domain, name: o.name ?? null, stage: o.stage ?? null, amount_cents: o.amount_cents ?? 0, kind, won: Boolean(o.is_won), meeting_id: m.meeting_id, met: m.person, meeting_at: new Date(held).toISOString(), moved_at: movedAt };
+          detail.set(o.id, deal);
+          if (!write) { const [other] = await q<{ event_id: string; meeting_at: string }>("SELECT event_id, meeting_at::text AS meeting_at FROM attribution_claims WHERE opportunity_id = $1", [o.id]); if (!other || other.event_id === eventId || Date.parse(other.meeting_at) < held) { counted.push(deal); influence[kind].n++; influence[kind].cents += o.amount_cents ?? 0; if (o.is_won) { influence.won.n++; influence.won.cents += o.amount_cents ?? 0; } } continue; }
           await q(`INSERT INTO attribution_claims (opportunity_id, event_id, kind, meeting_at, moved_at, amount_cents, won) VALUES ($1, $2, $3, $4, $5, $6, $7)
                    ON CONFLICT (opportunity_id) DO UPDATE SET event_id = CASE WHEN EXCLUDED.meeting_at > attribution_claims.meeting_at THEN EXCLUDED.event_id ELSE attribution_claims.event_id END, kind = CASE WHEN EXCLUDED.meeting_at > attribution_claims.meeting_at THEN EXCLUDED.kind ELSE attribution_claims.kind END, meeting_at = greatest(EXCLUDED.meeting_at, attribution_claims.meeting_at), amount_cents = EXCLUDED.amount_cents, won = EXCLUDED.won, updated_at = now()`,
             [o.id, eventId, kind, new Date(held).toISOString(), movedAt, o.amount_cents ?? 0, Boolean(o.is_won)]);
         }
       }
     });
-    if (write) for (const c of await db.query<{ kind: "sourced" | "influenced"; amount_cents: number; won: boolean }>("SELECT kind, amount_cents, won FROM attribution_claims WHERE event_id = $1", [eventId])) {
+    if (write) for (const c of await db.query<{ opportunity_id: string; kind: "sourced" | "influenced"; amount_cents: number; won: boolean; meeting_at: string; moved_at: string }>("SELECT opportunity_id, kind, amount_cents, won, meeting_at::text AS meeting_at, moved_at::text AS moved_at FROM attribution_claims WHERE event_id = $1", [eventId])) {
+      const d = detail.get(c.opportunity_id);
+      counted.push({ ...(d ?? { opportunity_id: c.opportunity_id, account: null, domain: null, name: null, stage: null, meeting_id: null, met: null }), kind: c.kind, amount_cents: c.amount_cents, won: c.won, meeting_at: d?.meeting_at ?? c.meeting_at, moved_at: d?.moved_at ?? c.moved_at });
       influence[c.kind].n++; influence[c.kind].cents += c.amount_cents;
       if (c.won) { influence.won.n++; influence.won.cents += c.amount_cents; }
     }
     influence.opportunities = influence.sourced.n + influence.influenced.n;
+    influence.deals = counted.sort((a, b) => b.amount_cents - a.amount_cents);
     influence.pipeline_cents = influence.sourced.cents + influence.influenced.cents;
     // The control: accounts kept on this list that nobody reached, against the accounts met. An honest comparison, not proof of cause.
     const others = await db.query<{ domain: string; name: string }>(

@@ -45,7 +45,7 @@ function Row({ label, n, of, tone = "t1", shown, onOpen }: { label: string; n: n
   return <li className={`brow${onOpen ? " opens" : ""}`} onClick={onOpen} role={onOpen ? "button" : undefined} tabIndex={onOpen ? 0 : undefined} onKeyDown={onOpen ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(); } } : undefined}><span>{label}</span><i aria-hidden="true"><u className={tone} style={{ width: `${of > 0 ? Math.min(100, (100 * n) / of) : 0}%` }} /></i><b>{shown ?? num(n)}</b></li>;
 }
 
-function Fold({ icon, title, peek, children }: { icon: React.ReactNode; title: string; peek?: React.ReactNode; children: React.ReactNode }) {
+export function Fold({ icon, title, peek, children }: { icon: React.ReactNode; title: string; peek?: React.ReactNode; children: React.ReactNode }) {
   return <details className="fold"><summary>{icon}<span className="fold-t">{title}</span><span className="fold-peek">{peek}</span><Chevron /></summary><div className="m-fold">{children}</div></details>;
 }
 
@@ -151,9 +151,10 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
   };
   if (!o) return null;
   const f = o.funnel, s = o.live_score, started = o.motion !== "none";
-  const hot = o.replies.filter((r) => r.code === "interested" || r.code === "meeting_request" || r.code === "referral");
   const free = slots.slots.filter((x) => !x.meeting_id), roster = slots.roster.map((x) => x.rep);
   const booked = new Set(o.meetings.map((m) => m.contact_id).filter(Boolean) as string[]);
+  // Waiting on a rep means waiting: someone with a meeting booked has had their answer, and is in Meetings.
+  const hot = o.replies.filter((r) => (r.code === "interested" || r.code === "meeting_request" || r.code === "referral") && !(r.contact_id && booked.has(r.contact_id)));
   const doubtful = o.replies.filter((r) => r.doubtful).length;
   const sheet = openObject();
   const mine = o.owners.find((x) => x.status === "mine")?.n ?? 0;
@@ -170,12 +171,12 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
 
   return (
     <section className="motion" aria-label="Outreach" data-ready="1">
-      <div className="m-head">
-        <h2 className="sr-only">Outreach</h2>
+      <h2 className="sr-only">Outreach</h2>
+      {((demo && !canFollowUp && !["closing", "scored"].includes(o.motion)) || (!demo && !started && (!o.card || o.card.status === "declined")) || canFollowUp) && <div className="m-head">
         {demo && !canFollowUp && !["closing", "scored"].includes(o.motion) && <button className="btn small" disabled={busy} onClick={() => act("POST", `/api/demo/motion/${id}/advance`)}>{o.motion === "in_market" ? "Simulate replies" : "Next step"}</button>}
         {!demo && !started && (!o.card || o.card.status === "declined") && <button className="btn small" disabled={busy} onClick={() => act("POST", `/api/events/${id}/motion/start`)}>Start outreach</button>}
         {canFollowUp && <button className="btn small" disabled={busy} onClick={() => act("POST", `/api/events/${id}/motion/sequences`, undefined, "The follow-up is set up. Each sequence waits for its launch checklist.")}>Start the follow-up</button>}
-      </div>
+      </div>}
       {note && <p className="m-note" role="status">{note}</p>}
       {error && <p className="error" role="alert">{error}</p>}
 
@@ -214,28 +215,6 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
               {mine > 0 && <Row label="Kept by account owners" n={mine} of={f.kept} tone="t3" />}
             </ul>
           </div>
-          {s && lead && (
-            <div>
-              <h3>Did it pay for itself?<span>{s.roi.pipeline_per_dollar === null ? "" : `${s.roi.pipeline_per_dollar}x`}</span></h3>
-              <ul className="money">
-                <Row label="Cost" n={s.cost.dollars_cents} of={top} tone="t3" shown={money(s.cost.dollars_cents)} />
-                {s.influence.available && <>
-                  <Row label="New pipeline" n={s.influence.sourced.cents} of={top} shown={money(s.influence.sourced.cents)} />
-                  <Row label="Pipeline it moved" n={s.influence.influenced.cents} of={top} tone="t2" shown={money(s.influence.influenced.cents)} />
-                  <Row label="Won" n={s.influence.won.cents} of={top} shown={money(s.influence.won.cents)} />
-                </>}
-                {s.cost_per_held_cents !== null && <li className="brow"><span>Per meeting held</span><i aria-hidden="true" /><b>{money(s.cost_per_held_cents)}</b></li>}
-              </ul>
-              {s.roi.cost_missing.length > 0 && (
-                <form className="m-act" onSubmit={(e) => { e.preventDefault(); act("POST", `/api/events/${id}/motion/costs`, { category: cost.category || s.roi.cost_missing[0], amount_cents: Math.round(Number(cost.amount) * 100) }); setCost({ category: "", amount: "" }); }}>
-                  <span className="fig over"><b>{s.roi.cost_missing.length}</b> costs to add</span>
-                  <select aria-label="Cost" value={cost.category || s.roi.cost_missing[0]} onChange={(e) => setCost({ ...cost, category: e.target.value })}>{s.roi.cost_missing.map((c) => <option key={c} value={c}>{c === "rep_time" ? "Rep time" : c[0].toUpperCase() + c.slice(1)}</option>)}</select>
-                  <input aria-label="US dollars" inputMode="decimal" placeholder="$" value={cost.amount} onChange={(e) => setCost({ ...cost, amount: e.target.value })} required />
-                  <button className="btn small line" disabled={busy}>Add</button>
-                </form>
-              )}
-            </div>
-          )}
         </section>
       )}
 
@@ -244,7 +223,7 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
       {hot.length > 0 && (
         <div className="m-group m-replies">
           <h3>Waiting on a rep<span className="mute">{hot.length}</span></h3>
-          <ReplyRows rows={hot.slice(0, 40)} open={sheet.reply} state={(r) => booked.has((r as Reply).contact_id ?? "") ? { text: "Meeting booked", soon: false } : { text: CODE_WORDS[r.code ?? ""] ?? "Replied", soon: r.code === "meeting_request" }} />
+          <ReplyRows rows={hot.slice(0, 40)} open={sheet.reply} state={(r) => ({ text: CODE_WORDS[r.code ?? ""] ?? "Replied", soon: r.code === "meeting_request" })} />
         </div>
       )}
 

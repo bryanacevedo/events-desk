@@ -417,6 +417,11 @@ describe("event ROI", () => {
     const s = await computeScorecard(db, h.deps, h.id, 30);
     expect(s.influence.sourced).toEqual({ n: 1, cents: 5_000_000 });
     expect(s.roi.pipeline_per_dollar).toBe(5);
+    // Each credited deal is kept, with the held meeting it is credited to, so the screen can show which deals and why.
+    const [held] = await db.query<{ id: string }>("SELECT id FROM meetings WHERE event_id = $1 AND status = 'held'", [h.id]);
+    expect(s.influence.deals).toEqual([expect.objectContaining({ opportunity_id: "new", account: "Tallgrass Software", kind: "sourced", amount_cents: 5_000_000, meeting_id: held.id })]);
+    const dry = await computeScorecard(db, h.deps, h.id, 30, { write: false });
+    expect(dry.influence.deals?.map((d) => d.opportunity_id)).toEqual(["new"]);
   });
 
   it("an open deal that moved is influenced, and a new deal beside it is not new pipeline", async () => {

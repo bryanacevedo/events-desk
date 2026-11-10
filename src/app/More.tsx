@@ -12,6 +12,7 @@ export function More({ go, showDay }: { go: (to: string) => void; showDay: boole
       <header className="hero" data-ready="1"><div><h1>More</h1></div></header>
       <nav className="morelist" aria-label="More">
         {showDay && <Link to="/my-day" go={go} className="navitem"><span className="ico"><Icon.calendar /></span><span className="lbl">My day</span></Link>}
+        {lead && <Link to="/results" go={go} className="navitem"><span className="ico"><Icon.results /></span><span className="lbl">Results</span></Link>}
         {lead && <Link to="/usage" go={go} className="navitem"><span className="ico"><Icon.usage /></span><span className="lbl">Usage</span></Link>}
         {isGtm(actor) && <Link to="/settings" go={go} className="navitem"><span className="ico"><Icon.settings /></span><span className="lbl">Settings</span></Link>}
       </nav>
