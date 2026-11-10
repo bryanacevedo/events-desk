@@ -200,6 +200,8 @@ Two reviewers, one reading the README against the code and one reading only the 
 
 The plan called for two videos, a short one for visitors and a narrated one for Bryan. A first 84-second cut passed its sound, frame and fact checks and still failed: it skipped most of the system. Bryan chose one video that does both jobs. It runs 3:19, covers every part of the system against a written list, and follows one person from the raw file to the Sheet. Coverage is now part of the video gate. The film's project is kept outside this repo.
 
+**Replaced 2026-11-10.** The system grew past the film (everything after delivery), so it was redone on the same structure: 3:41, one narrator, one company and one person from the attendee list to a deal. A cut with three voices (leadership, an SDR, an engineer) was made first and rejected by Bryan in favor of one narrator. Every camera move is timed to the word it shows. The script was fact-checked by a fresh-eyes review before voicing.
+
 ## 32. The hosted demo runs on Render (2026-11-09)
 
 Cloudflare Workers and Vercel run code in short requests. This app runs long jobs and keeps its demo database in the process, so either would have needed a port and a separate database. Render runs it unchanged as a normal server, on the free plan. Three things make it fit in 512 MB: prebuilt sample data, small Postgres caches, and Node 26, which alone cut startup from about 840 MB to about 300. With no login, whatever one visitor uploaded the next could read, so the hosted demo takes no files.
