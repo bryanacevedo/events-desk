@@ -27,5 +27,5 @@ describe("workbook shape for Google Sheets", () => {
       }
     }
     expect(rules).toBeGreaterThan(5);
-  });
+  }, 30_000);
 });

@@ -21,8 +21,9 @@ describe("Meridian Trade Expo, the large event", () => {
   it("is seeded through the real code paths to delivered, in seconds", async () => {
     expect((await db.query<{ stage: string }>("SELECT stage FROM events WHERE id = 'evt_meridian'"))[0].stage).toBe("delivered");
     // "In seconds" is a claim about the work the seed does, not about how busy the machine is. Wall time swings with the other test files running beside this
-    // one (3.5 s alone, past 15 s under load), so it only has to beat the setup timeout; the work itself is held to a CPU-time bound that load does not move.
-    expect(cpuSeconds).toBeLessThan(20);
+    // one (3.5 s alone, past 15 s under load), so it only has to beat the setup timeout. CPU time moves less, but it still moves: a few seconds on a laptop, 25 to 34 s
+    // on the shared GitHub runner, so the bound is 60 s, loose enough for CI and still a fail if the seed gets an order of magnitude slower.
+    expect(cpuSeconds).toBeLessThan(60);
     expect(seconds).toBeLessThan(100);
     const [r] = await db.query<{ n: number }>("SELECT count(*)::int AS n FROM source_rows WHERE event_id = 'evt_meridian'");
     expect(r.n).toBeGreaterThan(1500);
