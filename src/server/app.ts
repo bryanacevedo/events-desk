@@ -2,6 +2,8 @@
 
 import { readFileSync } from "node:fs";
 import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
+import { secureHeaders } from "hono/secure-headers";
 import type { Db } from "./db.ts";
 import { createEvent, EVENT_COLS, moveEvent, RuleError } from "./events.ts";
 import { spend, spendByStep } from "./ledger.ts";
@@ -45,6 +47,32 @@ const WEBSITE = "(SELECT c.website FROM catalog_events c WHERE c.id = events.cat
 export function createApp(db: Db, cfg: AppConfig) {
   const app = new Hono<Ctx>();
 
+  // Every response says how it may be framed and sniffed. Logos come from Google's favicon service, avatars from this server.
+  app.use("*", secureHeaders({ xFrameOptions: "DENY", referrerPolicy: "strict-origin-when-cross-origin", crossOriginEmbedderPolicy: false, crossOriginResourcePolicy: false,
+    contentSecurityPolicy: { defaultSrc: ["'self'"], imgSrc: ["'self'", "data:", "https://www.google.com", "https://*.gstatic.com", "https://images.unsplash.com"], styleSrc: ["'self'", "'unsafe-inline'"], scriptSrc: ["'self'"], connectSrc: ["'self'"], fontSrc: ["'self'", "data:"], frameAncestors: ["'none'"], objectSrc: ["'none'"], baseUri: ["'self'"] } }));
+  // No body is read whole before its size is known: files may be 20 MB, everything else 1 MB.
+  const FILE_ROUTE = /^\/api\/(events\/[^/]+\/(upload|new-registrations|review|top-ups)|icp\/documents)(\/|$)/;
+  app.use("*", async (c, next) => {
+    if (c.req.method === "GET" || c.req.method === "HEAD") return next();
+    return bodyLimit({ maxSize: FILE_ROUTE.test(c.req.path) ? 21_000_000 : 1_000_000, onError: (cc) => cc.text("Too large", 413) })(c, next);
+  });
+  // The hosted demo has no login: its webhooks are refused (the simulated tools call the desk in process), and each address gets a fair share of writes.
+  if (cfg.publicDemo) {
+    const writes = new Map<string, { n: number; at: number }>();
+    app.use("/hooks/*", async (c) => c.text("This public demo takes no webhooks.", 403));
+    app.use("/slack/*", async (c) => c.text("This public demo takes no webhooks.", 403));
+    app.use("/api/*", async (c, next) => {
+      if (c.req.method === "GET") return next();
+      const ip = (c.req.header("x-forwarded-for") ?? "").split(",")[0].trim() || "local";
+      const now = Date.now(), w = writes.get(ip);
+      const cur = w && now - w.at < 60_000 ? w : { n: 0, at: now };
+      cur.n += 1; writes.set(ip, cur);
+      if (writes.size > 5000) writes.clear();
+      if (cur.n > 60) return c.json({ error: "Too many changes in a minute. Try again shortly." }, 429);
+      return next();
+    });
+  }
+
   app.use("/api/*", async (c, next) => {
     if (c.req.method === "GET") {
       // Reads say who is acting too. Budget, Usage and Results are company money: leadership's and GTM Engineering's.
@@ -56,7 +84,7 @@ export function createApp(db: Db, cfg: AppConfig) {
       const actor = decodeURIComponent(c.req.header("x-actor") ?? "").trim();
       if (!actor) return bad("Say who you are before making changes.");
       c.set("actor", actor.slice(0, 60));
-      if (cfg.publicDemo && /^\/api\/events\/[^/]+\/(upload|new-registrations)$/.test(c.req.path)) return bad("This public demo does not take files. To try your own list, run it yourself: the README shows how.", 403);
+      if (cfg.publicDemo && /^\/api\/events\/[^/]+\/(upload|new-registrations|review)$/.test(c.req.path)) return bad("This public demo does not take files. To try your own list, run it yourself: the README shows how.", 403);
       // Settings and the ICP are GTM Engineering's. Acting as is not security; this keeps the desk honest until a real login.
       if (/^\/api\/(icp|settings)(\/|$)/.test(c.req.path) && !isGtm(c.get("actor"))) return bad(SETTINGS_REFUSAL, 403);
     }
@@ -374,7 +402,8 @@ export function createApp(db: Db, cfg: AppConfig) {
        FROM approvals a JOIN events e ON e.id = a.event_id LEFT JOIN cost_cards k ON k.id = a.card_id
        WHERE a.status = 'pending' ORDER BY a.created_at`,
     );
-    return c.json({ approvals });
+    // Seat prices and card estimates are company money: a rep gets the decisions without them.
+    return c.json({ approvals: isLead(c.get("actor")) ? approvals : forRep(approvals).map((a) => ({ ...(a as object), seat_price_cents: null })) });
   });
 
   // The Slack-style panel. This route does not exist outside demo mode.

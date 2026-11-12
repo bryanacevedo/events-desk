@@ -26,4 +26,33 @@ describe("the public demo", () => {
     const r = await post(createApp(db, { demo: true }), "/api/events/any/upload");
     expect(r.status).not.toBe(403);
   });
+  it("refuses a review workbook, webhooks and Slack calls", async () => {
+    const app = createApp(db, { demo: true, publicDemo: true });
+    expect((await post(app, "/api/events/any/review")).status).toBe(403);
+    expect((await app.request("/hooks/sequencer/instantly", { method: "POST", headers: { "x-desk-secret": "fake-secret" }, body: "{}" })).status).toBe(403);
+    expect((await app.request("/slack/commands", { method: "POST", body: "" })).status).toBe(403);
+  });
+  it("limits how many changes one address makes in a minute", async () => {
+    const app = createApp(db, { demo: true, publicDemo: true });
+    const hit = () => app.request("/api/events", { method: "POST", headers: { "x-actor": "Maya%20Ortiz", "x-forwarded-for": "9.9.9.9", "content-type": "application/json" }, body: "{}" });
+    for (let i = 0; i < 60; i++) expect((await hit()).status).not.toBe(429);
+    expect((await hit()).status).toBe(429);
+  });
+});
+
+describe("every deployment", () => {
+  it("refuses a body over the limit before reading it, and sends security headers", async () => {
+    const app = createApp(db, { demo: true });
+    const big = "x".repeat(1_100_000);
+    const r = await app.request("/api/events", { method: "POST", headers: { "x-actor": "Maya%20Ortiz", "content-type": "application/json", "content-length": String(big.length) }, body: big });
+    expect(r.status).toBe(413);
+    const g = await app.request("/api/events");
+    expect(g.headers.get("x-frame-options")).toBe("DENY");
+    expect(g.headers.get("content-security-policy")).toMatch(/frame-ancestors 'none'/);
+  });
+  it("gives a rep the pending decisions without seat prices or estimates", async () => {
+    const app = createApp(db, { demo: true });
+    const r = await (await app.request("/api/approvals", { headers: { "x-actor": "Maya%20Ortiz" } })).json() as { approvals: Record<string, unknown>[] };
+    for (const a of r.approvals) { expect(a.seat_price_cents ?? null).toBeNull(); expect(a.est_cents).toBeUndefined(); }
+  });
 });

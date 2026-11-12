@@ -246,7 +246,12 @@ export function liveWebsite(f: typeof fetch = fetch): WebsiteReader {
             continue;
           }
           if (!r.ok || !(r.headers.get("content-type") ?? "").includes("text/html")) return null;
-          const html = (await r.text()).slice(0, 200_000);
+          // Read at most 200 KB, then stop: a huge page is never held whole.
+          let html = "";
+          const reader = r.body?.getReader(); const dec = new TextDecoder();
+          while (reader && html.length < 200_000) { const { value, done } = await reader.read(); if (done) break; html += dec.decode(value, { stream: true }); }
+          await reader?.cancel().catch(() => {});
+          html = html.slice(0, 200_000);
           const text = html.replace(/<(script|style|noscript)[\s\S]*?<\/\1>/gi, " ").replace(/<[^>]+>/g, " ").replace(/&nbsp;|&amp;|&#\d+;/g, " ").replace(/\s+/g, " ").trim().slice(0, 4000);
           return text.length >= 40 ? text : null;
         }

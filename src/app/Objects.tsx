@@ -478,7 +478,7 @@ export function DealSheet({ id, close }: { id: string; close: () => void }) {
         {d.stage && <p><b>{d.stage}</b><span>stage</span></p>}
         <p><b>{dealWord(d)}</b><span>credit</span></p>
       </div>
-      {d.url && <div className="ob-acts"><a className="btn ob-reply" href={d.url} target="_blank" rel="noopener noreferrer">Open in {crmName(d.url)}<Out /></a></div>}
+      {d.url && /^https?:\/\//i.test(d.url) && <div className="ob-acts"><a className="btn ob-reply" href={d.url} target="_blank" rel="noopener noreferrer">Open in {crmName(d.url)}<Out /></a></div>}
       {(d.owner || d.close_date || d.next_step) && (
         <dl className="sheet-facts ob-deal-facts">
           {d.owner && <div><dt>Owner</dt><dd>{d.owner}</dd></div>}
