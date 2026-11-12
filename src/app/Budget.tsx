@@ -38,7 +38,7 @@ const describe = (name: string, s: Sums) => `${name}: ${money(s.spent)} spent, $
 function Left({ left, big = false }: { left: number; big?: boolean }) {
   return (
     <p className={big ? "byear-lead" : "bq-left"}>
-      {left < 0 ? <Flag cents={left} words="over" over /> : <span className="fig"><b>{money(left)}</b> left</span>}
+      {left < 0 ? <Flag cents={left} words="over" over /> : <span className="fig"><b>{money(left)}</b> {big ? "left this year" : "left"}</span>}
     </p>
   );
 }

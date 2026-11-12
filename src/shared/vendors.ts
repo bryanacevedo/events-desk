@@ -58,7 +58,7 @@ export function creditWork(step: string | null | undefined, name?: string | null
 }
 const AI_WORDS: Record<string, string> = {
   company_tier: "Tiering companies", second_look: "Second opinion on tiers", website_read: "Reading company websites", title_parse: "Reading job titles", title_tier: "Tiering job titles",
-  review: "Second look at people", perspective: "Writing the Summary", icp_compile: "Reading the ICP document", concierge: "Answering questions in Slack",
+  review: "Review flags", perspective: "Writing the Summary", icp_compile: "Reading the ICP document", concierge: "Answering questions in Slack",
   reply_classify: "Reading replies", debrief_extract: "Sorting notes from reps",
 };
 export function aiWork(step: string | null | undefined): string {

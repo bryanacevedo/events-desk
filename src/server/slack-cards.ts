@@ -79,7 +79,7 @@ export const debriefCard = (d: { event: string; meetings: number; debrief_id: st
   text: `What did you learn at ${d.event}?`,
   blocks: [
     header(`How was ${d.event}?`),
-    say(`You held ${d.meetings} ${d.meetings === 1 ? "meeting" : "meetings"}. A few lines is plenty: who mattered, what they said, what you would do differently.`),
+    say(`You held ${d.meetings} ${d.meetings === 1 ? "meeting" : "meetings"}. A few lines is plenty.`),
     { type: "actions", elements: [button("Write it", "debrief_open", d.debrief_id, "primary")] },
   ],
 });
@@ -141,7 +141,7 @@ export function postEventCard(w: { event: string; event_id: string; counts: { ch
 
 export const postEventReminderCard = (w: { event: string; event_id: string; last_press: string }): CardMessage => ({
   text: `The follow-up for ${w.event} has not started.`,
-  blocks: [say(`*The follow-up for ${esc(w.event)} has not started*\nThe sooner after the event, the better it lands.`), { type: "actions", elements: [button("Start the follow-up", "post_event_start", w.event_id, "primary")] }, small(`Works until ${day(w.last_press)}`)],
+  blocks: [say(`*The follow-up for ${esc(w.event)} has not started*`), { type: "actions", elements: [button("Start the follow-up", "post_event_start", w.event_id, "primary")] }, small(`Works until ${day(w.last_press)}`)],
 });
 
 /** A hot conversation at the booth goes to the rep who had it, the same day. It never waits for a sequence. */

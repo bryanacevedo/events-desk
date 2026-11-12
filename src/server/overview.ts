@@ -16,7 +16,7 @@ export interface OutreachNeed { kind: "replies" | "follow_up" | "paused" | "meet
 /** An event with outreach going: how far it has got. */
 export interface LiveRow { id: string; name: string; website: string | null; starts_on: string; motion: string; sheet_url: string | null; last_day: string; post_started_at: string | null; kept: number; sent: number; replied: number; held: number }
 /** An event's result so far: what it cost against the pipeline it made or moved. */
-export interface ResultRow { id: string; name: string; website: string | null; motion: string; final: boolean; cost_cents: number; pipeline_cents: number; held: number; per_dollar: number | null; scored: boolean }
+export interface ResultRow { id: string; name: string; website: string | null; motion: string; final: boolean; cost_cents: number; pipeline_cents: number; held: number; per_dollar: number | null; scored: boolean; costs_missing: number }
 
 const WEBSITE = "(SELECT k.website FROM catalog_events k WHERE k.id = e.catalog_id) AS website";
 
@@ -72,7 +72,7 @@ export async function overview(db: Db, deps?: LifecycleDeps): Promise<{ delivere
   for (const e of scored) {
     const m = e.metrics ?? await computeScorecard(db, deps, e.id, 30, { write: false }).catch(() => null);
     if (!m) continue;
-    results.push({ id: e.id, name: e.name, website: e.website, motion: e.motion, final: e.motion === "scored", cost_cents: m.cost.dollars_cents, pipeline_cents: m.influence.sourced.cents + m.influence.influenced.cents, held: m.held_all, per_dollar: m.roi.pipeline_per_dollar, scored: Boolean(m.score) });
+    results.push({ id: e.id, name: e.name, website: e.website, motion: e.motion, final: e.motion === "scored", cost_cents: m.cost.dollars_cents, pipeline_cents: m.influence.sourced.cents + m.influence.influenced.cents, held: m.held_all, per_dollar: m.roi.pipeline_per_dollar, scored: Boolean(m.score), costs_missing: ((m.roi as { cost_missing?: string[] }).cost_missing ?? []).length });
   }
   return { delivered, needs, live, results };
 }

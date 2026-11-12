@@ -70,7 +70,7 @@ function needSide(i: OutreachNeed): { text: string; soon: boolean } {
 const GROUPS: [string, (i: NeedItem) => boolean][] = [
   ["No attendee list", (i) => i.kind === "soon" || (i.kind === "step" && i.fix === "Add the attendee list")],
   ["Paused", (i) => i.kind === "paused"],
-  ["Cases to settle", (i) => i.kind === "case"],
+  ["Events with cases to settle", (i) => i.kind === "case"],
   ["Ready to run", (i) => i.kind === "step" && i.fix === "Review and run"],
   ["Not priced yet", (i) => i.kind === "step" && i.fix === "Price it"],
 ];
@@ -151,7 +151,7 @@ export function Overview({ go, sheetId }: { go: (to: string) => void; sheetId: s
               <div className="slot" key={e.id} style={{ "--i": order } as CSSProperties}>
                 <p className="c-month">{monthStart ? monthLabel(e.starts_on) : " "}</p>
                 {i === firstUpcoming && <div className="c-today" ref={todayMark}><span>Today</span></div>}
-                <Link to={`/?event=${e.id}`} go={go} data-opens-sheet="" data-row={e.id} title={e.name} style={{ "--brand": e.brand_color ?? "#1F5D3F" } as CSSProperties} className={`card ${s.tone}${past ? " past" : ""}${sheetId === e.id ? " open" : ""}`}>
+                <Link to={`/?event=${e.id}`} go={go} data-opens-sheet="" data-row={e.id} title={e.name} style={{ "--brand": e.brand_color ?? "#1F5D3F" } as CSSProperties} tabIndex={past ? -1 : undefined} className={`card ${s.tone}${past ? " past" : ""}${sheetId === e.id ? " open" : ""}`}>
                   <span className="c-band">
                     <span className="c-day"><b>{d.getDate()}</b><span>{d.toLocaleDateString("en-GB", { month: "short" })}<br />{d.toLocaleDateString("en-GB", { weekday: "short" })}</span></span>
                     <EventLogo name={e.name} website={e.website} size={38} />
@@ -173,7 +173,7 @@ export function Overview({ go, sheetId }: { go: (to: string) => void; sheetId: s
 
       <div className="ov-cols">
         <section className="ov" aria-label="Needs someone">
-          <div className="ov-h"><h2 className="display">Needs someone</h2>{waiting > 0 && <span>{waiting}</span>}</div>
+          <div className="ov-h"><h2 className="display">Needs someone</h2></div>
           {NEED_GROUPS.map(([kind, title, fix]) => {
             const items = outreachNeeds.filter((n) => n.kind === kind);
             if (!items.length) return null;
@@ -271,7 +271,7 @@ export function Overview({ go, sheetId }: { go: (to: string) => void; sheetId: s
                   {ov.results.map((r) => (
                     <li key={r.id} className="opens" data-opens-sheet="" onClick={(ev) => { if (!(ev.target as HTMLElement).closest("a, button")) go(`/?event=${r.id}`); }}>
                       <EventLogo name={r.name} website={r.website} size={34} />
-                      <div className="who-text"><p className="name"><Link to={`/?event=${r.id}`} go={go} title={r.name} data-opens-sheet="">{r.name}</Link></p><p className="small mute">{`${money(r.pipeline_cents)} pipeline  ·  ${money(r.cost_cents)} cost`}</p></div>
+                      <div className="who-text"><p className="name"><Link to={`/?event=${r.id}`} go={go} title={r.name} data-opens-sheet="">{r.name}</Link></p><p className="small mute">{[`${money(r.pipeline_cents)} pipeline`, `${money(r.cost_cents)} cost`, (r as { costs_missing?: number }).costs_missing ? `${(r as { costs_missing?: number }).costs_missing} to enter` : null, r.held < 5 ? "under 5 meetings" : null].filter(Boolean).join("  ·  ")}</p></div>
                       <p className={`paid-x${r.scored ? "" : " thin"}`}>{r.per_dollar !== null ? <><b>{r.per_dollar.toFixed(1)}</b>x</> : <span className="mute">no cost yet</span>}</p>
                     </li>
                   ))}

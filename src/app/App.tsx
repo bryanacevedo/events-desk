@@ -51,7 +51,7 @@ export function usePath() {
   return [path, go] as const;
 }
 
-export function Link({ to, go, className, children, ...rest }: { to: string; go: (to: string) => void; className?: string; children?: ReactNode; "aria-label"?: string; "aria-current"?: "page"; style?: React.CSSProperties; title?: string }) {
+export function Link({ to, go, className, children, ...rest }: { to: string; go: (to: string) => void; className?: string; children?: ReactNode; "aria-label"?: string; "aria-current"?: "page"; style?: React.CSSProperties; title?: string; tabIndex?: number }) {
   return <a href={to} className={className} {...rest} onClick={(ev) => { if (ev.metaKey || ev.ctrlKey || ev.button !== 0) return; ev.preventDefault(); go(to); }}>{children}</a>;
 }
 

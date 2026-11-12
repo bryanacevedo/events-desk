@@ -68,7 +68,7 @@ export function Result({ eventId, eventName, motion, lastDay, live, scorecards, 
         <div className="md-hello">
           <p>{kicker}</p>
           {lead && m.influence.available
-            ? <h2><b className={thin ? "thin" : undefined} title={thin ? "Fewer than five held meetings" : undefined}>{ratio === null ? "None" : times(ratio)}</b><span>pipeline per dollar</span></h2>
+            ? <h2><b className={thin ? "thin" : undefined} title={thin ? "Fewer than five held meetings" : undefined}>{ratio === null ? "None" : times(ratio)}</b><span>{["pipeline per dollar", thin ? "under 5 meetings" : null, m.roi.cost_missing.length ? `${m.roi.cost_missing.length} ${m.roi.cost_missing.length === 1 ? "cost" : "costs"} to enter` : null].filter(Boolean).join(", ")}</span></h2>
             : <h2><b>{num(m.held_all)}</b><span>{m.held_all === 1 ? "meeting held" : "meetings held"}</span></h2>}
         </div>
         <div className="md-figs">
@@ -110,7 +110,7 @@ export function Result({ eventId, eventName, motion, lastDay, live, scorecards, 
         )}
 
         {toReview.map((d) => (
-          <article key={d.id} className="rs-review">
+          <article key={d.id} className="rs-review decide-halo">
             <p className="rs-review-k"><b>{d.author}</b>{d.answered_at ? `, ${shortDate(d.answered_at.slice(0, 10))}` : ""}</p>
             <p className="rs-review-body">{d.body}</p>
             <div className="ob-acts">
@@ -149,8 +149,8 @@ export function ResultEvidence({ eventId, motion, lastDay, live, scorecards, onC
           <div>
             <h3>Accounts with pipeline</h3>
             <ul>
-              <li className="brow"><span>Ones we met</span><i aria-hidden="true"><u className="t1" style={{ width: `${pct(c.met_with_pipeline, c.met_accounts)}%` }} /></i><b>{pct(c.met_with_pipeline, c.met_accounts)}%</b></li>
-              <li className="brow" title={c.basis === "holdout" ? "A random share of the list, never contacted, kept for comparison" : "Accounts on the list nobody contacted"}><span>{c.basis === "holdout" ? "Ones we left out on purpose" : "Ones we never reached"}</span><i aria-hidden="true"><u className="t3" style={{ width: `${pct(c.control_with_pipeline, c.control_accounts)}%` }} /></i><b>{pct(c.control_with_pipeline, c.control_accounts)}%</b></li>
+              <li className="brow"><span>Accounts we met</span><i aria-hidden="true"><u className="t1" style={{ width: `${pct(c.met_with_pipeline, c.met_accounts)}%` }} /></i><b>{c.met_with_pipeline} of {c.met_accounts}</b></li>
+              <li className="brow" title={c.basis === "holdout" ? "A random share of the list, never contacted, kept for comparison" : "Accounts on the list nobody contacted"}><span>{c.basis === "holdout" ? "Accounts left out on purpose" : "Accounts nobody reached"}</span><i aria-hidden="true"><u className="t3" style={{ width: `${pct(c.control_with_pipeline, c.control_accounts)}%` }} /></i><b>{c.control_with_pipeline} of {c.control_accounts}</b></li>
             </ul>
           </div>
         )}
@@ -212,7 +212,7 @@ export function ResultView({ id, name, onChange }: { id: string; name: string; o
       <Result eventId={id} eventName={name} motion={o.motion} lastDay={lastDay} live={o.live_score} scorecards={o.scorecards ?? []} debriefs={o.debriefs ?? []} lead={lead} onChange={changed} />
       {lead && (
         <div className="folds">
-          <Fold icon={<Icon.cost />} title="How we know" peek={c?.available ? <>{pct(c.met_with_pipeline, c.met_accounts)}% of met accounts have pipeline<i>{pct(c.control_with_pipeline, c.control_accounts)}% of the rest</i></> : undefined}>
+          <Fold icon={<Icon.cost />} title="Met against the rest" peek={c?.available ? <>{c.met_with_pipeline} of {c.met_accounts} met accounts have pipeline<i>{c.control_with_pipeline} of {c.control_accounts} of the rest</i></> : undefined}>
             <ResultEvidence eventId={id} motion={o.motion} lastDay={lastDay} live={o.live_score} scorecards={o.scorecards ?? []} onChange={changed} />
           </Fold>
         </div>

@@ -1071,7 +1071,7 @@ function CostView({ id, done, children }: { id: string; done: boolean; children:
   return (
     <section className="cost-view" data-ready="1">
       <header className="md-hero rs-hero">
-        <div className="md-hello"><h2><b>{money(c.total_cents)}</b><span>{done ? "spent" : "spent so far"}</span></h2></div>
+        <div className="md-hello"><h2><b>{money(c.total_cents)}</b><span>{done ? "cost" : "cost so far"}</span></h2></div>
         <div className="md-figs">
           {c.missing.length > 0 && <p><b>{c.missing.length}</b><span>{c.missing.length === 1 ? "line to enter" : "lines to enter"}</span></p>}
           {c.owed_seats > 0 && <p className="owed"><b>{money(c.owed_cents)}</b><span>{c.owed_seats === 1 ? "seat to buy" : "seats to buy"}</span></p>}

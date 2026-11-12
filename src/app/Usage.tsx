@@ -93,7 +93,7 @@ function Bill({ ai, year, month }: { ai: View["ai"]; year: number; month: number
         {!ai.parts.length && <li className="mute"><span>No calls yet</span></li>}
       </ul>
       {ai.flat_calls > 0 && <p className="bill-saved small mute"><span>Flat {ai.flat_cents_per_call}¢ a call</span><i /><span>{n(ai.flat_calls)} calls</span></p>}
-      {ai.saved_cents > 0 && <p className="bill-saved small mute"><span>Saved</span><i /><span>{usd(ai.saved_cents)}</span></p>}
+      {ai.saved_cents > 0 && <p className="bill-saved small mute"><span>Saved in {MONTHS[month - 1]}</span><i /><span>{usd(ai.saved_cents)}</span></p>}
       <p className="bill-foot"><span>{year} so far</span><i /><span>{usd(ai.year_cents)}</span></p>
     </aside>
   );
@@ -174,7 +174,7 @@ export function Usage({ go, search }: { go: (to: string) => void; search: URLSea
 
       {v.vendor_health.length > 0 && (
         <section className="btable" aria-label="Lookups">
-          <div className="grp"><h2 className="display">Lookups</h2></div>
+          <div className="grp"><h2 className="display">Lookups, all time</h2></div>
           <div className="rows">{v.vendor_health.map((h) => <div className="srow" key={h.vendor}><span>{h.vendor}</span><span>{n(h.attempts)}{h.failures > 0 && <span className="mute"> · {n(h.failures)} failed</span>}</span></div>)}</div>
         </section>
       )}

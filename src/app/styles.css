@@ -66,7 +66,7 @@ ul, ol { padding: 0; list-style: none; }
 .navitem:hover { color: var(--ink); }
 .navitem[aria-current="page"] { background: var(--ground); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
 .navitem[aria-current="page"] .ico { color: var(--green); }
-.navitem .n, .tab .n { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 11px; background: var(--orange); color: #FFFFFF; font-size: 12px; font-weight: 500; }
+.navitem .n, .tab .n { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 11px; background: var(--orange-2); color: #FFFFFF; font-size: 12px; font-weight: 600; }
 .side-cta { width: 100%; margin-bottom: 4px; }
 .spacer { flex: 1; }
 .side-foot { display: grid; gap: 6px; padding-top: 12px; border-top: 1px solid var(--line); }
@@ -532,7 +532,7 @@ details summary::-webkit-details-marker { display: none; }
 .tdot { border-radius: 50%; margin: 0; }
 
 
-.plist { display: grid; gap: 12px; max-width: 1100px; }
+.plist { display: grid; gap: 12px; }
 .plist .grp { padding-top: 10px; }
 .prows { display: grid; }
 .prow {
@@ -845,8 +845,10 @@ select:not([multiple]) {
 .card:hover::after { opacity: 1; }
 .card:active { --ly: -2px; }
 .card.open { box-shadow: 0 0 0 2px var(--green), 0 18px 30px -14px rgba(21, 35, 27, 0.3); }
-.card.past { opacity: 0.72; filter: saturate(0.25); }
-.card.past:hover, .card.past.open { opacity: 1; filter: none; }
+/* A past event fades its date band and logo; its words stay readable. */
+.card.past .c-band { opacity: 0.6; filter: saturate(0.25); transition: opacity 220ms ease-out, filter 220ms ease-out; }
+.card.past .c-state { color: var(--mute); }
+.card.past:hover .c-band, .card.past.open .c-band { opacity: 1; filter: none; }
 
 .c-band { display: flex; align-items: center; justify-content: space-between; flex: none; height: 74px; padding: 0 14px; background: color-mix(in srgb, var(--brand) 13%, white); transition: background-color 240ms ease-out; }
 .card:hover .c-band { background: color-mix(in srgb, var(--brand) 26%, white); }
@@ -912,8 +914,8 @@ select:not([multiple]) {
 .abc span { display: inline-flex; align-items: baseline; justify-content: flex-end; gap: 4px; min-width: 34px; font: 600 16px/20px var(--display); color: var(--ink); }
 .abc i { font: 500 11px/20px var(--sans); font-style: normal; color: var(--mute); }
 .abc .a { color: var(--green); }
-.abc .zero { color: var(--line-2); font-weight: 500; }
-.abc .zero i { color: var(--line-2); }
+.abc .zero { color: var(--mute); font-weight: 400; }
+.abc .zero i { color: var(--mute); }
 
 .seatcall { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 16px 16px 16px 22px; border-radius: 20px; background: var(--green); color: #FFFFFF; transition: background-color 200ms ease-out, transform 240ms var(--ease), box-shadow 240ms ease-out; }
 .seatcall > b { font: 500 46px/1 var(--display); }
@@ -1706,7 +1708,7 @@ body.dlg-open { overflow: hidden; }
 .md-figs p { display: grid; gap: 4px; margin: 0; justify-items: center; text-align: center; }
 .md-figs b { font: 500 44px/1 var(--display); color: var(--ink); }
 .md-figs span { font-size: 13px; line-height: 16px; color: var(--mute); }
-.md-figs .zero b { color: var(--line-2); }
+.md-figs .zero b { color: var(--mute); font-weight: 400; }
 .md-h { margin: 0 0 12px; font: 500 20px/26px var(--display); }
 .md-clear { font: 500 20px/28px var(--display); color: var(--mute); }
 .clamp2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
@@ -2115,7 +2117,7 @@ ul.settled > li.st-group { display: block; padding: 0; border: 0; margin-top: 18
 .use-bar { display: block; height: 3px; border-radius: 2px; background: var(--line); overflow: hidden; }
 .use-bar u { display: block; height: 100%; background: var(--green); border-radius: 2px; transform-origin: left; animation: draw 700ms var(--ease) backwards; }
 .use-m.near .use-bar u { background: var(--orange); }
-.use-m.none .use-v { color: var(--line-2); }
+.use-m.none .use-v { color: var(--mute); }
 @media (max-width: 760px) { .use-row { grid-template-columns: auto minmax(0, 1fr); } .use-m { grid-column: 2; } }
 /* Budget by event: logo, name, quarter and seats, the event's spend as a bar on one shared scale, and its total. */
 .bud-row { grid-template-columns: auto minmax(180px, 1.3fr) 80px minmax(140px, 1.6fr) 150px; gap: 24px; min-height: 68px; }
@@ -2353,7 +2355,7 @@ section.more[aria-label="More"] { max-width: none; }
 .ob-sheet[data-kind="person"] { --kind: #A8475D; }
 .ob-sheet[data-kind="company"] { --kind: #4B5BA6; }
 .ob-sheet[data-kind="sequence"] { --kind: #8A5A2E; }
-.ob-kind { display: inline-flex; align-items: center; gap: 8px; margin: -6px 0 -10px; font: 600 12px/16px var(--sans); letter-spacing: 0.02em; color: var(--kind); animation: rise 280ms var(--ease) backwards; }
+.ob-kind { display: inline-flex; align-items: center; gap: 8px; margin: -6px 0 -10px; font: 600 12px/16px var(--sans); letter-spacing: 0.02em; color: var(--ink-2); animation: rise 280ms var(--ease) backwards; }
 .ob-kind::before { content: ""; width: 14px; height: 3px; border-radius: 2px; background: var(--kind); }
 
 /* Person sheet: why they are on the list, beside the grid that decides it. */
@@ -2452,3 +2454,20 @@ section.more[aria-label="More"] { max-width: none; }
 @media (max-width: 760px) { .fold > .m-fold { padding-left: 14px; padding-right: 14px; } }
 /* A meeting row's line wraps rather than cutting who it was with. */
 .mt-col .ob-who > span { white-space: normal; }
+
+/* Upgrade, 2026-11-11. */
+/* Monogram logos (no image) stay out of the overlapping stack, where they would be cut off. */
+.seatcall-logos .logo.fallback { display: none; }
+@media (max-width: 760px) {
+  /* On a phone the one decision on Overview comes first. */
+  .ov-cols { display: flex; flex-direction: column; gap: 28px; }
+  .ov-right { display: contents; }
+  .ov-right > .seatcall, .ov-right > a.seatcall { order: -1; }
+  .to, .brand, .ob-who a { min-height: 44px; display: inline-flex; align-items: center; }
+}
+/* The one thing on a screen that waits on someone's decision carries a soft halo (from Account Desk's proposed play):
+   a tight wash ring and a wide blurred glow, never a hard border. It settles once, then rests. */
+.decide-halo { position: relative; border-radius: 16px; box-shadow: 0 0 0 4px color-mix(in srgb, var(--green) 10%, transparent), 0 0 0 5px color-mix(in srgb, var(--green) 16%, transparent), 0 16px 44px -10px color-mix(in srgb, var(--green) 38%, transparent); animation: halo-in 2.4s var(--ease) 1; }
+@keyframes halo-in { from { box-shadow: 0 0 0 12px transparent, 0 0 0 0 transparent, 0 0 0 0 transparent; } }
+@media (prefers-reduced-motion: reduce) { .decide-halo { animation: none; } }
+.rs-review.decide-halo { background: var(--ground); margin: 8px 6px 12px; }

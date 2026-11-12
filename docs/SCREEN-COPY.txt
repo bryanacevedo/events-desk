@@ -5,7 +5,7 @@
 # of # held a meeting
 # of # live
 # of # used
-#% of met accounts have pipeline
+# of # met accounts have pipeline
 #, #, not requested. Request a seat
 A line for the version history
 Accounts you know will be there (optional)
@@ -49,3 +49,4 @@ Up to ##
 Usage is for leadership and GTM Engineering.
 Waiting on # to run this.
 Where the pipeline came from
+# of # of the rest

@@ -225,7 +225,7 @@ function CostStory({ id, done }: { id: string; done: boolean }) {
   const fig = (b: string, label: string) => <p key={label}><b>{b}</b><span>{label}</span></p>;
   return (
     <div className="md-figs ob-figs sheet-figs">
-      {fig(money(c.total_cents), done ? "spent" : "spent so far")}
+      {fig(money(c.total_cents), done ? "cost" : "cost so far")}
       {fig(money(c.tickets_cents), "tickets")}
       {c.travel_cents > 0 && fig(money(c.travel_cents), "travel")}
       {c.other_cents > 0 && fig(money(c.other_cents), "event costs")}

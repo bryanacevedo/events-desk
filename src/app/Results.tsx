@@ -58,13 +58,13 @@ export function Results({ go }: { go: (to: string) => void }) {
           </header>
 
           <div className="rs-sec">
-            <h3 className="rs-h">Event by event</h3>
+            <h3 className="rs-h">Events</h3>
             <ul className="ob-tray">{ranked.map((r, i) => (
               <li key={r.id} style={{ "--i": i } as CSSProperties}>
                 <Link to={withSheet(r.id)} go={go} className="ob-row rs-event" data-opens-sheet="" data-row={r.id}>
                   <span className="ob-logo"><EventLogo name={r.name} website={r.website} size={30} /></span>
-                  <span className="ob-who"><b>{r.name}</b><span>{[shortDate(r.starts_on), r.venue?.split(",").pop()?.trim(), r.notes.asked ? `${r.notes.written}/${r.notes.asked} notes` : null].filter(Boolean).join(" · ")}</span></span>
-                  <span className={`rs-fig${r.scored ? "" : " thin"}`}><b>{r.per_dollar === null ? "None" : times(r.per_dollar)}</b><span>per dollar</span></span>
+                  <span className="ob-who"><b>{r.name}</b><span>{[shortDate(r.starts_on), r.venue?.split(",").pop()?.trim(), r.notes.asked ? `${r.notes.written} of ${r.notes.asked} notes` : null, r.costs_missing ? `${r.costs_missing} ${r.costs_missing === 1 ? "cost" : "costs"} to enter` : null].filter(Boolean).join(" · ")}</span></span>
+                  <span className={`rs-fig${r.scored ? "" : " thin"}`}><b>{r.per_dollar === null ? "None" : times(r.per_dollar)}</b><span>{r.held < 5 ? "per dollar, under 5 meetings" : "per dollar"}</span></span>
                   <span className="rs-fig"><b>{money(r.pipeline_cents)}</b><span>pipeline</span></span>
                   <span className="ob-end"><span className="ob-when">{r.final ? "Scored" : "Closing"}</span><span className="ob-go">Open<Arrow /></span></span>
                 </Link>
@@ -87,7 +87,7 @@ export function Results({ go }: { go: (to: string) => void }) {
               <div key={kind}>
                 <h3>{title}</h3>
                 <ul>{g.map((t) => (
-                  <li key={t.group_value} className="brow" title={`${t.held} of ${t.people} held a meeting`}><span>{label(t.group_value)}</span><i aria-hidden="true"><u className="t1" style={{ width: `${Math.round(((t.rate ?? 0) / top) * 100)}%` }} /></i><b>{Math.round((t.rate ?? 0) * 100)}%</b></li>
+                  <li key={t.group_value} className="brow" title={`${t.held} of ${t.people} held a meeting`}><span>{label(t.group_value)}</span><i aria-hidden="true"><u className="t1" style={{ width: `${Math.round(((t.rate ?? 0) / top) * 100)}%` }} /></i><b>{t.held} of {t.people}</b></li>
                 ))}</ul>
               </div>
             );
