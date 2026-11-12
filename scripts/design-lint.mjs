@@ -3,7 +3,10 @@
 
    Rules
      pill            a status, date, count, badge, chip, tag or pill class with a fully rounded corner and a background or tint
-     dot             a small (10px or less) round coloured shape: a ::before or ::after, or a class containing "dot"
+     dot             a round coloured shape by geometry, whatever its class: 12px or less each way, border-radius 50% or more, a background colour
+     pill-radius     any element with border-radius 999px or more (avatars, logos, toggles, switches, progress and track bars, and real action buttons excepted:
+                     a btn or button class, or a filled element 28px or taller)
+     idle-motion     an animation named or used on pulse, blink or breath
      warm-warning    amber, orange or brown text or background (hue 20 to 50, saturation over 40%) on late, over, overdue, warn, warning, due or alert
      text-link-cta   an anchor or link styled as a link whose text starts "Open the", "See all", "View all", "View more", "Show all", "Go to", "Learn more"
      allow-reason    a `design-lint: allow` comment with no reason after it
@@ -152,8 +155,12 @@ function cssOf(file, raw) {
 }
 
 const PILL_WORDS = new Set(["status", "statuses", "date", "dates", "count", "counts", "badge", "badges", "chip", "chips", "tag", "tags", "pill", "pills"]);
-const PILL_EXEMPT = /avatar|logo|mark|toggle|switch|radio|checkbox/i;
-const DOT_EXEMPT = /toggle|switch|radio|checkbox/i;
+const PILL_EXEMPT = /avatar|logo|(^|[^a-z])marks?([^a-z]|$)|toggle|switch|radio|checkbox/i;
+const DOT_EXEMPT = PILL_EXEMPT;
+const RADIUS_EXEMPT = /avatar|logo|toggle|switch|progress|track|fill|(^|[^a-z])bar([^a-z]|$)/i;
+// Real action buttons are not pills: Bryan, 2026-11-12, "solid colored buttons, big, they dont look ai".
+const BUTTON_RE = /btn|button/i;
+const MOTION_RE = /pulse|blink|breath/i;
 const WARM_WORDS = new Set(["late", "over", "overdue", "warn", "warning", "due", "alert"]);
 const hasFill = (d) => ["background", "background-color"].some((p) => d.has(p) && !/^(none|transparent|inherit|initial|unset|0 0)$/i.test(d.get(p).trim()));
 const px = (v) => {
@@ -200,13 +207,20 @@ function lintCss(sheets, vars, allowFor, out, shapes) {
         out.push({ file, line: g.line, rule: "pill", snippet: squash(`${part} { border-radius: ${d.get("border-radius")} }`) });
     }
     // 2. dot
-    const small = w != null && h != null && w <= 10 && h <= 10 && w > 0 && h > 0;
-    const round = r && ((r.pct != null && r.pct >= 50) || (r.px != null && w != null && r.px >= w / 2));
-    const dotty = /::?(before|after)\s*$/.test(part) || /\.[\w-]*dot[\w-]*/i.test(part);
+    const small = w != null && h != null && w <= 12 && h <= 12 && w > 0 && h > 0;
+    const round = r && w != null && h != null && Math.abs(w - h) <= 1 && ((r.pct != null && r.pct >= 50) || (r.px != null && r.px >= w / 2));
+    const dotty = true; // by geometry, whatever the class is called
     // A round dot-named shape with no fill in CSS may get its colour inline in the markup (style={{ background }}).
-    if (small && round && !filled && /^\.[\w-]*dot[\w-]*$/i.test(part) && !DOT_EXEMPT.test(part)) shapes.set(part.slice(1), { w, file });
+    if (small && round && !filled && /^\.[\w-]+$/.test(part) && !DOT_EXEMPT.test(part)) shapes.set(part.slice(1), { w, file });
     if (small && round && dotty && filled && !DOT_EXEMPT.test(part))
       out.push({ file, line: g.line, rule: "dot", snippet: squash(`${part} { ${w}px by ${h}px; border-radius: ${d.get("border-radius")} }`) });
+    // 2b. pill-radius
+    if (r && ((r.px != null && r.px >= 999) || (r.pct != null && r.pct >= 999)) && !RADIUS_EXEMPT.test(part) && !BUTTON_RE.test(part) && !((px(d.get("height")) ?? px(d.get("min-height")) ?? 0) >= 28 && filled) && !(small && round))
+      out.push({ file, line: g.line, rule: "pill-radius", snippet: squash(`${part} { border-radius: ${d.get("border-radius")} }`) });
+    // 2c. idle-motion
+    const anim = [d.get("animation"), d.get("animation-name")].filter(Boolean).join(" ");
+    if (anim && !/^none\b/.test(anim.trim()) && (MOTION_RE.test(anim) || [...ws].some((x) => MOTION_RE.test(x)) && /infinite/.test(anim)))
+      out.push({ file, line: g.line, rule: "idle-motion", snippet: squash(`${part} { animation: ${anim} }`) });
     // 3. warm-warning
     if ([...ws].some((x) => WARM_WORDS.has(x))) {
       for (const p of ["color", "background", "background-color"]) {
