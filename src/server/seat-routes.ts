@@ -4,6 +4,7 @@
 import type { Hono } from "hono";
 import type { Db } from "./db.ts";
 import { RuleError } from "./events.ts";
+import { isLead } from "./money.ts";
 import { approvalHeadroom } from "./budget.ts";
 import { addCatalogEntry, decideSeat, Forbidden, Invalid, parseCatalogEntry, parseSeatRequest, requestSeat } from "./seats.ts";
 import { postSeatRequest, type SlackConfig } from "./slack.ts";
@@ -41,7 +42,11 @@ export function mountSeatRoutes(app: Hono<any>, db: Db, cfg: { demo: boolean; sl
   });
   app.get("/api/seat-requests", async (c) => {
     const room = await approvalHeadroom(db);
-    const requests = (await db.query<{ id: string }>(REQUESTS_SQL)).map((r) => ({ ...r, budget: room.get(r.id) ?? null }));
+    const lead = isLead(c.get("actor"));
+    // Budget headroom is leadership's; a rep sees ticket prices and the travel on their own requests, nobody else's.
+    const requests = (await db.query<{ id: string; requester?: string; travel_cents?: number | null }>(REQUESTS_SQL)).map((r) => lead
+      ? { ...r, budget: room.get(r.id) ?? null }
+      : { ...r, travel_cents: r.requester === c.get("actor") ? r.travel_cents ?? null : null, budget: null });
     return c.json({ requests });
   });
 

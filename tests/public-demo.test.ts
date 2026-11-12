@@ -55,4 +55,9 @@ describe("every deployment", () => {
     const r = await (await app.request("/api/approvals", { headers: { "x-actor": "Maya%20Ortiz" } })).json() as { approvals: Record<string, unknown>[] };
     for (const a of r.approvals) { expect(a.seat_price_cents ?? null).toBeNull(); expect(a.est_cents).toBeUndefined(); }
   });
+  it("gives a rep seat requests without anyone else's travel or the budget", async () => {
+    const app = createApp(db, { demo: true });
+    const r = await (await app.request("/api/seat-requests", { headers: { "x-actor": "Maya%20Ortiz" } })).json() as { requests: Record<string, unknown>[] };
+    for (const q of r.requests) { expect(q.budget).toBeNull(); if (q.requester !== "Maya Ortiz") expect(q.travel_cents ?? null).toBeNull(); }
+  });
 });
