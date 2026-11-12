@@ -397,6 +397,19 @@ describe("erasure", () => {
     expect(await db.query("SELECT 1 FROM suppressions WHERE email = $1", [ana.email])).toHaveLength(1);
     expect((await enrollmentStates(db, ana.id)).every((x) => x.state === "removed")).toBe(true);
   });
+  it("reaches the attendee file row, the stored original, the caches and the history, and refuses an empty address", async () => {
+    const h = await deliveredInMotion(db);
+    const ana = await personAt(db, h.id, "Ana Ruiz");
+    await db.query("INSERT INTO verification_cache (email, verdict, verifier) VALUES ($1, 'valid', 'zerobounce') ON CONFLICT DO NOTHING", [ana.email]);
+    await db.query("INSERT INTO activity_log (id, event_id, actor, kind, detail) VALUES ('act_x', $1, 'R', 'note', 'Ana Ruiz asked for a call')", [h.id]);
+    await forgetPerson(db, h.deps, ana.email, "GTM");
+    const [row] = await db.query<{ raw: object }>("SELECT sr.raw FROM source_rows sr JOIN contacts k ON k.source_row_id = sr.id WHERE k.id = $1", [ana.id]);
+    expect(row.raw).toEqual({});
+    expect(await db.query("SELECT 1 FROM verification_cache WHERE email = $1", [ana.email])).toHaveLength(0);
+    expect((await db.query<{ detail: string }>("SELECT detail FROM activity_log WHERE id = 'act_x'"))[0].detail).toBe("");
+    expect(await db.query("SELECT 1 FROM upload_files uf JOIN source_rows sr ON sr.upload_id = uf.upload_id JOIN contacts k ON k.source_row_id = sr.id WHERE k.id = $1", [ana.id])).toHaveLength(0);
+    await expect(forgetPerson(db, h.deps, "  ", "GTM")).rejects.toThrow(/email/);
+  });
 });
 
 describe("event ROI", () => {

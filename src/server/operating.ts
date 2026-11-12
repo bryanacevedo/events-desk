@@ -200,25 +200,47 @@ export async function captureOnsite(db: Db, deps: LifecycleDeps, eventId: string
 /** Removes what the desk holds about a person and keeps only the block, so they are never contacted again. Legal risk: high; counsel confirms the process. */
 export async function forgetPerson(db: Db, deps: LifecycleDeps, email: string, actor: string) {
   const e = email.trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+$/.test(e)) throw new RuleError("Give the person's email address.");
   const out = await db.tx(async (q) => {
     // Every record of the person: by address, by the shared person record, and by LinkedIn profile.
-    const rows = await q<{ id: string; full_name: string | null; key: string | null; linkedin: string | null }>(
-      `SELECT k.id, k.full_name, co.key, k.linkedin FROM contacts k LEFT JOIN companies co ON co.id = k.company_id
+    const rows = await q<{ id: string; full_name: string | null; key: string | null; linkedin: string | null; person_id: string | null; source_row_id: string; upload_id: string | null }>(
+      `SELECT k.id, k.full_name, co.key, k.linkedin, k.person_id, k.source_row_id, sr.upload_id FROM contacts k LEFT JOIN companies co ON co.id = k.company_id
+       LEFT JOIN source_rows sr ON sr.id = k.source_row_id
        WHERE lower(k.email) = $1 OR k.person_id IN (SELECT person_id FROM contacts WHERE lower(email) = $1 AND person_id IS NOT NULL)
           OR (k.linkedin IS NOT NULL AND k.linkedin IN (SELECT linkedin FROM contacts WHERE lower(email) = $1 AND linkedin IS NOT NULL))`, [e]);
     const ids = rows.map((r) => r.id);
+    const names = [...new Set(rows.map((r) => r.full_name).filter((n): n is string => Boolean(n && n.trim().length > 2)))];
+    const linkedins = [...new Set(rows.map((r) => r.linkedin).filter((x): x is string => Boolean(x)))];
+    const persons = [...new Set(rows.map((r) => r.person_id).filter((x): x is string => Boolean(x)))];
+    const pairs = rows.filter((r) => r.full_name && r.key).map((r) => [nameKey(r.full_name!), r.key!] as const);
     // The name at the company is blocked too, so a later list with no address still finds them.
-    for (const r of rows) if (r.full_name && r.key) await q("INSERT INTO suppressions (id, kind, name_key, company_key, reason, created_by) VALUES ($1, 'opt_out', $2, $3, 'Erasure request', $4)", [newId("sup"), nameKey(r.full_name), r.key, actor]);
+    for (const [n, k] of pairs) await q("INSERT INTO suppressions (id, kind, name_key, company_key, reason, created_by) VALUES ($1, 'opt_out', $2, $3, 'Erasure request', $4)", [newId("sup"), n, k, actor]);
     await stopContacts(q, ids, "remove", "erasure");
     await q("UPDATE inbound_messages SET body = NULL WHERE contact_id = ANY($1::text[])", [ids]);
+    // Slack cards and the event's history are scrubbed while the name is still known.
+    for (const needle of [...names, e]) {
+      await q("UPDATE notifications SET card = '{}'::jsonb, status = CASE WHEN status = 'queued' THEN 'failed' ELSE status END WHERE card::text ILIKE '%' || $1 || '%'", [needle]);
+      await q("UPDATE activity_log SET detail = '' WHERE detail ILIKE '%' || $1 || '%'", [needle]);
+    }
     await q("UPDATE contacts SET full_name = NULL, title = NULL, linkedin = NULL, email = NULL, person_location = NULL, drop_reason = 'opted_out', dropped_at = coalesce(dropped_at, now()), person_id = NULL WHERE id = ANY($1::text[])", [ids]);
-    await q("DELETE FROM person_emails WHERE email = $1", [e]);
-    await q("DELETE FROM people WHERE email = $1", [e]);
+    // The row as it came in the attendee file, and the original file itself: the rows rebuilt from what is kept stay downloadable.
+    await q("UPDATE source_rows SET raw = '{}'::jsonb, listed_name = NULL WHERE id = ANY($1::text[])", [rows.map((r) => r.source_row_id)]);
+    await q("DELETE FROM upload_files WHERE upload_id = ANY($1::text[])", [rows.map((r) => r.upload_id).filter(Boolean)]);
+    await q("DELETE FROM person_emails WHERE email = $1 OR person_id = ANY($2::text[])", [e, persons]);
+    await q("DELETE FROM people WHERE email = $1 OR id = ANY($2::text[]) OR linkedin = ANY($3::text[])", [e, persons, linkedins]);
     await q("DELETE FROM onsite_captures WHERE lower(email) = $1 OR contact_id = ANY($2::text[])", [e, ids]);
-    // Copies elsewhere: notes on their history, CRM writes not yet sent, and Slack cards still waiting to go.
+    // What was bought about them is not kept for reuse.
+    await q("DELETE FROM verification_cache WHERE lower(email) = $1", [e]);
+    await q("DELETE FROM reveals WHERE lower(email) = $1 OR linkedin = ANY($2::text[])", [e, linkedins]);
+    for (const [n, k] of pairs) {
+      await q("DELETE FROM waterfall_cache WHERE name_key = $1 AND company_key = $2", [n, k]);
+      await q("DELETE FROM linkedin_cache WHERE name_key = $1 AND company_key = $2", [n, k]);
+    }
+    await q("DELETE FROM waterfall_cache WHERE lower(email) = $1 OR linkedin = ANY($2::text[])", [e, linkedins]);
+    await q("DELETE FROM linkedin_cache WHERE lower(verified_email) = $1 OR linkedin = ANY($2::text[])", [e, linkedins]);
+    // Copies elsewhere: notes on their history and CRM writes not yet sent.
     await q("UPDATE touches SET reason = '' WHERE contact_id = ANY($1::text[])", [ids]);
     await q("UPDATE crm_outbox SET status = 'cancelled' WHERE status = 'queued' AND lower(payload->>'email') = $1", [e]);
-    await q("UPDATE notifications SET card = '{}'::jsonb, status = CASE WHEN status = 'queued' THEN 'failed' ELSE status END WHERE event_id IN (SELECT event_id FROM contacts WHERE id = ANY($1::text[])) AND card::text ILIKE '%' || $2 || '%'", [ids, (await q<{ full_name: string | null }>("SELECT full_name FROM contacts WHERE id = ANY($1::text[]) AND full_name IS NOT NULL LIMIT 1", [ids]))[0]?.full_name ?? e]);
     await q("INSERT INTO suppressions (id, kind, email, reason, created_by) VALUES ($1, 'opt_out', $2, 'Erasure request', $3)", [newId("sup"), e, actor]);
     return { contacts: ids.length };
   });
