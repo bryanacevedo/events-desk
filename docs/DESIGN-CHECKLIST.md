@@ -12,6 +12,7 @@ corrections during the v2 build, 2026-11-08 to 11-10.
 - [ ] Words people wrote (a rep's notes, a buyer's quote) are welcome. Words the app strings together are not.
 - [ ] No jargon a rep or a VP would not use ("held out at random", "waterfall", "flat-priced", "perspective", "the model"). Plain words.
 - [ ] A label never claims more than the data: a deal is pipeline, not "bought"; "on target" needs a target.
+- [ ] A rate from a small group is shown as a count ("4 of 5", "2 of 29"), and a figure the demo cannot support says why in visible words ("under 5 meetings", "3 costs to enter"), never only in a tooltip.
 - [ ] One name for one thing across every screen.
 - [ ] Where a person came from is always named, in its accent: Attendee in green, Prospect in blue.
 - [ ] A value is shown once per view: never as a heading and again in the line under it.
@@ -42,6 +43,7 @@ corrections during the v2 build, 2026-11-08 to 11-10.
 - [ ] One layer at a time. Replace, don't add: new information takes a weaker thing's place.
 - [ ] Separate jobs live in separate tabs (Outreach is not Results). Replies, and decisions about replies, live on Outreach; decisions about who is on the list live on People.
 - [ ] A tab with decisions waiting shows how many, like the menu's count beside Seats.
+- [ ] The one thing on a screen that waits on a decision (notes to accept) carries the soft green halo, `.decide-halo`, once per screen at most.
 - [ ] The menu follows the person's job: nobody sees a page they cannot use or that would be empty for them. GTM Engineering sees every page that has work or figures for it; My day is a rep's page and stays out of GTM's menu while it would be empty.
 - [ ] Company money (cost, pipeline, deals, return, AI spend) only for leadership and GTM, on every screen and every read.
 - [ ] Everything that names a person, a company, an event, a reply, a meeting or a deal opens it.

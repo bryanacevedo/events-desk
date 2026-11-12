@@ -8,12 +8,12 @@ Branch `upgrade-from-account-desk`, cut from `origin/main` at `b169b1f`.
 
 Six fresh reviewers, each a separate agent that had not seen the work, each pointed at one thing: docs against code,
 demo data against the product's rules, copy, design (hands-on at 1536 and 390), compliance, security. The copy, design,
-compliance and security passes finished. The docs and data passes were cut off by a spend limit before they reported, and
-were run again after the fixes (see the end). The demo they read is the committed snapshot (`samples/demo-snapshot.tgz`),
+compliance and security passes finished. The docs and data passes were cut off by a spend limit before they reported; the data pass
+was run again during the fixes (below), and the docs pass ran last, on the finished docs. The demo they read is the committed snapshot (`samples/demo-snapshot.tgz`),
 the same state the v3 film was captured from. Screens before the work: `~/Developer/events-desk-upgrade-shots/before/`.
 
 Severity: **Blocker** breaks the product or misleads a visitor; **Major** a real defect a careful reviewer would call out;
-**Nit** small. Status is the plan until the second pass at the end confirms each one.
+**Nit** small. Status says what was done, checked against the code at the end.
 
 ## Security
 
@@ -32,16 +32,16 @@ Severity: **Blocker** breaks the product or misleads a visitor; **Major** a real
 
 | # | Sev | Finding | Status |
 |---|---|---|---|
-| P1 | Blocker | The contact basis is one free-text note per event and region, regions are raw strings ("Germany", "DE"), only two are strict, and "unknown" can be recorded. It does not encode country law. | Partly: region names normalised to one key; the README now says plainly what the basis is and is not |
-| P2 | Blocker | Nothing in code requires an unsubscribe link, sender identity or postal address in an email. | Fixed: email templates must carry the unsubscribe and sender address tokens before launch |
-| P3 | Blocker | An unsubscribe recorded only in Apollo or Gong never reaches the desk. | Disclosed in the README; launch warns on tools that cannot report one |
-| P4 | Blocker | Erasure misses the original uploaded file, raw rows, caches, the activity log, and scrubs Slack cards after the name is already gone; an empty input suppresses "". | Fixed with a test |
+| P1 | Blocker | The contact basis is one free-text note per event and region, regions are raw strings ("Germany", "DE"), only two are strict, and "unknown" can be recorded. It does not encode country law. | Not built; the README now says plainly what the basis is and is not |
+| P2 | Blocker | Nothing in code requires an unsubscribe link, sender identity or postal address in an email. | Not built (it would change the demo's templates, and so the state the film was made from); disclosed in the README |
+| P3 | Blocker | An unsubscribe recorded only in Apollo or Gong never reaches the desk. | Disclosed in the README; not built |
+| P4 | Blocker | Erasure misses the original uploaded file, raw rows, caches, the activity log, and scrubs Slack cards after the name is already gone; an empty input suppresses "". | Fixed with a test, except asking the CRM and the sending tool to delete their copies (disclosed) |
 | P5 | Major | No privacy notice for people taken from an attendee list. | Disclosed in the README |
 | P6 | Major | No retention schedule for person data. | Disclosed in the README |
 | P7 | Major | Role checks on erasure and strict regions rest on the self-chosen "Acting as". | Already disclosed; README line extended |
 | P8 | Major | Opt-outs never match a LinkedIn profile. | Not fixed (needs a migration and a matching rule); disclosed |
 | P9 | Major | LinkedIn automation consent is the rep's, not the recipient's. | Disclosed in the README |
-| P10 | Nit | A badge-scan-only person is not covered by the in-person check at other events. | Fixed in the gate |
+| P10 | Nit | A badge-scan-only person is not covered by the in-person check at other events. | Not fixed: adding badge scans to the in-person check could also stop the badge-scan follow-up the rules allow; needs a decision |
 
 ## Copy
 
@@ -73,11 +73,28 @@ Severity: **Blocker** breaks the product or misleads a visitor; **Major** a real
 | D6 | Major | The People list stops 124px short of the page's right edge. | Fixed |
 | D7 | Nit | The waiting badge, white on orange, is 4.31:1. | Fixed |
 | D8 | Nit | Monogram logos crop in the seat call's logo stack. | Fixed |
-| D9 | Nit | Seat rows show an empty grey circle for people with no photo. | Fixed: initials |
+| D9 | Nit | Seat rows show an empty grey circle for people with no photo. | Not fixed, not reproduced: the photos load lazily and the full-page capture may have caught them unloaded |
 | D10 | Nit | Phone People rows misalign the tier and grade. | Not fixed |
 | D11 | Nit | A few phone tap targets are 38 to 42px. | Fixed |
 | D12 | Nit | Event sheet repeats a theme label. | Not fixed |
 | D13 | Nit | People tab stacks three headings with near-duplicate counts. | Not fixed (35 includes people set aside on review; 32 is people to reach) |
+
+## Demo data against the product's rules (fresh reviewer, during the fixes)
+
+| # | Sev | Finding | Status |
+|---|---|---|---|
+| R1 | Blocker | Shoptalk Spring 2026 shows Closing with no scorecard 230 days after it ended, while the older NRF 2026 is Scored. | Not fixed (see below) |
+| R2 | Blocker | Five delivered events are past the 14-day close but never closed (Money20/20 Europe and Dreamforce sequencing, FINNOSUMMIT owners with no decisions, Money20/20 USA in market 21 days after). | Not fixed (see below) |
+| R3 | Major | Results says NRF is not scored and Shoptalk is, the reverse of their stages: the flag means "five or more meetings", not "scorecard written". | Screens now say "under 5 meetings" instead of greying the figure; the field name is unchanged |
+| R4 | Major | Delivery, seat requests and creation are stamped with the build time (10 November), after outreach dates months earlier. | Not fixed (see below) |
+| R5 | Major | `GET /api/seat-requests` gave a rep other people's travel and the budget headroom. | Fixed with a test |
+| R6 | Major | Overview lists missing costs for Shoptalk only, though Money20/20 USA has four missing; it follows from R2. | Not fixed |
+| R7 | Nit | Shoptalk's notes were answered the second they were asked. | Not fixed |
+| R8 | Nit | Shoptalk: 4 met (people) against 5 meetings held; 35 people against 32 to reach. Different units, unlabelled. | Not fixed |
+
+R1, R2, R4 and R6 share one cause: the seed builds past events at the build time and never runs the lifecycle's close and scorecard pass over them. Fixing it means changing the seed and rebuilding `samples/demo-snapshot.tgz`, which changes Shoptalk from Closing to Scored and every figure the film reads. That is Bryan's call (a new snapshot means a film pass from scratch), so it is listed for him and not done here.
+
+Coverage the demo never shows: a single-card event, a new-registrations top-up, a pending or declined cost card, an event with no CRM, the "nobody reached" comparison, a won deal, a 365-day scorecard, a declined note, and "not now", bounce or wrong-person replies.
 
 ## Ported from Account Desk
 
@@ -85,6 +102,6 @@ Severity: **Blocker** breaks the product or misleads a visitor; **Major** a real
 |---|---|---|
 | A1 | The one thing waiting on a decision carries the soft halo Account Desk gives a proposed play (notes to accept on the Result tab). | Done |
 
-## Second pass
+## Tests
 
-Filled in after the fixes.
+1,148 passed and 9 skipped before; after the fixes the suite passes with the new tests for the public demo guards, approvals and seat requests, and erasure (see PROJECT-STATUS for the count).
