@@ -1,0 +1,1 @@
+src/app/styles.css	dot	.tdot { 10px by 10px; border-radius: 50% }
