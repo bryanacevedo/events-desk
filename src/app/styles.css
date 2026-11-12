@@ -2459,11 +2459,11 @@ section.more[aria-label="More"] { max-width: none; }
 /* Monogram logos (no image) stay out of the overlapping stack, where they would be cut off. */
 .seatcall-logos .logo.fallback { display: none; }
 @media (max-width: 760px) {
-  /* On a phone the one decision on Overview comes first. */
+  /* On a phone the one decision on Overview comes before the lists (the Today band stays on top). */
   .ov-cols { display: flex; flex-direction: column; gap: 28px; }
   .ov-right { display: contents; }
   .ov-right > .seatcall, .ov-right > a.seatcall { order: -1; align-self: stretch; }
-  .to, .brand, .ob-who a { min-height: 44px; display: inline-flex; align-items: center; }
+  .brand, .ob-who a { min-height: 44px; display: inline-flex; align-items: center; }
 }
 /* The one thing on a screen that waits on someone's decision carries a soft halo (from Account Desk's proposed play):
    a tight wash ring and a wide blurred glow, never a hard border. It settles once, then rests. */

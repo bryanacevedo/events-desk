@@ -218,9 +218,11 @@ export async function forgetPerson(db: Db, deps: LifecycleDeps, email: string, a
     await stopContacts(q, ids, "remove", "erasure");
     await q("UPDATE inbound_messages SET body = NULL WHERE contact_id = ANY($1::text[])", [ids]);
     // Slack cards and the event's history are scrubbed while the name is still known.
-    for (const needle of [...names, e]) {
-      await q("UPDATE notifications SET card = '{}'::jsonb, status = CASE WHEN status = 'queued' THEN 'failed' ELSE status END WHERE card::text ILIKE '%' || $1 || '%'", [needle]);
-      await q("UPDATE activity_log SET detail = '' WHERE detail ILIKE '%' || $1 || '%'", [needle]);
+    // Only on the events they were on, and with LIKE's wildcards taken literally, so nobody else's lines are touched.
+    const events = (await q<{ event_id: string }>("SELECT DISTINCT event_id FROM contacts WHERE id = ANY($1::text[])", [ids])).map((x) => x.event_id);
+    for (const needle of [...names, e].map((x) => x.replace(/[\\%_]/g, (ch) => "\\" + ch))) {
+      await q("UPDATE notifications SET card = '{}'::jsonb, status = CASE WHEN status = 'queued' THEN 'failed' ELSE status END WHERE event_id = ANY($2::text[]) AND card::text ILIKE '%' || $1 || '%'", [needle, events]);
+      await q("UPDATE activity_log SET detail = '' WHERE event_id = ANY($2::text[]) AND detail ILIKE '%' || $1 || '%'", [needle, events]);
     }
     await q("UPDATE contacts SET full_name = NULL, title = NULL, linkedin = NULL, email = NULL, person_location = NULL, drop_reason = 'opted_out', dropped_at = coalesce(dropped_at, now()), person_id = NULL WHERE id = ANY($1::text[])", [ids]);
     // The row as it came in the attendee file, and the original file itself: the rows rebuilt from what is kept stay downloadable.

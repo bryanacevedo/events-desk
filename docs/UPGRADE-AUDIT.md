@@ -9,7 +9,7 @@ Branch `upgrade-from-account-desk`, cut from `origin/main` at `b169b1f`.
 Six fresh reviewers, each a separate agent that had not seen the work, each pointed at one thing: docs against code,
 demo data against the product's rules, copy, design (hands-on at 1536 and 390), compliance, security. The copy, design,
 compliance and security passes finished. The docs and data passes were cut off by a spend limit before they reported; the data pass
-was run again during the fixes (below), and the docs pass ran last, on the finished docs. The demo they read is the committed snapshot (`samples/demo-snapshot.tgz`),
+was run again during the fixes (below). Two more fresh passes ran at the end, a goldfish on the finished docs and a second review of every change; see "Second pass". The demo they read is the committed snapshot (`samples/demo-snapshot.tgz`),
 the same state the v3 film was captured from. Screens before the work: `~/Developer/events-desk-upgrade-shots/before/`.
 
 Severity: **Blocker** breaks the product or misleads a visitor; **Major** a real defect a careful reviewer would call out;
@@ -24,7 +24,7 @@ Severity: **Blocker** breaks the product or misleads a visitor; **Major** a real
 | S3 | Major | No request body limit: every route reads the whole body before any size check, so one large request can exhaust memory. | Fixed: a global limit, larger only on file routes |
 | S4 | Major | `GET /api/approvals` returns seat prices and cost estimates to anyone acting as a rep. | Fixed: money stripped for reps |
 | S5 | Major | Website reader: DNS-based SSRF (a public name resolving to a private address), and the size cap applies after the whole page is read. Real deployments only. | Size cap fixed; DNS check disclosed in the README |
-| S6 | Major | No limit on anonymous writes to the public demo. | Fixed: a per-address write limit on the public demo |
+| S6 | Major | No limit on anonymous writes to the public demo. | Fixed: 60 changes a minute per address, keyed on the address the proxy appends (a soft limit, not abuse protection) |
 | S7 | Nit | A CRM deal URL becomes a link with no scheme check. | Fixed: only http(s) links |
 | S8 | Nit | No security headers. | Fixed: `secure-headers` |
 
@@ -47,7 +47,7 @@ Severity: **Blocker** breaks the product or misleads a visitor; **Major** a real
 
 | # | Sev | Finding | Status |
 |---|---|---|---|
-| C1 | Blocker | "5.4x" pipeline per dollar is shown while the same event has cost lines still to enter. | Fixed: the ratio says how many costs are missing |
+| C1 | Blocker | "5.4x" pipeline per dollar is shown while the same event has cost lines still to enter. | Fixed: the ratio says how many costs are not entered yet |
 | C2 | Blocker | Results shows meeting rates of 7%, 10% from counts too small to read as rates; the count lives only in a tooltip. | Fixed: counts ("2 of 29") |
 | C3 | Major | A thin ratio is greyed with the reason only in a tooltip. | Fixed: visible "under 5 meetings" |
 | C4 | Major | "1/1 notes" is a bare fraction. | Fixed: "1 of 1 notes" |
@@ -67,7 +67,7 @@ Severity: **Blocker** breaks the product or misleads a visitor; **Major** a real
 |---|---|---|---|
 | D1 | Major | Zero figures in `--line-2` measure 1.55:1. | Fixed: `--mute` |
 | D2 | Major | The Person sheet's kind label is rose-red text, against "no red text". | Fixed: kind colour only on the mark |
-| D3 | Major | Keyboard users tab through every past event card before Today. | Fixed: past cards leave the tab order |
+| D3 | Major | Keyboard users tab through every past event card before Today. | Not fixed: taking past cards out of the tab order left them unreachable by keyboard (second pass), so it was reverted; a roving tab order is the real fix |
 | D4 | Major | Past runway cards fade their text to about 3.1:1. | Fixed: only the date block and logo fade |
 | D5 | Major | On a phone the one decision on Overview (seat requests waiting) sits below everything. | Fixed: first on phones |
 | D6 | Major | The People list stops 124px short of the page's right edge. | Fixed |
@@ -85,7 +85,7 @@ Severity: **Blocker** breaks the product or misleads a visitor; **Major** a real
 |---|---|---|---|
 | R1 | Blocker | Shoptalk Spring 2026 shows Closing with no scorecard 230 days after it ended, while the older NRF 2026 is Scored. | Not fixed (see below) |
 | R2 | Blocker | Five delivered events are past the 14-day close but never closed (Money20/20 Europe and Dreamforce sequencing, FINNOSUMMIT owners with no decisions, Money20/20 USA in market 21 days after). | Not fixed (see below) |
-| R3 | Major | Results says NRF is not scored and Shoptalk is, the reverse of their stages: the flag means "five or more meetings", not "scorecard written". | Screens now say "under 5 meetings" instead of greying the figure; the field name is unchanged |
+| R3 | Major | Results says NRF is not scored and Shoptalk is, the reverse of their stages: the flag means "five or more meetings", not "scorecard written". | Screens now say "under 5 meetings" as well as greying the figure; the field name is unchanged |
 | R4 | Major | Delivery, seat requests and creation are stamped with the build time (10 November), after outreach dates months earlier. | Not fixed (see below) |
 | R5 | Major | `GET /api/seat-requests` gave a rep other people's travel and the budget headroom. | Fixed with a test |
 | R6 | Major | Overview lists missing costs for Shoptalk only, though Money20/20 USA has four missing; it follows from R2. | Not fixed |
@@ -102,6 +102,12 @@ Coverage the demo never shows: a single-card event, a new-registrations top-up, 
 |---|---|---|
 | A1 | The one thing waiting on a decision carries the soft halo Account Desk gives a proposed play (notes to accept on the Result tab). | Done |
 
+## Second pass (two fresh reviewers, end of the night)
+
+Found and fixed: the write limit trusted the first forwarded address (now the last, which the proxy adds; old entries expire instead of the map being cleared); past cards had no keyboard way in (reverted, D3 above); "3 to enter" did not say what it counted (now "not entered yet"); the halo could repeat on a second note (first only); the phone tap-target rule reached inline links (now rows and the brand only); the erasure scrub could touch other people's lines and read `%` and `_` as wildcards (now only the person's events, literal match); "of the rest" doubled up (now "others"); docs stated the file limit three ways and gave no test count.
+
+Left: one reviewer found "Review flags" vaguer than the old label; reps still receive every seat's ticket and purchase price from `/api/seat-requests` while `/api/events` hides the list price from them (the README now says reps see ticket prices); the halo card repeats the author's name under the line that already names them.
+
 ## Tests
 
-1,148 passed and 9 skipped before; after the fixes the suite passes with the new tests for the public demo guards, approvals and seat requests, and erasure (see PROJECT-STATUS for the count).
+Before: 1,148 passed, 9 skipped (1,157). After: see PROJECT-STATUS, which records the final run.

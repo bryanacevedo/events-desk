@@ -63,7 +63,7 @@ export function Results({ go }: { go: (to: string) => void }) {
               <li key={r.id} style={{ "--i": i } as CSSProperties}>
                 <Link to={withSheet(r.id)} go={go} className="ob-row rs-event" data-opens-sheet="" data-row={r.id}>
                   <span className="ob-logo"><EventLogo name={r.name} website={r.website} size={30} /></span>
-                  <span className="ob-who"><b>{r.name}</b><span>{[shortDate(r.starts_on), r.venue?.split(",").pop()?.trim(), r.notes.asked ? `${r.notes.written} of ${r.notes.asked} notes` : null, r.costs_missing ? `${r.costs_missing} ${r.costs_missing === 1 ? "cost" : "costs"} to enter` : null].filter(Boolean).join(" · ")}</span></span>
+                  <span className="ob-who"><b>{r.name}</b><span>{[shortDate(r.starts_on), r.venue?.split(",").pop()?.trim(), r.notes.asked ? `${r.notes.written} of ${r.notes.asked} notes` : null, r.costs_missing ? `${r.costs_missing} ${r.costs_missing === 1 ? "cost" : "costs"} not entered yet` : null].filter(Boolean).join(" · ")}</span></span>
                   <span className={`rs-fig${r.scored ? "" : " thin"}`}><b>{r.per_dollar === null ? "None" : times(r.per_dollar)}</b><span>{r.held < 5 ? "per dollar, under 5 meetings" : "per dollar"}</span></span>
                   <span className="rs-fig"><b>{money(r.pipeline_cents)}</b><span>pipeline</span></span>
                   <span className="ob-end"><span className="ob-when">{r.final ? "Scored" : "Closing"}</span><span className="ob-go">Open<Arrow /></span></span>

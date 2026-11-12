@@ -50,7 +50,7 @@ export function createApp(db: Db, cfg: AppConfig) {
   // Every response says how it may be framed and sniffed. Logos come from Google's favicon service, avatars from this server.
   app.use("*", secureHeaders({ xFrameOptions: "DENY", referrerPolicy: "strict-origin-when-cross-origin", crossOriginEmbedderPolicy: false, crossOriginResourcePolicy: false,
     contentSecurityPolicy: { defaultSrc: ["'self'"], imgSrc: ["'self'", "data:", "https://www.google.com", "https://*.gstatic.com", "https://images.unsplash.com"], styleSrc: ["'self'", "'unsafe-inline'"], scriptSrc: ["'self'"], connectSrc: ["'self'"], fontSrc: ["'self'", "data:"], frameAncestors: ["'none'"], objectSrc: ["'none'"], baseUri: ["'self'"] } }));
-  // No body is read whole before its size is known: files may be 20 MB, everything else 1 MB.
+  // No body is read whole before its size is known: files may be about 20 MB (21,000,000 bytes), everything else 1 MB.
   const FILE_ROUTE = /^\/api\/(events\/[^/]+\/(upload|new-registrations|review|top-ups)|icp\/documents)(\/|$)/;
   app.use("*", async (c, next) => {
     if (c.req.method === "GET" || c.req.method === "HEAD") return next();
@@ -63,11 +63,12 @@ export function createApp(db: Db, cfg: AppConfig) {
     app.use("/slack/*", async (c) => c.text("This public demo takes no webhooks.", 403));
     app.use("/api/*", async (c, next) => {
       if (c.req.method === "GET") return next();
-      const ip = (c.req.header("x-forwarded-for") ?? "").split(",")[0].trim() || "local";
+      // The proxy appends the real address last; earlier entries are whatever the client sent.
+      const ip = (c.req.header("x-forwarded-for") ?? "").split(",").pop()!.trim() || "local";
       const now = Date.now(), w = writes.get(ip);
       const cur = w && now - w.at < 60_000 ? w : { n: 0, at: now };
       cur.n += 1; writes.set(ip, cur);
-      if (writes.size > 5000) writes.clear();
+      if (writes.size > 5000) for (const [k, v] of writes) if (now - v.at >= 60_000) writes.delete(k);
       if (cur.n > 60) return c.json({ error: "Too many changes in a minute. Try again shortly." }, 429);
       return next();
     });

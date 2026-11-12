@@ -68,7 +68,7 @@ export function Result({ eventId, eventName, motion, lastDay, live, scorecards, 
         <div className="md-hello">
           <p>{kicker}</p>
           {lead && m.influence.available
-            ? <h2><b className={thin ? "thin" : undefined} title={thin ? "Fewer than five held meetings" : undefined}>{ratio === null ? "None" : times(ratio)}</b><span>{["pipeline per dollar", thin ? "under 5 meetings" : null, m.roi.cost_missing.length ? `${m.roi.cost_missing.length} ${m.roi.cost_missing.length === 1 ? "cost" : "costs"} to enter` : null].filter(Boolean).join(", ")}</span></h2>
+            ? <h2><b className={thin ? "thin" : undefined} title={thin ? "Fewer than five held meetings" : undefined}>{ratio === null ? "None" : times(ratio)}</b><span>{["pipeline per dollar", thin ? "under 5 meetings" : null, m.roi.cost_missing.length ? `${m.roi.cost_missing.length} ${m.roi.cost_missing.length === 1 ? "cost" : "costs"} not entered yet` : null].filter(Boolean).join(", ")}</span></h2>
             : <h2><b>{num(m.held_all)}</b><span>{m.held_all === 1 ? "meeting held" : "meetings held"}</span></h2>}
         </div>
         <div className="md-figs">
@@ -109,8 +109,8 @@ export function Result({ eventId, eventName, motion, lastDay, live, scorecards, 
           })}</ul>
         )}
 
-        {toReview.map((d) => (
-          <article key={d.id} className="rs-review decide-halo">
+        {toReview.map((d, i) => (
+          <article key={d.id} className={`rs-review${i === 0 ? " decide-halo" : ""}`}>
             <p className="rs-review-k"><b>{d.author}</b>{d.answered_at ? `, ${shortDate(d.answered_at.slice(0, 10))}` : ""}</p>
             <p className="rs-review-body">{d.body}</p>
             <div className="ob-acts">
@@ -212,7 +212,7 @@ export function ResultView({ id, name, onChange }: { id: string; name: string; o
       <Result eventId={id} eventName={name} motion={o.motion} lastDay={lastDay} live={o.live_score} scorecards={o.scorecards ?? []} debriefs={o.debriefs ?? []} lead={lead} onChange={changed} />
       {lead && (
         <div className="folds">
-          <Fold icon={<Icon.cost />} title="Met against the rest" peek={c?.available ? <>{c.met_with_pipeline} of {c.met_accounts} met accounts have pipeline<i>{c.control_with_pipeline} of {c.control_accounts} of the rest</i></> : undefined}>
+          <Fold icon={<Icon.cost />} title="Met against the rest" peek={c?.available ? <>{c.met_with_pipeline} of {c.met_accounts} met accounts have pipeline<i>{c.control_with_pipeline} of {c.control_accounts} others</i></> : undefined}>
             <ResultEvidence eventId={id} motion={o.motion} lastDay={lastDay} live={o.live_score} scorecards={o.scorecards ?? []} onChange={changed} />
           </Fold>
         </div>

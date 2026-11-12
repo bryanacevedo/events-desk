@@ -6,10 +6,10 @@
 
 Events Desk held against the bar Account Desk set, by six fresh reviewers (docs, demo data against rules, copy, design at 1536 and 390, compliance, security). Every finding and what happened to it is in `docs/UPGRADE-AUDIT.md`.
 
-- Security: a body limit on every route (1 MB, 21 MB on file routes), security headers, the public demo refuses webhooks, Slack calls and review workbooks and takes at most 60 changes a minute per address, reps no longer get seat prices and estimates from `/api/approvals` or other people's travel and the budget from `/api/seat-requests`, the website reader stops at 200 KB, deal links must be http(s).
+- Security: a body limit on every route (1 MB, about 20 MB on file routes), security headers, the public demo refuses webhooks, Slack calls and review workbooks and takes at most 60 changes a minute per address (keyed on the address the proxy appends; a soft limit), reps no longer get seat prices and estimates from `/api/approvals` or other people's travel and the budget from `/api/seat-requests`, the website reader stops at 200 KB, deal links must be http(s).
 - Erasure now reaches the attendee-file row, the stored original file, the paid-answer caches, history lines and Slack cards, and refuses an empty address.
-- Copy: counts instead of percentages where the groups are small, the ratio says how many costs are still to enter and when it rests on under five meetings, one word for cost, "Met against the rest" instead of "How we know", no mixed totals on Overview.
-- Design: readable zeros and past cards, the seat decision first on a phone, the People list on the page's edge, kind labels in ink, past cards out of the tab order, and Account Desk's soft halo on the one decision on the Result tab (notes to accept).
+- Copy: counts instead of percentages where the groups are small, the ratio says how many costs are not entered yet and when it rests on under five meetings, one word for cost, "Met against the rest" instead of "How we know", no mixed totals on Overview.
+- Design: readable zeros and past cards, the seat decision first on a phone, the People list on the page's edge, kind labels in ink, and Account Desk's soft halo on the one decision on the Result tab (notes to accept).
 - README: plain eval wording, what the public demo refuses, and an honest compliance section (contact basis, unsubscribe, opt-outs, erasure, privacy notice, retention, LinkedIn).
 - Film v4: `~/Developer/events-desk-video/renders/events-desk-film-v4.mp4` and its phone copy, the v3 film with the 16 screens whose UI changed recaptured from the same snapshot; no narrated line changed. Not uploaded.
 
