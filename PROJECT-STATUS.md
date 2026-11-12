@@ -1,8 +1,15 @@
 # Events Desk: project status
 
-**Updated:** 2026-11-11 (night, branch `upgrade-from-account-desk`, not merged). **Spec:** `docs/SPEC.md`, goldfish-reviewed 2026-11-08 before any code (12 Major, 13 Nit, no Blocker; 24 fixed, 1 moot because a clause gate was closed). It has been edited to match the code since. **Decisions:** `docs/DECISIONS.md`, 1 to 45.
+**Updated:** 2026-11-12. **Spec:** `docs/SPEC.md`, goldfish-reviewed 2026-11-08 before any code (12 Major, 13 Nit, no Blocker; 24 fixed, 1 moot because a clause gate was closed). It has been edited to match the code since. **Decisions:** `docs/DECISIONS.md`, 1 to 46.
 
-## Upgrade from Account Desk (2026-11-11, branch `upgrade-from-account-desk`, not merged, not deployed)
+## Now (2026-11-12)
+
+- `main` holds the upgrade below and the CRM switch, Render now redeploys on every push to `main` by itself. Checked live on 2026-11-12: the upgrade's security headers and the sidebar tagline "From the seat to the result" (83ea0fa) are on https://events-desk.onrender.com. The CRM switch (dfc9bc8) went out by auto-deploy and was not checked on the live site; it changes nothing while `CRM` is unset.
+- CRM switch (decision 46): `CRM` unset keeps today's CRM (`simCrm` in the demo, `noCrm` live); `CRM=crmdesk` uses CRM Desk through `src/server/crm-desk.ts` with `CRM_DESK_URL` and `CRM_DESK_KEY`; `CRM=salesforce` is refused. Contract tests 1, 3, 4, 5 and 6 in `tests/crm-desk-contract.test.ts`; the three against a running CRM Desk are skipped without `CRM_DESK_URL`, `CRM_DESK_KEY` and `CRM_DESK_ADMIN_KEY`.
+- `npx vitest run` on 2026-11-12: 1,158 passed, 12 skipped (1,170).
+- Film: the v4 walkthrough (3:41) is published at https://bryanacevedo.github.io/project-videos/video/events-desk.mp4 and linked from the README.
+
+## Upgrade from Account Desk (2026-11-11, merged into `main` and live since 2026-11-12)
 
 Events Desk held against the bar Account Desk set, by six fresh reviewers (docs, demo data against rules, copy, design at 1536 and 390, compliance, security). Every finding and what happened to it is in `docs/UPGRADE-AUDIT.md`.
 
@@ -11,8 +18,8 @@ Events Desk held against the bar Account Desk set, by six fresh reviewers (docs,
 - Copy: counts instead of percentages where the groups are small, the ratio says how many costs are not entered yet and when it rests on under five meetings, one word for cost, "Met against the rest" instead of "How we know", no mixed totals on Overview.
 - Design: readable zeros and past cards, the seat decision first on a phone, the People list on the page's edge, kind labels in ink, and Account Desk's soft halo on the one decision on the Result tab (notes to accept).
 - README: plain eval wording, what the public demo refuses, and an honest compliance section (contact basis, unsubscribe, opt-outs, erasure, privacy notice, retention, LinkedIn).
-- Tests, 2026-11-12 on this branch: `npx vitest run` 1,154 passed, 9 skipped (1,163), and `npx tsc --noEmit` clean. Under heavy load (a film render at the same time) four slow tests hit the 5 s limit and passed when rerun alone. Not run: the layout and interaction audits, the real-Postgres suite.
-- Film v4: `~/Developer/events-desk-video/renders/events-desk-film-v4.mp4` and its phone copy, the v3 film with the 16 screens whose UI changed recaptured from the same snapshot (the result screens after the Cost tab's lines are entered as none, as the narration has it); no narrated line changed, so nothing was re-voiced. `hyperframes check` passes. Not uploaded.
+- Tests, 2026-11-12 on the branch, before the merge and the CRM switch: `npx vitest run` 1,154 passed, 9 skipped (1,163), and `npx tsc --noEmit` clean. Under heavy load (a film render at the same time) four slow tests hit the 5 s limit and passed when rerun alone. Not run: the layout and interaction audits, the real-Postgres suite.
+- Film v4: `~/Developer/events-desk-video/renders/events-desk-film-v4.mp4` and its phone copy, the v3 film with the 16 screens whose UI changed recaptured from the same snapshot (the result screens after the Cost tab's lines are entered as none, as the narration has it); no narrated line changed, so nothing was re-voiced. `hyperframes check` passes. Published on the project-videos site on 2026-11-12.
 
 Not done, for Bryan: the demo seed stamps past events with the build time and never closes or scores them (Shoptalk shows Closing 230 days on, five events are past their close). Fixing it means a new snapshot, which changes the figures the film reads. Country rules for the contact basis, a template check for unsubscribe and sender address, LinkedIn-profile opt-outs, a privacy notice and a retention schedule are disclosed, not built.
 
@@ -43,7 +50,7 @@ To resume: run `npx vitest run`, then pick from "Needs Bryan" below.
 
 **Not proven.**
 
-- Salesforce: no adapter exists. Live mode uses `noCrm`: no CRM check runs, owner and deal stay blank, nothing is written back. Field names, match quality, limits and the write path are all unknown.
+- Salesforce: no adapter exists, and `CRM=salesforce` is refused. With `CRM` unset, live mode uses `noCrm`: no CRM check runs, owner and deal stay blank, nothing is written back. Field names, match quality, limits and the write path are all unknown.
 - Slack: signed commands, buttons and messages, on fakes only.
 - Apollo: the key on file is on the free plan. `mixed_people/search`, `mixed_people/api_search` and `people/match` returned 403 `API_INACCESSIBLE` on 2026-11-08 and the waterfall cannot be reached, so no real Apollo call has completed. Request and response shapes are from documentation, tested on faked responses. The search-response `linkedin_url` field and the single-person match shape are unconfirmed.
 - ZeroBounce: faked responses only.
@@ -99,9 +106,9 @@ From `node scripts/eval-report.ts` and the title report from the same code. Deta
 
 ## Needs Bryan
 
-- The v3 film is shipped (2026-11-10, Bryan: "Ship it"): the whole system in 3:41, one narrator in v1's structure (Kokoro am_eric), one spine (Quillridge Systems and Camille Bélanger), each camera move timed to the word it shows. It replaces the 3:19 film in `docs/video/` and on the events-desk-site Pages link in the README. Script `~/Developer/events-desk-video/SCRIPT-V3.md` (fresh-eyes reviewed). Next: the requirements docs for every build.
+- The v3 film is shipped (2026-11-10, Bryan: "Ship it"): the whole system in 3:41, one narrator in v1's structure (Kokoro am_eric), one spine (Quillridge Systems and Camille Bélanger), each camera move timed to the word it shows. It replaced the 3:19 film; the README now links the v4 cut (same story, refreshed screens) on the project-videos site. Script `~/Developer/events-desk-video/SCRIPT-V3.md` (fresh-eyes reviewed). Next: the requirements docs for every build.
 - Paid Apollo and a ZeroBounce key, then one real run on a very small list. The waterfall lineup is set in Apollo, and a sample of a few hundred contacts decides it.
-- Connect Salesforce when wanted. Confirm Do Not Call.
+- Connect Salesforce when wanted (an adapter has to be written first; CRM Desk is the other option, `CRM=crmdesk`). Confirm Do Not Call.
 - The real credit allotment in each vendor's pool, for the Usage page.
 - Real Slack: create the app and test signed commands and buttons.
 - A fresh title holdout, if the title figure is to be quoted as held out.

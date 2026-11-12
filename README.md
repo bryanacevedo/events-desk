@@ -6,13 +6,13 @@ Events Desk is for a person who runs events all year. You go to a lot of confere
 
 You ask for a seat. Someone approves it. You upload the attendee list. The desk works out which companies and people matter, finds and checks their emails, and hands back a Google Sheet (or an Excel file) your sales team can work from. If more people register later, you upload the new file and the desk adds only the new ones.
 
-**[Try the live demo](https://events-desk.onrender.com).** Everything in it is invented and every vendor is simulated. If it has been idle, the first load takes about a minute.
+**[Try the live demo](https://events-desk.onrender.com)** · [Film (3:41)](https://bryanacevedo.github.io/project-videos/video/events-desk.mp4) · [Decisions](docs/DECISIONS.md). Everything in the demo is invented and every vendor is simulated. If it has been idle, the first load takes about a minute.
 
 It is a portfolio project. Read "What is proven and what is not" below before you trust any number in it.
 
 [![Watch the walkthrough (3:41)](docs/video/poster.jpg)](https://bryanacevedo.github.io/project-videos/video/events-desk.mp4)
 
-The walkthrough covers the whole system, from the seat request to the result. It follows one company on the demo's attendee list and one person the desk found there, through a reply and a meeting to a deal. The people, vendors, CRM and AI calls in the demo are simulated.
+**[Watch the walkthrough (3:41)](https://bryanacevedo.github.io/project-videos/video/events-desk.mp4)**: the whole system, from the seat request to the result. It follows one company on the demo's attendee list and one person the desk found there, through a reply and a meeting to a deal. The people, vendors, CRM and AI calls in the demo are simulated.
 
 ## What it does for you
 
@@ -91,7 +91,8 @@ Also: every drop has a reason and the database refuses one without it, and Conci
 
 **Only simulated vendors have run end to end.** The whole flow runs in the demo and in the tests with simulated Apollo, ZeroBounce, CRM and model, from a made-up world of about 1,650 attendees. Nothing here has been run against these, and all of them are unproven:
 
-- **Salesforce.** No Salesforce adapter exists. In live mode the desk uses a CRM that says it is not connected, so none of the Salesforce checks above run, owner and deal columns stay blank, nothing is written back, and the Result tab's pipeline, deals and met-against-not-met comparison read "not available". The local opt-out list still works in every mode.
+- **Salesforce.** No Salesforce adapter exists, and `CRM=salesforce` is refused. With `CRM` unset, live mode uses a CRM that says it is not connected, so none of the CRM checks above run, owner and deal columns stay blank, nothing is written back, and the Result tab's pipeline, deals and met-against-not-met comparison read "not available". The local opt-out list still works in every mode.
+- **CRM Desk.** `CRM=crmdesk` makes [CRM Desk](https://crm-desk-sevh.onrender.com) the desk's CRM (see [Choosing the CRM](#choosing-the-crm)). Its contract tests against a running CRM Desk are written and skipped here without one; a passing run is reported in CRM Desk's status, not logged in this repository. It has not run against a team's real CRM.
 - **Slack.** Signed commands, buttons and messages are tested against fakes only.
 - **Apollo.** The adapters were written from documentation and tested on faked responses. The Apollo key on file is on the free plan, which refuses its search and match endpoints, so no real Apollo call has completed and the waterfall has never been reached.
 - **ZeroBounce.** The same: faked responses only.
@@ -139,7 +140,7 @@ The company-tier report also shows the second look: a second model that re-check
 
 The Summary check has seen three real model calls. Eight of the nine parts passed the checks first time, and the ninth was a false rejection that is fixed. Three calls is too few to call a rate.
 
-**Tests.** `npx vitest run` passes every test on PGlite, and locally on a real Postgres with `TEST_ALL_ON_POSTGRES` set; `npx tsc --noEmit` is clean. Nine tests are skipped by default. Seven need a real Postgres and run in CI, which starts one; the whole suite has also passed on real Postgres. One is the `NOT MEASURED` check in `tests/company-tier-evals.test.ts`, which runs only when that recording is stale. One is the gate benchmark at 10,000 people (`BENCH_GATE=1`, `tests/gate-scale.bench.test.ts`). Continuous integration runs the type check, the tests with evals held strict, the build and a boot smoke test on every push.
+**Tests.** `npx vitest run` passes every test on PGlite (1,158 passed and 12 skipped on 2026-11-12), and locally on a real Postgres with `TEST_ALL_ON_POSTGRES` set; `npx tsc --noEmit` is clean. Twelve tests are skipped by default. Three are the CRM Desk half of the CRM contract tests (`tests/crm-desk-contract.test.ts`), which run only against a running CRM Desk named by `CRM_DESK_URL`, `CRM_DESK_KEY` and `CRM_DESK_ADMIN_KEY`. Seven need a real Postgres and run in CI, which starts one; the whole suite has also passed on real Postgres. One is the `NOT MEASURED` check in `tests/company-tier-evals.test.ts`, which runs only when that recording is stale. One is the gate benchmark at 10,000 people (`BENCH_GATE=1`, `tests/gate-scale.bench.test.ts`). Continuous integration runs the type check, the tests with evals held strict, the build and a boot smoke test on every push.
 
 ## Run the demo
 
@@ -149,7 +150,7 @@ Needs Node 22.18 or later.
 make demo
 ```
 
-Open http://localhost:8787, or set `PORT` if that port is taken. The demo needs no keys and ignores any you have exported. Use "Acting as" (in the sidebar on desktop, at the top on a phone) to act as a different fictional person: the requester, the approver or the GTM team.
+Open http://localhost:8787, or set `PORT` if that port is taken. The demo needs no keys and ignores any vendor or model key you have exported. It does honour `CRM=crmdesk`: with `CRM_DESK_URL` and `CRM_DESK_KEY` exported it writes to that CRM Desk, so leave `CRM` unset for the demo. Use "Acting as" (in the sidebar on desktop, at the top on a phone) to act as a different fictional person: the requester, the approver or the GTM team.
 
 `make ask Q="How many priority A contacts are there?"` asks Concierge about a throwaway copy of the older sample data, with a scripted model, so it can only answer that kind of question.
 
@@ -177,7 +178,22 @@ The license is noncommercial. Running this inside a business needs a separate li
 5. Publish an ICP in Settings first. Without a published ICP, events fall back to the older single-prompt tiering.
 6. Run `npm ci`, `npm run build` and `npm run migrate`, then `LIVE_SPEND=1 npm start`. Slack must reach the server through a tunnel or proxy; set `HOST` only if you have put your own access control in front of it.
 
+### Choosing the CRM
+
+`CRM` picks the desk's CRM. Unset, the desk keeps the one it has today: the simulated CRM in the demo, and in live mode one that says it is not connected. `CRM=crmdesk` uses [CRM Desk](https://crm-desk-sevh.onrender.com) through `src/server/crm-desk.ts` and needs `CRM_DESK_URL` and `CRM_DESK_KEY` (a key made in CRM Desk with `--desk events_desk`); the desk then looks up accounts, do-not-contact flags, meetings and opportunities there and writes campaigns, campaign members, leads, tasks, found email addresses and opt-outs to it. `CRM=salesforce` is refused, because there is no Salesforce adapter yet, and a value the desk does not know stops the server at start (`default` means the same as unset). Every call to CRM Desk fails closed: a timeout, a refused connection, a 429 or a 5xx pauses the CRM check and drops nobody. The public CRM Desk demo refuses API keys, so point `CRM_DESK_URL` at your own install (decision 46).
+
 **Spend guards.** A live run refuses to start on an event with more than `REAL_RUN_MAX_ROWS` source rows (default 4) before any paid call, pauses the event, and says why in its activity. `make evals-live` needs `LIVE_SPEND=1` and makes at most `EVALS_MAX_ITEMS` real model calls (default 8). `make apollo-check COMPANY="..."` tests an Apollo key and spends `MATCHES` credits (default 1), held to the row guard. Raise any of these only on purpose. The vendor charges the desk records are the configured rates, except the waterfall, which records what Apollo reports it used. None are read from bills.
+
+## Portfolio
+
+| Project | What it does | Links |
+|---|---|---|
+| Account Desk | Signal-based, account-based outbound with a person on the send decision | [Code](https://github.com/bryanacevedo/account-desk) · [Live demo](https://account-desk-x4ko.onrender.com) · [Film](https://bryanacevedo.github.io/project-videos/video/account-desk.mp4) |
+| Events Desk (this repository) | For someone who runs events all year: seat requests and approvals, attendee lists turned into the companies and people worth meeting, with checked emails, handed back as a sheet for sales | [Live demo](https://events-desk.onrender.com) · [Film](https://bryanacevedo.github.io/project-videos/video/events-desk.mp4) |
+| Market Desk | Decides who a B2B team sells to from its own deals, sizes that market and splits it into territories | [Code](https://github.com/bryanacevedo/market-desk) · [Live demo](https://market-desk-3kou.onrender.com) · [Film](https://bryanacevedo.github.io/project-videos/video/market-desk.mp4) |
+| CRM Desk | A CRM for teams of one to fifty with Salesforce's data model and a simpler experience; Account Desk and Events Desk can use it as their CRM | [Live demo](https://crm-desk-sevh.onrender.com) · [Film](https://bryanacevedo.github.io/project-videos/video/crm-desk.mp4) (code private) |
+
+All four films: https://bryanacevedo.github.io/project-videos/
 
 ## License
 
