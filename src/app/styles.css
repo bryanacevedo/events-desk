@@ -2462,7 +2462,7 @@ section.more[aria-label="More"] { max-width: none; }
   /* On a phone the one decision on Overview comes first. */
   .ov-cols { display: flex; flex-direction: column; gap: 28px; }
   .ov-right { display: contents; }
-  .ov-right > .seatcall, .ov-right > a.seatcall { order: -1; }
+  .ov-right > .seatcall, .ov-right > a.seatcall { order: -1; align-self: stretch; }
   .to, .brand, .ob-who a { min-height: 44px; display: inline-flex; align-items: center; }
 }
 /* The one thing on a screen that waits on someone's decision carries a soft halo (from Account Desk's proposed play):
