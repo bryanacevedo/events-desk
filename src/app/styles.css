@@ -59,6 +59,10 @@ ul, ol { padding: 0; list-style: none; }
 .side { position: sticky; top: 0; height: 100vh; width: 232px; flex: none; display: flex; flex-direction: column; padding: 14px 12px 16px; background: var(--well); box-sizing: border-box; }
 .brand { display: inline-flex; align-items: center; gap: 10px; height: 40px; padding: 0 10px; font-family: var(--display); font-weight: 500; font-size: 17px; color: var(--ink); }
 .side .brand { margin-bottom: 14px; }
+/* The tagline sits under the lockup, on the sidebar's full width, as in Account Desk. */
+.side .brand-block { margin-bottom: 14px; }
+.side .brand-block .brand { margin-bottom: 0; }
+.brand-block .tagline { padding: 0 10px; font-size: 12px; line-height: 1.3; color: var(--mute); }
 .navlist { display: flex; flex-direction: column; gap: 2px; }
 .navitem { display: flex; align-items: center; gap: 12px; height: 40px; padding: 0 12px; border-radius: 10px; color: var(--mute); font-size: 14px; font-weight: 500; }
 .navitem .ico { display: inline-flex; width: 20px; height: 20px; color: var(--mute); }

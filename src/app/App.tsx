@@ -109,7 +109,10 @@ export function App() {
     <AppCtx.Provider value={{ actor, demo, needs, refresh, go }}>
       <div className="app">
         <nav className="side" aria-label="Events Desk">
-          <Link to="/" go={go} className="brand"><Mark /><span>Events Desk</span></Link>
+          <div className="brand-block">
+            <Link to="/" go={go} className="brand"><Mark /><span>Events Desk</span></Link>
+            <div className="tagline">From the seat to the result</div>
+          </div>
           <div className="navlist" style={{ "--at": navAt } as React.CSSProperties} data-on={navAt >= 0 ? "" : undefined}>
             {item("/", "overview", "Overview", <Icon.overview />, "navitem")}
             {showDay && item("/my-day", "myday", "My day", <Icon.calendar />, "navitem", waiting)}
