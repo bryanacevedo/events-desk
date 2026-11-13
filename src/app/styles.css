@@ -314,8 +314,7 @@ details summary::-webkit-details-marker { display: none; }
 .steps { display: flex; gap: 6px; }
 .steps i { flex: 1; height: 6px; border-radius: 3px; background: var(--line); }
 .steps i.done { background: var(--green); }
-.steps i.now { background: var(--green); animation: breathe 1.4s ease-in-out infinite; }
-@keyframes breathe { 50% { opacity: 0.45; } }
+.steps i.now { background: var(--green); }
 
 /* ------------------------------------------------------------------ cases */
 
@@ -632,7 +631,7 @@ button.chevbtn:hover { background: var(--well); color: var(--ink); }
 .tl-bar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--green); }
 .tl-bar u { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--ground); }
 .tl-bar b { position: absolute; top: 0; bottom: 0; width: 20%; }
-.tl-bar.run b { background: var(--green); animation: breathe 1.4s ease-in-out infinite; }
+.tl-bar.run b { background: var(--green); }
 .tl-dot { position: absolute; top: 12px; width: 12px; height: 12px; border-radius: 50%; transform: translateX(-50%); background: var(--ink); z-index: 1; }
 .tl-dot.ok { background: var(--green); }
 .tl-dot.wait { background: var(--ink); }
@@ -872,7 +871,7 @@ select:not([multiple]) {
 .c-track i { flex: 1; height: 5px; border-radius: 3px; background: var(--line); transform-origin: center; transition: transform 220ms var(--ease); transition-delay: calc(var(--s) * 32ms); }
 .c-track i.on { background: var(--green); animation: fill 460ms var(--ease) backwards; animation-delay: calc(var(--i, 0) * 45ms + 240ms + var(--s) * 70ms); transform-origin: left center; }
 .c-track i.now { background: var(--orange); }
-.c-track.run i.now { background: var(--green); animation: breathe 1.3s ease-in-out infinite; }
+.c-track.run i.now { background: var(--green); }
 .card:hover .c-track i { transform: scaleY(1.7); }
 
 /* Sections separate by trays and space, not by rules. */
@@ -1180,7 +1179,6 @@ select:not([multiple]) {
 .tl-sign { flex: none; width: 3px; height: 24px; border-radius: 2px; background: var(--line); transition: transform 200ms var(--ease); }
 .tl-state.wait .tl-sign { background: color-mix(in srgb, var(--orange) 45%, white); }
 .tl-state.ok .tl-sign, .tl-state.run .tl-sign { background: color-mix(in srgb, var(--green) 60%, white); }
-.tl-state.run .tl-sign { animation: breathe 1.4s ease-in-out infinite; }
 .tl-row:hover .tl-sign { transform: scaleY(1.2); }
 .efacts dd .going-more { color: #FFFFFF; font: 600 14px/1 var(--display); }
 .cases .grp .chevrow { height: 32px; min-height: 32px; padding: 0 8px 0 12px; border-radius: var(--r-pill); background: var(--well); color: var(--ink); font-size: 13px; font-weight: 500; transition: background-color 150ms ease; }
@@ -1331,7 +1329,7 @@ select:not([multiple]) {
 .al-main { display: grid; gap: 3px; min-width: 0; }
 .al-name { font: 500 16px/22px var(--sans); overflow-wrap: anywhere; }
 .al-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 10px; font-size: 13px; line-height: 18px; color: var(--mute); }
-.al-meta i { flex: none; width: 3px; height: 3px; border-radius: 50%; background: var(--line-2); }
+.al-meta i { flex: none; width: 1px; height: 12px; background: var(--line-2); }
 .al-side { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px; }
 .al-side .actions { gap: 0; }
 .al-side .btn.small { height: 40px; border-radius: 12px; }
@@ -2306,8 +2304,7 @@ button.corow { width: 100%; text-align: left; border: 0; background: none; font:
 /* The stage under way: the same size and baseline as its neighbours, set apart by weight and ink; its bar is flat orange, no sweep. */
 @media (min-width: 761px) { .stages .now .st-label { font: 600 14px/18px var(--sans); color: var(--ink); } }
 .stages .now .st-bar i::after { display: none; }
-.stages.running .now .st-bar i { animation: fill 420ms var(--ease) backwards, breathe 1.6s ease-in-out 900ms infinite; }
-@keyframes breathe { 50% { opacity: 0.55; } }
+.stages.running .now .st-bar i { animation: fill 420ms var(--ease) backwards; }
 /* Details: the date, place and people read as plain facts with a quiet icon, on the page's own left edge; the folds under them run the full width. */
 .efacts { padding: 22px 0 6px; }
 .efacts dt { width: 20px; height: 20px; margin-top: 1px; border-radius: 0; background: none; }

@@ -1,6 +1,0 @@
-src/app/styles.css	dot	.al-meta i { 3px by 3px; border-radius: 50% }
-src/app/styles.css	idle-motion	.c-track.run i.now { animation: breathe 1.3s ease-in-out infinite }
-src/app/styles.css	idle-motion	.stages.running .now .st-bar i { animation: fill 420ms var(--ease) backwards, breathe 1.6s ease-in-out 900ms infinite }
-src/app/styles.css	idle-motion	.steps i.now { animation: breathe 1.4s ease-in-out infinite }
-src/app/styles.css	idle-motion	.tl-bar.run b { animation: breathe 1.4s ease-in-out infinite }
-src/app/styles.css	idle-motion	.tl-state.run .tl-sign { animation: breathe 1.4s ease-in-out infinite }

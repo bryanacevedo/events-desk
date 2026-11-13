@@ -6,6 +6,7 @@
 
 - `main` holds the upgrade below and the CRM switch, Render now redeploys on every push to `main` by itself. Checked live on 2026-11-12: the upgrade's security headers and the sidebar tagline "From the seat to the result" (83ea0fa) are on https://events-desk.onrender.com. The CRM switch (dfc9bc8) went out by auto-deploy and was not checked on the live site; it changes nothing while `CRM` is unset.
 - CRM switch (decision 46): `CRM` unset keeps today's CRM (`simCrm` in the demo, `noCrm` live); `CRM=crmdesk` uses CRM Desk through `src/server/crm-desk.ts` with `CRM_DESK_URL` and `CRM_DESK_KEY`; `CRM=salesforce` is refused. Contract tests 1, 3, 4, 5 and 6 in `tests/crm-desk-contract.test.ts`; the three against a running CRM Desk are skipped without `CRM_DESK_URL`, `CRM_DESK_KEY` and `CRM_DESK_ADMIN_KEY`.
+- Design-lint held items cleared on 2026-11-12 with Bryan's approval: all five idle `breathe` loops removed (T6; running states keep their colour, no motion) and the `.al-meta` separator dot replaced by a 1px `--line-2` hairline. `docs/DESIGN-LINT-BASELINE.txt` is now empty. Suite after: 1,159 passed, 12 skipped.
 - `npx vitest run` on 2026-11-12: 1,158 passed, 12 skipped (1,170).
 - Film: the v4 walkthrough (3:41) is published at https://bryanacevedo.github.io/project-videos/video/events-desk.mp4 and linked from the README.
 
