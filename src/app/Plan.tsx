@@ -27,7 +27,7 @@ const TRAY_OF: Record<string, PlanInvolvement["kind"]> = { passes: "passes", tra
 const dollars = (cents: number) => money(cents);
 
 /** The money columns. Contracted reads "Not contracted" and actual "Not entered" until there is something to say; a total row closes a group of more than one. */
-function Budget({ cats, total, aiCents }: { cats: PlanBudgetCategory[]; total?: { planned: number; contracted: number; actual: number }; aiCents?: number }) {
+function Budget({ cats, total, aiCents }: { cats: PlanBudgetCategory[]; total?: { planned: number; contracted: number | null; actual: number }; aiCents?: number }) {
   if (!cats.length && !aiCents) return <p className="mute">No budget lines yet.</p>;
   return (
     <div className="pl-bt" role="table" aria-label="Budget">
@@ -44,7 +44,7 @@ function Budget({ cats, total, aiCents }: { cats: PlanBudgetCategory[]; total?: 
         <div className="pl-bt-row" role="row"><span role="rowheader"><b>AI</b></span><span role="cell" data-col="Planned" /><span role="cell" data-col="Contracted" /><span role="cell" data-col="Actual">{dollars(aiCents)}</span></div>
       )}
       {total && (
-        <div className="pl-bt-row pl-bt-total" role="row"><span role="rowheader"><b>Total</b></span><span role="cell" data-col="Planned">{dollars(total.planned)}</span><span role="cell" data-col="Contracted">{dollars(total.contracted)}</span><span role="cell" data-col="Actual">{dollars(total.actual)}</span></div>
+        <div className="pl-bt-row pl-bt-total" role="row"><span role="rowheader"><b>Total</b></span><span role="cell" data-col="Planned">{dollars(total.planned)}</span><span role="cell" data-col="Contracted">{total.contracted === null ? <i className="pl-nc">Not contracted</i> : dollars(total.contracted)}</span><span role="cell" data-col="Actual">{dollars(total.actual)}</span></div>
       )}
     </div>
   );
@@ -58,11 +58,11 @@ const involvementFacts = (i: PlanInvolvement): string => {
 };
 const statusWord = (i: PlanInvolvement) => (i.status === "dropped" ? "Dropped" : i.status === "confirmed" ? "Confirmed" : "Planned");
 
-function InvolvementRow({ i }: { i: PlanInvolvement }) {
+function InvolvementRow({ i, bare }: { i: PlanInvolvement; bare?: boolean }) {
   const speaker = i.kind === "talk" && !i.speaker ? "No speaker yet" : i.speaker;
   return (
     <li className="pl-row">
-      <span className="pl-what"><b>{i.label || KIND_WORDS[i.kind]}</b><span>{[KIND_WORDS[i.kind], involvementFacts(i), i.kind === "talk" ? speaker : ""].filter(Boolean).join(", ")}</span></span>
+      <span className="pl-what"><b>{bare ? involvementFacts(i) || KIND_WORDS[i.kind] : i.label || KIND_WORDS[i.kind]}</b><span>{[bare ? "" : KIND_WORDS[i.kind], bare ? "" : involvementFacts(i), i.kind === "talk" ? speaker : ""].filter(Boolean).join(", ")}</span></span>
       <span className="pl-end">{statusWord(i)}{i.dropped_reason ? `: ${i.dropped_reason}` : ""}</span>
     </li>
   );
@@ -71,7 +71,7 @@ function InvolvementRow({ i }: { i: PlanInvolvement }) {
 function PersonRow({ p, withSeat = true }: { p: PlanPerson; withSeat?: boolean }) {
   return (
     <li className="pl-row">
-      <span className="pl-what"><b>{p.person}</b><span>{p.team || "No team"}</span></span>
+      <span className="pl-what"><b>{p.person}</b><span>{p.team}</span></span>
       <span className="pl-mid">{p.roles.map((r) => ROLE_WORDS[r] ?? r).join(", ")}</span>
       <span className={`pl-end${p.seat_status === "pending" ? " pl-strong" : ""}`}>{withSeat ? (p.seat_status ? SEAT_WORDS[p.seat_status] : "No pass") : ""}</span>
     </li>
@@ -126,7 +126,7 @@ export function PlanTab({ id, listRows, onChange }: { id: string; listRows: numb
 
   const live = p.involvements.filter((i) => i.status !== "dropped");
   const b = p.budget;
-  const total = b ? { planned: b.total_planned_cents, contracted: b.total_contracted_cents, actual: b.total_actual_cents } : undefined;
+  const total = b ? { planned: b.total_planned_cents, contracted: b.categories.some((c) => c.contracted_cents !== null) ? b.total_contracted_cents : null, actual: b.total_actual_cents } : undefined;
   const people = p.who_goes;
 
   /* The sections, written once and laid out three ways. */
@@ -173,11 +173,11 @@ export function PlanTab({ id, listRows, onChange }: { id: string; listRows: numb
         <div className="pl-main">
           <Sec title="Why we go">{reason}</Sec>
           {kinds.map((k) => live.filter((i) => i.kind === k).map((i) => (
-            <Sec key={i.id} title={i.label || KIND_WORDS[k]}>
-              <ul className="pl-rows"><InvolvementRow i={i} /></ul>
+            <Sec key={i.id} title={i.label || (k === "hosted" ? HOSTED_WORDS[i.hosted_format ?? ""] : "") || KIND_WORDS[k]}>
+              <ul className="pl-rows"><InvolvementRow i={i} bare /></ul>
               {k === "passes" && people.length > 0 && <><h3 className="pl-h3">Who goes</h3><ul className="pl-rows">{loose.map((x) => <PersonRow key={x.id} p={x} />)}</ul></>}
               {k === "hosted" && people.length > 0 && <><h3 className="pl-h3">Who hosts</h3><ul className="pl-rows">{people.map((x) => <PersonRow key={x.id} p={x} withSeat={false} />)}</ul></>}
-              {k !== "talk" && trayCats(k).length > 0 && <><h3 className="pl-h3">Budget</h3><Budget cats={trayCats(k)} total={trayCats(k).length > 1 ? { planned: trayCats(k).reduce((n, c) => n + c.planned_cents, 0), contracted: trayCats(k).reduce((n, c) => n + (c.contracted_cents ?? 0), 0), actual: trayCats(k).reduce((n, c) => n + (c.actual_cents ?? 0), 0) } : undefined} /></>}
+              {k !== "talk" && trayCats(k).length > 0 && <><h3 className="pl-h3">Budget</h3><Budget cats={trayCats(k)} total={trayCats(k).length > 1 ? { planned: trayCats(k).reduce((n, c) => n + c.planned_cents, 0), contracted: trayCats(k).some((c) => c.contracted_cents !== null) ? trayCats(k).reduce((n, c) => n + (c.contracted_cents ?? 0), 0) : null, actual: trayCats(k).reduce((n, c) => n + (c.actual_cents ?? 0), 0) } : undefined} /></>}
             </Sec>
           )))}
           {!live.some((i) => i.kind === "passes" || i.kind === "hosted") && people.length > 0 && <Sec title="Who goes">{who}</Sec>}
@@ -192,7 +192,7 @@ export function PlanTab({ id, listRows, onChange }: { id: string; listRows: numb
             <section><h2>Budget</h2>
               <dl className="pl-tot">
                 <div><dt>Planned</dt><dd>{dollars(b.total_planned_cents)}</dd></div>
-                <div><dt>Contracted</dt><dd>{dollars(b.total_contracted_cents)}</dd></div>
+                <div><dt>Contracted</dt><dd>{total?.contracted === null ? <i className="pl-nc">Not contracted</i> : dollars(b.total_contracted_cents)}</dd></div>
                 <div><dt>Actual</dt><dd>{dollars(b.total_actual_cents)}</dd></div>
                 {b.approved_budget_cents !== null && <div><dt>Approved</dt><dd>{dollars(b.approved_budget_cents)}</dd></div>}
               </dl>
@@ -218,10 +218,10 @@ export function PlanTab({ id, listRows, onChange }: { id: string; listRows: numb
           <section className="pl-sec" aria-label="This week"><h2>This week</h2><div className="pl-body"><p className="mute">No deadlines yet.</p></div></section>
         </div>
         <div className="pl-main folds pl-folds">
-          <Fold icon={<Icon.history />} title="Why we go" peek={p.reason ? p.reason.slice(0, 60) + (p.reason.length > 60 ? "..." : "") : "Not written"}>{reason}</Fold>
-          <Fold icon={<Icon.target />} title="Goal" peek={p.result.words.length ? p.result.words.join(", ") : "No goal was set"}><Goal p={p} /></Fold>
-          <Fold icon={<Icon.grid />} title="Taking part" peek={live.length ? live.map((i) => KIND_WORDS[i.kind]).join(", ") : "Nothing yet"}>{taking}</Fold>
-          {b && <Fold icon={<Icon.cost />} title="Budget" peek={<>{dollars(b.total_planned_cents)} planned<i>{dollars(b.total_actual_cents)} actual</i></>}>{budget}</Fold>}
+          <Fold icon={<Icon.history />} title="Why we go" peek={p.reason ? "Written" : "Not written"}>{reason}</Fold>
+          <Fold icon={<Icon.target />} title="Goal" peek={p.goal.meetings_held !== null ? `${num(p.goal.meetings_held)} meetings` : p.goal.accounts_met !== null ? `${num(p.goal.accounts_met)} accounts` : "None set"}><Goal p={p} /></Fold>
+          <Fold icon={<Icon.grid />} title="Taking part" peek={live.length ? String(live.length) : "Nothing yet"}>{taking}</Fold>
+          {b && <Fold icon={<Icon.cost />} title="Budget" peek={dollars(b.total_planned_cents)}>{budget}</Fold>}
           <Fold icon={<Icon.people />} title="Who goes" peek={people.length ? `${people.length}` : "Nobody yet"}>{who}</Fold>
           <Fold icon={<Icon.lists />} title="Audience" peek={listRows > 0 ? `${num(listRows)} rows` : "List not uploaded"}>{audience}</Fold>
         </div>
