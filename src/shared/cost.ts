@@ -50,6 +50,9 @@ export interface Settings {
   /** Each credit vendor's pre-allocated pool. Null allotment means unknown. */
   pools: Pools;
   approvers: string[];
+  /** The field marketers who write plans and read their money (docs/EVENT-PLAN.md, decision 54). They approve nothing. */
+  planners?: string[];
+  plan?: { prepare_days_before: number; approval_over_cents: number; assessment_calls_per_event: number };
   agent_question_limit: number;
   calls_per_question: number;
   research: ResearchRates;

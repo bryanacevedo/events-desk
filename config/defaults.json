@@ -68,6 +68,14 @@
   "approvers": [
     "Dan Whitlock"
   ],
+  "planners": [
+    "Camille Laurent"
+  ],
+  "plan": {
+    "prepare_days_before": 70,
+    "approval_over_cents": 0,
+    "assessment_calls_per_event": 6
+  },
   "agent_question_limit": 50,
   "calls_per_question": 3,
   "research": {

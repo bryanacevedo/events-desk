@@ -19,7 +19,7 @@ import { recordConsent, recordPlacement, setDomainStatus } from "./sending.ts";
 import { captureOnsite, forgetPerson, markHandled } from "./operating.ts";
 import { addSlots, bookSlot, dealDetail, debriefDetail, eventDeals, meetingDetail, personDetail, prepBrief, repDay, replyDetail, roster } from "./rep-day.ts";
 import { isGtm } from "../shared/roles.ts";
-import { forRep, isLead, MONEY_REFUSAL, withoutMoney } from "./money.ts";
+import { canPlan, forRep, isLead, MONEY_REFUSAL, withoutMoney } from "./money.ts";
 import { sequenceDetail, sequenceList } from "./sequence-view.ts";
 import { MOTION_LABEL } from "../shared/motion.ts";
 import { pickSenders, planCapacity } from "../shared/sending.ts";
@@ -88,7 +88,7 @@ export function mountLifecycle(app: App, db: Db, deps: LifecycleDeps, opts: { ba
   if (opts.demoTools) app.post("/api/demo/motion/:id/advance", guarded(async (c) => demoAdvance(db, deps, opts.demoTools!, c.req.param("id"))));
 
   app.delete("/api/events/:id/costs/:category", guarded(async (c) => { if (!isLead(c.get("actor"))) throw new RuleError(MONEY_REFUSAL); await clearEventCost(db, c.req.param("id"), c.get("actor"), c.req.param("category")); return { cleared: true }; }));
-  app.get("/api/events/:id/cost", async (c) => (isLead(c.get("actor")) ? c.json(await eventCost(db, c.req.param("id"))) : bad(MONEY_REFUSAL, 403)));
+  app.get("/api/events/:id/cost", async (c) => (canPlan(c.get("actor")) ? c.json(await eventCost(db, c.req.param("id"))) : bad(MONEY_REFUSAL, 403)));
   app.get("/api/events/:id/next", async (c) => {
     const id = c.req.param("id");
     // How many decisions wait on each tab: the list's on People, everything about sending and answering on Outreach.

@@ -70,6 +70,11 @@ export interface EventRow {
   parent_event_id?: string | null;
   ended_at?: string | null;
   merged_at?: string | null;
+  /** The plan stage beside the list stage (docs/EVENT-PLAN.md). None of these holds money. */
+  plan_stage?: "planning" | "confirmed" | "preparing" | "live" | "following_up" | "judged";
+  approval_mode?: "per_seat" | "budget";
+  plan_approved_at?: string | null;
+  judged_at?: string | null;
 }
 
 export interface ActivityRow {

@@ -54,8 +54,10 @@ export function mountSeatRoutes(app: Hono<any>, db: Db, cfg: { demo: boolean; sl
     const body = await c.req.json<Record<string, unknown>>().catch(() => ({}) as Record<string, unknown>);
     const actor: string = c.get("actor");
     try {
-      const made = await requestSeat(db, actor, parseSeatRequest(actor, body), { approvers: cfg.slack?.approvers });
-      if (cfg.slack) await postSeatRequest(db, cfg.slack, made.id);
+      // An event whose seats are approved through its budget takes the ask as "ask to go": the long answers are optional, and no seat card is posted.
+      const [onPlan] = typeof body.catalog_id === "string" && body.catalog_id ? await db.query("SELECT 1 FROM events WHERE catalog_id = $1 AND stage <> 'declined' AND approval_mode = 'budget' LIMIT 1", [body.catalog_id]) : [];
+      const made = await requestSeat(db, actor, parseSeatRequest(actor, body, { relaxed: Boolean(onPlan) }), { approvers: cfg.slack?.approvers });
+      if (cfg.slack && !made.budget_mode) await postSeatRequest(db, cfg.slack, made.id);
       return c.json(made, 201);
     } catch (e) {
       if (e instanceof Forbidden) return Response.json({ error: e.message }, { status: 403 });

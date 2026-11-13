@@ -26,7 +26,9 @@ import { benchToExample, cancelCompile, confirmCompile, reopenCompile, editDraft
 import { mockLlm, type Crm, type Dns, type Llm } from "./providers.ts";
 import type { Settings } from "../shared/cost.ts";
 import { isGtm, SETTINGS_REFUSAL } from "../shared/roles.ts";
-import { forRep, isLead, MONEY_REFUSAL } from "./money.ts";
+import { canPlan, forRep, isLead, MONEY_REFUSAL } from "./money.ts";
+import { mountPlanRoutes } from "./plan-routes.ts";
+import { stageNow } from "./plan.ts";
 import { mountSettingsView } from "./settings-view.ts";
 import { mountSeatRoutes } from "./seat-routes.ts";
 import { mountBudgetRoutes } from "./budget-routes.ts";
@@ -76,9 +78,10 @@ export function createApp(db: Db, cfg: AppConfig) {
 
   app.use("/api/*", async (c, next) => {
     if (c.req.method === "GET") {
-      // Reads say who is acting too. Budget, Usage and Results are company money: leadership's and GTM Engineering's.
+      // Reads say who is acting too. Usage is company money: leadership's and GTM Engineering's. Budget and Results also admit a planner (decision 54), who writes the plans they show.
       c.set("actor", decodeURIComponent(c.req.header("x-actor") ?? "").trim().slice(0, 60));
-      if (/^\/api\/(budget|usage|results)(\/|$)/.test(c.req.path) && !isLead(c.get("actor"))) return bad(MONEY_REFUSAL, 403);
+      if (/^\/api\/usage(\/|$)/.test(c.req.path) && !isLead(c.get("actor"))) return bad(MONEY_REFUSAL, 403);
+      if (/^\/api\/(budget|results)(\/|$)/.test(c.req.path) && !canPlan(c.get("actor"))) return bad(MONEY_REFUSAL, 403);
     }
     if (c.req.method !== "GET") {
       if (cfg.writeKey && c.req.header("x-write-key") !== cfg.writeKey) return bad("This desk needs the team write key to make changes.", 401);
@@ -134,6 +137,7 @@ export function createApp(db: Db, cfg: AppConfig) {
   mountSeatRoutes(app, db, cfg);
   mountBudgetRoutes(app, db, cfg);
   mountEventViews(app, db);
+  mountPlanRoutes(app, db, cfg);
   // "Did it pay?" is company money: anyone else gets the overview without it.
   app.get("/api/overview", async (c) => { const o = await overview(db, cfg.lifecycle); return c.json(isLead(c.get("actor")) ? o : { ...o, results: [], needs: o.needs.filter((n) => n.kind !== "costs") }); });
 
@@ -187,7 +191,9 @@ export function createApp(db: Db, cfg: AppConfig) {
 
   app.get("/api/events", async (c) => {
     const events = await db.query<EventRow>(`SELECT ${EVENT_COLS}, catalog_id, (SELECT u.uploaded_by FROM uploads u WHERE u.event_id = events.id ORDER BY u.created_at, u.id LIMIT 1) AS uploaded_by, ${WEBSITE} FROM events WHERE parent_event_id IS NULL ORDER BY starts_on, name`);
-    return c.json({ events: isLead(c.get("actor")) ? events : events.map((e) => ({ ...e, seat_price_cents: null })), demo: cfg.demo });
+    // The plan stage is read on the spot at the desk's clock, so a screen is never a tick behind.
+    const shown = events.map((e) => ({ ...e, plan_stage: stageNow(e, cfg.lifecycle) }));
+    return c.json({ events: isLead(c.get("actor")) ? shown : shown.map((e) => ({ ...e, seat_price_cents: null })), demo: cfg.demo });
   });
 
   app.get("/api/events/:id", async (c) => {
@@ -205,7 +211,8 @@ export function createApp(db: Db, cfg: AppConfig) {
     const noCents = forRep;
     const repCards = lead ? cards : cards.map(noCents);
     const byStep = await withAiCents(db, id, await spendByStep(db, id), defaultSettings().llm_call_cents);
-    return c.json({ event: lead ? event : { ...event, seat_price_cents: null }, activity: lead ? activity : activity.filter((a) => !/\$\s?\d/.test(String((a as { detail?: string }).detail ?? ""))), list: await listSummary(db, id), settings: settingsRow?.settings ? (lead ? settingsRow.settings : noCents(settingsRow.settings)) : null, card: repCards[0] ?? null, cards: repCards, spend: lead ? await spend(db, id) : { credits: (await spend(db, id)).credits }, spend_by_step: lead ? byStep : byStep.filter((r) => r.unit !== "llm").map(noCents), open_cases: open, uploads: await listUploads(db, id), top_ups: await topUpsOf(db, id), spread: event.flow === "two_card" && ["ready_for_review", "finding_people", "flagging", "delivered"].includes(event.stage) ? await spreadFor(db.query, id, { ...defaultSettings(), ...settingsRow?.settings }) : null, icp_version: (await db.query<{ v: number | null }>("SELECT icp_version AS v FROM events WHERE id = $1", [id]))[0]?.v ?? null });
+    const shown = { ...event, plan_stage: stageNow(event, cfg.lifecycle) };
+    return c.json({ event: lead ? shown : { ...shown, seat_price_cents: null }, activity: lead ? activity : activity.filter((a) => !/\$\s?\d/.test(String((a as { detail?: string }).detail ?? ""))), list: await listSummary(db, id), settings: settingsRow?.settings ? (lead ? settingsRow.settings : noCents(settingsRow.settings)) : null, card: repCards[0] ?? null, cards: repCards, spend: lead ? await spend(db, id) : { credits: (await spend(db, id)).credits }, spend_by_step: lead ? byStep : byStep.filter((r) => r.unit !== "llm").map(noCents), open_cases: open, uploads: await listUploads(db, id), top_ups: await topUpsOf(db, id), spread: event.flow === "two_card" && ["ready_for_review", "finding_people", "flagging", "delivered"].includes(event.stage) ? await spreadFor(db.query, id, { ...defaultSettings(), ...settingsRow?.settings }) : null, icp_version: (await db.query<{ v: number | null }>("SELECT icp_version AS v FROM events WHERE id = $1", [id]))[0]?.v ?? null });
   });
 
   if (cfg.slack) mountSlack(app, db, cfg.slack, cfg.kick, cfg.lifecycle);

@@ -15,6 +15,7 @@ import { senderSweep } from "./sending.ts";
 import { postEventStep } from "./post-event.ts";
 import { blindSweep, drainNotifications, escalateWaiting, purgeOldBodies, raiseAlert, recordRun } from "./operating.ts";
 import { dailyDigest } from "./closeout.ts";
+import { syncAllPlanStages } from "./plan.ts";
 
 export async function pollTools(db: Db, deps: LifecycleDeps) {
   const since = new Date(nowOf(deps).getTime() - 3 * DAY).toISOString();
@@ -69,6 +70,7 @@ export function tickStale(now: Date = new Date()) {
 
 async function tickOnce(db: Db, deps: LifecycleDeps, opts: { flags?: boolean; nightly?: boolean }) {
   running.db = db; running.deps = deps;
+  await quietly("plan stage", () => syncAllPlanStages(db, deps));
   await quietly("owners", () => ownerStep(db, deps));
   await quietly("observe", () => observeSequences(db, deps));
   await quietly("ops", () => drainOps(db, deps));

@@ -8,6 +8,9 @@ import type { Scorecard } from "./closeout.ts";
 export const MONEY_REFUSAL = "Company money is for leadership and GTM Engineering.";
 export const isLead = (actor: string, approvers: string[] = (defaultSettings().approvers ?? []) as string[]) => Boolean(actor) && (isGtm(actor) || approvers.includes(actor));
 
+/** A planner writes plans and reads their money (decision 54): leadership and GTM, or anyone on the configured `planners` list. A planner approves nothing, and `isLead` is not widened. */
+export const canPlan = (actor: string, planners: string[] = (defaultSettings().planners ?? []) as string[], approvers?: string[]) => isLead(actor, approvers) || (Boolean(actor) && planners.includes(actor));
+
 /** The same reading with every dollar taken out: meetings, reach, replies and the comparison stay. */
 export function withoutMoney<T extends Scorecard | null | undefined>(m: T): T {
   if (!m) return m;

@@ -11,7 +11,8 @@ export const newId = (p: string) => `${p}_${crypto.randomUUID().replace(/-/g, ""
 
 export const EVENT_COLS = `id, name, venue, starts_on::text AS starts_on, ends_on::text AS ends_on, seat_count, seat_price_cents, stage, paused_from,
   decline_reason, requested_by, created_at, updated_at, stage_changed_at, country, flow, parent_event_id, ended_at, merged_at, motion,
-  post_started_at::text AS post_started_at, coalesce((SELECT c.ends_on FROM catalog_events c WHERE c.id = events.catalog_id), events.ends_on, events.starts_on)::text AS last_day`;
+  post_started_at::text AS post_started_at,
+  plan_stage, approval_mode, plan_approved_at, judged_at, coalesce((SELECT c.ends_on FROM catalog_events c WHERE c.id = events.catalog_id), events.ends_on, events.starts_on)::text AS last_day`;
 
 export class RuleError extends Error {}
 /** A top-up that was ended or has already merged never moves again. */

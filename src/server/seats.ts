@@ -10,6 +10,7 @@ import type { Db } from "./db.ts";
 import { defaultSettings, getSettings } from "./approvals.ts";
 import { logActivity, moveWithin, newId, RuleError } from "./events.ts";
 import { isGtm } from "../shared/roles.ts";
+import { askToGo } from "./plan.ts";
 
 export class Invalid extends Error {}
 export class Forbidden extends Error {}
@@ -31,8 +32,8 @@ const ymdOk = (s: unknown): s is string => typeof s === "string" && /^\d{4}-\d{2
 const text = (v: unknown) => (typeof v === "string" ? v.trim() : "");
 export const todayYmd = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 
-/** Checks the body of a seat request. Throws Invalid with one sentence a person can act on. */
-export function parseSeatRequest(actor: string, b: Record<string, unknown>): SeatInput {
+/** Checks the body of a seat request. Throws Invalid with one sentence a person can act on. `relaxed` is for an event whose seats are approved through its budget (docs/EVENT-PLAN.md 6.2): the long answers are optional there. */
+export function parseSeatRequest(actor: string, b: Record<string, unknown>, opts: { relaxed?: boolean } = {}): SeatInput {
   // One person, one seat, their own. The server takes the requester from who is acting, never from the body.
   if (b.requester !== undefined && b.requester !== actor) throw new Forbidden("A seat request is for your own seat. Ask for yours.");
   for (const k of ["seats", "seat_count"]) if (b[k] !== undefined && b[k] !== 1) throw new Forbidden("A seat request is for one seat, your own.");
@@ -56,12 +57,14 @@ export function parseSeatRequest(actor: string, b: Record<string, unknown>): Sea
   const team = text(b.team), role = text(b.role);
   if (!team) throw new Invalid("Say which team you are on.");
   if (!role) throw new Invalid("Say your role.");
-  if (typeof b.goal !== "string" || !(b.goal in GOALS)) throw new Invalid("Choose the main goal.");
+  if (!opts.relaxed && (typeof b.goal !== "string" || !(b.goal in GOALS))) throw new Invalid("Choose the main goal.");
+  const goal: Goal = typeof b.goal === "string" && b.goal in GOALS ? (b.goal as Goal) : "new_pipeline";
   const why_event = text(b.why_event), why_you = text(b.why_you);
-  if (why_event.length < MIN_WHY) throw new Invalid(`Say why this event, in at least ${MIN_WHY} characters.`);
-  if (why_you.length < MIN_WHY) throw new Invalid(`Say why you, in at least ${MIN_WHY} characters.`);
-  const meetings = Number(b.expected_meetings);
-  if (b.expected_meetings === undefined || b.expected_meetings === "" || !Number.isInteger(meetings) || meetings < 0 || meetings > 500) throw new Invalid("Say how many meetings you expect, as a whole number.");
+  if (!opts.relaxed && why_event.length < MIN_WHY) throw new Invalid(`Say why this event, in at least ${MIN_WHY} characters.`);
+  if (!opts.relaxed && why_you.length < MIN_WHY) throw new Invalid(`Say why you, in at least ${MIN_WHY} characters.`);
+  const missing = b.expected_meetings === undefined || b.expected_meetings === "" || b.expected_meetings === null;
+  const meetings = opts.relaxed && missing ? 0 : Number(b.expected_meetings);
+  if ((!opts.relaxed || !missing) && (missing || !Number.isInteger(meetings) || meetings < 0 || meetings > 500)) throw new Invalid("Say how many meetings you expect, as a whole number.");
   const known = text(b.known_accounts) || null;
   if (known && known.length > 600) throw new Invalid("Keep the known accounts under 600 characters.");
   let travel_cents: number | null = null;
@@ -75,7 +78,7 @@ export function parseSeatRequest(actor: string, b: Record<string, unknown>): Sea
     if (!ymdOk(b.decide_by)) throw new Invalid("Give the decide-by date as a date, or leave it blank.");
     decide_by = b.decide_by;
   }
-  return { catalog_id, suggestion, team: team.slice(0, 60), role: role.slice(0, 60), goal: b.goal as Goal, why_event: why_event.slice(0, 1500), why_you: why_you.slice(0, 1500), expected_meetings: meetings, known_accounts: known, travel_cents, decide_by };
+  return { catalog_id, suggestion, team: team.slice(0, 60), role: role.slice(0, 60), goal, why_event: why_event.slice(0, 1500), why_you: why_you.slice(0, 1500), expected_meetings: meetings, known_accounts: known, travel_cents, decide_by };
 }
 
 /** A catalog entry as GTM Engineering or an approver adds it from the Events tab. Same fields as a suggestion, plus an optional venue. */
@@ -105,10 +108,10 @@ export async function addCatalogEntry(db: Db, actor: string, c: CatalogInput) {
   return { id };
 }
 
-interface EventLite { id: string; stage: string; seat_count: number }
+interface EventLite { id: string; stage: string; seat_count: number; approval_mode?: string }
 
 /** seat_count follows the requests: the number approved, or while nothing is approved yet, the number waiting. */
-async function recount(q: Db["query"], eventId: string) {
+export async function recount(q: Db["query"], eventId: string) {
   const [c] = await q<{ approved: number; pending: number }>(
     "SELECT count(*) FILTER (WHERE status = 'approved')::int AS approved, count(*) FILTER (WHERE status = 'pending')::int AS pending FROM seat_requests WHERE event_id = $1", [eventId]);
   await q("UPDATE events SET seat_count = $2 WHERE id = $1", [eventId, Math.max(1, c.approved || c.pending)]);
@@ -129,7 +132,7 @@ export async function requestSeat(db: Db, actor: string, input: SeatInput, opts:
       cat = { id: null, name: s.name, venue: s.city, country: s.country, starts_on: s.starts_on, ends_on: s.ends_on, price_cents: s.price_cents };
     }
     let ev: EventLite | undefined;
-    if (cat.id) [ev] = await q<EventLite>("SELECT id, stage, seat_count FROM events WHERE catalog_id = $1 AND stage <> 'declined' ORDER BY created_at DESC LIMIT 1 FOR UPDATE", [cat.id]);
+    if (cat.id) [ev] = await q<EventLite>("SELECT id, stage, seat_count, approval_mode FROM events WHERE catalog_id = $1 AND stage <> 'declined' ORDER BY created_at DESC LIMIT 1 FOR UPDATE", [cat.id]);
     if (!ev) {
       const id = opts.id ?? newId("evt");
       await q(
@@ -138,6 +141,8 @@ export async function requestSeat(db: Db, actor: string, input: SeatInput, opts:
       await q("INSERT INTO event_settings (event_id, settings) VALUES ($1, $2::jsonb)", [id, JSON.stringify({ ...JSON.parse(readFileSync(new URL("../../config/defaults.json", import.meta.url), "utf8")), ...(opts.approvers ? { approvers: opts.approvers } : {}) })]);
       [ev] = await q<EventLite>("SELECT id, stage, seat_count FROM events WHERE id = $1", [id]);
     }
+    // An event whose seats are approved through its budget takes the ask as "ask to go": a person on the plan and a waiting seat, no second event and no seat card.
+    if (ev.approval_mode === "budget") return askToGo(q, actor, ev, { team: input.team, role: input.role, travel_cents: input.travel_cents });
     const [dup] = await q("SELECT 1 FROM seat_requests WHERE event_id = $1 AND requester = $2 AND status IN ('pending', 'approved')", [ev.id, actor]);
     if (dup) throw new RuleError("You already have a seat request for this event. One seat each.");
     const id = newId("sr");
@@ -147,7 +152,7 @@ export async function requestSeat(db: Db, actor: string, input: SeatInput, opts:
       [id, ev.id, cat.id, actor, input.team, input.role, input.goal, input.why_event, input.why_you, input.expected_meetings, input.known_accounts, input.travel_cents, input.decide_by, input.suggestion ? JSON.stringify(input.suggestion) : null]);
     await recount(q, ev.id);
     await logActivity(q, ev.id, actor, "requested", input.suggestion ? "Asked for a seat at a new event" : "Asked for a seat");
-    return { id, event_id: ev.id, stage: ev.stage };
+    return { id, event_id: ev.id, stage: ev.stage } as { id: string; event_id: string; stage: string; budget_mode?: boolean };
   });
 }
 
@@ -167,7 +172,7 @@ export async function decideSeat(db: Db, d: SeatDecision) {
     if (d.decision === "decline" && !d.reason?.trim()) throw new RuleError("Say why before declining.");
     const status = d.decision === "approve" ? "approved" : "declined";
     await q("UPDATE seat_requests SET status = $2, decided_by = $3, decided_at = now(), decline_reason = $4 WHERE id = $1", [r.id, status, d.actor, d.reason?.trim() || null]);
-    const [ev] = await q<{ id: string; stage: string }>("SELECT id, stage FROM events WHERE id = $1 FOR UPDATE", [r.event_id]);
+    const [ev] = await q<{ id: string; stage: string; approval_mode: string }>("SELECT id, stage, approval_mode FROM events WHERE id = $1 FOR UPDATE", [r.event_id]);
     if (status === "approved" && r.suggestion && !r.catalog_id) {
       // Approving a suggestion adds the event to the catalog.
       const s = r.suggestion, cid = newId("cat");
@@ -177,7 +182,10 @@ export async function decideSeat(db: Db, d: SeatDecision) {
       await q("UPDATE events SET catalog_id = $2 WHERE id = $1", [ev.id, cid]);
     }
     const c = await recount(q, ev.id);
-    if (status === "approved") {
+    if (ev.approval_mode === "budget") {
+      // Seats on a plan are settled one by one here, and never move the plan: approving a seat cannot approve the plan, and declining the last seat cannot decline it.
+      await logActivity(q, ev.id, d.actor, "approval", status === "approved" ? `Approved ${r.requester}'s seat` : `Declined ${r.requester}'s seat: ${d.reason!.trim()}`);
+    } else if (status === "approved") {
       // Only an event still waiting on its first seat moves. A later seat, or a late one, just counts.
       if (ev.stage === "requested") await moveWithin(q, ev.id, "approved", d.actor, { detail: `Approved ${r.requester}'s seat` });
       else await logActivity(q, ev.id, d.actor, "approval", `Approved ${r.requester}'s seat`);

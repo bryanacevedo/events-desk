@@ -5,6 +5,7 @@ import type { Db } from "./db.ts";
 import { budgetView, NotApprover, recordTicket, setBudget } from "./budget.ts";
 import { RuleError } from "./events.ts";
 import { usageView } from "./usage.ts";
+import { yearBudget } from "./budget-lines.ts";
 
 const num = (v: string | undefined) => (v === undefined || v === "" ? undefined : Number(v));
 const refuse = (e: unknown) => {
@@ -14,7 +15,12 @@ const refuse = (e: unknown) => {
 };
 
 export function mountBudgetRoutes(app: Hono<any>, db: Db, cfg: { demo: boolean; slack?: { approvers: string[] } }) {
-  app.get("/api/budget", async (c) => c.json(await budgetView(db, { year: num(c.req.query("year")) ?? new Date().getFullYear(), q: c.req.query("q"), page: num(c.req.query("page")), size: num(c.req.query("size")), quarter: num(c.req.query("quarter")), team: c.req.query("team") || undefined, region: c.req.query("region") || undefined, show: c.req.query("show"), sort: c.req.query("sort") })));
+  app.get("/api/budget", async (c) => {
+    const year = num(c.req.query("year")) ?? new Date().getFullYear();
+    const view = await budgetView(db, { year, q: c.req.query("q"), page: num(c.req.query("page")), size: num(c.req.query("size")), quarter: num(c.req.query("quarter")), team: c.req.query("team") || undefined, region: c.req.query("region") || undefined, show: c.req.query("show"), sort: c.req.query("sort") });
+    // The ticket block stays as it was. Each event's planned, contracted and actual sit beside it; the middleware admits only leadership and planners here.
+    return c.json({ ...view, plan: await yearBudget(db, year) });
+  });
   app.get("/api/usage", async (c) => c.json(await usageView(db, { year: num(c.req.query("year")), month: num(c.req.query("month")), q: c.req.query("q"), page: num(c.req.query("page")), size: num(c.req.query("size")), when: c.req.query("when"), near: c.req.query("near") === "1", sort: c.req.query("sort"), simulated: cfg.demo })));
 
   app.put("/api/budget/:year", async (c) => {
