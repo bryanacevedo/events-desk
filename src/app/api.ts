@@ -88,3 +88,20 @@ export async function send<T = unknown>(method: "POST" | "PATCH" | "PUT" | "DELE
     return { ok: false, error: "The desk could not be reached. Check the connection and try again." };
   }
 }
+
+/** The plan read (GET /api/events/:id/plan). A rep's read has no money keys and no `budget`; every key ending in `cents` is leadership's and planners'. */
+export interface PlanInvolvement { id: string; kind: "passes" | "sponsorship" | "talk" | "hosted"; label: string; status: "planned" | "confirmed" | "dropped"; dropped_reason: string | null; conference_event_id: string | null; pass_count: number | null; hosted_format: string | null; headcount: number | null; talk_title: string | null; speaker: string | null }
+export interface PlanPerson { id: string; person: string; roles: string[]; team: string; involvement_id: string | null; seat_request_id: string | null; seat_status: "pending" | "approved" | "declined" | null }
+export interface PlanBudgetCategory { category: string; label: string; line_ids: string[]; planned_cents: number; contracted_cents: number | null; actual_cents: number | null }
+export interface GoalLine { goal: number; actual: number; short_by: number }
+export interface PlanData {
+  event: { id: string; name: string; venue: string; starts_on: string; last_day: string; stage: string; decline_reason: string | null; approval_mode: "per_seat" | "budget"; hosted: boolean };
+  stage_line: { plan_stage: string; plan_stage_label: string; list_stage: string; list_stage_label: string; waiting_on: string; paused: boolean };
+  reason: string; reason_words: string | null;
+  goal: { meetings_held: number | null; accounts_met: number | null; pipeline_cents?: number | null };
+  result: { meetings: GoalLine | null; accounts: GoalLine | null; pipeline: { goal_cents?: number; actual_cents?: number; short_by_cents?: number } | null; words: string[] };
+  approval: { submitted_at: string | null; approved_by: string | null; approved_at: string | null; approved_budget_cents?: number | null; requested_by: string; approvers: string[]; over_budget: boolean; over_plan: boolean; waiting_seats: number };
+  involvements: PlanInvolvement[]; side_events: { id: string; name: string; starts_on: string; hosted_format: string; plan_stage: string }[]; who_goes: PlanPerson[];
+  notes: string[]; judged_at: string | null;
+  budget?: { lines: { id: string; category: string; label: string; planned_cents: number; contracted_cents: number | null }[]; categories: PlanBudgetCategory[]; ai_actual_cents: number; total_planned_cents: number; total_contracted_cents: number; total_actual_cents: number; approved_budget_cents: number | null };
+}

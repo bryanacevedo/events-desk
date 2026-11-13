@@ -661,3 +661,9 @@ Where the spec was ambiguous or wrong against the code, the smaller, safer readi
 7. **Bigint money columns are cast to `float8` on read** (`planned_cents`, `contracted_cents`, `approved_budget_cents`, `goal_pipeline_cents`), because the two drivers return bigint differently. All stay below 2^53 cents.
 8. **`askToGo` returns `budget_mode: true`**, which `POST /api/seat-requests` reads to skip the Slack seat card. The seat form's long answers are optional only when the catalog entry already has a budget-mode event (`parseSeatRequest(..., { relaxed })`).
 9. **`seed-year.ts` takes its own "today"** (`SEED_TODAY = 2026-11-08`, from its comments, overridable with `opts.today`) so the past dinners close and read `judged` the same on any day.
+
+## 17. Decided with Bryan (2026-11-13)
+
+- The Plan tab ships three views (one ledger, by involvement, what needs me now), chosen per person and remembered, default by involvement; sections inside the scrolling panel are separated clearly.
+- Planner money (decision 54): yes. Open question 2 is closed.
+- The in-flight plan in the demo is AWS re:Invent 2026 (30 Nov 2026, Las Vegas, 17 days after the demo's day), not a Money20/20 2027 plan. Money20/20 USA 2026 stays the past event: its Result reads against its goal and its assessment (browse-only, the six-word FAQ quote) is confirmed. re:Invent carries the passes, the sponsorship with deliverables due this week and late, the talk placeholder, the goal, and an assessment that finds an emailed list, so its organizer request email and expected date show. Session 3 seeds this; every "Money20/20 USA 2027" in sections 10 and 13 reads "AWS re:Invent 2026" and its dates come from the real-events entry. Reusing last year's assessment stays covered by tests.

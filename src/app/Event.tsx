@@ -15,6 +15,7 @@ import { objectHref, ObjectSheets } from "./Objects";
 import { Cases, openCases } from "./Cases";
 import { Motion } from "./Motion";
 import { ResultView } from "./Result";
+import { PlanTab } from "./Plan";
 import { To } from "./To";
 import { Chevron, FileButton, ShowMore, SheetButton } from "./Patterns";
 import { isGtm } from "../shared/roles";
@@ -709,17 +710,17 @@ export function StageBlock({ ev, go, compact }: { ev: EventState; go: (to: strin
   );
 }
 
-type View = "result" | "outreach" | "people" | "cost" | "details";
+type View = "plan" | "result" | "outreach" | "people" | "cost" | "details";
 /* Result comes first once sending is done (Closing, Scored); before that the event has no result, and the tab is not there. */
-const VIEWS: [View, string][] = [["result", "Result"], ["outreach", "Outreach"], ["people", "People"], ["cost", "Cost"], ["details", "Details"]];
+const VIEWS: [View, string][] = [["plan", "Plan"], ["result", "Result"], ["outreach", "Outreach"], ["people", "People"], ["cost", "Cost"], ["details", "Details"]];
 
 /** A delivered event, one layer at a time: what needs someone now, on one line, then the work in motion, the list, and the event's details as views.
     The view is in the link (#outreach, #people, #details), so a Slack card can point straight at it. */
-function DeliveredViews({ id, started, closed, views, onChange, counts = {} }: { id: string; started: boolean; closed: boolean; views: Partial<Record<View, React.ReactNode>>; onChange: () => void; counts?: Partial<Record<View, number>> }) {
+function DeliveredViews({ id, started, closed, startAt, views, onChange, counts = {} }: { id: string; started: boolean; closed: boolean; startAt?: View; views: Partial<Record<View, React.ReactNode>>; onChange: () => void; counts?: Partial<Record<View, number>> }) {
   const shown = VIEWS.filter(([k]) => views[k] !== undefined);
   const { actor } = useActor();
   const fromHash = (): View | null => { const h = location.hash.slice(1); return shown.some(([k]) => k === h) ? (h as View) : null; };
-  const [view, setView] = useState<View>(() => fromHash() ?? (closed ? "result" : started ? "outreach" : "people"));
+  const [view, setView] = useState<View>(() => fromHash() ?? startAt ?? (closed ? "result" : started ? "outreach" : "people"));
   const [next, setNext] = useState<{ text: string; tab: View; action?: string } | null>(null);
   const [tabCounts, setTabCounts] = useState<Partial<Record<View, number>>>({});
   const [busy, setBusy] = useState(false);
@@ -748,6 +749,21 @@ function DeliveredViews({ id, started, closed, views, onChange, counts = {} }: {
         {shown.map(([k, label]) => <button key={k} type="button" role="tab" aria-selected={view === k} aria-pressed={view === k} onClick={() => pick(k)}>{label}{(tabCounts[k] ?? counts[k]) ? <span className="n" aria-label={`${tabCounts[k] ?? counts[k]} to decide`}>{tabCounts[k] ?? counts[k]}</span> : null}</button>)}
       </div>
       <div role="tabpanel" className="views-panel" aria-label={VIEWS.find(([k]) => k === view)![1]}>{views[view]}</div>
+    </>
+  );
+}
+
+/** Before delivery the page is one job, so it stays whole; the plan is its first tab beside it. */
+function PreViews({ plan, startAtPlan, children }: { plan: React.ReactNode; startAtPlan: boolean; children: React.ReactNode }) {
+  const fromHash = () => (location.hash === "#plan" ? "plan" : location.hash === "#list" ? "list" : null);
+  const [view, setView] = useState<"plan" | "list">(() => fromHash() ?? (startAtPlan ? "plan" : "list"));
+  const pick = (v: "plan" | "list") => { setView(v); history.replaceState(null, "", `${location.pathname}${location.search}#${v}`); };
+  return (
+    <>
+      <div className="seg views" role="tablist" aria-label="View">
+        {([["plan", "Plan"], ["list", "List"]] as const).map(([k, label]) => <button key={k} type="button" role="tab" aria-selected={view === k} aria-pressed={view === k} onClick={() => pick(k)}>{label}</button>)}
+      </div>
+      <div role="tabpanel" className="views-panel" aria-label={view === "plan" ? "Plan" : "List"}>{view === "plan" ? plan : children}</div>
     </>
   );
 }
@@ -996,6 +1012,8 @@ export function Event({ id, go }: { id: string; go: (to: string) => void }) {
   ) : null;
   // A delivered event shows one layer at a time; before that there is one job to do, so the page stays whole.
   const delivered = stage === "delivered";
+  // A plan written through the desk opens on its Plan tab while it is being written, approved and prepared; an older event opens where it always did.
+  const planFirst = e.approval_mode === "budget" && ["planning", "confirmed", "preparing"].includes(e.plan_stage ?? "");
   const replyCases = ev.cases.filter((c) => c.kind === "reply_doubtful");
   return (
     <>
@@ -1015,7 +1033,8 @@ export function Event({ id, go }: { id: string; go: (to: string) => void }) {
         {!delivered && facts}
       </header>
       {delivered ? (
-        <DeliveredViews counts={{ outreach: openCases(replyCases).length, people: openCases(ev.cases).length - openCases(replyCases).length }} id={e.id} started={Boolean(e.motion && e.motion !== "none")} closed={["closing", "scored"].includes(e.motion ?? "")} onChange={ev.load} views={{
+        <DeliveredViews counts={{ outreach: openCases(replyCases).length, people: openCases(ev.cases).length - openCases(replyCases).length }} id={e.id} started={Boolean(e.motion && e.motion !== "none")} closed={["closing", "scored"].includes(e.motion ?? "")} startAt={planFirst ? "plan" : undefined} onChange={ev.load} views={{
+          plan: <PlanTab id={e.id} listRows={d.list?.upload?.row_count ?? 0} onChange={ev.load} />,
           ...(["closing", "scored"].includes(e.motion ?? "") ? { result: <ResultView id={e.id} name={e.name} onChange={ev.load} /> } : {}),
           outreach: <>{replyCases.length > 0 && <Cases eventId={e.id} cases={replyCases} onChange={ev.load} />}<Motion id={e.id} onChange={ev.load} /></>,
           people: <StageBlock ev={ev} go={go} />,
@@ -1023,11 +1042,11 @@ export function Event({ id, go }: { id: string; go: (to: string) => void }) {
           details: <>{facts}<AttendeeList d={d} go={go} onChange={ev.load} />{more}</>,
         }} />
       ) : (
-        <>
+        <PreViews plan={<PlanTab id={e.id} listRows={d.list?.upload?.row_count ?? 0} onChange={ev.load} />} startAtPlan={planFirst}>
           <AttendeeList d={d} go={go} onChange={ev.load} />
           <StageBlock ev={ev} go={go} />
           {more}
-        </>
+        </PreViews>
       )}
     </>
   );

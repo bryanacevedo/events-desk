@@ -6,7 +6,7 @@
 import { EventLogo } from "./EventLogo";
 import { companyDisplayName as co, dealDisplayName } from "../shared/names";
 import { useEffect, useState, type CSSProperties } from "react";
-import { get, send } from "./api";
+import { get, send, type PlanData } from "./api";
 import { Link, useActor } from "./App";
 import { Icon } from "./icons";
 import { Fold } from "./Motion";
@@ -197,6 +197,24 @@ export function ResultEvidence({ eventId, motion, lastDay, live, scorecards, onC
 }
 
 /** The Result tab of a finished event: the verdict, the deals, what we learned, and for leadership how we know, folded below. */
+/** The outcome against the goal: a figure for each goal that was set, with what it counts. Counts reach everyone; the pipeline figure only comes to leadership and planners. */
+function GoalOutcome({ id }: { id: string }) {
+  const [r, setR] = useState<PlanData["result"] | null>(null);
+  useEffect(() => { get<PlanData>(`/api/events/${id}/plan`).then((p) => setR(p?.result ?? null)); }, [id]);
+  if (!r) return null;
+  const rows: { n: string; w: string; short: string }[] = [];
+  const gap = (n: number) => (n > 0 ? `${num(n)} short` : "Goal met");
+  if (r.meetings) rows.push({ n: `${num(r.meetings.actual)} of ${num(r.meetings.goal)}`, w: "meetings held", short: gap(r.meetings.short_by) });
+  if (r.accounts) rows.push({ n: `${num(r.accounts.actual)} of ${num(r.accounts.goal)}`, w: "target accounts met", short: gap(r.accounts.short_by) });
+  const pl = r.pipeline;
+  if (pl && pl.goal_cents !== undefined && pl.actual_cents !== undefined) rows.push({ n: `${money(pl.actual_cents)} of ${money(pl.goal_cents)}`, w: "pipeline", short: pl.short_by_cents ? `${money(pl.short_by_cents)} short` : "Goal met" });
+  return (
+    <section className="pl-sec rs-goal" aria-label="Goal"><h2>Goal</h2>
+      <div className="pl-body">{rows.length ? <dl className="pl-figs">{rows.map((x) => <div key={x.w}><dd>{x.n}</dd><dt>{x.w}</dt><i className="pl-gap">{x.short}</i></div>)}</dl> : <p className="mute">No goal was set.</p>}</div>
+    </section>
+  );
+}
+
 export function ResultView({ id, name, onChange }: { id: string; name: string; onChange: () => void }) {
   const { actor, needs } = useActor();
   const lead = isGtm(actor) || Boolean(needs?.approvers.includes(actor));
@@ -209,6 +227,7 @@ export function ResultView({ id, name, onChange }: { id: string; name: string; o
   const c = pickMetrics(o.motion, o.live_score, o.scorecards ?? []).m?.control;
   return (
     <section className="result-view" data-ready="1">
+      <GoalOutcome id={id} />
       <Result eventId={id} eventName={name} motion={o.motion} lastDay={lastDay} live={o.live_score} scorecards={o.scorecards ?? []} debriefs={o.debriefs ?? []} lead={lead} onChange={changed} />
       {lead && (
         <div className="folds">

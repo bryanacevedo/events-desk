@@ -13,6 +13,7 @@ import { mockLlm, mockVendors } from "./providers.ts";
 import { simDeps } from "./sim-vendors.ts";
 import { seedYear } from "./seed-year.ts";
 import { seedReal } from "./seed-real.ts";
+import { seedDemoPlan } from "./seed-plan.ts";
 import { seedSamplePools } from "./pools.ts";
 import { ingestUpload } from "./uploads.ts";
 import { decideSeat, requestSeat, type Goal } from "./seats.ts";
@@ -96,7 +97,7 @@ export async function seedIcp(db: Db) {
 /** `real` is the demo: the real events from samples/real-events.json with a fictional roster asking for seats. It replaces the fictional sample events. */
 export async function seed(db: Db, opts: { large?: LargeEvent; year?: boolean; real?: boolean } = {}) {
   await seedIcp(db);
-  if (opts.real) { await seedSamplePools(db); return seedReal(db); }
+  if (opts.real) { await seedSamplePools(db); await seedReal(db); await seedDemoPlan(db); return; }
   for (const [id, name, venue, starts_on, seat_count, seat_price_cents, upto] of SAMPLE) {
     await createEvent(db, MAYA, { name, venue, starts_on, seat_count, seat_price_cents }, id);
     if (upto === "requested") continue;

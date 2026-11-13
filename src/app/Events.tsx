@@ -44,6 +44,8 @@ function stateOf(r: Row, today: string, needs: Needs): State {
   const past = r.ends_on < today;
   const owner = firstName(e.uploaded_by ?? e.requested_by);
   if (isRunning(e.stage)) return { key: "run", words: "Building the list", who: null, tone: "run" };
+  // A plan written through the desk reads by its plan stage until it is being prepared; older events read as they always did.
+  if (e.approval_mode === "budget" && e.stage !== "declined" && (e.plan_stage === "planning" || e.plan_stage === "confirmed")) return { key: "wait", words: e.plan_stage === "planning" ? "Planning" : "Confirmed", who: e.plan_stage === "planning" ? holderWords(needs.approvers) : owner, tone: e.plan_stage === "planning" ? "wait" : "ok" };
   switch (e.stage) {
     case "requested": { const n = needs.requests.filter((q) => q.event_id === e.id && q.status === "pending").length; return { key: "wait", words: n > 1 ? `${n} seats waiting` : "Seat waiting", who: holderWords(needs.approvers), tone: "wait" }; }
     case "approved": return { key: "wait", words: "No attendee list", who: owner, tone: "wait" };
