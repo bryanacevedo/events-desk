@@ -23,6 +23,22 @@ export const SCHEMAS: Record<string, { type: "json_schema"; schema: Record<strin
   assessment_propose: { type: "json_schema", schema: { type: "object", properties: { answers: { type: "array", items: { type: "object", properties: { question: { type: "string", enum: [...QUESTION_IDS] }, answer: { type: "string" }, detail: { type: "string" }, quote: { type: "string" } }, required: ["question", "answer", "detail", "quote"], additionalProperties: false } } }, required: ["answers"], additionalProperties: false } },
 };
 
+/** Every template is its instructions (and, for the tiering steps, the whole ICP), then a line that starts the data (see DATA_START), then the facts about one
+    company. Everything before that line is the same for every company in a run, so it is sent as its own block marked as the cache
+    breakpoint, and the per-company part comes after it. A prefix under the model's minimum (512 tokens on Opus 5.5) is not cached
+    and bills as normal. A prompt with no such line is sent whole, unmarked. */
+/** The line where a template's per-request part begins: INPUT, the seat requests of the perspective, or the first data marker of the reply and debrief steps. */
+const DATA_START = /\n(?:INPUT|SEAT REQUESTS|<<<[A-Z]+)\n/;
+
+export function cacheableContent(prompt: string) {
+  const at = prompt.search(DATA_START);
+  if (at < 0) return prompt;
+  return [
+    { type: "text" as const, text: prompt.slice(0, at + 1), cache_control: { type: "ephemeral" as const } },
+    { type: "text" as const, text: prompt.slice(at + 1) },
+  ];
+}
+
 export function anthropicLlm(model = process.env.EVENTS_DESK_MODEL || DEFAULT_MODEL): Llm {
   // A key not scoped to one workspace has to name the workspace on every request.
   const workspace = process.env.ANTHROPIC_WORKSPACE_ID;
@@ -47,12 +63,12 @@ export function anthropicLlm(model = process.env.EVENTS_DESK_MODEL || DEFAULT_MO
         betas: ["server-side-fallback-2026-07-01"],
         fallbacks: "default",
         output_config: { effort: "low", ...(SCHEMAS[step] ? { format: SCHEMAS[step] } : {}) },
-        messages: [{ role: "user", content: prompt }],
+        messages: [{ role: "user", content: cacheableContent(prompt) }],
       }).catch((e: unknown) => { throw e instanceof Anthropic.RateLimitError ? new VendorError(0) : e; });
       const text = response.stop_reason === "refusal" || response.stop_reason === "max_tokens"
         ? ""
         : response.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("");
-      return { text, input_tokens: response.usage.input_tokens, output_tokens: response.usage.output_tokens, model: response.model, stop_reason: response.stop_reason ?? undefined, thinking_tokens: response.usage.output_tokens_details?.thinking_tokens };
+      return { text, input_tokens: response.usage.input_tokens + (response.usage.cache_creation_input_tokens ?? 0) + (response.usage.cache_read_input_tokens ?? 0), cache_creation_input_tokens: response.usage.cache_creation_input_tokens ?? 0, cache_read_input_tokens: response.usage.cache_read_input_tokens ?? 0, output_tokens: response.usage.output_tokens, model: response.model, stop_reason: response.stop_reason ?? undefined, thinking_tokens: response.usage.output_tokens_details?.thinking_tokens };
     },
   };
 }

@@ -12,7 +12,7 @@ import type { FirmoRecord } from "../shared/tiering.ts";
 import { parseTitle } from "../shared/titles.ts";
 
 /** `model` is the model that answered, when the API says. With server-side fallback it can differ from the one requested. */
-export interface LlmResult { text: string; input_tokens: number; output_tokens: number; model?: string; /** Real model only: why it stopped, and how many of the output tokens were hidden thinking. */ stop_reason?: string; thinking_tokens?: number }
+export interface LlmResult { text: string; input_tokens: number; output_tokens: number; /** Real model only: of input_tokens, how many were written to and read from the prompt cache. input_tokens is the total, so the cost card never under-counts; it prices cache reads at the full rate, an overestimate. */ cache_creation_input_tokens?: number; cache_read_input_tokens?: number; model?: string; /** Real model only: why it stopped, and how many of the output tokens were hidden thinking. */ stop_reason?: string; thinking_tokens?: number }
 /** `hint` is for simulators only: a real model is never sent it (the prompt is the whole request). The simulated model uses it to return the code-written text for the perspective step.
     `simulated` marks a model that is not a model, so nothing it returns is presented as written by one. */
 export interface LlmImage { mime: "image/jpeg" | "image/png" | "image/webp"; base64: string }
