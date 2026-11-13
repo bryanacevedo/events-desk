@@ -647,3 +647,17 @@ Three smaller defaults, also proceeding pending Bryan:
 5. The assessment call sits outside the event's cost card, and its AI cost shows in Usage only, not in the event's own cost.
 6. "Target accounts met" counts tier 1 companies with a held meeting until step 7 brings a target account list.
 7. An uploaded list with no source header is stored as "other".
+
+## 16. Built differently (Session 1)
+
+Where the spec was ambiguous or wrong against the code, the smaller, safer reading was built. Session 1 covers section 13 steps 1 to 5 and 7, server side.
+
+1. **A hosted plan is not asked for a number goal.** Section 6.1 requires one of the three goal numbers to ask for approval, and section 10 says the seeded dinners and roadshows have none until step 2 gives them attendance. Both cannot hold. `submitPlan` skips the goal check for an event with a live `hosted` involvement; it still needs a reason, an involvement and a budget line.
+2. **The plan stage is not synced from `ingestUpload`.** Section 5 says it runs "after `ingestUpload`". `uploads.ts` is Session 2's file. Reads compute `planStageOf` on the spot (`/api/events`, `/api/events/:id`, the plan read), every plan write calls `syncPlanStage`, and the tick calls it for every non-top-up event, so the stored column is at most one tick behind and no screen is.
+3. **`closeResult` takes the day as an argument** (`closeResult(db, actor, eventId, today)`), and the route passes `todayOf(deps)`. The seed passes its own fixed day.
+4. **The live-mode plan card in Slack is not built.** Section 6.1 says live mode posts a plan card to the approvals channel. Session 1 ships `approvePlan` and `declinePlan` and the demo-only decision route, the same pattern as seats. The card is a follow-up slice, with `slack-cards.ts` and `slack.ts`.
+5. **Approving needs the plan to have been asked for** (`plan_submitted_at` set). Declining is allowed only while the plan is not approved; after approval the event is ended the way an event always is.
+6. **`event_people` removal** also checks that the reason is not blank in the database (`event_people_removal_has_reason`), beside the pair check in 4.1, so "removal needs a reason" holds below the code too.
+7. **Bigint money columns are cast to `float8` on read** (`planned_cents`, `contracted_cents`, `approved_budget_cents`, `goal_pipeline_cents`), because the two drivers return bigint differently. All stay below 2^53 cents.
+8. **`askToGo` returns `budget_mode: true`**, which `POST /api/seat-requests` reads to skip the Slack seat card. The seat form's long answers are optional only when the catalog entry already has a budget-mode event (`parseSeatRequest(..., { relaxed })`).
+9. **`seed-year.ts` takes its own "today"** (`SEED_TODAY = 2026-11-08`, from its comments, overridable with `opts.today`) so the past dinners close and read `judged` the same on any day.

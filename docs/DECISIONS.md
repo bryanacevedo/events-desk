@@ -280,3 +280,23 @@ Bryan: "cut those sequences... why did you think it was a good idea to run a seq
 ## 46. A CRM setting, with CRM Desk as the second CRM (2026-11-12)
 
 `CRM` picks the desk's CRM. Unset (or `default`) keeps the CRM the desk has today: `simCrm` in the demo and `noCrm` in live mode, so nothing changes for anyone who does not set it. `CRM=crmdesk` uses CRM Desk through `src/server/crm-desk.ts`, which needs `CRM_DESK_URL` and `CRM_DESK_KEY` (a key made in CRM Desk with `--desk events_desk`). `CRM=salesforce` is refused at start, because the desk has no Salesforce adapter and running a stand-in under that name would look like a real check. An unknown value also stops the server. Every CRM Desk call fails closed: a timeout, a refused connection, a 429 or a 5xx becomes `CrmDown`, so the run pauses and nobody is dropped. A 409 `erased` is a finished write with nothing written. The contract tests in `tests/crm-desk-contract.test.ts` cover tests 1, 3, 4, 5 and 6 of CRM Desk's `docs/CONTRACT-TESTS.md`; the half against a running CRM Desk is skipped unless `CRM_DESK_URL`, `CRM_DESK_KEY` and `CRM_DESK_ADMIN_KEY` are set. The cost: a second CRM to keep in step with the `Crm` interface in `providers.ts`; the public CRM Desk demo refuses API keys, so the adapter runs only against a private install.
+
+## 47. An event starts as a plan, and the plan stage sits beside the list stage (2026-11-13)
+
+`events.plan_stage` (`planning`, `confirmed`, `preparing`, `live`, `following_up`, `judged`) is a second column decided by one pure function, `planStageOf` in `src/shared/plan.ts`, from the approval, the dates, the list stage and the motion. The list machine in `src/shared/domain.ts` is not changed (`tests/plan-contract.test.ts` freezes it), and `moveWithin` stays the only writer of `events.stage`. Approving a plan is the `requested` to `approved` edge that already existed. Declined and paused stay list states: a declined event keeps the plan stage it had; a pause never moves it. Spec: `docs/EVENT-PLAN.md`.
+
+## 48. Leadership approves the budget, not each seat (2026-11-13)
+
+New events are budget mode: a planner writes the plan, an approver who did not write it approves the planned total, and that approval covers the passes inside it. A seat is still a `seat_requests` row, so tickets, the ticket budget and event cost work unchanged. An approver's own pass waits for a different approver. A rep still asks through Seats, and the ask lands on the plan as "ask to go". Going over the approved amount warns, waits for the approver, and never blocks. Events made before this stay per-seat, with decisions 10 and 13 as written. This amends decision 13 for new events only.
+
+## 49. Planned, contracted, actual; and actual is never stored (2026-11-13)
+
+A budget line holds planned and contracted. Actual is read from where money is already recorded: tickets, travel, and the cost ledger of decision 40. `eventCost` stays the one source, so the plan, the Cost tab, the Result and the Budget cannot disagree. "Committed" keeps its decision 15 meaning (approved seats not yet bought) and is not used for budget lines. This extends decision 15: Budget still answers the ticket question first, and now also shows each event's three columns. Spend on a top-up's own hidden event stays out of `eventCost` of the shown event, as it does today.
+
+## 50. A hosted event is its own event (2026-11-13)
+
+A dinner, side event, roadshow stop, webinar or customer event has one `hosted` involvement and its own budget, people and result. When it hangs off a conference, the involvement names the conference in `conference_event_id`; the conference's page shows it, and its money is never added into the conference's. `events.parent_event_id` stays the top-up's column.
+
+## 54. A planner sees the money of the plans they write (2026-11-13, proposed)
+
+`planners` is a configured list in `config/defaults.json`. A planner reads and writes plan money; reps still see none, and the test that walks a rep's reads covers every new one. A planner cannot approve. `isLead` is not widened: a new `canPlan` admits planners to the plan's money reads, `/api/budget` and `/api/results`, through one edit to the middleware in `src/server/app.ts`; Usage, AI spend and Settings stay as they are. This widens decision 41 by one named role. Proposed, default yes. Bryan was asked; the build proceeds on this default and the decision stays proposed until he answers.

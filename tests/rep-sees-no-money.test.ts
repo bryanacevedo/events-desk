@@ -9,6 +9,9 @@ import { recordEventCost, sendDebriefPrompts } from "../src/server/closeout.ts";
 import { bookMeeting, recordOutcome } from "../src/server/meetings.ts";
 import { freshDb } from "./helpers.ts";
 import { clock, deliveredInMotion, fakeCrm, MAYA, personAt } from "./lifecycle-harness.ts";
+import { setBudgetLine } from "../src/server/budget-lines.ts";
+import { addInvolvement, addPerson, updatePlan } from "../src/server/plan.ts";
+import { approvedPlan, CAMILLE } from "./plan-helpers.ts";
 
 let db: Db;
 beforeEach(async () => { db = await freshDb(); });
@@ -44,5 +47,38 @@ describe("a rep's reads carry no company money", () => {
       found.push(...money(await r.json()).map((f) => `${path}: ${f}`));
     }
     expect(found).toEqual([]);
+  });
+});
+
+describe("a plan's reads carry no company money to a rep, and a planner reads what they write", () => {
+  it("the plan read answers a rep with counts and words, and the money reads are refused", async () => {
+    const h = await deliveredInMotion(db, { crm: fakeCrm(), time: clock("2027-03-01T12:00:00Z") });
+    const id = await approvedPlan(db, { passes_cents: 300_000 });
+    const { id: spo } = await addInvolvement(db, CAMILLE, id, { kind: "sponsorship", label: "Gold" });
+    await setBudgetLine(db, CAMILLE, id, { category: "sponsorship", involvement_id: spo, planned_cents: 1_500_000, contracted_cents: 1_400_000 });
+    await updatePlan(db, CAMILLE, id, { goal_pipeline_cents: 40_000_000, goal_meetings_held: 25 });
+    await addPerson(db, CAMILLE, id, { person: MAYA, team: "Sales", role_title: "SDR", needs_pass: true });
+    // Over its approved budget now: the rep's words say so with no figure.
+    const app = createApp(db, { demo: true, lifecycle: h.deps });
+    const rep = await app.request(`/api/events/${id}/plan`, { headers: as(MAYA) });
+    expect(rep.status).toBe(200);
+    const body = await rep.json() as { approval: { over_budget: boolean }; notes: string[] };
+    expect(body.approval.over_budget).toBe(true);
+    expect(body.notes[0]).toBe("Over the approved budget. Waiting on Dan Whitlock.");
+    expect(money(body)).toEqual([]);
+    for (const path of [`/api/events/${id}/budget-lines`, "/api/budget", "/api/results", "/api/usage", `/api/events/${id}/cost`]) expect((await app.request(path, { headers: as(MAYA) })).status, path).toBe(403);
+    // The plan stage rides on the events list with no money in it.
+    const list = await (await app.request("/api/events", { headers: as(MAYA) })).json() as { events: { id: string; plan_stage: string }[] };
+    expect(list.events.find((e) => e.id === id)?.plan_stage).toBe("confirmed");
+    expect(money(list)).toEqual([]);
+    // A planner reads the plan's money, and not Usage.
+    for (const path of ["/api/budget", "/api/results", `/api/events/${id}/budget-lines`, `/api/events/${id}/cost`]) expect((await app.request(path, { headers: as(CAMILLE) })).status, path).toBe(200);
+    expect((await app.request("/api/usage", { headers: as(CAMILLE) })).status).toBe(403);
+    const planner = await (await app.request(`/api/events/${id}/plan`, { headers: as(CAMILLE) })).json() as { notes: string[]; budget: { total_planned_cents: number } };
+    expect(planner.budget.total_planned_cents).toBe(1_800_000);
+    expect(planner.notes[0]).toBe("Over the approved budget by $15,000. Waiting on Dan Whitlock.");
+    // The plan year rides on /api/budget for leadership and planners.
+    const year = await (await app.request("/api/budget?year=2027", { headers: as(CAMILLE) })).json() as { plan: { events: { event_id: string }[] } };
+    expect(year.plan.events.map((e) => e.event_id)).toContain(id);
   });
 });
