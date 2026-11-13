@@ -213,3 +213,7 @@ From `node scripts/eval-report.ts` and the title report from the same code. Deta
 - 2026-11-09, late: Google app in production, home and privacy pages live, sample Sheet public to view. Two goldfish reviews of the whole system; every code defect they named fixed or disclosed (decision 30, `tests/goldfish-fixes.test.ts`).
 - 2026-11-09: screen rounds 1 to 5 and a cleanup pass; Sheet design passes 1 and 2 (decisions 18 to 20); original files and event delete (21); model-written Summary (22); Apollo and ZeroBounce only, with reuse and saved credits (23); real re-recording of the evals, second look cut (24); title gate (25); AI priced from tokens (26); Summary retest (27); Salesforce checks, person record and write-back on a simulated CRM (28); new registrations (29). The simulated wrong-priority-A floor moved from 20% to 25% (decision 27).
 - 2026-11-10: Three more design rounds deployed (`58691ba`, `e1f9f88`, `efdaf6b`), each after a hands-on fresh-eyes review: side sheets for replies, meetings, deals and notes; the desk prices cost cards itself (decision 39); the Cost tab ledger (decision 40); no money in any rep read (decision 41); the design checklist in `docs/DESIGN-CHECKLIST.md` with its layout and interaction audits.
+
+## Prompt caching (2026-11-13, Backlog bl_117, branch `cache/prompt-caching`)
+
+Cache markers, tests and cache-aware cost accounting are in; most prompts are under the 512-token cache minimum, and the live before and after measurement waits on an Anthropic key. See the newest decision.
