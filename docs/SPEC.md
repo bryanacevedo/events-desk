@@ -482,3 +482,7 @@ New code and synthetic data only. No code, data, screenshots or system names fro
 ## Not in v1
 
 Sending email or building sequences, a real CRM connection (write-back exists against a simulated CRM only), meeting booking, per-person accounts and roles, multiple workspaces, and LLM column mapping.
+
+## Event as a plan (redesign step 1)
+
+The step 1 spec is `docs/EVENT-PLAN.md`: involvements, goal, budget lines, who goes, sponsorship, assessment, list source and the plan stage. It was goldfish-reviewed before code (2026-11-13).
