@@ -20,7 +20,7 @@ export interface NeedItem {
   caseCount?: number;
 }
 
-export interface Needs { items: NeedItem[]; approvals: Pending[]; approvers: string[]; events: EventRow[]; requests: SeatRequest[]; catalog: CatalogEntry[] }
+export interface Needs { items: NeedItem[]; approvals: Pending[]; approvers: string[]; planners: string[]; events: EventRow[]; requests: SeatRequest[]; catalog: CatalogEntry[] }
 /** Cost cards are a step on the event, not an approval; the sidebar counts seat requests only. */
 
 export const holderWords = (approvers: string[]) => {
@@ -37,6 +37,7 @@ export async function loadNeeds(): Promise<Needs> {
   ]);
   const events = ev?.events ?? [];
   const approvers = df?.settings.approvers ?? [];
+  const planners = df?.settings.planners ?? [];
   const requests = sr?.requests ?? [];
   // Each waiting seat request is one row on Seats and one in the sidebar count.
   const approvals: Pending[] = requests.filter((r) => r.status === "pending").map((r) => ({ id: r.id, kind: "seats", requested_by: r.requester, event_id: r.event_id, name: r.name, seat_count: 1, seat_price_cents: r.seat_price_cents, lines: null, credits_cap: null, llm_cap: null, est_cents: null }));
@@ -60,7 +61,7 @@ export async function loadNeeds(): Promise<Needs> {
   // Soonest first.
   const when = (i: NeedItem) => daysTo(events.find((e) => e.id === i.eventId)?.starts_on ?? "2099-01-01");
   items.sort((a, b) => when(a) - when(b));
-  return { items, approvals, approvers, events, requests, catalog: cat?.catalog ?? [] };
+  return { items, approvals, approvers, planners, events, requests, catalog: cat?.catalog ?? [] };
 }
 
 /** Plain words for a cost card's kind. */

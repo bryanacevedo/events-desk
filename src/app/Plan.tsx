@@ -8,6 +8,7 @@ import { get, send, type PlanBudgetCategory, type PlanData, type PlanInvolvement
 import { useActor } from "./App";
 import { Icon } from "./icons";
 import { Fold } from "./Motion";
+import { DeclineBox, Editable, GoalEditor, InvolvementEditor, LinesEditor, PersonEditor, ReasonEditor } from "./PlanEdit";
 import { money, num, shortDate } from "./words";
 
 type PV = "a" | "b" | "c";
@@ -96,12 +97,15 @@ const StageFacts = ({ p }: { p: PlanData }) => (
   </dl>
 );
 
+const Sec = ({ title, children }: { title: string; children: ReactNode }) => <section className="pl-sec" aria-label={title}><h2>{title}</h2><div className="pl-body">{children}</div></section>;
+
 export function PlanTab({ id, listRows, onChange }: { id: string; listRows: number; onChange: () => void }) {
   const { actor, needs } = useActor();
   const [p, setP] = useState<PlanData | null>(null);
   const [view, setView] = useState<PV>(() => readView(actor));
   const [busy, setBusy] = useState(false), [error, setError] = useState("");
   const load = async () => setP(await get<PlanData>(`/api/events/${id}/plan`));
+  const saved = async () => { await load(); onChange(); };
   useEffect(() => { load(); }, [id, actor]);
   useEffect(() => { setView(readView(actor)); }, [actor]);
   if (!p) return null;
@@ -115,6 +119,8 @@ export function PlanTab({ id, listRows, onChange }: { id: string; listRows: numb
     : planning && submitted && isApprover ? { label: "Approve the plan", run: () => send("POST", `/api/events/${id}/plan/decision`, actor, { decision: "approve" }) }
     : !planning && p.approval.over_budget && isApprover ? { label: "Approve again", run: () => send("POST", `/api/events/${id}/plan/decision`, actor, { decision: "approve" }) }
     : null;
+  const canEdit = p.can_plan && p.event.stage !== "declined";
+  const canDecline = isApprover && planning && submitted && !p.approval.approved_at;
   const go = async () => {
     if (!act) return;
     setBusy(true); setError("");
@@ -130,15 +136,23 @@ export function PlanTab({ id, listRows, onChange }: { id: string; listRows: numb
   const people = p.who_goes;
 
   /* The sections, written once and laid out three ways. */
-  const reason = p.reason ? <p className="pl-said">{p.reason}</p> : <p className="mute">{p.reason_words ?? "No reason was written"}</p>;
-  const taking = (
+  const reason = (
+    <Editable can={canEdit} label={p.reason ? "Edit the reason" : "Write the reason"}
+      view={p.reason ? <p className="pl-said">{p.reason}</p> : <p className="mute">{p.reason_words ?? "No reason was written"}</p>}
+      editor={(close) => <ReasonEditor id={id} value={p.reason} done={close} saved={saved} />} />
+  );
+  const goal = <Editable can={canEdit} label="Edit the goal" view={<Goal p={p} />} editor={(close) => <GoalEditor id={id} goal={p.goal} withPipeline={money_} done={close} saved={saved} />} />;
+  const takingView = (
     <>
       {live.length ? <ul className="pl-rows">{live.map((i) => <InvolvementRow key={i.id} i={i} />)}</ul> : <p className="mute">Nothing planned yet.</p>}
       {p.side_events.length > 0 && <ul className="pl-rows pl-sub" aria-label="Side events">{p.side_events.map((s) => <li className="pl-row" key={s.id}><span className="pl-what"><b>{s.name}</b><span>{HOSTED_WORDS[s.hosted_format] ?? s.hosted_format}</span></span><span className="pl-end">{shortDate(s.starts_on)}</span></li>)}</ul>}
     </>
   );
-  const budget = b ? <Budget cats={b.categories} total={b.categories.length > 1 ? total : undefined} aiCents={b.ai_actual_cents} /> : null;
-  const who = people.length ? <ul className="pl-rows">{people.map((x) => <PersonRow key={x.id} p={x} />)}</ul> : <p className="mute">Nobody is going yet.</p>;
+  const taking = <Editable can={canEdit && !p.event.hosted} label="Add a way of taking part" view={takingView} editor={(close) => <InvolvementEditor id={id} have={live.map((i) => i.kind)} done={close} saved={saved} />} />;
+  const budgetView = b ? <Budget cats={b.categories} total={b.categories.length > 1 ? total : undefined} aiCents={b.ai_actual_cents} /> : null;
+  const budget = b ? <Editable can={canEdit} label="Edit budget lines" view={budgetView} editor={(close) => <LinesEditor id={id} lines={b.lines} done={close} saved={saved} />} /> : null;
+  const whoView = people.length ? <ul className="pl-rows">{people.map((x) => <PersonRow key={x.id} p={x} />)}</ul> : <p className="mute">Nobody is going yet.</p>;
+  const who = <Editable can={canEdit && p.event.approval_mode === "budget"} label="Add a person" view={whoView} editor={(close) => <PersonEditor id={id} hosted={p.event.hosted} done={close} saved={saved} />} />;
   const audience = (
     <ul className="pl-rows">
       <li className="pl-row"><span className="pl-what"><b>Attendee list</b></span><span className="pl-end">{listRows > 0 ? `${num(listRows)} rows` : "Not uploaded"}</span></li>
@@ -148,14 +162,12 @@ export function PlanTab({ id, listRows, onChange }: { id: string; listRows: numb
   );
   const notes = p.notes.length > 0 && <ul className="pl-notes" aria-label="Needs a look">{p.notes.map((n) => <li key={n}>{n}</li>)}</ul>;
 
-  const Sec = ({ title, children }: { title: string; children: ReactNode }) => <section className="pl-sec" aria-label={title}><h2>{title}</h2><div className="pl-body">{children}</div></section>;
-
   let body: ReactNode;
   if (view === "a") {
     body = (
       <div className="pl-ledger">
         <Sec title="Why we go">{reason}</Sec>
-        <Sec title="Goal"><Goal p={p} /></Sec>
+        <Sec title="Goal">{goal}</Sec>
         <Sec title="Taking part">{taking}</Sec>
         {budget && <Sec title="Budget">{budget}</Sec>}
         <Sec title="Who goes">{who}</Sec>
@@ -185,9 +197,11 @@ export function PlanTab({ id, listRows, onChange }: { id: string; listRows: numb
           {live.length === 0 && <Sec title="Taking part">{taking}</Sec>}
           <Sec title="Audience">{audience}</Sec>
           {b && otherCats.length > 0 && <Sec title="Other costs"><Budget cats={otherCats} aiCents={b.ai_actual_cents} /></Sec>}
+          {b && canEdit && <Sec title="Budget lines"><Editable can label="Edit budget lines" view={<p className="mute">{b.lines.length ? `${b.lines.length} ${b.lines.length === 1 ? "line" : "lines"}` : "No budget lines yet."}</p>} editor={(close) => <LinesEditor id={id} lines={b.lines} done={close} saved={saved} />} /></Sec>}
+          {canEdit && <Sec title="Add to the plan">{p.event.approval_mode === "budget" && <Editable can label="Add a person" view={null} editor={(close) => <PersonEditor id={id} hosted={p.event.hosted} done={close} saved={saved} />} />}{!p.event.hosted && <Editable can label="Add a way of taking part" view={null} editor={(close) => <InvolvementEditor id={id} have={live.map((i) => i.kind)} done={close} saved={saved} />} />}</Sec>}
         </div>
         <aside className="pl-rail" aria-label="The plan">
-          <section><h2>Goal</h2><Goal p={p} /></section>
+          <section><h2>Goal</h2>{goal}</section>
           {b && (
             <section><h2>Budget</h2>
               <dl className="pl-tot">
@@ -219,7 +233,7 @@ export function PlanTab({ id, listRows, onChange }: { id: string; listRows: numb
         </div>
         <div className="pl-main folds pl-folds">
           <Fold icon={<Icon.history />} title="Why we go" peek={p.reason ? "Written" : "Not written"}>{reason}</Fold>
-          <Fold icon={<Icon.target />} title="Goal" peek={p.goal.meetings_held !== null ? `${num(p.goal.meetings_held)} meetings` : p.goal.accounts_met !== null ? `${num(p.goal.accounts_met)} accounts` : "None set"}><Goal p={p} /></Fold>
+          <Fold icon={<Icon.target />} title="Goal" peek={p.goal.meetings_held !== null ? `${num(p.goal.meetings_held)} meetings` : p.goal.accounts_met !== null ? `${num(p.goal.accounts_met)} accounts` : "None set"}>{goal}</Fold>
           <Fold icon={<Icon.grid />} title="Taking part" peek={live.length ? String(live.length) : "Nothing yet"}>{taking}</Fold>
           {b && <Fold icon={<Icon.cost />} title="Budget" peek={dollars(b.total_planned_cents)}>{budget}</Fold>}
           <Fold icon={<Icon.people />} title="Who goes" peek={people.length ? `${people.length}` : "Nobody yet"}>{who}</Fold>
@@ -241,6 +255,7 @@ export function PlanTab({ id, listRows, onChange }: { id: string; listRows: numb
         </div>
       </header>
       {error && <p role="alert" className="error small">{error}</p>}
+      {canDecline && <div className="pl-decline"><DeclineBox id={id} saved={saved} /></div>}
       {view !== "c" && notes}
       {body}
     </section>

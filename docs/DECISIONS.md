@@ -297,6 +297,14 @@ A budget line holds planned and contracted. Actual is read from where money is a
 
 A dinner, side event, roadshow stop, webinar or customer event has one `hosted` involvement and its own budget, people and result. When it hangs off a conference, the involvement names the conference in `conference_event_id`; the conference's page shows it, and its money is never added into the conference's. `events.parent_event_id` stays the top-up's column.
 
-## 54. A planner sees the money of the plans they write (2026-11-13, proposed)
+## 54. A planner sees the money of the plans they write (2026-11-13, Bryan said yes)
 
 `planners` is a configured list in `config/defaults.json`. A planner reads and writes plan money; reps still see none, and the test that walks a rep's reads covers every new one. A planner cannot approve. `isLead` is not widened: a new `canPlan` admits planners to the plan's money reads, `/api/budget` and `/api/results`, through one edit to the middleware in `src/server/app.ts`; Usage, AI spend and Settings stay as they are. This widens decision 41 by one named role. Proposed, default yes. Bryan was asked; the build proceeds on this default and the decision stays proposed until he answers.
+
+## 55. The demo's in-flight plan is AWS re:Invent 2026, written onto the event that already holds its list (2026-11-14)
+
+Bryan chose re:Invent as the plan in flight (spec section 17). The real-events seed already holds it as the demo's paused event, with twelve approved seats and a 140-row list, and one catalog entry never has two events. So the seed writes the plan onto that event (budget mode, Camille Laurent as the maker, twelve passes, a booth sponsorship, a talk with no title, a goal, budget lines, approved by Dan Whitlock) instead of making a second one. The event stays paused. Money20/20 USA 2027 is no longer in the demo.
+
+## 56. Editing a plan happens where it is read; declining needs a reason (2026-11-14)
+
+The Plan tab edits the reason, the goal, the budget lines, who goes and the ways of taking part in place, for planners only, each with one save button. Budget lines save one at a time. A plan is made from Events, "New plan", for planners: a listed conference, one that is not listed, or a hosted event. The approver's second choice is Decline, which asks for the reason the database demands and ends the event as declined. The Approve button stays the one primary action.

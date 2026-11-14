@@ -560,6 +560,7 @@ export async function planView(db: Db, deps: LifecycleDeps | undefined, eventId:
     involvements, side_events: side, who_goes: people,
     notes,
     judged_at: e.judged_at ?? null,
+    can_plan: money,
     ...(money ? { budget } : {}),
   };
   return money ? view : forRep(view);

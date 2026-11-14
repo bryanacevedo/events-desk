@@ -11,6 +11,7 @@ import { send, type CatalogEntry } from "./api";
 import { Link, useActor } from "./App";
 import { EventLogo } from "./EventLogo";
 import { RequestSeats } from "./RequestForm";
+import { NewPlan } from "./NewPlan";
 import { SideSheet } from "./SideSheet";
 import { holderWords, stepAt, type Needs } from "./waiting";
 import { city, countdown, daysTo, firstName, isRunning, plural, shortDate, todayYmd } from "./words";
@@ -83,6 +84,8 @@ export function Events({ go, sheetId, requesting, preselect, search }: { go: (to
   const region = search.get("region") ?? "", state = search.get("state") ?? "", q = (search.get("q") ?? "").trim().toLowerCase();
   const adding = search.get("add") === "1";
   const canAdd = isGtm(actor) || needs.approvers.includes(actor);
+  const planning = search.get("plan") === "1";
+  const canPlanHere = canAdd || needs.planners.includes(actor);
 
   // Every event, plus the listed events nobody has asked for (a catalog entry with no live event row).
   const catById = new Map(needs.catalog.map((c) => [c.id, c]));
@@ -127,13 +130,13 @@ export function Events({ go, sheetId, requesting, preselect, search }: { go: (to
 
   const to = (patch: Record<string, string | null>) => {
     const p = new URLSearchParams(search);
-    for (const k of ["request", "catalog", "add"]) p.delete(k);
+    for (const k of ["request", "catalog", "add", "plan"]) p.delete(k);
     for (const [k, v] of Object.entries(patch)) { if (v === null || v === "" || (k === "time" && v === "coming")) p.delete(k); else p.set(k, v); }
     const s = p.toString();
     go(`/events${s ? `?${s}` : ""}`);
   };
-  const keepQuery = () => { const p = new URLSearchParams(search); for (const k of ["request", "catalog", "add", "event"]) p.delete(k); const s = p.toString(); return `/events${s ? `?${s}` : ""}`; };
-  const withParam = (k: string, v: string) => { const p = new URLSearchParams(search); for (const kk of ["request", "catalog", "add", "event"]) p.delete(kk); p.set(k, v); return `/events?${p.toString()}`; };
+  const keepQuery = () => { const p = new URLSearchParams(search); for (const k of ["request", "catalog", "add", "plan", "event"]) p.delete(k); const s = p.toString(); return `/events${s ? `?${s}` : ""}`; };
+  const withParam = (k: string, v: string) => { const p = new URLSearchParams(search); for (const kk of ["request", "catalog", "add", "plan", "event"]) p.delete(kk); p.set(k, v); return `/events?${p.toString()}`; };
   const count = (k: TimeKey) => rows.filter((r) => k === "all" || (k === "past") === isPast(r)).length;
 
   return (
@@ -141,6 +144,7 @@ export function Events({ go, sheetId, requesting, preselect, search }: { go: (to
       <header className="hero" data-ready="1">
         <div><h1>Events</h1></div>
         <span className="spacer" />
+        {canPlanHere && <Link to={withParam("plan", "1")} go={go} className="btn line small tl-add">New plan</Link>}
         {canAdd && <Link to={withParam("add", "1")} go={go} className="btn line small tl-add">Add event</Link>}
         <Link to={withParam("request", "1")} go={go} className="btn phone-only">Request a seat</Link>
       </header>
@@ -215,6 +219,7 @@ export function Events({ go, sheetId, requesting, preselect, search }: { go: (to
       </section>
 
       {sheetId && <SideSheet id={sheetId} go={go} close={() => go(keepQuery())} />}
+      {planning && canPlanHere && <NewPlan onDone={(id) => go(`/events?event=${id}`)} onClose={() => go(keepQuery())} />}
       {adding && canAdd && <AddEvent onDone={() => go(keepQuery())} onClose={() => go(keepQuery())} />}
     </>
   );

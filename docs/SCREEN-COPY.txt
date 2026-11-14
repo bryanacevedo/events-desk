@@ -4,18 +4,23 @@
 # no tier#
 # of # held a meeting
 # of # live
-# of # used
 # of # met accounts have pipeline
+# of # others
+# of # used
 #, #, not requested. Request a seat
 A line for the version history
 Accounts you know will be there (optional)
+Add a way of taking part
 Budget is for leadership and GTM Engineering.
 Declined by ##
 Domain not set up to send
+Every way of taking part is on the plan.
 From the attendee file (unverified):
+From the seat to the result
 Held back by account owners
 Keep it as my rule
 Last day of the event
+My event is not listed
 No event has finished sending yet.
 Not read: the card ran out
 Nothing needs anyone right now.
@@ -35,12 +40,14 @@ Says unsubscribe, read as something else
 Seats are for leadership and GTM Engineering.
 That company is not on this event.
 That deal is no longer credited here.
+That did not go through. Try again.
 That event does not exist.
 That meeting is no longer here.
 That person is not on the list.
 That reply is no longer here.
 That sequence is not on this event.
 The Google Sheet stays in Drive.
+The plan was made, but # Add the rest on the plan.
 The rules changed since this test. Test again before publishing.
 This draft was thrown away.
 Those notes are not here.
@@ -49,5 +56,3 @@ Up to ##
 Usage is for leadership and GTM Engineering.
 Waiting on # to run this.
 Where the pipeline came from
-# of # others
-From the seat to the result

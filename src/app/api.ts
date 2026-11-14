@@ -102,6 +102,6 @@ export interface PlanData {
   result: { meetings: GoalLine | null; accounts: GoalLine | null; pipeline: { goal_cents?: number; actual_cents?: number; short_by_cents?: number } | null; words: string[] };
   approval: { submitted_at: string | null; approved_by: string | null; approved_at: string | null; approved_budget_cents?: number | null; requested_by: string; approvers: string[]; over_budget: boolean; over_plan: boolean; waiting_seats: number };
   involvements: PlanInvolvement[]; side_events: { id: string; name: string; starts_on: string; hosted_format: string; plan_stage: string }[]; who_goes: PlanPerson[];
-  notes: string[]; judged_at: string | null;
+  notes: string[]; judged_at: string | null; can_plan: boolean;
   budget?: { lines: { id: string; category: string; label: string; planned_cents: number; contracted_cents: number | null }[]; categories: PlanBudgetCategory[]; ai_actual_cents: number; total_planned_cents: number; total_contracted_cents: number; total_actual_cents: number; approved_budget_cents: number | null };
 }
