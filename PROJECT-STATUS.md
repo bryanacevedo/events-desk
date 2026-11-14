@@ -1,17 +1,12 @@
 # Events Desk: project status
 
-## HAND-OFF: redesign step 1 (written 2026-11-13, session 1 of 3 ends here)
+## Redesign step 1, session 2 (2026-11-14): leftovers done
 
-Worktree `~/Developer/events-desk/.claude/worktrees/admiring-kepler-c6dcf2`, branch `claude/admiring-kepler-c6dcf2`, not pushed (sandbox blocked github.com on `git fetch`; rule 2 needs a fetch, rebase, full suite, then `git push origin HEAD:main`). Spec: `docs/EVENT-PLAN.md` (goldfish-reviewed; section 16 "Built differently", section 17 Bryan's picks). Brief: `~/Developer/events-rethink/steps/step-1.md`.
+Worktree `~/Developer/events-desk/.claude/worktrees/admiring-kepler-c6dcf2`, branch `claude/admiring-kepler-c6dcf2`. Spec `docs/EVENT-PLAN.md` (progress in section 18), decisions 47 to 50, 54 to 56.
 
-**Done (commits 23b0664 to 209d3e9):** the spec; contract tests; `plan_stage` and `planStageOf`; migration 0049; `plan.ts`, `plan-routes.ts`, `budget-lines.ts`, `canPlan` and the middleware edit; seat asks routed to `askToGo`; hosted plans in `seed-year.ts`; decisions 47 to 50 and 54; `src/app/Plan.tsx` with three switchable views (default by involvement, Bryan 2026-11-13: sections must be clearly separated), the Result goal block, the Events list plan stage; `seed-plan.ts` with a demo plan. Full suite once: 1,238 passed, 12 skipped, 1 timeout in `data-hygiene.test.ts` under load (passes alone). tsc, design-lint, screen-copy, both audits clean at the last run.
+**Done on top of session 1:** the New plan form (Events, planners: a listed conference, one not listed, or a hosted event); in-place editing on the Plan tab for planners (reason, goal, budget lines one at a time, who goes, ways of taking part); Decline with a reason for the approver; `can_plan` on the plan read and `planners` in the client's needs; the demo's in-flight plan is AWS re:Invent 2026, written onto the existing paused event that holds its list and twelve seats (decision 55); demo snapshot rebuilt; `tests/plan-edit-decline-seed.test.ts`. Full suite 1,241 passed, 12 skipped; the one failure was the new seed test timing out under load (5 s limit, 7 s alone), now given 60 s and passing. tsc, design-lint, screen-copy and both audits clean.
 
-**Next, in order:**
-1. Session 1 leftovers: a New plan form and on-screen editing of reason, goal and budget lines for planners; a decline action with a reason; Slack plan card in live mode; `seed-plan.ts` still seeds Money20/20 USA 2027 as the in-flight plan, but Bryan chose AWS re:Invent 2026 (spec section 17), with Money20/20 USA 2026 as the past event read against its goal (needs held meetings and a scorecard, M9); a seed test; render the Result goal block on a past event; rerun the full suite once; fetch, rebase, push, check Render once, live check at 1440 and 375, report the hash to the orchestrator.
-2. Session 2 (spec section 13): sponsorship, deadlines, `list_source` (0050, 0051), Overview year plan and week's deadlines, Events list and Budget table. Three directions first for Overview (a genuinely new screen), drawn by a fable subagent.
-3. Session 3: assessment (0052), model recording `assessment_propose`, organizer request email, seeds, snapshot, README, both audits at both widths.
-
-Decision 54 (planners see plan money): yes. Questions 3 and 4 in the spec still run on the defaults (also seed two hosted events in the demo; the Money20/20 FAQ quote is six words).
+**Not done (next, in order):** live-mode Slack plan card; sponsorship, deliverables, `list_source`, Overview year plan and week's deadlines (0050, 0051, session 2 of the original plan); the assessment, organizer request, past events read against their goals, the Money20/20 USA 2026 seed (0052, session 3); a seed test for those; README for the plan. re:Invent's upload source "emailed by the organizer" waits for 0051.
 
 **Updated:** 2026-11-12. **Spec:** `docs/SPEC.md`, goldfish-reviewed 2026-11-08 before any code (12 Major, 13 Nit, no Blocker; 24 fixed, 1 moot because a clause gate was closed). It has been edited to match the code since. **Decisions:** `docs/DECISIONS.md`, 1 to 46.
 
