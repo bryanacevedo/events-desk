@@ -7,12 +7,12 @@ import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const ROOT = new URL("../", import.meta.url).pathname;
-const DIR = join(ROOT, "src/app");
+const DIRS = ["src/app", "src/scan"].map((d) => join(ROOT, d));
 const OUT = join(ROOT, "docs/SCREEN-COPY.txt");
 
 export function sentences() {
   const found = new Map();
-  for (const f of readdirSync(DIR).filter((x) => x.endsWith(".tsx")).sort()) {
+  for (const [DIR, f] of DIRS.flatMap((d) => readdirSync(d).filter((x) => x.endsWith(".tsx")).sort().map((x) => [d, x]))) {
     const src = readFileSync(join(DIR, f), "utf8")
       .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "))
       .replace(/(^|[^:"'`])\/\/.*$/gm, (m, a) => a + m.slice(a.length).replace(/[^\n]/g, " "));

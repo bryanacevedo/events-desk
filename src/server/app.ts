@@ -29,6 +29,8 @@ import { isGtm, SETTINGS_REFUSAL } from "../shared/roles.ts";
 import { canPlan, forRep, isLead, MONEY_REFUSAL } from "./money.ts";
 import { mountPlanRoutes } from "./plan-routes.ts";
 import { mountHosted } from "./hosted-routes.ts";
+import { mountScans } from "./scan-routes.ts";
+import type { OrganizerAdapter } from "./organizer-api.ts";
 import type { TransactionalSender } from "./transactional.ts";
 import { involvementsByEvent, involvementWords, stageNow, todayOf, weekDeadlines, yearPlan } from "./plan.ts";
 import { isListSource, type ListSourceInput } from "../shared/plan.ts";
@@ -42,7 +44,7 @@ import type { LifecycleDeps } from "./lifecycle-deps.ts";
 import type { FakeTool } from "./connectors/fake.ts";
 import { validateRequest, type ActivityRow, type EventRow } from "../shared/domain.ts";
 
-export interface AppConfig { writeKey?: string; demo: boolean; /** Everything after delivery. Absent, those routes do not exist. */ lifecycle?: LifecycleDeps; demoTools?: Record<string, FakeTool>; /** The hosted demo: no login, so it takes no files a later visitor could read. */ publicDemo?: boolean; kick?: (eventId: string) => void; /** Where reminders and seat-open messages go. Absent in the demo, a simulated sender; absent live, the desk refuses to send. */ transactional?: TransactionalSender; slack?: SlackConfig; sheets?: SheetPublisher; /** The model the ICP compile and test bench use. Defaults to the mock. */ llm?: Llm; /** The mail-server check used before the Research card. Defaults to the one for mock and simulated domains. */ dns?: Dns; /** The CRM an opt-out is queued for. */ crm?: Crm; /** The desk prices each cost card itself once its event is ready; the uploader only confirms. Off in tests that walk the manual request. */ autoQuote?: boolean }
+export interface AppConfig { writeKey?: string; demo: boolean; /** Everything after delivery. Absent, those routes do not exist. */ lifecycle?: LifecycleDeps; demoTools?: Record<string, FakeTool>; /** The hosted demo: no login, so it takes no files a later visitor could read. */ publicDemo?: boolean; kick?: (eventId: string) => void; /** Where reminders and seat-open messages go. Absent in the demo, a simulated sender; absent live, the desk refuses to send. */ transactional?: TransactionalSender; slack?: SlackConfig; sheets?: SheetPublisher; /** The model the ICP compile and test bench use. Defaults to the mock. */ llm?: Llm; /** The mail-server check used before the Research card. Defaults to the one for mock and simulated domains. */ dns?: Dns; /** The CRM an opt-out is queued for. */ crm?: Crm; /** The desk prices each cost card itself once its event is ready; the uploader only confirms. Off in tests that walk the manual request. */ autoQuote?: boolean; /** Turns a badge id into a person. Absent, badge ids wait (docs/SCANNER.md). */ organizer?: OrganizerAdapter | null }
 type Ctx = { Variables: { actor: string } };
 /** The public RSVP answer, by exact pattern. */
 const RSVP_ANSWER = /^\/api\/rsvp\/[^/]+$/;
@@ -56,7 +58,7 @@ export function createApp(db: Db, cfg: AppConfig) {
 
   // Every response says how it may be framed and sniffed. Logos come from Google's favicon service, avatars from this server.
   app.use("*", secureHeaders({ xFrameOptions: "DENY", referrerPolicy: "strict-origin-when-cross-origin", crossOriginEmbedderPolicy: false, crossOriginResourcePolicy: false,
-    contentSecurityPolicy: { defaultSrc: ["'self'"], imgSrc: ["'self'", "data:", "https://www.google.com", "https://*.gstatic.com", "https://images.unsplash.com"], styleSrc: ["'self'", "'unsafe-inline'"], scriptSrc: ["'self'"], connectSrc: ["'self'"], fontSrc: ["'self'", "data:"], frameAncestors: ["'none'"], objectSrc: ["'none'"], baseUri: ["'self'"] } }));
+    contentSecurityPolicy: { defaultSrc: ["'self'"], imgSrc: ["'self'", "data:", "blob:", "https://www.google.com", "https://*.gstatic.com", "https://images.unsplash.com"], styleSrc: ["'self'", "'unsafe-inline'"], scriptSrc: ["'self'", "'wasm-unsafe-eval'"], workerSrc: ["'self'"], mediaSrc: ["'self'", "blob:"], manifestSrc: ["'self'"], connectSrc: ["'self'"], fontSrc: ["'self'", "data:"], frameAncestors: ["'none'"], objectSrc: ["'none'"], baseUri: ["'self'"] } }));
   // No body is read whole before its size is known: files may be about 20 MB (21,000,000 bytes), everything else 1 MB.
   const FILE_ROUTE = /^\/api\/(events\/[^/]+\/(upload|new-registrations|review|top-ups|guests\/import)|icp\/documents|target-accounts\/import)(\/|$)/;
   app.use("*", async (c, next) => {
@@ -233,7 +235,7 @@ export function createApp(db: Db, cfg: AppConfig) {
   });
 
   if (cfg.slack) mountSlack(app, db, cfg.slack, cfg.kick, cfg.lifecycle);
-  if (cfg.lifecycle) mountLifecycle(app, db, cfg.lifecycle, { bad, publicDemo: cfg.publicDemo, demoTools: cfg.demoTools });
+  if (cfg.lifecycle) { mountLifecycle(app, db, cfg.lifecycle, { bad, publicDemo: cfg.publicDemo, demoTools: cfg.demoTools }); mountScans(app, db, cfg.lifecycle, { demo: cfg.demo, llm: cfg.llm, organizer: cfg.organizer, lifecycle: cfg.lifecycle }); }
 
   // One route for every card. A single-card event gets its cost card. A two-card event gets the Research card from the mapped list, and the Outreach card once research is done.
   const quote = async (id: string, actor: string, flow: string, stage: string) => {

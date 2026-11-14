@@ -26,6 +26,8 @@ import { sheetsFor } from "./sheets.ts";
 import { exampleDns, systemDns } from "./identity.ts";
 import { seed } from "./seed.ts";
 import { restampDemoPlan, seedPastResults } from "./seed-plan.ts";
+import { seedScans } from "./seed-scans.ts";
+import { swapcardAdapter } from "./organizer-api.ts";
 import { senderFromEnv } from "./transactional.ts";
 import { simDeps } from "./sim-vendors.ts";
 import { demoConnectors, liveConnectors } from "./connectors/setup.ts";
@@ -125,6 +127,8 @@ if (!demoMotionReady) void (async () => {
         await seedDemoStages(db, lifecycle!, demoSetup!.tools);
         // The past events read against their goals: held meetings topped up through the real paths, then the 30-day scorecard.
         await seedPastResults(db, lifecycle!);
+        // A day's scans on the same past event, and Tokyo set up for the one coming.
+        await seedScans(db, lifecycle!);
         // Free meeting slots belong to an event still to come: the one in market before it starts.
         const tokyo = "evt_salesforce-world-tour-tokyo-2026";
         const [rep] = await db.query<{ rep: string }>("SELECT requester AS rep FROM seat_requests WHERE event_id = $1 AND status = 'approved' ORDER BY (requester = 'Maya Ortiz') DESC, requester LIMIT 1", [tokyo]);
@@ -136,7 +140,7 @@ if (!demoMotionReady) void (async () => {
   } catch (e) { console.error("demo motion", (e as Error).message); }
   demoMotionReady = true;
 })();
-const api = createApp(db, { autoQuote: true, lifecycle, demoTools: demoSetup?.tools, writeKey: mode.demo ? undefined : process.env.WRITE_KEY, demo: mode.demo, publicDemo: mode.demo && process.env.PUBLIC_DEMO === "1", kick, slack, sheets: deps.sheets, llm: deps.llm, dns: mode.liveSpend ? systemDns : exampleDns, crm: deps.crm, transactional: senderFromEnv(env) ?? undefined });
+const api = createApp(db, { autoQuote: true, lifecycle, demoTools: demoSetup?.tools, writeKey: mode.demo ? undefined : process.env.WRITE_KEY, demo: mode.demo, publicDemo: mode.demo && process.env.PUBLIC_DEMO === "1", kick, slack, sheets: deps.sheets, llm: deps.llm, dns: mode.liveSpend ? systemDns : exampleDns, crm: deps.crm, transactional: senderFromEnv(env) ?? undefined, organizer: !mode.demo && env.SWAPCARD_KEYS ? swapcardAdapter() : null });
 // Write-back to the CRM runs here and never from a run, so a failed write cannot touch a delivery. A CRM that cannot write (noCrm) makes this do nothing.
 if (mayRun && canWrite(deps.crm)) {
   const sweep = () => { void drainQuietly(db, deps.crm); };

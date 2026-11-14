@@ -145,9 +145,9 @@ export const postEventReminderCard = (w: { event: string; event_id: string; last
 });
 
 /** A hot conversation at the booth goes to the rep who had it, the same day. It never waits for a sequence. */
-export const hotCaptureCard = (h: { person: string; company: string | null; note: string }): CardMessage => ({
+export const hotCaptureCard = (h: { person: string; company: string | null; note: string; owner?: string | null; noOwner?: boolean; task?: boolean }): CardMessage => ({
   text: `Hot from the booth: ${h.person}${h.company ? ` at ${h.company}` : ""}. Follow up today.`,
-  blocks: [say(`*Hot from the booth: ${esc(h.person)}*${h.company ? `\n${esc(h.company)}` : ""}`), ...(h.note.trim() ? [small(`“${quote(h.note)}”`)] : []), small("Follow up today. A task is in the CRM. This person stays out of every sequence.")],
+  blocks: [say(`*Hot from the booth: ${esc(h.person)}*${h.company ? `\n${esc(h.company)}` : ""}`), ...(h.note.trim() ? [small(`“${quote(h.note)}”`)] : []), small(`Follow up today. ${h.task === false ? "There is no CRM task, because there is no email." : "A task is in the CRM."} This person stays out of every sequence.${h.owner ? ` ${esc(h.owner)} owns the account.` : h.noOwner ? " No account owner is known." : ""}`)],
 });
 
 /** The last message in an event's channel, the day it is archived. */

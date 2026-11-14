@@ -14,7 +14,8 @@ import { parseTitle } from "../shared/titles.ts";
 export interface LlmResult { text: string; input_tokens: number; output_tokens: number; model?: string; /** Real model only: why it stopped, and how many of the output tokens were hidden thinking. */ stop_reason?: string; thinking_tokens?: number }
 /** `hint` is for simulators only: a real model is never sent it (the prompt is the whole request). The simulated model uses it to return the code-written text for the perspective step.
     `simulated` marks a model that is not a model, so nothing it returns is presented as written by one. */
-export interface Llm { model: string; simulated?: boolean; complete(step: Step, prompt: string, hint?: unknown): Promise<LlmResult> }
+export interface LlmImage { mime: "image/jpeg" | "image/png" | "image/webp"; base64: string }
+export interface Llm { model: string; simulated?: boolean; complete(step: Step, prompt: string, hint?: unknown): Promise<LlmResult>; /** Reads one image with a prompt (the scanner's photo read). Absent on a model that cannot see. The simulated one answers from `hint`. */ read?(step: Step, prompt: string, image: LlmImage, hint?: unknown): Promise<LlmResult> }
 
 /** `charged` is 0 when the vendor says it did not bill, and "unknown" otherwise. */
 export class VendorError extends Error {
@@ -367,6 +368,8 @@ export const draftReply = (hint: unknown): LlmResult => ({ text: hint && typeof 
 export const mockLlm: Llm = {
   model: "mock-deterministic",
   simulated: true,
+  /** The simulated reader returns what it was handed as the printed card, and nothing without a hint: it cannot see. */
+  async read(_step, _prompt, _image, hint) { return { text: hint && typeof hint === "object" ? JSON.stringify(hint) : JSON.stringify({ fields: {}, confidence: {}, text: "" }), input_tokens: 0, output_tokens: 0 }; },
   async complete(step, prompt, hint) {
     if (step === "perspective") return draftReply(hint);
     if (step === "assessment_propose") return { text: simulatedAssessment(prompt), input_tokens: 0, output_tokens: 0 };

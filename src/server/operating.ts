@@ -5,6 +5,7 @@ import { DAY, LIVE_THREAD_HOLD_DAYS } from "../shared/policy.ts";
 import type { Db } from "./db.ts";
 import { welcomeRoom } from "./event-room.ts";
 import { stopContacts } from "./enroll-ops.ts";
+import { purgeScanData } from "./scans.ts";
 import { logActivity, newId, RuleError } from "./events.ts";
 import { DESK, nowOf, type LifecycleDeps } from "./lifecycle-deps.ts";
 import { pauseSequenceById, drainOps } from "./sequences.ts";
@@ -134,7 +135,16 @@ export async function escalateWaiting(db: Db, deps: LifecycleDeps) {
 
 /* ------------------------------------------------------------------ on site */
 
-export interface Capture { full_name?: string; email?: string; linkedin?: string; company?: string; title?: string; note?: string; temperature?: "hot" | "warm" | "cold"; met?: boolean; source?: "quick_add" | "badge_scan" }
+/** The note, then what was promised and the next step, so the follow-up rests on the conversation and not on the scan. */
+const taskBody = (c: Capture) => [c.note ?? "", c.promise?.text ? `Promised: ${c.promise.text}` : "", c.promise?.next_step ? `Next step: ${c.promise.next_step}${c.promise.next_step_on ? ` by ${c.promise.next_step_on}` : ""}` : ""].filter(Boolean).join("\n");
+
+export interface Capture {
+  full_name?: string; email?: string; linkedin?: string; company?: string; title?: string; note?: string; temperature?: "hot" | "warm" | "cold"; met?: boolean; source?: "quick_add" | "badge_scan";
+  /** From the scanner (docs/SCANNER.md): the organizer's id for the person, their country and phone, the scan this capture is, and what the person said about marketing. */
+  registrant_id?: string; country?: string; phone?: string; scan_id?: string; marketing_consent?: { yes: boolean; note: string };
+  /** What the rep said they would send, who sends it, and the next step: the owner gets a task of their own. */
+  promise?: { text: string; owner: string; next_step: string; next_step_on: string | null };
+}
 
 /** Someone met at the booth or scanned at the door, on a list or not. They stop getting automated outreach within the same write: a rep has them now. */
 export async function captureOnsite(db: Db, deps: LifecycleDeps, eventId: string, rep: string, c: Capture) {
@@ -144,10 +154,18 @@ export async function captureOnsite(db: Db, deps: LifecycleDeps, eventId: string
   const out = await db.tx(async (q) => {
     const [ev] = await q("SELECT 1 FROM events WHERE id = $1", [eventId]);
     if (!ev) throw new RuleError("That event does not exist.");
+    // A scan's capture has an id of its own derived from the scan, so a retry after a crash finds the capture it already made and changes nothing.
+    const capId = c.scan_id ? `cap_${c.scan_id}` : newId("cap");
+    if (c.scan_id) {
+      const [made] = await q<{ id: string; contact_id: string | null }>("SELECT id, contact_id FROM onsite_captures WHERE id = $1", [capId]);
+      if (made) return { capture_id: made.id, contact_id: made.contact_id, on_list: true, repeat: true } as { capture_id: string; contact_id: string; on_list: boolean };
+    }
+    // The order of keys is the dedupe order: the organizer's id, then the address, then the LinkedIn profile, then the name at the company.
     const [found] = await q<{ id: string; person_id: string | null; domain: string | null }>(
       `SELECT k.id, k.person_id, co.primary_domain AS domain FROM contacts k JOIN companies co ON co.id = k.company_id
-       WHERE k.event_id = $1 AND (($2::text IS NOT NULL AND lower(k.email) = $2) OR ($3::text IS NOT NULL AND k.linkedin = $3) OR ($4::text IS NOT NULL AND $5::text IS NOT NULL AND lower(k.full_name) = lower($4) AND co.key = $5)) LIMIT 1`,
-      [eventId, email, linkedin, name, c.company ? companyKey(c.company) : null]);
+       WHERE k.event_id = $1 AND coalesce(k.drop_reason, '') <> 'duplicate' AND (($6::text IS NOT NULL AND k.registrant_id = $6) OR ($2::text IS NOT NULL AND lower(k.email) = $2) OR ($3::text IS NOT NULL AND k.linkedin = $3) OR ($4::text IS NOT NULL AND $5::text IS NOT NULL AND lower(k.full_name) = lower($4) AND co.key = $5))
+       ORDER BY CASE WHEN $6::text IS NOT NULL AND k.registrant_id = $6 THEN 0 WHEN $2::text IS NOT NULL AND lower(k.email) = $2 THEN 1 WHEN $3::text IS NOT NULL AND k.linkedin = $3 THEN 2 ELSE 3 END, k.id LIMIT 1`,
+      [eventId, email, linkedin, name, c.company ? companyKey(c.company) : null, c.registrant_id ?? null]);
     let contact = found;
     if (!contact) {
       const d = email ? emailDomain(email) : null, domain = d && !isFreeWebmail(d) ? d : null;
@@ -160,10 +178,13 @@ export async function captureOnsite(db: Db, deps: LifecycleDeps, eventId: string
       if (!up) throw new RuleError("This event has no attendee list yet.");
       const rowId = newId("row");
       await q("INSERT INTO source_rows (id, event_id, upload_id, row_number, raw, kind, company_id, issues) VALUES ($1, $2, $3, $4, $5::jsonb, 'person', $6, '[]'::jsonb)", [rowId, eventId, up.id, up.next, JSON.stringify({ captured_on_site: true, name, email, company }), co.id]);
-      await q("INSERT INTO contacts (id, event_id, source_row_id, company_id, full_name, title, email, linkedin, source) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'onsite')", [id, eventId, rowId, co.id, name, c.title?.trim() || null, email, linkedin]);
+      await q("INSERT INTO contacts (id, event_id, source_row_id, company_id, full_name, title, email, linkedin, source, registrant_id, person_location) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'onsite', $9, $10)", [id, eventId, rowId, co.id, name, c.title?.trim() || null, email, linkedin, c.registrant_id ?? null, c.country?.trim() || null]);
       contact = { id, person_id: null, domain: co.primary_domain };
     }
-    const capId = newId("cap");
+    // The organizer's id and the person's consent are kept on the person, whoever scanned them first.
+    if (c.registrant_id) await q("UPDATE contacts SET registrant_id = coalesce(registrant_id, $2) WHERE id = $1", [contact.id, c.registrant_id]);
+    if (c.country?.trim()) await q("UPDATE contacts SET person_location = coalesce(person_location, $2) WHERE id = $1", [contact.id, c.country.trim()]);
+    if (c.marketing_consent?.yes) await q("UPDATE contacts SET marketing_consent = true, consent_note = $2 WHERE id = $1", [contact.id, c.marketing_consent.note]);
     await q("INSERT INTO onsite_captures (id, event_id, contact_id, full_name, email, linkedin, company, title, note, temperature, rep, source, captured_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)",
       [capId, eventId, contact.id, name, email, linkedin, c.company ?? null, c.title ?? null, (c.note ?? "").slice(0, 4000), c.temperature ?? "warm", rep, c.source ?? "quick_add", now.toISOString()]);
     // Anyone the team saw at the booth is the rep's, a badge scan included (Bryan, 2026-11-10, docs/SEQUENCES-VIEW.md §8): out of every
@@ -174,7 +195,16 @@ export async function captureOnsite(db: Db, deps: LifecycleDeps, eventId: string
     await stopContacts(q, [contact.id], "pause", "met_onsite", capId);
     if (scanOnly && canWrite(deps.crm) && email) {
       const [known] = await q<{ full_name: string | null }>("SELECT full_name FROM contacts WHERE id = $1", [contact.id]);
-      await queueCreate(q, "task", `scan:${capId}`, contact.person_id, { email, full_name: name, company: c.company ?? null, domain: contact.domain, event_id: eventId, subject: `Badge scanned at the booth: ${name ?? known?.full_name ?? email}`, body: c.note ?? "", due: now.toISOString().slice(0, 10), owner: rep });
+      await queueCreate(q, "task", `scan:${capId}`, contact.person_id, { email, full_name: name, company: c.company ?? null, domain: contact.domain, event_id: eventId, subject: `Badge scanned at the booth: ${name ?? known?.full_name ?? email}`, body: taskBody(c), due: now.toISOString().slice(0, 10), owner: rep });
+    }
+    // A scan that is neither a bare badge scan nor hot is a conversation: the rep's follow-up still gets its task.
+    if (c.scan_id && !scanOnly && !hot && canWrite(deps.crm) && email) {
+      const [known] = await q<{ full_name: string | null }>("SELECT full_name FROM contacts WHERE id = $1", [contact.id]);
+      await queueCreate(q, "task", `scan:${capId}`, contact.person_id, { email, full_name: name, company: c.company ?? null, domain: contact.domain, event_id: eventId, subject: `Follow up from the booth: ${name ?? known?.full_name ?? email}`, body: taskBody(c), due: addDays(now.toISOString().slice(0, 10), 2), owner: rep });
+    }
+    if (c.promise?.text && canWrite(deps.crm) && email) {
+      const [known] = await q<{ full_name: string | null }>("SELECT full_name FROM contacts WHERE id = $1", [contact.id]);
+      await queueCreate(q, "task", `promise:${capId}`, contact.person_id, { email, full_name: name, company: c.company ?? null, domain: contact.domain, event_id: eventId, subject: `Send what was promised to ${name ?? known?.full_name ?? email}`, body: `${c.promise.text}${c.promise.next_step_on ? `\nBy ${c.promise.next_step_on}` : ""}`, due: c.promise.next_step_on ?? addDays(now.toISOString().slice(0, 10), 2), owner: c.promise.owner });
     }
     if (contact.domain) {
       await addHold(q, { domain: contact.domain, person_id: contact.person_id, cause: "live_thread", cause_id: contact.id, expires_at: new Date(now.getTime() + LIVE_THREAD_HOLD_DAYS * DAY) });
@@ -186,9 +216,11 @@ export async function captureOnsite(db: Db, deps: LifecycleDeps, eventId: string
     if (hot) {
       const [known] = await q<{ full_name: string | null }>("SELECT full_name FROM contacts WHERE id = $1", [contact.id]);
       const who = name ?? known?.full_name ?? email ?? "Someone";
-      if (canWrite(deps.crm) && email) await queueCreate(q, "task", `hot:${capId}`, contact.person_id, { email, full_name: name, company: c.company ?? null, domain: contact.domain, event_id: eventId, subject: `Hot from the booth: ${who}`, body: c.note ?? "", due: now.toISOString().slice(0, 10), owner: rep });
-      await queueEvent(q, eventId, hotCaptureCard({ person: who, company: c.company ?? null, note: c.note ?? "" }), [deps.userMap?.[rep]]);
+      if (canWrite(deps.crm) && email) await queueCreate(q, "task", `hot:${capId}`, contact.person_id, { email, full_name: name, company: c.company ?? null, domain: contact.domain, event_id: eventId, subject: `Hot from the booth: ${who}`, body: taskBody(c), due: now.toISOString().slice(0, 10), owner: rep });
+      const [own] = await q<{ owner: string | null }>("SELECT d.owner FROM owner_decisions d JOIN contacts k ON k.company_id = d.company_id WHERE k.id = $1 LIMIT 1", [contact.id]);
+      await queueEvent(q, eventId, hotCaptureCard({ person: who, company: c.company ?? null, note: c.note ?? "", owner: own?.owner && own.owner !== rep ? own.owner : null, noOwner: !own?.owner, task: canWrite(deps.crm) && Boolean(email) }), [deps.userMap?.[rep], own?.owner ? deps.userMap?.[own.owner] : null]);
     }
+    if (c.scan_id) await q("UPDATE scans SET contact_id = $2, capture_id = $3, state = CASE WHEN state IN ('received', 'resolving', 'lookup_pending', 'needs_fields') THEN 'placed' ELSE state END WHERE id = $1", [c.scan_id, contact.id, capId]);
     return { capture_id: capId, contact_id: contact.id, on_list: Boolean(found) };
   });
   await drainOps(db, deps, eventId);
@@ -224,12 +256,14 @@ export async function forgetPerson(db: Db, deps: LifecycleDeps, email: string, a
       await q("UPDATE notifications SET card = '{}'::jsonb, status = CASE WHEN status = 'queued' THEN 'failed' ELSE status END WHERE event_id = ANY($2::text[]) AND card::text ILIKE '%' || $1 || '%'", [needle, events]);
       await q("UPDATE activity_log SET detail = '' WHERE event_id = ANY($2::text[]) AND detail ILIKE '%' || $1 || '%'", [needle, events]);
     }
-    await q("UPDATE contacts SET full_name = NULL, title = NULL, linkedin = NULL, email = NULL, person_location = NULL, drop_reason = 'opted_out', dropped_at = coalesce(dropped_at, now()), person_id = NULL WHERE id = ANY($1::text[])", [ids]);
+    await q("UPDATE contacts SET registrant_id = NULL, marketing_consent = false, consent_note = NULL, full_name = NULL, title = NULL, linkedin = NULL, email = NULL, person_location = NULL, drop_reason = 'opted_out', dropped_at = coalesce(dropped_at, now()), person_id = NULL WHERE id = ANY($1::text[])", [ids]);
     // The row as it came in the attendee file, and the original file itself: the rows rebuilt from what is kept stay downloadable.
     await q("UPDATE source_rows SET raw = '{}'::jsonb, listed_name = NULL WHERE id = ANY($1::text[])", [rows.map((r) => r.source_row_id)]);
     await q("DELETE FROM upload_files WHERE upload_id = ANY($1::text[])", [rows.map((r) => r.upload_id).filter(Boolean)]);
     await q("DELETE FROM person_emails WHERE email = $1 OR person_id = ANY($2::text[])", [e, persons]);
     await q("DELETE FROM people WHERE email = $1 OR id = ANY($2::text[]) OR linkedin = ANY($3::text[])", [e, persons, linkedins]);
+    // Scans carry the person's fields, note, promise and photo: they go with the person, including scans that never became one (a photo not read, a lookup waiting).
+    await q("DELETE FROM scans WHERE contact_id = ANY($2::text[]) OR lower(fields->>'email') = $1 OR position($1 in lower(raw_payload)) > 0 OR (contact_id IS NULL AND lower(fields->>'name') = ANY($3::text[]) AND event_id = ANY($4::text[]))", [e, ids, names.map((n) => n.toLowerCase()), events]);
     await q("DELETE FROM onsite_captures WHERE lower(email) = $1 OR contact_id = ANY($2::text[])", [e, ids]);
     // What was bought about them is not kept for reuse.
     await q("DELETE FROM verification_cache WHERE lower(email) = $1", [e]);
@@ -255,4 +289,5 @@ export async function purgeOldBodies(db: Db, deps: LifecycleDeps, days = 180) {
   const now = nowOf(deps).toISOString();
   await db.query("UPDATE inbound_messages SET body = NULL WHERE body IS NOT NULL AND received_at < $1::timestamptz - ($2::text || ' days')::interval", [now, String(days)]);
   await db.query("UPDATE notifications SET card = '{}'::jsonb WHERE status <> 'queued' AND card <> '{}'::jsonb AND created_at < $1::timestamptz - interval '7 days'", [now]);
+  await purgeScanData(db, deps);
 }

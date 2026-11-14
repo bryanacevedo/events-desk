@@ -40,6 +40,9 @@ const hostedPages = [
   ...(past ? [[`/event/${past}#result`, "Dan Whitlock"], [`/event/${past}#guests`, MAYA]] : []),
   ...(today ? [[`/event/${today}#check-in`, MAYA], [`/event/${today}#result`, "Dan Whitlock"]] : []),
   ["/my-day", MAYA],
+  // The Scanner tab (docs/SCANNER.md 10): scans from a day, and one set up with none yet.
+  ...(byName("Money20/20 USA") ? [[`/event/${byName("Money20/20 USA")}#scanner`, "Camille Laurent"], [`/event/${byName("Money20/20 USA")}#scanner`, MAYA]] : []),
+  ...(byName("Salesforce World Tour Tokyo") ? [[`/event/${byName("Salesforce World Tour Tokyo")}#scanner`, "Camille Laurent"]] : []),
 ];
 const pages = [
   ["/", MAYA], ["/events", MAYA], [`/events?event=${ids[1] ?? flagship}`, MAYA], ["/events?time=all", MAYA], ["/events?time=past&region=na", MAYA], ["/events?add=1", GTM], [`/events?event=${flagship}`, MAYA], ["/events?request=1", MAYA], [`/events?request=1&catalog=${listed}`, MAYA],
@@ -274,7 +277,36 @@ async function rsvpPages() {
     await ctx.close();
   }
 }
+// The rep's scanner on a phone (docs/SCANNER.md 10): its own page with no desk around it, nothing sideways, every control 44px, in each state it opens in (camera, Today, one scan's screen).
+async function scanPages() {
+  const id = byName("Money20/20 USA");
+  if (!id) return;
+  for (const width of widths) {
+    const phone = width < 500;
+    const ctx = await browser.newContext({ viewport: { width, height: 812 }, isMobile: phone, hasTouch: phone });
+    await ctx.addInitScript(() => { try { localStorage.setItem("actor", "Maya Ortiz"); } catch {} });
+    const page = await ctx.newPage();
+    for (const [what, act] of [["camera", null], ["today", ".sc-bar .textlink"], ["scan", ".sc-methods button:has-text('Type')"]]) {
+      await page.goto(`${base}/scan/${id}`, { waitUntil: "networkidle" });
+      if (!(await page.waitForSelector("[data-ready]", { timeout: 8000 }).then(() => true).catch(() => false))) { problems++; console.log(`${width}px /scan (${what})  never became ready`); continue; }
+      if (act) { await page.click(act); await page.waitForSelector(".sc-sheet", { timeout: 4000 }).catch(() => undefined); }
+      const found = await page.evaluate((vw) => {
+        const out = [];
+        if (document.documentElement.scrollWidth > vw + 1) out.push(`page scrolls sideways: ${document.documentElement.scrollWidth}px wide in a ${vw}px viewport`);
+        if (document.querySelector(".side, .tabs, .phone-top")) out.push("the desk's own chrome is showing on the scanner");
+        for (const el of document.querySelectorAll(".sc button, .sc input, .sc select, .sc textarea, .sc label.textlink")) {
+          const b = el.getBoundingClientRect();
+          if (b.width > 0 && b.height > 0 && b.height < 43.5 && !el.closest(".sc-hidden") && el.type !== "checkbox") out.push(`tap target ${el.tagName.toLowerCase()} ("${(el.textContent || el.getAttribute("aria-label") || "").trim().slice(0, 20)}") is ${Math.round(b.height)}px tall`);
+        }
+        return out;
+      }, width);
+      for (const f of found) { problems++; console.log(`${width}px /scan (${what})  ${f}`); }
+    }
+    await ctx.close();
+  }
+}
 await rsvpPages();
+await scanPages();
 await browser.close();
 } finally {
   // The three compiles were made for measuring only; cancelling them keeps the demo's Settings page clean, even when the audit stops early.

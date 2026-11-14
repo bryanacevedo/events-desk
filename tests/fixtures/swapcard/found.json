@@ -1,0 +1,1 @@
+{"data":{"scanBadges":{"badges":[{"errorCode":null,"connection":{"id":"Q29ubmVjdGlvbl8xMTYzNDE=","rating":5,"note":"Lead to contact urgently","target":{"__typename":"EventPerson","firstName":"John","lastName":"Doe","jobTitle":null,"email":"test@gmail.com","organization":null,"address":null},"customFields":[],"connectedAt":"2025-09-03 15:28:33"}}],"errors":[]}}}

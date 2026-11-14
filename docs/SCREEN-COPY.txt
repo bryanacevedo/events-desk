@@ -12,6 +12,7 @@
 # still registered will be marked as no-shows.
 #, #, not requested. Request a seat
 #, added by #
+#Syncs only while this page stays open#.
 A line for the version history
 Accounts you know will be there (optional)
 Add a way of taking part
@@ -32,6 +33,7 @@ Keep it as my rule
 Last day of the event
 Leave out the answer to #
 My event is not listed
+No email, no CRM task.
 No event has finished sending yet.
 Not read: the card ran out
 Nothing is due this week.
@@ -39,6 +41,7 @@ Nothing needs anyone right now.
 One company per line: name, employees, industry, business model, expected tier, kind (won, lost or bad fit)
 One ticket ###
 Open the link in your invitation email again, or ask the person who invited you for a new one.
+Open this page in Safari to scan codes, or take a photo with the phone's camera, or type the person.
 Page # of #
 People to look for per company
 Publish although it got under # right
@@ -67,6 +70,7 @@ The plan was made, but # Add the rest on the plan.
 The rules changed since this test. Test again before publishing.
 The sentence, word for word
 The side that owns the account keeps all its guests
+This browser will not keep scans after the page closes. Sync before you leave.
 This draft was thrown away.
 Those notes are not here.
 To change anything, write to #.

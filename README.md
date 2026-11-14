@@ -84,6 +84,18 @@ The desk carries an event to the end of its life (built on `v2`, merged into `ma
 
 None of it has run against a real sequencer, CRM or calendar account. **Real sending is off** unless `LIVE_SEND=1`, and then it refuses to start unless `DESK_LOGIN=1` is set, a flag no real login backs yet, so turning it on is a deliberate choice; it also needs `LIVE_SPEND=1`, `WRITE_KEY`, `WEBHOOK_BASE` and `SEQUENCER_WEBHOOK_SECRET`. The full design, with what is proven and what is not, is in [docs/LIFECYCLE.md](docs/LIFECYCLE.md).
 
+## The scanner
+
+One phone web app for every rep at an event, at `/scan/<event id>` (the event's Scanner tab shows its link and a QR code). Aim at a badge code, photograph a badge or a business card, or type the person; then one screen: hot, warm or cold, the event's qualifiers, a note, what was promised and who sends it, the next step, consent.
+
+- **Offline.** Every scan is written on the phone first, with its own id, and sent when the app is open and online (on load, on coming back online, every 30 seconds, from the Sync button). An iPhone cannot sync in the background, so the app says so and asks at day's end. Sending twice is one scan. An "unsynced" count is on every screen and a CSV export is the fallback.
+- **Reading a badge.** A code that carries contact data (vCard, MeCard, a link with the person in it) is read on the phone with the browser's own decoder or a WebAssembly one (the app's own copy). A code that is only an id is resolved through the organizer's API when one is set up, and waits otherwise. A photo is read by the model; every field it was unsure of is marked "check", and a person confirms before it counts. A read costs money, so it is counted and capped per event.
+- **After the scan.** The person goes to the rep who scanned them, with a CRM task; hot ones reach the account owner the same day. Two reps scanning one person make one person with two scans; a name that is nearly the same goes to a review list. Marketing consent is off unless the person says yes, and each scan keeps the notice wording it was shown. Counsel confirms the wording before any live use.
+- **The organizer adapter.** Swapcard's exhibitor API is the first implementation, written from its public documentation and tested against its documented responses. A live call waits for a show that enables it, and a lookup makes a connection on Swapcard's side.
+- **Not proven yet.** The camera in an iPhone home-screen app has open WebKit bugs; the app falls back to Safari, the photo picker and typing. Two real phones are tested by hand before a show.
+
+The design is in [docs/SCANNER.md](docs/SCANNER.md), with the decisions (63 to 68) in [docs/DECISIONS.md](docs/DECISIONS.md).
+
 ## Safeguards
 
 **It is built not to pay for the same data twice, and it shows what that saved.** Company facts are kept for 90 days. A company's tier is kept by domain and ICP version. Title readings, paid person lookups, Apollo email-waterfall results and LinkedIn lookups are kept, and email check results are reused for 30 days, good or bad, as is an Apollo miss. A person lookup older than 180 days is bought again. If a stored record older than 30 days shows the person changed jobs, it is bought once, fresh. Each time a stored answer replaces a call that would have been paid, the desk writes it down at the cost it avoided. Usage shows that as "saved" on each provider's own pool, and for AI as dollars. A stored answer counts as saved only when another event, or this event before its first card was approved, wrote it.

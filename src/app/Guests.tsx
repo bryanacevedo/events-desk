@@ -33,7 +33,7 @@ const GROUPS: { key: GuestOut["status"]; title: string; note?: string }[] = [
 ];
 
 /** A sheet that slides in over the page, the way every other sheet does: Esc, a click outside and the × close it, and focus stays inside. */
-function HSheet({ label, close, children }: { label: string; close: () => void; children: ReactNode }) {
+export function HSheet({ label, close, children }: { label: string; close: () => void; children: ReactNode }) {
   const ref = useSheet(close);
   return createPortal(
     <aside className="sheet hg-sheet" ref={ref} role="dialog" aria-label={label} data-hsheet={label}>
@@ -42,7 +42,7 @@ function HSheet({ label, close, children }: { label: string; close: () => void; 
     </aside>, document.body);
 }
 
-const Facts = ({ rows }: { rows: [string, ReactNode][] }) => <dl className="sheet-facts">{rows.filter(([, v]) => v !== "" && v !== null && v !== undefined && v !== false).map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>;
+export const Facts = ({ rows }: { rows: [string, ReactNode][] }) => <dl className="sheet-facts">{rows.filter(([, v]) => v !== "" && v !== null && v !== undefined && v !== false).map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>;
 
 /* ------------------------------------------------------------------ the invitation: copy it, send it from your own mailbox, log that it went */
 

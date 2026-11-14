@@ -7,4 +7,5 @@ import "./styles.css";
 // A guest's own RSVP link is its own page: no desk, no acting-as choice, no write key. Everything else is the desk.
 const root = createRoot(document.getElementById("root")!);
 if (/^\/rsvp\/[^/]+\/?$/.test(location.pathname)) import("./Rsvp").then(({ Rsvp }) => root.render(<StrictMode><Rsvp /></StrictMode>));
+else if (/^\/scan\/[^/]+\/?$/.test(location.pathname)) import("../scan/ScanApp").then(({ ScanApp }) => root.render(<StrictMode><ScanApp /></StrictMode>));
 else import("./App").then(({ App }) => root.render(<StrictMode><App /></StrictMode>));

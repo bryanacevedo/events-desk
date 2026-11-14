@@ -709,3 +709,7 @@ Done: everything in section 13 sessions 2 and 3 including the real-model recordi
 ## 20. Progress (step 2, 2026-11-14)
 
 Hosted events are built in `docs/HOSTED.md` (migration 0053, decisions 58 to 61). The Orrery customer dinner in Lisbon is a hosted plan, and the Money20/20 USA 2026 pipeline line reads "not read" instead of $0 when no CRM was connected. Step 1's open items otherwise stand.
+
+## 21. Progress (step 3, 2026-11-14)
+
+The scanner is built in `docs/SCANNER.md` (migration 0054, decisions 63 to 68): a phone web app at `/scan/<event id>`, an offline queue, the badge decoder, five ways to capture a person, the one screen after a scan, dedupe with a review of near matches, consent with its wording, the organizer adapter (Swapcard, proven against its documented responses and a fake), and the Scanner tab on the event. Directions are in `~/Developer/events-desk-review/step3/`; the recommended ones are built provisionally. The two real phones (iPhone Safari and home-screen, Android Chrome) are not tested yet; the offline path is proven in Chrome with a fake camera.

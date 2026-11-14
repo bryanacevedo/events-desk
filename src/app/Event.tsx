@@ -17,6 +17,7 @@ import { Motion } from "./Motion";
 import { ResultView } from "./Result";
 import { PlanTab } from "./Plan";
 import { Guests } from "./Guests";
+import { Scanner } from "./Scanner";
 import { CheckIn } from "./CheckIn";
 import { HostedResult } from "./HostedResult";
 import { Upload } from "./Upload";
@@ -695,9 +696,9 @@ export function StageBlock({ ev, go, compact }: { ev: EventState; go: (to: strin
   );
 }
 
-type View = "plan" | "result" | "outreach" | "people" | "cost" | "details";
+type View = "plan" | "result" | "outreach" | "people" | "scanner" | "cost" | "details";
 /* Result comes first once sending is done (Closing, Scored); before that the event has no result, and the tab is not there. */
-const VIEWS: [View, string][] = [["plan", "Plan"], ["result", "Result"], ["outreach", "Outreach"], ["people", "People"], ["cost", "Cost"], ["details", "Details"]];
+const VIEWS: [View, string][] = [["plan", "Plan"], ["result", "Result"], ["outreach", "Outreach"], ["people", "People"], ["scanner", "Scanner"], ["cost", "Cost"], ["details", "Details"]];
 
 /** A delivered event, one layer at a time: what needs someone now, on one line, then the work in motion, the list, and the event's details as views.
     The view is in the link (#outreach, #people, #details), so a Slack card can point straight at it. */
@@ -1061,6 +1062,7 @@ export function Event({ id, go }: { id: string; go: (to: string) => void }) {
           ...(["closing", "scored"].includes(e.motion ?? "") ? { result: <ResultView id={e.id} name={e.name} onChange={ev.load} /> } : {}),
           outreach: <>{replyCases.length > 0 && <Cases eventId={e.id} cases={replyCases} onChange={ev.load} />}<Motion id={e.id} onChange={ev.load} /></>,
           people: <StageBlock ev={ev} go={go} />,
+          scanner: <Scanner id={e.id} eventName={e.name} />,
           ...(lead ? { cost: <CostView id={e.id} done={["closing", "scored"].includes(e.motion ?? "")}>{creditCards}</CostView> } : {}),
           details: <>{facts}<AttendeeList d={d} go={go} onChange={ev.load} />{more}</>,
         }} />

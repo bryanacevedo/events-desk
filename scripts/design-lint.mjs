@@ -25,7 +25,7 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const BASELINE = join(ROOT, "docs/DESIGN-LINT-BASELINE.txt");
-const SCAN_DIRS = ["web/src", "src/app"];
+const SCAN_DIRS = ["web/src", "src/app", "src/scan"];
 const SCAN_FILES = ["index.html", "web/index.html"];
 const SKIP_DIRS = new Set(["node_modules", "dist", "build", ".git", ".claude", ".venv", ".data"]);
 const EXTS = new Set([".css", ".tsx", ".ts", ".jsx", ".html"]);
