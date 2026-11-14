@@ -1,0 +1,36 @@
+{
+  "about": "Seven pages and the answers a person labelled for each. Six are fictional sample pages in tests/fixtures/assessment; the seventh is the research note the demo seeds. Each answer carries the sentence that supports it, word for word. A page that answers nothing has an empty list.",
+  "items": [
+    { "id": "faq_browse_only", "file": "tests/fixtures/assessment/faq-browse-only.txt", "source_kind": "faq", "answers": [
+      { "question": "directory_present", "answer": "yes", "quote": "view, sort, and filter the attendee list inside the Harbourline app" },
+      { "question": "directory_tickets", "answer": "Full Conference pass", "quote": "Every registered attendee with a Full Conference pass can view" },
+      { "question": "directory_fields", "answer": "name, title, company, country, photo", "quote": "Each entry shows name, job title, company and country. A photo is optional." },
+      { "question": "can_hide", "answer": "yes", "quote": "You can hide your profile from the directory in your account settings at any time." },
+      { "question": "download", "answer": "browse_only", "quote": "The list cannot be downloaded, exported or printed by attendees or sponsors." },
+      { "question": "sponsor_adds", "answer": "lead_retrieval", "quote": "Sponsors receive lead retrieval for the badges they scan at their own booth." },
+      { "question": "terms", "answer": "We do not share or sell the attendee list.", "quote": "We do not share or sell the attendee list." }
+    ] },
+    { "id": "registration_terms", "file": "tests/fixtures/assessment/registration-terms.txt", "source_kind": "registration_terms", "answers": [
+      { "question": "directory_present", "answer": "yes", "quote": "may appear in the Cedar Forum attendee directory, which is visible to other registered attendees" },
+      { "question": "can_hide", "answer": "yes", "quote": "You may opt out of the directory when you register by ticking the box on the pass form." },
+      { "question": "download", "answer": "emailed", "quote": "Cedar Forum may email a list of the attendees who opted in to share their details to participating sponsors within 14 days after the event." },
+      { "question": "sponsor_adds", "answer": "opt_in_list", "quote": "a list of the attendees who opted in to share their details to participating sponsors" },
+      { "question": "terms", "answer": "Attendees may not copy, scrape or download directory entries, or use them for bulk marketing.", "quote": "Attendees may not copy, scrape or download directory entries, or use them for bulk marketing." }
+    ] },
+    { "id": "app_store_listing", "file": "tests/fixtures/assessment/app-store-listing.txt", "source_kind": "app_store_listing", "answers": [
+      { "question": "directory_present", "answer": "yes", "quote": "Browse the full attendee directory and filter by company, role or country." },
+      { "question": "directory_fields", "answer": "name, title, company, photo", "quote": "Each profile shows a name, job title, company and photo." },
+      { "question": "sponsor_adds", "answer": "meeting_program, lead_retrieval", "quote": "Book a time with other attendees through the in-app meeting program." }
+    ] },
+    { "id": "sponsor_prospectus", "file": "tests/fixtures/assessment/sponsor-prospectus.txt", "source_kind": "prospectus", "answers": [
+      { "question": "download", "answer": "emailed", "quote": "Gold and Platinum sponsors also receive the opted-in attendee list, emailed by the organizer two weeks before the show." },
+      { "question": "sponsor_adds", "answer": "lead_retrieval, opt_in_list", "quote": "Every package includes lead retrieval for your booth team." }
+    ] },
+    { "id": "nothing", "file": "tests/fixtures/assessment/nothing.txt", "source_kind": "event_page", "answers": [] },
+    { "id": "injection", "file": "tests/fixtures/assessment/injection.txt", "source_kind": "event_page", "answers": [] },
+    { "id": "money2020_note", "file": "samples/assessment-money2020-note.txt", "source_kind": "faq", "answers": [
+      { "question": "directory_present", "answer": "yes", "quote": "view, sort, and filter the attendee list" },
+      { "question": "download", "answer": "browse_only", "quote": "view, sort, and filter the attendee list" }
+    ] }
+  ]
+}

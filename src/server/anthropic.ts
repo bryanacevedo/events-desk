@@ -7,17 +7,20 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { VendorError, type Llm } from "./providers.ts";
 import { PARTS } from "./perspective-check.ts";
+import { QUESTION_IDS } from "../shared/assessment.ts";
 
 export const DEFAULT_MODEL = "claude-opus-5-5";
 
 /** Output room per step. Hidden thinking is counted inside max_tokens, so a step that thinks and then writes needs room for both: at 2048 the Summary's
     three paragraphs can be cut off after the thinking, and a cut-off reply is returned empty (below), which reads as invalid JSON. */
-const MAX_TOKENS: Record<string, number> = { icp_compile: 8000, perspective: 8000 };
+export const MAX_TOKENS: Record<string, number> = { icp_compile: 8000, perspective: 8000, assessment_propose: 4000 };
 const DEFAULT_MAX_TOKENS = 2048;
 
 /** Steps whose reply must be exactly this JSON, so the API holds the model to it (structured output) instead of the prompt asking nicely. */
-const SCHEMAS: Record<string, { type: "json_schema"; schema: Record<string, unknown> }> = {
+export const SCHEMAS: Record<string, { type: "json_schema"; schema: Record<string, unknown> }> = {
   perspective: { type: "json_schema", schema: { type: "object", properties: Object.fromEntries(PARTS.map((p) => [p, { type: "string" }])), required: [...PARTS], additionalProperties: false } },
+  // The answers of the assessment step. The question and the quote are checked in code (src/shared/assessment.ts); the schema holds the shape.
+  assessment_propose: { type: "json_schema", schema: { type: "object", properties: { answers: { type: "array", items: { type: "object", properties: { question: { type: "string", enum: [...QUESTION_IDS] }, answer: { type: "string" }, detail: { type: "string" }, quote: { type: "string" } }, required: ["question", "answer", "detail", "quote"], additionalProperties: false } } }, required: ["answers"], additionalProperties: false } },
 };
 
 export function anthropicLlm(model = process.env.EVENTS_DESK_MODEL || DEFAULT_MODEL): Llm {

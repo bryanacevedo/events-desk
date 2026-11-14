@@ -10,6 +10,7 @@ import { Icon } from "./icons";
 import { Fold } from "./Motion";
 import { DeclineBox, Editable, GoalEditor, InvolvementEditor, LinesEditor, PersonEditor, ReasonEditor } from "./PlanEdit";
 import { SponsorBlock } from "./PlanSponsor";
+import { AssessmentBlock, OrganizerBlock } from "./PlanAssessment";
 import { Upload } from "./Upload";
 import { LIST_SOURCE_WORDS } from "../shared/plan";
 import { money, num, shortDate } from "./words";
@@ -164,10 +165,16 @@ export function PlanTab({ id, listRows, onChange }: { id: string; listRows: numb
     <>
       <ul className="pl-rows">
         <li className="pl-row"><span className="pl-what"><b>Attendee list</b>{src && <span>{src}</span>}</span><span className="pl-end">{listRows > 0 ? `${num(listRows)} rows` : "Not uploaded"}</span></li>
-        <li className="pl-row"><span className="pl-what"><b>Assessment</b></span><span className="pl-end mute">None yet</span></li>
-        <li className="pl-row"><span className="pl-what"><b>Request to the organizer</b></span><span className="pl-end mute">None yet</span></li>
       </ul>
       {canUpload && <Upload primary label="Add the attendee list" path={`/api/events/${id}/upload`} accept={`.csv,.xlsx,text/csv,${XLSX}`} onDone={() => { void saved(); }} />}
+      {!p.event.hosted && (
+        <>
+          <h3 className="pl-h3">Assessment</h3>
+          <AssessmentBlock id={id} data={p.assessment} saved={saved} />
+          <h3 className="pl-h3">Request to the organizer</h3>
+          <OrganizerBlock id={id} data={p.assessment} canDraft={p.can_plan} saved={saved} />
+        </>
+      )}
     </>
   );
   const sponsorship = live.some((i) => i.kind === "sponsorship") ? <SponsorBlock id={id} p={p} canEdit={canEdit} saved={saved} /> : null;

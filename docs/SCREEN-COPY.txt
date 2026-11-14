@@ -2,24 +2,31 @@
 # for # needed
 # new, # already in
 # no tier#
+# of # confirmed
 # of # held a meeting
 # of # live
 # of # met accounts have pipeline
 # of # others
 # of # used
 #, #, not requested. Request a seat
+#, added by #
 A line for the version history
 Accounts you know will be there (optional)
 Add a way of taking part
 Budget is for leadership and GTM Engineering.
+Confirmed by #, #
 Declined by ##
 Domain not set up to send
 Every way of taking part is on the plan.
 From the attendee file (unverified):
 From the seat to the result
 Held back by account owners
+How to give the page
+It will not share the list
+It will share the list
 Keep it as my rule
 Last day of the event
+Leave out the answer to #
 My event is not listed
 No event has finished sending yet.
 Not read: the card ran out
@@ -37,6 +44,7 @@ Review the cost to verify and find contacts
 Save the document as .txt or .md, or paste its text.
 Saved. Their outreach is stopped, and a task for today is in the CRM.
 Saved. Their outreach is stopped.
+Say when you sent it
 Says unsubscribe, read as something else
 Seats are for leadership and GTM Engineering.
 Sponsor session or side event
@@ -51,6 +59,7 @@ That sequence is not on this event.
 The Google Sheet stays in Drive.
 The plan was made, but # Add the rest on the plan.
 The rules changed since this test. Test again before publishing.
+The sentence, word for word
 This draft was thrown away.
 Those notes are not here.
 Travel per person, dollars (optional)

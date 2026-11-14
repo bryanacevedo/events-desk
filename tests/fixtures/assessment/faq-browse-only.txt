@@ -1,0 +1,16 @@
+Harbourline Summit 2026: attendee FAQ
+
+Who can see the attendee directory?
+Every registered attendee with a Full Conference pass can view, sort, and filter the attendee list inside the Harbourline app. Expo-only passes do not include the directory.
+
+What does the directory show?
+Each entry shows name, job title, company and country. A photo is optional.
+
+Can I hide my profile?
+Yes. You can hide your profile from the directory in your account settings at any time.
+
+Can I download the list?
+No. The list cannot be downloaded, exported or printed by attendees or sponsors. It can only be browsed in the app.
+
+What do sponsors get?
+Sponsors receive lead retrieval for the badges they scan at their own booth. We do not share or sell the attendee list.

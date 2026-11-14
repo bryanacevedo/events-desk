@@ -134,7 +134,9 @@ export async function seedReal(db: Db) {
     // Attendee lists are windows of the large registration export, so numbers differ from event to event.
     const big = i === 15;
     const n = rows ?? 0;
-    await ingestUpload(db, id, uploader, `${id.slice(4)}-registrations.csv`, big ? [...exportBanner(r.name, 1650), ...readFileSync(new URL("../../samples/attendees-large.csv", import.meta.url), "utf8").split(/\r?\n/).slice(2)].join("\n") : windowCsv(cursor, n, r.name));
+    // AWS re:Invent's list is the one the organizer emailed (the demo's one such list; decision 51), so its source says so on the upload, every row and every person.
+    const source = r.name === "AWS re:Invent 2026" ? { kind: "emailed_by_organizer" as const, note: "" } : undefined;
+    await ingestUpload(db, id, uploader, `${id.slice(4)}-registrations.csv`, big ? [...exportBanner(r.name, 1650), ...readFileSync(new URL("../../samples/attendees-large.csv", import.meta.url), "utf8").split(/\r?\n/).slice(2)].join("\n") : windowCsv(cursor, n, r.name), source);
     if (i === TOP_UP_AT) topUp = { id, from: cursor, rows: n, name: r.name };
     cursor += n;
     if (upto === "mapped") continue;

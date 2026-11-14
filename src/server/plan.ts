@@ -13,6 +13,7 @@ import { LAST_DAY_SQL } from "./motion.ts";
 import { dollars, eventBudget, plannedTotal } from "./budget-lines.ts";
 import { canPlan, forRep } from "./money.ts";
 import { sponsorshipView } from "./sponsorship.ts";
+import { assessmentView } from "./assessment.ts";
 import { DEFAULT_FLOW, type EventRow, type Flow } from "../shared/domain.ts";
 import {
   dueGroup, dueWords, HOSTED_FORMATS, HOSTED_WORDS, INVOLVEMENT_KINDS, weekWindow, type DueGroup, type HostedFormat, INVOLVEMENT_WORDS, PERSON_ROLES, PREPARE_DAYS_BEFORE, planStageLabel, planStageOf, planWaitingOn,
@@ -553,6 +554,7 @@ export async function planView(db: Db, deps: LifecycleDeps | undefined, eventId:
   const result = await goalResult(db, deps, eventId);
   const sponsor = await sponsorshipView(db, eventId, today);
   const deadlines = (await eventDeadlines(db, eventId, today));
+  const assessment = await assessmentView(db, eventId);
   const view = {
     event: { id: e.id, name: e.name, venue: e.venue, starts_on: e.starts_on, last_day: e.last_day, country: e.country ?? null, stage: e.stage, decline_reason: e.decline_reason, approval_mode: e.approval_mode ?? "per_seat", hosted },
     stage_line: { plan_stage, plan_stage_label: planStageLabel(plan_stage), list_stage: e.stage, list_stage_label: stageLabel(e.stage), waiting_on: planWaitingOn(e, { hosted, submitted: Boolean(e.plan_submitted_at) }), paused: e.stage === "paused" },
@@ -563,6 +565,7 @@ export async function planView(db: Db, deps: LifecycleDeps | undefined, eventId:
     involvements, side_events: side, who_goes: people,
     sponsorship: sponsor.sponsorship, deliverables: sponsor.deliverables, promises: sponsor.promises, deadlines,
     list_source: await currentListSource(db, eventId),
+    assessment, organizer_request: assessment.organizer_request,
     notes,
     judged_at: e.judged_at ?? null,
     can_plan: money,

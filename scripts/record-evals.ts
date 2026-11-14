@@ -12,6 +12,9 @@ import { cleanReply } from "../src/shared/reply-clean.ts";
 import { VendorError } from "../src/server/providers.ts";
 import { planEvalRun } from "../src/evals/limits.ts";
 import { loadTitleDev, loadTitleHoldout, titlePrompt } from "../src/evals/title-tier.ts";
+import { assessmentPrompt } from "../src/server/assessment.ts";
+import { assessmentDev, assessmentPage } from "../src/server/assessment-sim.ts";
+import { pageSent } from "../src/shared/assessment.ts";
 import { decidedByRule, demoIcp, inputsHash, loadDev, loadHoldout, promptFor, secondLookItems } from "../src/evals/company-tier.ts";
 
 if (process.env.LIVE_SPEND !== "1" || !process.env.ANTHROPIC_API_KEY) {
@@ -46,6 +49,8 @@ const steps: [Step, Item[] | (() => Item[])][] = [
   ["review", list.contacts.map((c: { id: string; name: string; title: string; company: string; email: string }) => ({ id: c.id, prompt: fill("review", { input: `Name: ${c.name}\nTitle: ${c.title}\nCompany: ${c.company}\nEmail: ${c.email}` }) }))],
   // Reply reading: what the person typed, after cleaning, is what the model sees in production.
   ["reply_classify", ["dev", "holdout", "injection"].flatMap((k) => JSON.parse(readFileSync(`evals/reply-classify.${k}.json`, "utf8")).items).map((it: { id: string; reply: string }) => ({ id: it.id, prompt: fill("reply_classify", { codes: REPLY_CODES.join(", "), reply: cleanReply(it.reply) || it.reply }) }))],
+  // The assessment step reads each labelled page the way production sends it: markers neutralised, cut to length. About 7 calls.
+  ["assessment_propose", assessmentDev().map((it) => ({ id: it.id, prompt: assessmentPrompt(pageSent(assessmentPage(it))) }))],
   ["concierge", list.questions.map((q: { id: string; question: string }) => ({ id: q.id, prompt: fill("concierge", { tools, input: `Event: evt_eval\nQuestion: ${q.question}` }) }))],
 ];
 

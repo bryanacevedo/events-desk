@@ -7,6 +7,7 @@ import { mapColumns, normalize, type QualityReport } from "../shared/ingest.ts";
 import { linkEventQuietly, pruneQuietly } from "./person-record.ts";
 import { parseUpload, sniff } from "./xlsx-read.ts";
 import type { ListSource, ListSourceInput } from "../shared/plan.ts";
+import { closeOrganizerRequest } from "./assessment.ts";
 
 /** Where a list came from. No header means `other`, so old callers keep working. */
 export const OTHER_SOURCE: ListSourceInput = { kind: "other", note: "" };
@@ -82,7 +83,8 @@ export async function ingestUpload(db: Db, eventId: string, actor: string, filen
         full_name: c.full_name, title: c.title, email: c.email, linkedin: c.linkedin, drop_reason: c.drop_reason,
       }))), eventId, source.kind],
     );
-    // The organizer-request hook (task 3 of a later session): a list that arrives `emailed_by_organizer` moves an open organizer request to received here.
+    // A list the organizer emailed closes the open request to the organizer, in this same transaction.
+    if (source.kind === "emailed_by_organizer") await closeOrganizerRequest(q, eventId, actor);
     await logActivity(q, eventId, actor, "mapped", `Mapped ${Object.keys(map).length} columns, ignored ${ignored.length}. Attendee list quality: ${data.quality.verdict}`);
     // The event row is unchanged; the quality report rides along as one extra field.
     return { ...event, quality: data.quality };

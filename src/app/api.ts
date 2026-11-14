@@ -100,6 +100,18 @@ export interface PlanBudgetCategory { category: string; label: string; line_ids:
 export interface GoalLine { goal: number; actual: number; short_by: number }
 export interface PlanDeliverable { id: string; kind: string; label: string; due_on: string | null; owner: string; done: boolean; done_by: string | null; note: string; due_words: string; group: "late" | "today" | "week" | null }
 export interface PlanPromise { id: string; item: string; label: string; promised_qty: number | null; received_qty: number | null; received_on: string | null; note: string; words: string }
+/** The assessment and the request to the organizer (GET /api/events/:id/assessment, and carried on the plan read). No money is in either. */
+export interface AssessmentAnswer { id: string; question: string; answer: string; detail: string; source_kind: string; source_id: string | null; quote: string; proposed_by: string; state: "proposed" | "confirmed"; confirmed_by: string | null; confirmed_at: string | null }
+export interface AssessmentQuestion { id: string; label: string; type: "choice" | "list" | "text"; values: string[]; words: Record<string, string>; max: number; answer: AssessmentAnswer | null }
+export interface OrganizerRequest { id: string; template: "ask_for_list" | "follow_up"; subject: string; body: string; organizer_name: string; status: "drafted" | "copied" | "sent" | "will_share" | "will_not_share" | "received"; copied_by: string | null; copied_at: string | null; sent_on: string | null; expected_on: string | null; follow_up_on: string | null; created_by: string }
+export interface AssessmentData {
+  assessment: { id: string; status: "draft" | "confirmed"; confirmed_by: string | null; confirmed_at: string | null; conference_key: string; copied_from_id: string | null } | null;
+  questions: AssessmentQuestion[];
+  sources: { id: string; input: "pasted" | "fetched"; source_kind: string; url: string | null; chars: number; added_by: string; created_at: string }[];
+  progress: { confirmed: number; total: number; proposed: number }; reads_left: number; reads_cap: number;
+  finds_networking: boolean; last_year: { event_name: string } | null;
+  organizer_request: OrganizerRequest | null; request_offered: boolean; request_open: boolean;
+}
 export interface PlanData {
   event: { id: string; name: string; venue: string; starts_on: string; last_day: string; stage: string; decline_reason: string | null; approval_mode: "per_seat" | "budget"; hosted: boolean };
   stage_line: { plan_stage: string; plan_stage_label: string; list_stage: string; list_stage_label: string; waiting_on: string; paused: boolean };
@@ -113,5 +125,6 @@ export interface PlanData {
   sponsorship: { id: string; involvement_id: string; tier_name: string; price_cents?: number; contract_signed_on: string | null; deposit_cents?: number | null; deposit_due_on: string | null; deposit_paid_on: string | null; balance_due_on: string | null; balance_paid_on: string | null } | null;
   deliverables: PlanDeliverable[]; promises: PlanPromise[]; deadlines: { kind: string; ref_id: string; label: string; due_on: string; owner: string; due_words: string; group: "late" | "today" | "week" | null }[];
   list_source: { list_source: ListSource; source_note: string } | null;
+  assessment: AssessmentData; organizer_request: OrganizerRequest | null;
   budget?: { lines: { id: string; category: string; label: string; planned_cents: number; contracted_cents: number | null }[]; categories: PlanBudgetCategory[]; ai_actual_cents: number; total_planned_cents: number; total_contracted_cents: number; total_actual_cents: number; approved_budget_cents: number | null };
 }

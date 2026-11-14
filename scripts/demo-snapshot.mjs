@@ -14,6 +14,11 @@ for (let i = 0; i < 480; i++) {
   if ((await motionOf("evt_nrf-2026-retail-s-big-show")) === "scored" && (await motionOf("evt_salesforce-world-tour-tokyo-2026")) === "in_market") break;
   await new Promise((r) => setTimeout(r, 500));
 }
+// Last: the two past events are topped up to their held meetings and scored (seedPastResults), so Result reads against their goals.
+for (let i = 0; i < 480; i++) {
+  if ((await motionOf("evt_money20-20-usa-2026")) === "scored" && (await motionOf("evt_dreamforce-2026")) === "scored") break;
+  await new Promise((r) => setTimeout(r, 500));
+}
 await new Promise((r) => setTimeout(r, 3000));
 await new Promise((r) => setTimeout(r, 2000));
 await new Promise((r) => { server.on("exit", r); server.kill("SIGTERM"); });

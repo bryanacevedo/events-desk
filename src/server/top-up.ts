@@ -13,6 +13,7 @@ import { refreshSheet } from "./sheet-delivery.ts";
 import { mockSheets, type SheetPublisher } from "./sheets.ts";
 import { MAX_ROWS, OTHER_SOURCE, sourceNote, toBytes, TYPES } from "./uploads.ts";
 import type { ListSourceInput } from "../shared/plan.ts";
+import { closeOrganizerRequest } from "./assessment.ts";
 import { parseUpload, sniff } from "./xlsx-read.ts";
 import { classifyEmail, nameSet } from "../shared/layer0.ts";
 import { mapColumns, normalize, type Ingested, type IngestContact, type IngestSourceRow } from "../shared/ingest.ts";
@@ -166,6 +167,8 @@ export async function createTopUp(db: Db, parentId: string, actor: string, filen
         full_name: c.full_name, title: c.title, email: c.email, linkedin: c.linkedin,
       }))), id, source.kind]);
     await logActivity(q, id, actor, "mapped", `${filename || "A file"}: ${fresh.length} new, ${alreadyIn} already in, ${dropped} not usable`);
+    // New registrations the organizer emailed close the parent's open request to the organizer.
+    if (source.kind === "emailed_by_organizer") await closeOrganizerRequest(q, parentId, actor);
     return { ...counts, top_up_id: id };
   });
   if (out.top_up_id) await linkEventQuietly(db, out.top_up_id);

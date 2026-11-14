@@ -181,11 +181,12 @@ export async function computeScorecard(db: Db, deps: LifecycleDeps, eventId: str
 }
 
 /** First score 30 days after the event's last day, then again at 60, 90, 180 and 365; each version is kept as written. */
-export async function writeScorecards(db: Db, deps: LifecycleDeps) {
+export async function writeScorecards(db: Db, deps: LifecycleDeps, opts: { only?: string[] } = {}) {
   const now = nowOf(deps);
   let written = 0;
+  // `only` is for the demo seed, which scores two past events on a clock of its own and must leave every other event alone.
   const open = await db.query<{ id: string; motion: string; country: string | null; last_day: string; name: string }>(
-    `SELECT e.id, e.motion, e.country, e.name, ${LAST_DAY_SQL}::text AS last_day FROM events e WHERE e.stage = 'delivered' AND e.parent_event_id IS NULL AND e.motion IN ('closing', 'scored')`);
+    `SELECT e.id, e.motion, e.country, e.name, ${LAST_DAY_SQL}::text AS last_day FROM events e WHERE e.stage = 'delivered' AND e.parent_event_id IS NULL AND e.motion IN ('closing', 'scored') AND ($1::text[] IS NULL OR e.id = ANY($1::text[]))`, [opts.only ?? null]);
   for (const e of open) {
     const past = daysPast(e, now);
     for (const w of WINDOWS) {

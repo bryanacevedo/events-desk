@@ -25,6 +25,7 @@ import { chooseCrm } from "./crm-desk.ts";
 import { sheetsFor } from "./sheets.ts";
 import { exampleDns, systemDns } from "./identity.ts";
 import { seed } from "./seed.ts";
+import { restampDemoPlan, seedPastResults } from "./seed-plan.ts";
 import { simDeps } from "./sim-vendors.ts";
 import { demoConnectors, liveConnectors } from "./connectors/setup.ts";
 import { lifecycleTick } from "./lifecycle-tick.ts";
@@ -59,13 +60,18 @@ const migrations = readdirSync(join(root, "migrations")).filter((f) => f.endsWit
 await migrate(db, migrations);
 if (migrateOnly) { console.log("Migrations applied."); await db.close(); process.exit(0); }
 
+// The demo's "today" for the plan dates that must read as near (DEMO_TODAY, else the wall clock). The sample plan's dates are offsets from it.
+const demoToday = process.env.DEMO_TODAY ?? new Date().toISOString().slice(0, 10);
 const empty = (await db.query<{ n: number }>("SELECT count(*)::int AS n FROM events"))[0]?.n === 0;
 const mayLoadSample = !url || process.env.SEED_SAMPLE === "1";
 if ((mode.demo && !fromSnapshot) || (empty && mayLoadSample && !fromSnapshot)) {
   const t0 = Date.now();
-  await seed(db, mode.demo ? { real: true } : {});
+  await seed(db, mode.demo ? { real: true, today: demoToday } : {});
   console.log(`Loaded the sample events in ${Date.now() - t0} ms.${mode.demo ? " Includes the flagship with about 1,650 rows." : ""}`);
 }
+
+// A snapshot built weeks ago still shows work due this week: the offset dates are rewritten from today, by fixed id, and a second run changes nothing.
+if (mode.demo) await restampDemoPlan(db, demoToday);
 
 const env = process.env as Record<string, string>;
 const deps: Deps = mode.liveSpend
@@ -116,6 +122,8 @@ if (!demoMotionReady) void (async () => {
         await demoAdvance(db, lifecycle!, demoSetup!.tools, f.id, { pressFollowUp: true });
         // Every other step after delivery gets an event of its own, so each can be opened.
         await seedDemoStages(db, lifecycle!, demoSetup!.tools);
+        // The past events read against their goals: held meetings topped up through the real paths, then the 30-day scorecard.
+        await seedPastResults(db, lifecycle!);
         // Free meeting slots belong to an event still to come: the one in market before it starts.
         const tokyo = "evt_salesforce-world-tour-tokyo-2026";
         const [rep] = await db.query<{ rep: string }>("SELECT requester AS rep FROM seat_requests WHERE event_id = $1 AND status = 'approved' ORDER BY (requester = 'Maya Ortiz') DESC, requester LIMIT 1", [tokyo]);

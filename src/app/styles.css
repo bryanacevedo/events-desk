@@ -2625,3 +2625,28 @@ a:hover > .swap .due, a:focus-visible > .swap .due { opacity: 0; transform: tran
 .tl-name.under { padding-left: 20px; }
 .yr.bp { --cols: 52px minmax(0, 1.8fr) 100px 92px 92px 88px; } .yr.bp .yr-t .t { grid-column: 2 / span 2; }
 @media (max-width: 760px) { .yr.bp .yr-r { grid-template-columns: minmax(0, 1fr) auto; } .yr.bp .yr-t .t { grid-column: 1; } }
+
+/* The assessment and the request to the organizer, on the Plan tab. Rows reuse the plan's row; a quote reuses the debrief fact's green mark. */
+.as { display: grid; gap: 12px; min-width: 0; }
+.as-rows { margin: 0; }
+.as-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 16px; align-items: start; padding: 12px 0; border-top: 1px solid var(--line); }
+.as-row:first-child { border-top: 0; }
+.as-editing { display: block; }
+.as-answer { color: var(--ink); font-weight: 600; font-size: 15px; line-height: 22px; }
+.as-quote { display: block; max-width: 68ch; font: 400 15px/22px var(--display); color: var(--ink); quotes: none; }
+.as-quote::before { content: "\201C"; color: var(--green); font: 600 20px/0 var(--display); position: relative; top: 4px; margin-right: 3px; }
+.as-end { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.as-err { grid-column: 1 / -1; }
+.as-label { margin: 0; font-weight: 600; }
+.as-checks { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 0; padding: 0; border: 0; }
+.as-checks legend { padding: 0; margin-bottom: 6px; font-size: 13px; color: var(--mute); }
+.as-checks label { display: inline-flex; align-items: center; gap: 6px; }
+.as-mail { display: grid; gap: 8px; max-width: 68ch; padding: 16px 0 4px; border-top: 1px solid var(--line); }
+.as-mail-sub { display: grid; gap: 1px; margin: 0; }
+.as-mail-sub span { font-size: 13px; line-height: 18px; color: var(--mute); }
+.as-mail pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: 400 15px/23px var(--display); color: var(--ink); }
+@media (max-width: 720px) {
+  .as-row { grid-template-columns: minmax(0, 1fr); }
+  .as-end { justify-content: flex-start; }
+  .as-end .btn { min-height: 44px; }
+}

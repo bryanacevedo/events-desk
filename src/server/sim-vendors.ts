@@ -14,6 +14,7 @@
 
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { simulatedAssessment } from "./assessment-sim.ts";
 import { companyKey } from "../shared/ingest.ts";
 import type { Settings } from "../shared/cost.ts";
 import type { World, WorldCompany, WorldPerson } from "../shared/world.ts";
@@ -679,6 +680,7 @@ export function simLlm(world: World, opts: { salt?: string } = {}): Llm {
     simulated: true,
     async complete(step, prompt, hint) {
       if (step === "perspective") return draftReply(hint);
+      if (step === "assessment_propose") return { text: simulatedAssessment(prompt), input_tokens: 0, output_tokens: 0 };
       const input = prompt.slice(prompt.lastIndexOf("INPUT") + 5).trim();
       const out = (o: unknown) => ({ text: JSON.stringify(o), input_tokens: 0, output_tokens: 0 });
       if (step === "title_parse") {

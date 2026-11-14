@@ -14,9 +14,14 @@ import {
 } from "./plan.ts";
 import type { LifecycleDeps } from "./lifecycle-deps.ts";
 import { postPlanCard, type SlackConfig } from "./slack.ts";
+import {
+  addSource, assessmentView, AssessmentInvalid, confirmAssessment, draftOrganizerRequest, markRequestCopied, patchOrganizerRequest, proposeAnswers, rejectAnswer, reuseLastYear, setAnswer,
+  type AnswerInput, type PageFetcher, type RequestPatch, type SourceInput,
+} from "./assessment.ts";
+import { mockLlm, type Llm } from "./providers.ts";
 
 export const PLANNER_REFUSAL = "Plans are written by the field marketer, leadership and GTM Engineering.";
-type Cfg = { demo: boolean; slack?: SlackConfig; lifecycle?: LifecycleDeps };
+type Cfg = { demo: boolean; slack?: SlackConfig; lifecycle?: LifecycleDeps; llm?: Llm; /** Reads one public page for the assessment. Tests give a stand-in; the demo never fetches. */ fetchPage?: PageFetcher };
 type Body = Record<string, any>;
 
 export function mountPlanRoutes(app: Hono<any>, db: Db, cfg: Cfg) {
@@ -26,7 +31,7 @@ export function mountPlanRoutes(app: Hono<any>, db: Db, cfg: Cfg) {
   const run = async <T>(fn: () => Promise<T>, status: 200 | 201 = 200) => {
     try { return Response.json(await fn(), { status }); }
     catch (e) {
-      if (e instanceof PlanInvalid || e instanceof Invalid || e instanceof SponsorshipInvalid) return refuse(e.message, 400);
+      if (e instanceof PlanInvalid || e instanceof Invalid || e instanceof SponsorshipInvalid || e instanceof AssessmentInvalid) return refuse(e.message, 400);
       if (e instanceof Forbidden) return refuse(e.message, 403);
       throw e;
     }
@@ -153,5 +158,38 @@ export function mountPlanRoutes(app: Hono<any>, db: Db, cfg: Cfg) {
     if (!planner(c)) return refuse(PLANNER_REFUSAL, 403);
     const b = (await body(c)) as PromiseInput;
     return run(() => updatePromise(db, actorOf(c), id(c), c.req.param("pid") as string, b));
+  });
+
+  /* The assessment and the request to the organizer. Nothing here holds money, so a rep reads and writes all of it. There is no route that sends mail: the person copies the email
+     and sends it from their own mailbox, and the desk keeps who copied it and the dates they say. */
+  app.get("/api/events/:id/assessment", async (c) => {
+    try { return c.json(await assessmentView(db, id(c))); }
+    catch (e) { if (e instanceof RuleError) return refuse(e.message, 404); throw e; }
+  });
+  app.post("/api/events/:id/assessment/sources", async (c) => {
+    const b = (await body(c)) as SourceInput;
+    // The demo never fetches a page: a visitor's link would make this server read the open web.
+    return run(() => addSource(db, actorOf(c), id(c), b, { fetchPage: cfg.demo && !cfg.fetchPage ? null : cfg.fetchPage }), 201);
+  });
+  app.post("/api/events/:id/assessment/propose", async (c) => {
+    const b = await body(c);
+    if (typeof b.source_id !== "string" || !b.source_id) return refuse("Say which source to read.", 400);
+    return run(() => proposeAnswers(db, cfg.llm ?? mockLlm, id(c), actorOf(c), b.source_id));
+  });
+  app.put("/api/events/:id/assessment/answers/:question", async (c) => {
+    const b = (await body(c)) as AnswerInput;
+    return run(() => setAnswer(db, actorOf(c), id(c), c.req.param("question") as string, b));
+  });
+  app.delete("/api/events/:id/assessment/answers/:question", async (c) => run(() => rejectAnswer(db, actorOf(c), id(c), c.req.param("question") as string)));
+  app.post("/api/events/:id/assessment/confirm", async (c) => run(() => confirmAssessment(db, actorOf(c), id(c))));
+  app.post("/api/events/:id/assessment/reuse", async (c) => run(() => reuseLastYear(db, actorOf(c), id(c))));
+  app.post("/api/events/:id/organizer-request", async (c) => {
+    const b = (await body(c)) as { template?: string; organizer_name?: string };
+    return run(() => draftOrganizerRequest(db, actorOf(c), id(c), b, { planner: planner(c) }), 201);
+  });
+  app.post("/api/events/:id/organizer-request/:rid/copied", async (c) => run(() => markRequestCopied(db, actorOf(c), id(c), c.req.param("rid") as string)));
+  app.patch("/api/events/:id/organizer-request/:rid", async (c) => {
+    const b = (await body(c)) as RequestPatch;
+    return run(() => patchOrganizerRequest(db, actorOf(c), id(c), c.req.param("rid") as string, b));
   });
 }

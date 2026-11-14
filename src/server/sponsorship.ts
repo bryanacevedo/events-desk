@@ -210,7 +210,7 @@ export async function sponsorshipView(db: Db, eventId: string, today: string) {
     .map((d): DeliverableRow => ({ id: d.id, kind: d.kind, label: d.label, due_on: d.due_on, owner: d.owner, done: d.done_at !== null, done_by: d.done_by, note: d.note,
       due_words: d.done_at ? "Done" : dueWords(d.due_on, today), group: d.due_on && !d.done_at ? dueGroup(d.due_on, today) : null }));
   const promises = (await db.query<{ id: string; item: string; label: string; promised_qty: number | null; received_qty: number | null; received_on: string | null; note: string }>(
-    "SELECT id, item, label, promised_qty, received_qty, received_on::text AS received_on, note FROM sponsorship_promises WHERE sponsorship_id = $1 ORDER BY created_at, id", [pkg.id]))
+    "SELECT id, item, label, promised_qty, received_qty, received_on::text AS received_on, note FROM sponsorship_promises WHERE sponsorship_id = $1 ORDER BY created_at, (promised_qty IS NULL), id", [pkg.id]))
     .map((p) => ({ ...p, words: promiseWords(p) }));
   return { sponsorship: pkg, deliverables, promises };
 }

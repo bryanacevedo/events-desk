@@ -110,3 +110,35 @@ describe("sponsorship, deadlines and the year reach a rep with no dollars", () =
   });
 });
 
+
+describe("the assessment and the request to the organizer carry no money to anyone", () => {
+  it("a rep reads and writes them with no dollar figure, on an event with a sponsorship price, budget lines and a pipeline goal", async () => {
+    const id = await approvedPlan(db, { passes_cents: 300_000, starts_on: "2026-12-05", ends_on: "2026-12-06" });
+    const { id: spo } = await addInvolvement(db, CAMILLE, id, { kind: "sponsorship", label: "Gold" });
+    await saveSponsorship(db, CAMILLE, id, spo, { tier: "Gold", price_cents: 2_500_000, contract_signed_on: "2026-10-01" });
+    await updatePlan(db, CAMILLE, id, { goal_pipeline_cents: 40_000_000 });
+    const app = createApp(db, { demo: true, lifecycle: { now: () => new Date("2026-11-13T12:00:00Z") } as never });
+    const json = { "content-type": "application/json" };
+    const call = (who: string, method: string, path: string, body?: unknown) => app.request(path, { method, headers: { ...as(who), ...json }, body: body === undefined ? undefined : JSON.stringify(body) });
+    const src = await (await call(MAYA, "POST", `/api/events/${id}/assessment/sources`, { input: "pasted", source_kind: "faq", text: "Attendees can browse the list in the app. The list cannot be downloaded by attendees." })).json() as { id: string };
+    expect((await call(MAYA, "POST", `/api/events/${id}/assessment/propose`, { source_id: src.id })).status).toBe(200);
+    expect((await call(MAYA, "PUT", `/api/events/${id}/assessment/answers/directory_present`, { answer: "yes", source_kind: "first_hand" })).status).toBe(200);
+    const made = await call(CAMILLE, "POST", `/api/events/${id}/organizer-request`, {});
+    expect(made.status).toBe(201);
+    const found: string[] = [];
+    for (const path of [`/api/events/${id}/assessment`, `/api/events/${id}/plan`]) {
+      const r = await call(MAYA, "GET", path);
+      expect(r.status, path).toBe(200);
+      found.push(...money(await r.json()).map((f) => `${path}: ${f}`));
+    }
+    const view = await (await call(MAYA, "GET", `/api/events/${id}/assessment`)).json() as { organizer_request: { subject: string; body: string }; request_offered: boolean };
+    expect(view.request_offered).toBe(true);
+    expect(`${view.organizer_request.subject} ${view.organizer_request.body}`).not.toMatch(/\$\s?\d/);
+    expect(found).toEqual([]);
+    // The plan read carries both, and a planner's money is still on the plan read only for a planner.
+    const rep = await (await call(MAYA, "GET", `/api/events/${id}/plan`)).json() as { assessment: { progress: { total: number } }; organizer_request: { status: string }; budget?: unknown };
+    expect(rep.assessment.progress.total).toBe(7);
+    expect(rep.organizer_request.status).toBe("drafted");
+    expect(rep.budget).toBeUndefined();
+  });
+});
