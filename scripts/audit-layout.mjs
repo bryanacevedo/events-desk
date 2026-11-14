@@ -24,7 +24,8 @@ for (let i = 0; i < 90; i++) {
   if (!all.some((e) => ["researching", "finding_people", "flagging", "tiering", "enriching"].includes(e.stage))) break;
   await new Promise((r) => setTimeout(r, 1000));
 }
-const byStage = (stage, not = () => false) => all.find((e) => e.stage === stage && !not(e));
+// Hosted events have no attendee list, so the stage pages below are the conference ones; the hosted pages are measured further down.
+const byStage = (stage, not = () => false) => all.find((e) => e.stage === stage && !e.hosted_format && !not(e));
 const byName = (name) => all.find((e) => e.name.startsWith(name))?.id;
 const ids = ["delivered", "approved", "mapped", "quoted", "requested", "paused", "declined", "ready_for_review"].map((st) => byStage(st)?.id).filter(Boolean);
 const flagship = byName("Web Summit 2026") ?? ids[0];
@@ -32,6 +33,14 @@ const flagship = byName("Web Summit 2026") ?? ids[0];
 const volumes = [flagship, byName("Dreamforce 2026"), byName("SaaS North 2026"), byStage("approved")?.id, byName("GITEX Global 2026")].filter(Boolean);
 const catalog = (await (await fetch(base + "/api/catalog")).json()).catalog;
 const listed = catalog.find((c) => !c.event_id && c.ends_on >= new Date().toISOString().slice(0, 10))?.id ?? "";
+const hostedId = (name) => all.find((e) => e.name.startsWith(name) && e.hosted_format)?.id;
+const dinner = hostedId("Golden Gate Field Dinner"), past = hostedId("Lakeside Field Dinner"), today = hostedId("Capitol Revenue Roadshow");
+const hostedPages = [
+  ...(dinner ? [[`/event/${dinner}#guests`, "Dan Whitlock"], [`/event/${dinner}#guests`, MAYA], [`/event/${dinner}#details`, "Dan Whitlock"]] : []),
+  ...(past ? [[`/event/${past}#result`, "Dan Whitlock"], [`/event/${past}#guests`, MAYA]] : []),
+  ...(today ? [[`/event/${today}#check-in`, MAYA], [`/event/${today}#result`, "Dan Whitlock"]] : []),
+  ["/my-day", MAYA],
+];
 const pages = [
   ["/", MAYA], ["/events", MAYA], [`/events?event=${ids[1] ?? flagship}`, MAYA], ["/events?time=all", MAYA], ["/events?time=past&region=na", MAYA], ["/events?add=1", GTM], [`/events?event=${flagship}`, MAYA], ["/events?request=1", MAYA], [`/events?request=1&catalog=${listed}`, MAYA],
   [`/?event=${ids[1] ?? flagship}`, MAYA], ["/budget", "Dan Whitlock"], ["/budget?year=2027", "Dan Whitlock"], ["/budget?year=2027&q=money", "Dan Whitlock"], ["/usage", "Dan Whitlock"], ["/more", MAYA],
@@ -64,7 +73,7 @@ async function icpCompiles() {
   return { paths: [`/settings?compile=${a.compile_id}`, `/settings?compile=${b.compile_id}`, `/settings?compile=${c.compile_id}`], ids: [a.compile_id, b.compile_id, c.compile_id], cancel: (id) => j(`/api/icp/compiles/${id}/cancel`, "POST") };
 }
 const compiles = await icpCompiles();
-pages.push(...compiles.paths.map((p) => [p, GTM]));
+pages.push(...compiles.paths.map((p) => [p, GTM]), ...hostedPages);
 
 const browser = await chromium.launch({ executablePath: process.env.CHROME ?? CHROME });
 let problems = 0;
@@ -228,6 +237,44 @@ for (const width of widths) {
   }
   await page.close();
 }
+
+// The guest's own RSVP page (docs/HOSTED.md 6): its own page with no desk around it, one column, nothing sideways, every tap target 44px, and the answer goes out with no actor and no write key.
+async function rsvpPages() {
+  const tokens = [];
+  for (const [id, status] of [[dinner, "listed"], [dinner, "registered"], [dinner, "waitlist"], [dinner, "declined"], [past, "attended"]]) {
+    if (!id) continue;
+    const view = await (await fetch(`${base}/api/events/${id}/hosted`, { headers: { "x-actor": "Dan%20Whitlock" } })).json();
+    const g = view.guests.find((x) => x.status === status);
+    if (g?.rsvp_token) tokens.push([`/rsvp/${g.rsvp_token}`, status]);
+  }
+  tokens.push(["/rsvp/not-a-real-link", "invalid"]);
+  for (const width of widths) {
+    const phone = width < 500;
+    const ctx = await browser.newContext({ viewport: { width, height: 900 }, isMobile: phone, hasTouch: phone });
+    const page = await ctx.newPage();
+    const sent = [];
+    page.on("request", (r) => { if (r.url().includes("/api/")) sent.push(r.headers()); });
+    for (const [path, what] of tokens) {
+      sent.length = 0;
+      await page.goto(base + path, { waitUntil: "networkidle" });
+      if (!(await page.waitForSelector("[data-ready]", { timeout: 8000 }).then(() => true).catch(() => false))) { problems++; console.log(`${width}px ${path.slice(0, 12)} (${what})  never became ready`); continue; }
+      const found = await page.evaluate((vw) => {
+        const out = [];
+        if (document.documentElement.scrollWidth > vw + 1) out.push(`page scrolls sideways: ${document.documentElement.scrollWidth}px wide in a ${vw}px viewport`);
+        if (document.querySelector(".side, .tabs, .phone-top")) out.push("the desk's own chrome is showing on the guest's page");
+        for (const el of document.querySelectorAll(".btn, input, select")) {
+          const b = el.getBoundingClientRect();
+          if (b.width > 0 && b.height < 43.5) out.push(`tap target ${el.tagName.toLowerCase()} ("${(el.textContent || el.getAttribute("name") || "").trim().slice(0, 20)}") is ${Math.round(b.height)}px tall`);
+        }
+        return out;
+      }, width);
+      if (sent.some((h) => h["x-actor"] || h["x-write-key"])) found.push("the page sent an acting-as header or a write key");
+      for (const f of found) { problems++; console.log(`${width}px /rsvp (${what})  ${f}`); }
+    }
+    await ctx.close();
+  }
+}
+await rsvpPages();
 await browser.close();
 } finally {
   // The three compiles were made for measuring only; cancelling them keeps the demo's Settings page clean, even when the audit stops early.

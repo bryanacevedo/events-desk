@@ -1,5 +1,6 @@
 # comes off every outreach list and is never looked up again, at every event.
 # for # needed
+# knows not to expect you. Change your answer any time before the event.
 # new, # already in
 # no tier#
 # of # confirmed
@@ -8,6 +9,7 @@
 # of # met accounts have pipeline
 # of # others
 # of # used
+# still registered will be marked as no-shows.
 #, #, not requested. Request a seat
 #, added by #
 A line for the version history
@@ -17,9 +19,11 @@ Budget is for leadership and GTM Engineering.
 Confirmed by #, #
 Declined by ##
 Domain not set up to send
+Each side keeps the guests it invited
 Every way of taking part is on the plan.
 From the attendee file (unverified):
 From the seat to the result
+Guarantee sent to the venue
 Held back by account owners
 How to give the page
 It will not share the list
@@ -34,6 +38,7 @@ Nothing is due this week.
 Nothing needs anyone right now.
 One company per line: name, employees, industry, business model, expected tier, kind (won, lost or bad fit)
 One ticket ###
+Open the link in your invitation email again, or ask the person who invited you for a new one.
 Page # of #
 People to look for per company
 Publish although it got under # right
@@ -57,14 +62,17 @@ That person is not on the list.
 That reply is no longer here.
 That sequence is not on this event.
 The Google Sheet stays in Drive.
+The list takes new yes answers
 The plan was made, but # Add the rest on the plan.
 The rules changed since this test. Test again before publishing.
 The sentence, word for word
+The side that owns the account keeps all its guests
 This draft was thrown away.
 Those notes are not here.
+To change anything, write to #.
 Travel per person, dollars (optional)
 Up to ##
 Usage is for leadership and GTM Engineering.
 Waiting on # to run this.
-Where the list came from
+Where the file came from
 Where the pipeline came from

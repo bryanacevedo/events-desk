@@ -3,14 +3,15 @@
    is folded at the bottom. */
 
 import { useEffect, useState } from "react";
-import { get } from "./api";
-import { useActor } from "./App";
+import { get, type HostedMine } from "./api";
+import { Link, useActor } from "./App";
+import { copyText } from "./Guests";
 import { Icon } from "./icons";
 import { dayIn, headIn, MeetingRows, meetTime, NoteRows, ObjectSheets, openObject, ReplyRows, type NoteRowData } from "./Objects";
 import { Chevron } from "./Patterns";
 import { PersonAvatar } from "./PersonAvatar";
 import { eventHref, personHref, To } from "./To";
-import { plural } from "./words";
+import { plural, todayYmd } from "./words";
 
 interface Brief { person: string; title: string | null; company: string; tier: number | null; why: string | null; industry: string | null; employees: string | null; owner: string | null; deal: string | null; said: string | null; met_note: string | null }
 interface Day {
@@ -28,12 +29,13 @@ const SHOWN = 6;
 const greeting = () => { const h = new Date().getHours(); return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening"; };
 
 export function MyDay() {
-  const { actor, needs } = useActor();
+  const { actor, needs, go } = useActor();
   // Seat requests still open for this person. Buying the ticket is the approvers' job, so an approval leaves this page.
   const mySeats = (needs?.requests ?? []).filter((r) => r.requester === actor && (r.status === "pending" || r.status === "declined"));
   const [d, setD] = useState<Day | null>(null), [allReplies, setAllReplies] = useState(false);
   const sheet = openObject();
-  const load = async () => setD(await get<Day>(`/api/motion/my-day?rep=${encodeURIComponent(actor)}`));
+  const [mine, setMine] = useState<HostedMine | null>(null);
+  const load = async () => { setD(await get<Day>(`/api/motion/my-day?rep=${encodeURIComponent(actor)}`)); setMine(await get<HostedMine>("/api/hosted/mine")); };
   useEffect(() => { load(); }, [actor]);
   if (!d) return null;
   const today = new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
@@ -71,7 +73,9 @@ export function MyDay() {
         </div>
       )}
 
-      {!d.replies.length && !d.meetings.length && <p className="md-clear">Nothing waiting on you.</p>}
+      {(mine?.count ?? 0) > 0 && <HostedGuests mine={mine!} go={go} />}
+
+      {!d.replies.length && !d.meetings.length && !(mine?.count ?? 0) && <p className="md-clear">Nothing waiting on you.</p>}
 
       {(d.slots.length > 0 || d.captures.length > 0 || mySeats.length > 0) && (
         <div className="folds">
@@ -119,5 +123,34 @@ export function MyDay() {
       )}
       <ObjectSheets changed={load} />
     </section>
+  );
+}
+
+/** The guests this person owns at hosted events, by event: where each stands, as a word in ink, and the notes the host left. On the event's own day the way to its door sits beside it. */
+function HostedGuests({ mine, go }: { mine: HostedMine; go: (to: string) => void }) {
+  const events = [...new Set(mine.guests.map((g) => g.event_id))].map((id) => ({ id, rows: mine.guests.filter((g) => g.event_id === id) }));
+  const today = todayYmd();
+  return (
+    <div className="m-sec">
+      <h2 className="md-h">Your guests<span>{mine.count}</span></h2>
+      {events.map(({ id, rows }) => (
+        <section className="hg-event" key={id} aria-label={rows[0].event_name}>
+          <div className="hg-event-h">
+            <h3><Link to={`/event/${id}#guests`} go={go}>{rows[0].event_name}</Link></h3>
+            {rows[0].starts_on === today && !rows[0].closed && <Link to={`/event/${id}#check-in`} go={go} className="btn line small">Check-in</Link>}
+          </div>
+          <ul className="hr-rows">
+            {rows.map((g) => (
+              <li className="hr-row" key={g.id}>
+                <span className="hr-who"><b>{g.name}</b><span>{g.company}</span></span>
+                <span className={`hr-owner${g.group === "attended" || g.group === "no_show" ? "" : " plain"}`}>{g.status_word}</span>
+                <span className="hr-note">{g.notes}</span>
+                <span className="hr-act">{"text" in g && g.text && <button type="button" className="btn line small" onClick={() => copyText(g.text!)}>Copy text</button>}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+    </div>
   );
 }

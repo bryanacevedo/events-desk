@@ -50,7 +50,7 @@ function stateOf(r: Row, today: string, needs: Needs): State {
   if (e.approval_mode === "budget" && e.stage !== "declined" && (e.plan_stage === "planning" || e.plan_stage === "confirmed")) return { key: "wait", words: e.plan_stage === "planning" ? "Planning" : "Confirmed", who: e.plan_stage === "planning" ? holderWords(needs.approvers) : owner, tone: e.plan_stage === "planning" ? "wait" : "ok" };
   switch (e.stage) {
     case "requested": { const n = needs.requests.filter((q) => q.event_id === e.id && q.status === "pending").length; return { key: "wait", words: n > 1 ? `${n} seats waiting` : "Seat waiting", who: holderWords(needs.approvers), tone: "wait" }; }
-    case "approved": return { key: "wait", words: "No attendee list", who: owner, tone: "wait" };
+    case "approved": return { key: "wait", words: e.hosted_format ? "Guest list" : "No attendee list", who: owner, tone: "wait" };
     case "mapped": case "quoted": return { key: "wait", words: "Ready to run", who: owner, tone: "wait" };
     case "ready_for_review": { const n = needs.items.find((i) => i.kind === "case" && i.eventId === e.id)?.caseCount; return { key: "wait", words: n ? `${plural(n, "case")} to settle` : "Cases to settle", who: null, tone: "wait" }; }
     case "paused": return { key: "wait", words: "Paused", who: null, tone: "wait" };

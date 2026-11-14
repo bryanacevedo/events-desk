@@ -9,13 +9,16 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { OLD_SHEET_ERROR, type EventRow, type Stage } from "../shared/domain";
 import { AFTER, afterStep } from "./stages";
-import { get, send, type Card, type CompanyRow, type EventPayload, type Page, type Pending, type PersonRow, type ReviewCase, type SeatRequest, type Spread, type TopUpCounts, type TopUpItem, type UploadItem } from "./api";
+import { get, send, type HostedPage, type Card, type CompanyRow, type EventPayload, type Page, type Pending, type PersonRow, type ReviewCase, type SeatRequest, type Spread, type TopUpCounts, type TopUpItem, type UploadItem } from "./api";
 import { Link, useActor } from "./App";
 import { objectHref, ObjectSheets } from "./Objects";
 import { Cases, openCases } from "./Cases";
 import { Motion } from "./Motion";
 import { ResultView } from "./Result";
 import { PlanTab } from "./Plan";
+import { Guests } from "./Guests";
+import { CheckIn } from "./CheckIn";
+import { HostedResult } from "./HostedResult";
 import { Upload } from "./Upload";
 import { To } from "./To";
 import { Chevron, FileButton, ShowMore, SheetButton } from "./Patterns";
@@ -735,6 +738,28 @@ function DeliveredViews({ id, started, closed, startAt, views, onChange, counts 
   );
 }
 
+type HView = "plan" | "guests" | "result" | "cost" | "details";
+const HVIEWS: [HView, string][] = [["plan", "Plan"], ["guests", "Guests"], ["result", "Result"], ["cost", "Cost"], ["details", "Details"]];
+
+/** A hosted event has a guest list and no attendee file, so Guests takes the place of People and List. The view is in the link (#guests, #result), so a Slack card can point straight at it. */
+function HostedViews({ views, startAt }: { views: Partial<Record<HView, React.ReactNode>>; startAt: HView }) {
+  const shown = HVIEWS.filter(([k]) => views[k] !== undefined);
+  const fromHash = (): HView | null => { const h = location.hash.slice(1); return shown.some(([k]) => k === h) ? (h as HView) : null; };
+  const [view, setView] = useState<HView>(() => fromHash() ?? startAt);
+  useEffect(() => { const on = () => { const v = fromHash(); if (v) setView(v); }; window.addEventListener("hashchange", on); window.addEventListener("popstate", on); return () => { window.removeEventListener("hashchange", on); window.removeEventListener("popstate", on); }; }, []);
+  useEffect(() => { const v = fromHash(); if (v && v !== view) setView(v); }, [shown.length]);
+  const pick = (v: HView) => { setView(v); history.replaceState(null, "", `${location.pathname}${location.search}#${v}`); };
+  const at = shown.some(([k]) => k === view) ? view : startAt;
+  return (
+    <>
+      <div className="seg views" role="tablist" aria-label="View">
+        {shown.map(([k, label]) => <button key={k} type="button" role="tab" aria-selected={at === k} aria-pressed={at === k} onClick={() => pick(k)}>{label}</button>)}
+      </div>
+      <div role="tabpanel" className="views-panel" aria-label={HVIEWS.find(([k]) => k === at)![1]}>{views[at]}</div>
+    </>
+  );
+}
+
 /** Before delivery the page is one job, so it stays whole; the plan is its first tab beside it. */
 function PreViews({ plan, startAtPlan, children }: { plan: React.ReactNode; startAtPlan: boolean; children: React.ReactNode }) {
   const fromHash = () => (location.hash === "#plan" ? "plan" : location.hash === "#list" ? "list" : null);
@@ -917,11 +942,19 @@ function Going({ people, past = false }: { people: SeatRequest[]; past?: boolean
 export function Event({ id, go }: { id: string; go: (to: string) => void }) {
   const ev = useEvent(id);
   const { actor, needs } = useActor();
+  // A hosted event reads its own page: undefined while it loads, null for an event that is not hosted.
+  const [hosted, setHosted] = useState<HostedPage | null | undefined>(undefined);
+  const loadHosted = async () => { setHosted(await get<HostedPage>(`/api/events/${id}/hosted`)); };
+  const isHosted = ev.data ? Boolean(ev.data.event.hosted_format) : undefined;
+  useEffect(() => { setHosted(undefined); if (isHosted) loadHosted(); else if (isHosted === false) setHosted(null); }, [id, actor, isHosted]);
+  const [hash, setHash] = useState(location.hash);
+  useEffect(() => { const on = () => setHash(location.hash); window.addEventListener("hashchange", on); window.addEventListener("popstate", on); return () => { window.removeEventListener("hashchange", on); window.removeEventListener("popstate", on); }; }, []);
   // New registrations are not an event. Anyone who lands on one is sent to the event they belong to.
   const parent = ev.data?.event.parent_event_id;
   useEffect(() => { if (parent) go(`/event/${parent}`); }, [parent]);
   if (ev.missing) return <div className="empty" data-ready="1">That event does not exist. <Link to="/events" go={go} className="to">Back to Events</Link></div>;
-  if (!ev.data || parent) return null;
+  if (!ev.data || parent || hosted === undefined) return null;
+  if (hosted && hash === "#check-in") return hosted.can_check_in ? <CheckIn id={id} page={hosted} reload={loadHosted} go={go} /> : <div className="empty" data-ready="1">Check-in is for the people on this event&apos;s list. <Link to={`/event/${id}#guests`} go={go} className="to">Back to the guests</Link></div>;
   const d = ev.data, e = d.event, stage: Stage = e.stage;
   const going = (needs?.requests ?? []).filter((r) => r.event_id === e.id && r.status === "approved");
   // The server decides; the screen only hides the control from people it would refuse, and while a run is going.
@@ -1005,16 +1038,24 @@ export function Event({ id, go }: { id: string; go: (to: string) => void }) {
           <EventLogo name={e.name} website={e.website} size={64} />
           <div className="ehero-text">
             <h1>{e.name}</h1>
-            {ev.note && <p className="stage-note"><Icon.next />{ev.note}</p>}
+            {!hosted && ev.note && <p className="stage-note"><Icon.next />{ev.note}</p>}
           </div>
           {away >= 0
             ? <p className="ehero-count" aria-label={countdown(e.starts_on)}>{away === 0 ? <b>Today</b> : <><b>{away}</b><span>{away === 1 ? "day" : "days"} to go</span></>}</p>
             : null}
-          <Stages e={e} approvers={needs?.approvers ?? []} cases={ev.open.length} />
+          {!hosted && <Stages e={e} approvers={needs?.approvers ?? []} cases={ev.open.length} />}
         </div>
         {!delivered && facts}
       </header>
-      {delivered ? (
+      {hosted ? (
+        <HostedViews startAt={hosted.event.closed_at ? "result" : "guests"} views={{
+          plan: <PlanTab id={e.id} listRows={0} onChange={ev.load} />,
+          guests: <Guests id={e.id} page={hosted} reload={loadHosted} go={go} />,
+          ...(hosted.event.day_began || hosted.event.closed_at ? { result: <HostedResult id={e.id} canWrite={hosted.can_write} dayBegan={hosted.event.day_began} webinar={hosted.event.webinar} onChange={loadHosted} /> } : {}),
+          ...(lead ? { cost: <CostView id={e.id} done={Boolean(hosted.event.closed_at)}>{creditCards}</CostView> } : {}),
+          details: more,
+        }} />
+      ) : delivered ? (
         <DeliveredViews counts={{ outreach: openCases(replyCases).length, people: openCases(ev.cases).length - openCases(replyCases).length }} id={e.id} started={Boolean(e.motion && e.motion !== "none")} closed={["closing", "scored"].includes(e.motion ?? "")} startAt={planFirst ? "plan" : undefined} onChange={ev.load} views={{
           plan: <PlanTab id={e.id} listRows={d.list?.upload?.row_count ?? 0} onChange={ev.load} />,
           ...(["closing", "scored"].includes(e.motion ?? "") ? { result: <ResultView id={e.id} name={e.name} onChange={ev.load} /> } : {}),

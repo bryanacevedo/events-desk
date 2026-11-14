@@ -6,7 +6,9 @@ Worktree `.wt/ev2`, branch `ev2`. Spec `docs/HOSTED.md` (what was built and wher
 
 **Built:** guest lists with one owner each, invitations drafted from a template and logged when the host sends them, the public RSVP link (one 404 for every bad token, 30 bad tokens a minute per address), waitlist and promotion under a row lock, reminders and logistics from a transactional sender that does not depend on the sequencer, country rules, expected no-shows (default, set, history), venue dates in the week's deadlines, check-in with walk-ins and undo, closing attendance, the two follow-up groups with the owners' notes, co-host split and lead rule, Luma and Splash imports, target accounts and suggestions, and the demo's dinners. Also fixed: a goal's pipeline line no longer reads "$0 of $800,000" when the scorecard had no CRM.
 
-**Open:** client screens (Guests tab, Check-in, the RSVP page) are not built; the live transactional sender is not proven against a provider; the CRM fill of target accounts is step 7; the demo snapshot needs rebuilding (`make demo-snapshot`) to carry the new dinners.
+**Client side (2026-11-14, provisional directions):** the Guests tab (guests direction B), Check-in at `/event/<id>#check-in` (check-in direction C), the public RSVP page at `/rsvp/<token>` (RSVP direction B, its own entry in `main.tsx`), the hosted Result tab with Close attendance, and My day's guests. Built from the recommended directions before Bryan chose; `docs/HOSTED.md` section 24 lists where the screens differ from the spec.
+
+**Open:** the live transactional sender is not proven against a provider; the CRM fill of target accounts is step 7; the demo snapshot needs rebuilding (`make demo-snapshot`) to carry the new dinners.
 
 ## Redesign step 1, finished (2026-11-14)
 

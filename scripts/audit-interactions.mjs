@@ -64,6 +64,50 @@ await sheet("Event reply", "Maya Ortiz", "/event/evt_money20-20-usa-2026#outreac
 await sheet("Result deal meeting", "Dan Whitlock", "/event/evt_nrf-2026-retail-s-big-show#result", ".rs-deal");
 await sheet("Events sheet", "Dan Whitlock", "/events", "[data-opens-sheet]");
 
+/* The hosted sheets (guest, invitation, reminder) are part of the page, not the address: Esc, a click outside and the close control close them, and neither opening nor closing
+   moves the reader's place or rebuilds the page underneath. */
+async function hostedSheet(name, actor, path, opener) {
+  await as(actor, path);
+  const row = page.locator(opener).first();
+  if (!(await row.count())) { problems.push(`${name}: nothing to open (${opener})`); return; }
+  for (const how of ["Esc", "outside", "close button"]) {
+    await row.scrollIntoViewIfNeeded();
+    await page.evaluate(() => { window.scrollBy(0, 40); document.querySelector(".main").__mark = true; });
+    const before = await page.evaluate(() => Math.round(scrollY));
+    await row.evaluate((el) => el.click());
+    await pause(500);
+    const opened = await page.evaluate(() => ({ y: Math.round(scrollY), sheet: Boolean(document.querySelector("aside[data-hsheet]")), same: Boolean(document.querySelector(".main").__mark), inside: Boolean(document.querySelector("aside[data-hsheet]")?.contains(document.activeElement)) }));
+    if (!opened.sheet) { problems.push(`${name}: the sheet did not open`); return; }
+    if (Math.abs(opened.y - before) > 2) problems.push(`${name}: opening moved the page from ${before} to ${opened.y}`);
+    if (!opened.same) problems.push(`${name}: opening rebuilt the page underneath`);
+    if (!opened.inside) problems.push(`${name}: focus did not move into the sheet`);
+    if (how === "Esc") await page.keyboard.press("Escape");
+    else if (how === "outside") await page.evaluate(() => document.querySelector("h1").dispatchEvent(new MouseEvent("mousedown", { bubbles: true })));
+    else await page.locator("aside[data-hsheet] [data-close]").click();
+    await pause(400);
+    const closed = await page.evaluate(() => ({ y: Math.round(scrollY), sheet: Boolean(document.querySelector("aside[data-hsheet]")), same: Boolean(document.querySelector(".main").__mark) }));
+    if (closed.sheet) problems.push(`${name}: ${how} did not close the sheet`);
+    if (Math.abs(closed.y - before) > 2) problems.push(`${name}: closing with ${how} moved the page from ${before} to ${closed.y}`);
+    if (!closed.same) problems.push(`${name}: closing with ${how} rebuilt the page underneath`);
+  }
+}
+const dinner = (await (await fetch(`${base}/api/events`)).json()).events.find((e) => e.name.startsWith("Golden Gate Field Dinner"))?.id;
+if (dinner) {
+  await hostedSheet("Guests: a guest", "Dan Whitlock", `/event/${dinner}#guests`, ".gb-r .nm");
+  await hostedSheet("Guests: the next invitations", "Dan Whitlock", `/event/${dinner}#guests`, "button[data-next]");
+  await hostedSheet("Guests: the reminder", "Dan Whitlock", `/event/${dinner}#guests`, "button:has-text('Send reminder')");
+  // A guest's own page: a yes and a no, from a link with no actor, and no console error from either.
+  const view = await (await fetch(`${base}/api/events/${dinner}/hosted`, { headers: { "x-actor": "Dan%20Whitlock" } })).json();
+  const g = view.guests.find((x) => x.status === "invited");
+  if (g) {
+    await page.goto(`${base}/rsvp/${g.rsvp_token}`, { waitUntil: "networkidle" });
+    await page.getByRole("button", { name: "Yes, I will come" }).click(); await pause(600);
+    if (!(await page.getByText("You are on the list.").count()) && !(await page.getByText("The table is full.").count())) problems.push("RSVP: a yes did not show the answer");
+    await page.getByRole("button", { name: /come after all|off the waitlist/ }).click(); await pause(600);
+    if (!(await page.getByText("You said no.").count())) problems.push("RSVP: a no did not show the answer");
+  }
+}
+
 await browser.close();
 for (const e of [...new Set(errors)]) problems.push(`console error: ${e}`);
 if (problems.length) { console.error(`${problems.length} interaction problems:\n- ${problems.join("\n- ")}`); process.exit(1); }

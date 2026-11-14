@@ -226,7 +226,9 @@ export function createApp(db: Db, cfg: AppConfig) {
     const noCents = forRep;
     const repCards = lead ? cards : cards.map(noCents);
     const byStep = await withAiCents(db, id, await spendByStep(db, id), defaultSettings().llm_call_cents);
-    const shown = { ...event, plan_stage: stageNow(event, cfg.lifecycle) };
+    // A hosted event says so, so the page asks for its guest list only when there is one.
+    const [hostedWith] = await db.query<{ hosted_format: string }>("SELECT hosted_format FROM involvements WHERE event_id = $1 AND kind = 'hosted' AND status <> 'dropped' LIMIT 1", [id]);
+    const shown = { ...event, plan_stage: stageNow(event, cfg.lifecycle), hosted_format: hostedWith?.hosted_format ?? null };
     return c.json({ event: lead ? shown : { ...shown, seat_price_cents: null }, activity: lead ? activity : activity.filter((a) => !/\$\s?\d/.test(String((a as { detail?: string }).detail ?? ""))), list: await listSummary(db, id), settings: settingsRow?.settings ? (lead ? settingsRow.settings : noCents(settingsRow.settings)) : null, card: repCards[0] ?? null, cards: repCards, spend: lead ? await spend(db, id) : { credits: (await spend(db, id)).credits }, spend_by_step: lead ? byStep : byStep.filter((r) => r.unit !== "llm").map(noCents), open_cases: open, uploads: await listUploads(db, id), top_ups: await topUpsOf(db, id), spread: event.flow === "two_card" && ["ready_for_review", "finding_people", "flagging", "delivered"].includes(event.stage) ? await spreadFor(db.query, id, { ...defaultSettings(), ...settingsRow?.settings }) : null, icp_version: (await db.query<{ v: number | null }>("SELECT icp_version AS v FROM events WHERE id = $1", [id]))[0]?.v ?? null });
   });
 

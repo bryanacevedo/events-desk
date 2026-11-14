@@ -79,6 +79,18 @@ export async function get<T>(path: string): Promise<T | null> {
   }
 }
 
+/** A read that says why it was refused, for the places that show the reason (an invitation the country rules block, a reminder with nobody to send to). */
+export async function read<T>(path: string): Promise<Result<T>> {
+  let actor = ""; try { actor = localStorage.getItem("actor") ?? ""; } catch { /* private window */ }
+  try {
+    const r = await fetch(path, actor ? { headers: { "x-actor": encodeURIComponent(actor) } } : undefined);
+    const data = await r.json().catch(() => ({}));
+    return r.ok ? { ok: true, data: data as T } : { ok: false, error: (data as { error?: string }).error ?? "That did not go through. Try again." };
+  } catch {
+    return { ok: false, error: "The desk could not be reached. Check the connection and try again." };
+  }
+}
+
 export async function send<T = unknown>(method: "POST" | "PATCH" | "PUT" | "DELETE", path: string, actor: string, body?: unknown, raw?: { bytes: ArrayBuffer; filename: string; type: string; headers?: Record<string, string> }): Promise<Result<T>> {
   const headers: Record<string, string> = { "x-actor": encodeURIComponent(actor) };
   let payload: BodyInit | undefined;
@@ -128,3 +140,14 @@ export interface PlanData {
   assessment: AssessmentData; organizer_request: OrganizerRequest | null;
   budget?: { lines: { id: string; category: string; label: string; planned_cents: number; contracted_cents: number | null }[]; categories: PlanBudgetCategory[]; ai_actual_cents: number; total_planned_cents: number; total_contracted_cents: number; total_actual_cents: number; approved_budget_cents: number | null };
 }
+
+/* Hosted events (docs/HOSTED.md). The shapes are the server's own, read through its return types, so a field renamed there stops this file compiling. */
+import type { followUp, GuestOut, hostedView, myGuests } from "../server/hosted-view";
+import type { Invitation } from "../server/hosted";
+import type { ReminderPreview, ReminderSent } from "../server/hosted-reminders";
+import type { ImportResult } from "../server/guest-import";
+import type { PublicRsvp } from "../server/rsvp";
+export type HostedPage = Awaited<ReturnType<typeof hostedView>>;
+export type HostedFollowUp = Awaited<ReturnType<typeof followUp>>;
+export type HostedMine = Awaited<ReturnType<typeof myGuests>>;
+export type { GuestOut, Invitation, ReminderPreview, ReminderSent, ImportResult, PublicRsvp };

@@ -22,7 +22,7 @@ function cardState(e: EventRow, today: string): { words: string; tone: "ok" | "w
   const past = e.starts_on.slice(0, 10) < today;
   switch (e.stage) {
     case "requested": return { words: "Waiting on seats", tone: "wait" };
-    case "approved": return { words: "No attendee list yet", tone: "wait" };
+    case "approved": return { words: e.hosted_format ? "Guest list" : "No attendee list yet", tone: "wait" };
     case "mapped": return { words: "Attendees in", tone: "wait" };
     case "quoted": return { words: "Ready to run", tone: "wait" };
     case "paused": return { words: "Paused", tone: "wait" };
