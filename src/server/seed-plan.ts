@@ -18,14 +18,15 @@ import { LAST_DAY_SQL } from "./motion.ts";
 import { DESK, type LifecycleDeps } from "./lifecycle-deps.ts";
 import { addDays } from "../shared/motion.ts";
 import { STANDARD_DELIVERABLES } from "../shared/plan.ts";
+import { CAPITOL, GG_STEP_FEE, GG_STEP_FREE, GOLDEN_GATE, seedHostedYear } from "./seed-hosted.ts";
 
 const CAMILLE = "Camille Laurent", DAN = "Dan Whitlock", MAYA = "Maya Ortiz";
 export const REINVENT = "evt_aws-re-invent-2026", M2020 = "evt_money20-20-usa-2026", DREAMFORCE = "evt_dreamforce-2026", GITEX = "evt_gitex-global-2026";
 export const DINNER_MADRID = "evt_demo_dinner_madrid", DINNER_M2020 = "evt_m2020_usa_2026_dinner";
 const delivId = (prefix: string, n: number) => `dlv_seed_${prefix}_${STANDARD_DELIVERABLES[n].kind}`;
 
-export type SeedTable = "sponsorship_deliverables" | "sponsorships" | "organizer_requests" | "events";
-export interface SeedDate { table: SeedTable; id: string; column: string; /** Days from today. null leaves the date empty. */ offset: number | null }
+export type SeedTable = "sponsorship_deliverables" | "sponsorships" | "organizer_requests" | "events" | "event_venues" | "venue_cancellation_steps";
+export interface SeedDate { table: SeedTable; id: string; /** The column `id` is matched against. `id` unless the table is keyed otherwise. */ key?: string; column: string; /** Days from today. null leaves the date empty. */ offset: number | null }
 
 /** The only place these dates are written. seedPlan and restampDemoPlan both read it, by fixed id. Days from the demo's today. */
 export const SEED_DATES: SeedDate[] = [
@@ -52,6 +53,11 @@ export const SEED_DATES: SeedDate[] = [
   { table: "organizer_requests", id: "org_seed_gitex", column: "sent_on", offset: -9 },
   { table: "organizer_requests", id: "org_seed_gitex", column: "follow_up_on", offset: -2 },
   { table: "events", id: DINNER_MADRID, column: "starts_on", offset: 20 },
+  // Hosted dinners: the Golden Gate guarantee is due in 13 days, its free cancellation ends in 5 (so This week shows it), and Capitol Revenue Roadshow is on the demo's day, at the door.
+  { table: "event_venues", id: GOLDEN_GATE, key: "event_id", column: "guarantee_by", offset: 13 },
+  { table: "venue_cancellation_steps", id: GG_STEP_FREE, column: "by_date", offset: 5 },
+  { table: "venue_cancellation_steps", id: GG_STEP_FEE, column: "by_date", offset: 13 },
+  { table: "events", id: CAPITOL, column: "starts_on", offset: 0 },
 ];
 
 const dateOf = (today: string, id: string, column: string) => {
@@ -64,7 +70,7 @@ const dateOf = (today: string, id: string, column: string) => {
 export async function restampDemoPlan(db: Db, today: string): Promise<number> {
   let n = 0;
   for (const d of SEED_DATES) {
-    const r = await db.query<{ id: string }>(`UPDATE ${d.table} SET ${d.column} = ${d.offset === null ? "NULL" : "$2::date + $3::int"} WHERE id = $1 RETURNING id`, d.offset === null ? [d.id] : [d.id, today, d.offset]);
+    const r = await db.query<{ id: string }>(`UPDATE ${d.table} SET ${d.column} = ${d.offset === null ? "NULL" : "$2::date + $3::int"} WHERE ${d.key ?? "id"} = $1 RETURNING ${d.key ?? "id"} AS id`, d.offset === null ? [d.id] : [d.id, today, d.offset]);
     n += r.length;
   }
   return n;
@@ -85,6 +91,8 @@ export async function seedPlan(db: Db, opts: { today?: string } | string = {}) {
   await seedMadrid(db, today);
   await seedGitex(db, today);
   await seedPastEvents(db, today);
+  // The hosted dinners and their guest lists, written through the code the routes use.
+  await seedHostedYear(db, today);
 }
 /** The name the first slice used. */
 export const seedDemoPlan = seedPlan;

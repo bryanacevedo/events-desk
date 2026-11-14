@@ -117,7 +117,7 @@ describe("seedReal and seedPlan on 2026-11-13", () => {
 
   it("both past events read exact goal lines from a written scorecard: one short, one met", async () => {
     for (const id of [M2020, DREAMFORCE]) expect((await q<{ n: number }>("SELECT count(*)::int AS n FROM scorecards WHERE event_id = $1 AND window_days = 30", [id]))[0].n).toBe(1);
-    expect(goalWords(await goalResult(db, lifecycle, M2020), true)).toEqual(["Held 10 of 16 meetings", "Met 4 of 10 target accounts", "$0 of $800,000 pipeline"]);
+    expect(goalWords(await goalResult(db, lifecycle, M2020), true)).toEqual(["Held 10 of 16 meetings", "Met 4 of 10 target accounts", "Pipeline not read, no CRM connected (goal $800,000)"]);
     expect(goalWords(await goalResult(db, lifecycle, DREAMFORCE), true)).toEqual(["Held 8 of 8 meetings"]);
     const m = await goalResult(db, lifecycle, M2020), d = await goalResult(db, lifecycle, DREAMFORCE);
     expect(m.meetings!.short_by).toBe(6);
@@ -149,8 +149,9 @@ describe("seedReal and seedPlan on 2026-11-13", () => {
 });
 
 describe("restampDemoPlan", () => {
-  const FP = ["events", "sponsorships", "sponsorship_deliverables", "organizer_requests"] as const;
-  const fingerprint = async () => Object.fromEntries(await Promise.all(FP.map(async (t) => [t, Object.fromEntries((await q<{ id: string; j: string }>(`SELECT id, to_jsonb(t)::text AS j FROM ${t} t`)).map((r) => [r.id, r.j]))])));
+  const FP = ["events", "sponsorships", "sponsorship_deliverables", "organizer_requests", "event_venues", "venue_cancellation_steps"] as const;
+  const KEY: Record<string, string> = { event_venues: "event_id" };
+  const fingerprint = async () => Object.fromEntries(await Promise.all(FP.map(async (t) => [t, Object.fromEntries((await q<{ id: string; j: string }>(`SELECT ${KEY[t] ?? "id"} AS id, to_jsonb(t)::text AS j FROM ${t} t`)).map((r) => [r.id, r.j]))])));
   type Fp = Awaited<ReturnType<typeof fingerprint>>;
   const changed = (a: Fp, b: Fp) => FP.flatMap((t) => Object.keys(b[t]).filter((id) => a[t][id] !== b[t][id]).map((id) => `${t}:${id}`)).sort();
 
@@ -164,7 +165,7 @@ describe("restampDemoPlan", () => {
     expect(changed(before, after)).toEqual(moving);
     expect(wrote).toBe(SEED_DATES.length);
     for (const d of SEED_DATES) {
-      const [row] = await q<{ v: string | null }>(`SELECT ${d.column}::text AS v FROM ${d.table} WHERE id = $1`, [d.id]);
+      const [row] = await q<{ v: string | null }>(`SELECT ${d.column}::text AS v FROM ${d.table} WHERE ${d.key ?? "id"} = $1`, [d.id]);
       expect(row.v, `${d.table}:${d.id}.${d.column}`).toBe(d.offset === null ? null : addDays(NEW, d.offset));
     }
     // Rows outside the table, such as Money20/20's own fixed dates, are as they were.

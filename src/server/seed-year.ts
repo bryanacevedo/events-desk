@@ -23,7 +23,7 @@ const DAN = "Dan Whitlock";
 
 type Upto = "requested" | "approved" | "mapped" | "quoted" | "delivered" | "declined" | "paused";
 /** `hosted` makes the row a hosted plan (docs/EVENT-PLAN.md section 10): one hosted involvement, hosts under who goes in place of seats, no passes and no list. `rows` is kept for step 2's guest lists. `closed` closes the result of a past one. */
-interface YearEvent { id: string; name: string; venue: string; country: string; on: string; seats: number; price: number; upto: Upto; rows?: [number, number]; reason?: string; hosted?: "dinner" | "roadshow_stop"; closed?: boolean }
+export interface YearEvent { id: string; name: string; venue: string; country: string; on: string; seats: number; price: number; upto: Upto; rows?: [number, number]; reason?: string; hosted?: "dinner" | "roadshow_stop"; closed?: boolean }
 
 // [start row, row count] windows into the large registration export; windows do not overlap.
 export const YEAR: YearEvent[] = [
@@ -88,7 +88,7 @@ const HOSTS = [MAYA, "Priya Natarajan", "Leo Marsh"];
 const FORMAT_WORDS = { dinner: "A small dinner for buyers the team has not met, hosted by the team.", roadshow_stop: "A roadshow stop: one room, the team and the buyers in the city." };
 
 /** A dinner or a roadshow stop as a hosted plan, through the real code: written by Maya, approved by Dan, hosts under who goes, one planned line, and for a past dinner its cost on the ledger. */
-async function seedHosted(db: Db, y: YearEvent, today: string) {
+export async function seedHosted(db: Db, y: YearEvent, today: string) {
   const fmt = y.hosted!;
   const { id } = await createPlan(db, MAYA, { name: y.name, venue: y.venue, country: y.country, starts_on: y.on, seat_price_cents: 0, reason: FORMAT_WORDS[fmt], hosted: { format: fmt, headcount: y.seats } }, { id: y.id, flow: "single_card" });
   for (const person of HOSTS.slice(0, Math.min(y.seats, HOSTS.length))) await addPerson(db, MAYA, id, { person, roles: ["host"], team: "Field marketing" });

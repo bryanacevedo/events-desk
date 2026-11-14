@@ -19,6 +19,28 @@ import { createTopUp } from "./top-up.ts";
 import { recordTicket, setBudget } from "./budget.ts";
 import type { Settings } from "../shared/cost.ts";
 import { vendorWords } from "../shared/vendors.ts";
+import { setBudgetLine } from "./budget-lines.ts";
+import { addPerson, createPlan } from "./plan.ts";
+import { addGuest, patchHosted } from "./hosted.ts";
+
+export const ORRERY_DINNER = "evt_orrery_lisbon_dinner";
+
+/** The customer dinner in Lisbon: a hosted plan in planning, a host, a budget line, and six customers listed, each owned by the host. Through the same code the routes use. */
+async function seedOrreryDinner(db: Db, host: string) {
+  await createPlan(db, host, {
+    name: "Orrery customer dinner, Lisbon", venue: "Lisbon", country: "Portugal", starts_on: "2026-12-03", reason: "Four customers are in Lisbon for Web Summit and a dinner the week after is the cheapest way to see them together.",
+    hosted: { format: "customer_event", headcount: 1 },
+  }, { id: ORRERY_DINNER });
+  await addPerson(db, host, ORRERY_DINNER, { person: host, roles: ["host"], team: "Outbound" });
+  await setBudgetLine(db, host, ORRERY_DINNER, { category: "dinners", label: "Dinner", planned_cents: 6 * 18000 });
+  await patchHosted(db, host, ORRERY_DINNER, { capacity: 8, host_name: host, host_email: "host@orrery.example", doors_at: "19:30", welcome: "A table for the customers we work with, the week after Web Summit." });
+  const guests: [string, string, string, string, string][] = [
+    ["Inês Carvalho", "Pinefold", "Head of Revenue", "PT", "ines.carvalho@pinefold.example"], ["Rui Almeida", "Larkspur Freight", "VP Sales", "PT", "rui.almeida@larkspur.example"],
+    ["Marta Sousa", "Brightwater", "Chief Revenue Officer", "ES", "marta.sousa@brightwater.example"], ["Tiago Pereira", "Ribeira Freight", "Director of Partnerships", "PT", "tiago.pereira@ribeira.example"],
+    ["Clara Nunes", "Altamar Logistics", "Head of Growth", "ES", "clara.nunes@altamar.example"], ["Pedro Faria", "Nordvik Commerce", "VP Revenue Operations", "FR", "pedro.faria@nordvik.example"],
+  ];
+  for (const [name, company, title, country, email] of guests) await addGuest(db, host, ORRERY_DINNER, { name, company, title, country, email, owner: host, source: "account" });
+}
 
 const DAN = "Dan Whitlock";
 /** Accounts a rep says they know will be there, varied per person and event. */
@@ -166,13 +188,8 @@ export async function seedReal(db: Db) {
     const made = await createTopUp(db, topUp.id, "Maya Ortiz", `${topUp.id.slice(4)}-late-registrations.csv`, windowCsv(topUp.from, topUp.rows, topUp.name) + late);
     if (made.top_up_id) await requestResearchCard(db, made.top_up_id, "Maya Ortiz");
   }
-  // One suggestion waiting, so the Seats screen shows a new event next to the listed ones.
-  const p = ROSTER[0];
-  await requestSeat(db, p.name, {
-    catalog_id: null, suggestion: { name: "Orrery customer dinner, Lisbon", website: "https://orrery.example.com/dinner", starts_on: "2026-12-03", ends_on: "2026-12-03", city: "Lisbon", country: "Portugal", price_cents: 18000 },
-    team: p.team, role: p.role, goal: "existing_customers", why_event: "Four customers are in Lisbon for Web Summit and a dinner the week after is the cheapest way to see them together.",
-    why_you: "I run the account plans for three of them and would host.", expected_meetings: 4, known_accounts: "Pinefold", travel_cents: null, decide_by: null,
-  });
+  // The Orrery customer dinner in Lisbon was a pending seat suggestion. It is a hosted plan now (docs/HOSTED.md 17): a host, a dinner for customers, and six guests on the list, none invited yet.
+  await seedOrreryDinner(db, ROSTER[0].name);
   // Tickets already bought: every seat at a past event, and half of those in the next six weeks, some at an early-bird price.
   const seats = await db.query<{ id: string; starts_on: string; price: number }>(
     `SELECT r.id, e.starts_on::text AS starts_on, e.seat_price_cents AS price FROM seat_requests r JOIN events e ON e.id = r.event_id WHERE r.status = 'approved' AND e.stage <> 'declined' ORDER BY r.id`);

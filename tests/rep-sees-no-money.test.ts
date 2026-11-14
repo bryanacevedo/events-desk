@@ -142,3 +142,22 @@ describe("the assessment and the request to the organizer carry no money to anyo
     expect(rep.budget).toBeUndefined();
   });
 });
+
+describe("a hosted event's reads carry no company money to a rep", () => {
+  it("the hosted page, the follow-up, the owner's list and the venue answer a rep with words and counts", async () => {
+    const { hostedDinner, depsAt, yes, BEFORE } = await import("./hosted-helpers.ts");
+    const { putCohost, putVenue } = await import("../src/server/hosted-view.ts");
+    const id = await hostedDinner(db, { capacity: 6 });
+    await yes(db, depsAt(BEFORE), id, "Ana Ruiz");
+    await putVenue(db, depsAt(BEFORE), CAMILLE, id, { name: "Pier Room", minimum_spend_cents: 500_000, guarantee_headcount: 6, guarantee_by: "2027-06-01", steps: [{ by_date: "2027-06-03", rule: "Half is owed after this", fee_cents: 250_000 }] });
+    await putCohost(db, CAMILLE, id, { partner: "Partner Co", our_share_percent: 50, lead_rule: "own_invites" });
+    const app = createApp(db, { demo: true });
+    const found: string[] = [];
+    for (const path of [`/api/events/${id}/hosted`, `/api/events/${id}/follow-up`, "/api/hosted/mine", `/api/events/${id}/guests/suggestions`]) {
+      const r = await app.request(path, { headers: as(MAYA) });
+      expect(r.status, path).toBe(200);
+      found.push(...money(await r.json()).map((f) => `${path}: ${f}`));
+    }
+    expect(found).toEqual([]);
+  });
+});
