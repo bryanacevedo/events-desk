@@ -50,7 +50,7 @@ describe("goal result", () => {
     await updatePlan(db, CAMILLE, h.id, { goal_accounts_met: 4, goal_pipeline_cents: 20_000_000 });
     const r = await goalResult(db, h.deps, h.id);
     expect(r.accounts).toEqual({ goal: 4, actual: 2, short_by: 2 });
-    expect(r.pipeline).toEqual({ goal_cents: 20_000_000, actual_cents: 12_000_000, short_by_cents: 8_000_000 });
+    expect(r.pipeline).toEqual({ goal_cents: 20_000_000, actual_cents: 12_000_000, short_by_cents: 8_000_000, read: true });
     await db.query("UPDATE companies SET tier = 2 WHERE event_id = $1 AND name = 'Brightwater Software'", [h.id]);
     expect((await goalResult(db, h.deps, h.id)).accounts?.actual).toBe(1);
   });
@@ -75,7 +75,7 @@ describe("goal result", () => {
     const app = createApp(db, { demo: true, lifecycle: h.deps });
     const rep = await (await app.request(`/api/events/${h.id}/plan`, { headers: as(MAYA) })).json() as { result: { meetings: unknown; pipeline: unknown; words: string[] }; goal: Record<string, unknown> };
     expect(rep.result.meetings).toEqual({ goal: 3, actual: 1, short_by: 2 });
-    expect(rep.result.pipeline).toEqual({});
+    expect(rep.result.pipeline).toEqual({ read: true });
     expect(JSON.stringify(rep)).not.toMatch(/goal_cents|actual_cents|short_by_cents|pipeline_cents/);
     expect(rep.result.words).toEqual(["Held 1 of 3 meetings"]);
     const lead = await (await app.request(`/api/events/${h.id}/plan`, { headers: as(CAMILLE) })).json() as { result: { pipeline: { goal_cents: number } } };
