@@ -56,9 +56,9 @@ export function planStageOf(e: PlanFields, today: string, prepareDays: number = 
 }
 
 /** What the event waits on. Wraps waitingOn in domain.ts, which is not changed: a plan at requested waits on the planner or the approver, and a hosted event never waits on an attendee list. */
-export function planWaitingOn(e: Pick<EventRow, "stage"> & { approval_mode?: ApprovalMode }, plan: { hosted: boolean; submitted: boolean }): string {
+export function planWaitingOn(e: Pick<EventRow, "stage"> & { approval_mode?: ApprovalMode }, plan: { hosted: boolean; submitted: boolean; /** A hosted event's list: who has not been invited yet. */ guests?: { total: number; listed: number } }): string {
   if (e.approval_mode === "budget" && e.stage === "requested") return plan.submitted ? "Approver: the plan" : "Planner: ask for approval";
-  if (plan.hosted && e.stage === "approved") return "Nobody";
+  if (plan.hosted && e.stage === "approved") return plan.guests && plan.guests.listed > 0 ? `Host: invite ${plan.guests.listed} ${plan.guests.listed === 1 ? "guest" : "guests"}` : "Nobody";
   return waitingOn(e as { stage: Stage });
 }
 

@@ -76,6 +76,14 @@
     "approval_over_cents": 0,
     "assessment_calls_per_event": 6
   },
+  "hosted": {
+    "noshow_default_pct": 20,
+    "history_min_events": 2,
+    "history_min_yes": 10
+  },
+  "email_country_rules": {
+    "blocked": ["IT", "CH", "SE", "DK", "BE", "AT", "NO", "DE"]
+  },
   "agent_question_limit": 50,
   "calls_per_question": 3,
   "research": {

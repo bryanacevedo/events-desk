@@ -26,6 +26,7 @@ import { sheetsFor } from "./sheets.ts";
 import { exampleDns, systemDns } from "./identity.ts";
 import { seed } from "./seed.ts";
 import { restampDemoPlan, seedPastResults } from "./seed-plan.ts";
+import { senderFromEnv } from "./transactional.ts";
 import { simDeps } from "./sim-vendors.ts";
 import { demoConnectors, liveConnectors } from "./connectors/setup.ts";
 import { lifecycleTick } from "./lifecycle-tick.ts";
@@ -135,7 +136,7 @@ if (!demoMotionReady) void (async () => {
   } catch (e) { console.error("demo motion", (e as Error).message); }
   demoMotionReady = true;
 })();
-const api = createApp(db, { autoQuote: true, lifecycle, demoTools: demoSetup?.tools, writeKey: mode.demo ? undefined : process.env.WRITE_KEY, demo: mode.demo, publicDemo: mode.demo && process.env.PUBLIC_DEMO === "1", kick, slack, sheets: deps.sheets, llm: deps.llm, dns: mode.liveSpend ? systemDns : exampleDns, crm: deps.crm });
+const api = createApp(db, { autoQuote: true, lifecycle, demoTools: demoSetup?.tools, writeKey: mode.demo ? undefined : process.env.WRITE_KEY, demo: mode.demo, publicDemo: mode.demo && process.env.PUBLIC_DEMO === "1", kick, slack, sheets: deps.sheets, llm: deps.llm, dns: mode.liveSpend ? systemDns : exampleDns, crm: deps.crm, transactional: senderFromEnv(env) ?? undefined });
 // Write-back to the CRM runs here and never from a run, so a failed write cannot touch a delivery. A CRM that cannot write (noCrm) makes this do nothing.
 if (mayRun && canWrite(deps.crm)) {
   const sweep = () => { void drainQuietly(db, deps.crm); };

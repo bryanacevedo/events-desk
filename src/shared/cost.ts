@@ -52,6 +52,8 @@ export interface Settings {
   approvers: string[];
   /** The field marketers who write plans and read their money (docs/EVENT-PLAN.md, decision 54). They approve nothing. */
   planners?: string[];
+  hosted?: { noshow_default_pct: number; history_min_events: number; history_min_yes: number };
+  email_country_rules?: { blocked: string[] };
   plan?: { prepare_days_before: number; approval_over_cents: number; assessment_calls_per_event: number };
   agent_question_limit: number;
   calls_per_question: number;

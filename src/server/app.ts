@@ -28,6 +28,8 @@ import type { Settings } from "../shared/cost.ts";
 import { isGtm, SETTINGS_REFUSAL } from "../shared/roles.ts";
 import { canPlan, forRep, isLead, MONEY_REFUSAL } from "./money.ts";
 import { mountPlanRoutes } from "./plan-routes.ts";
+import { mountHosted } from "./hosted-routes.ts";
+import type { TransactionalSender } from "./transactional.ts";
 import { involvementsByEvent, involvementWords, stageNow, todayOf, weekDeadlines, yearPlan } from "./plan.ts";
 import { isListSource, type ListSourceInput } from "../shared/plan.ts";
 import { mountSettingsView } from "./settings-view.ts";
@@ -40,8 +42,10 @@ import type { LifecycleDeps } from "./lifecycle-deps.ts";
 import type { FakeTool } from "./connectors/fake.ts";
 import { validateRequest, type ActivityRow, type EventRow } from "../shared/domain.ts";
 
-export interface AppConfig { writeKey?: string; demo: boolean; /** Everything after delivery. Absent, those routes do not exist. */ lifecycle?: LifecycleDeps; demoTools?: Record<string, FakeTool>; /** The hosted demo: no login, so it takes no files a later visitor could read. */ publicDemo?: boolean; kick?: (eventId: string) => void; slack?: SlackConfig; sheets?: SheetPublisher; /** The model the ICP compile and test bench use. Defaults to the mock. */ llm?: Llm; /** The mail-server check used before the Research card. Defaults to the one for mock and simulated domains. */ dns?: Dns; /** The CRM an opt-out is queued for. */ crm?: Crm; /** The desk prices each cost card itself once its event is ready; the uploader only confirms. Off in tests that walk the manual request. */ autoQuote?: boolean }
+export interface AppConfig { writeKey?: string; demo: boolean; /** Everything after delivery. Absent, those routes do not exist. */ lifecycle?: LifecycleDeps; demoTools?: Record<string, FakeTool>; /** The hosted demo: no login, so it takes no files a later visitor could read. */ publicDemo?: boolean; kick?: (eventId: string) => void; /** Where reminders and seat-open messages go. Absent in the demo, a simulated sender; absent live, the desk refuses to send. */ transactional?: TransactionalSender; slack?: SlackConfig; sheets?: SheetPublisher; /** The model the ICP compile and test bench use. Defaults to the mock. */ llm?: Llm; /** The mail-server check used before the Research card. Defaults to the one for mock and simulated domains. */ dns?: Dns; /** The CRM an opt-out is queued for. */ crm?: Crm; /** The desk prices each cost card itself once its event is ready; the uploader only confirms. Off in tests that walk the manual request. */ autoQuote?: boolean }
 type Ctx = { Variables: { actor: string } };
+/** The public RSVP answer, by exact pattern. */
+const RSVP_ANSWER = /^\/api\/rsvp\/[^/]+$/;
 
 const bad = (msg: string, status: 400 | 401 | 403 | 404 | 409 = 400) => Response.json({ error: msg }, { status });
 /** The organizer's website, from the catalog entry the event came from. Screens read the logo domain from it. */
@@ -54,7 +58,7 @@ export function createApp(db: Db, cfg: AppConfig) {
   app.use("*", secureHeaders({ xFrameOptions: "DENY", referrerPolicy: "strict-origin-when-cross-origin", crossOriginEmbedderPolicy: false, crossOriginResourcePolicy: false,
     contentSecurityPolicy: { defaultSrc: ["'self'"], imgSrc: ["'self'", "data:", "https://www.google.com", "https://*.gstatic.com", "https://images.unsplash.com"], styleSrc: ["'self'", "'unsafe-inline'"], scriptSrc: ["'self'"], connectSrc: ["'self'"], fontSrc: ["'self'", "data:"], frameAncestors: ["'none'"], objectSrc: ["'none'"], baseUri: ["'self'"] } }));
   // No body is read whole before its size is known: files may be about 20 MB (21,000,000 bytes), everything else 1 MB.
-  const FILE_ROUTE = /^\/api\/(events\/[^/]+\/(upload|new-registrations|review|top-ups)|icp\/documents)(\/|$)/;
+  const FILE_ROUTE = /^\/api\/(events\/[^/]+\/(upload|new-registrations|review|top-ups|guests\/import)|icp\/documents|target-accounts\/import)(\/|$)/;
   app.use("*", async (c, next) => {
     if (c.req.method === "GET" || c.req.method === "HEAD") return next();
     return bodyLimit({ maxSize: FILE_ROUTE.test(c.req.path) ? 21_000_000 : 1_000_000, onError: (cc) => cc.text("Too large", 413) })(c, next);
@@ -85,11 +89,13 @@ export function createApp(db: Db, cfg: AppConfig) {
       if (/^\/api\/(budget|results)(\/|$)/.test(c.req.path) && !canPlan(c.get("actor"))) return bad(MONEY_REFUSAL, 403);
     }
     if (c.req.method !== "GET") {
+      // The guest's own RSVP answer is the one write with no actor and no write key: the link is the credential, and the route answers only about the guest it names.
+      if (c.req.method === "POST" && RSVP_ANSWER.test(c.req.path)) { c.set("actor", "guest"); return next(); }
       if (cfg.writeKey && c.req.header("x-write-key") !== cfg.writeKey) return bad("This desk needs the team write key to make changes.", 401);
       const actor = decodeURIComponent(c.req.header("x-actor") ?? "").trim();
       if (!actor) return bad("Say who you are before making changes.");
       c.set("actor", actor.slice(0, 60));
-      if (cfg.publicDemo && /^\/api\/events\/[^/]+\/(upload|new-registrations|review)$/.test(c.req.path)) return bad("This public demo does not take files. To try your own list, run it yourself: the README shows how.", 403);
+      if (cfg.publicDemo && /^\/api\/(events\/[^/]+\/(upload|new-registrations|review|guests\/import)|target-accounts\/import)$/.test(c.req.path)) return bad("This public demo does not take files. To try your own list, run it yourself: the README shows how.", 403);
       // Settings and the ICP are GTM Engineering's. Acting as is not security; this keeps the desk honest until a real login.
       if (/^\/api\/(icp|settings)(\/|$)/.test(c.req.path) && !isGtm(c.get("actor"))) return bad(SETTINGS_REFUSAL, 403);
     }
@@ -139,6 +145,7 @@ export function createApp(db: Db, cfg: AppConfig) {
   mountBudgetRoutes(app, db, cfg);
   mountEventViews(app, db);
   mountPlanRoutes(app, db, cfg);
+  mountHosted(app, db, cfg);
   // "Did it pay?" is company money: anyone else gets the overview without it.
   // The year plan and the week's deadlines sit beside what was already here. A rep's year has no key holding dollars (yearPlan answers through forRep).
   app.get("/api/overview", async (c) => {

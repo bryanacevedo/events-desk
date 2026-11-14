@@ -487,7 +487,8 @@ export async function closeResult(db: Db, actor: string, eventId: string, today:
 /* ------------------------------------------------------------------ result against the goal */
 
 export interface GoalLine { goal: number; actual: number; short_by: number }
-export interface GoalResult { meetings: GoalLine | null; accounts: GoalLine | null; pipeline: { goal_cents: number; actual_cents: number; short_by_cents: number } | null }
+/** `read` is false when the scorecard could not read pipeline (no CRM was connected when it was made). Then actual and short_by are null: an unread pipeline is not a pipeline of $0. */
+export interface GoalResult { meetings: GoalLine | null; accounts: GoalLine | null; pipeline: { goal_cents: number; actual_cents: number | null; short_by_cents: number | null; read?: boolean } | null }
 
 /** The result against the goal. Held meetings come from the latest written scorecard, else one read without writing. Target accounts met are tier 1 companies with a held meeting
     (a stand-in until step 7 brings a target account list). Pipeline is sourced plus influenced. Money keys end in `cents`, so forRep strips the pipeline for a rep. */
@@ -495,7 +496,7 @@ export async function goalResult(db: Db, deps: LifecycleDeps | undefined, eventI
   const [g] = await db.query<{ m: number | null; a: number | null; p: number | null }>("SELECT goal_meetings_held AS m, goal_accounts_met AS a, goal_pipeline_cents::float8 AS p FROM events WHERE id = $1", [eventId]);
   const none: GoalResult = { meetings: null, accounts: null, pipeline: null };
   if (!g || (g.m === null && g.a === null && g.p === null)) return none;
-  const [row] = await db.query<{ metrics: { held_all: number; influence: { sourced: { cents: number }; influenced: { cents: number } } } }>("SELECT metrics FROM scorecards WHERE event_id = $1 ORDER BY window_days DESC LIMIT 1", [eventId]);
+  const [row] = await db.query<{ metrics: { held_all: number; influence: { available?: boolean; sourced: { cents: number }; influenced: { cents: number } } } }>("SELECT metrics FROM scorecards WHERE event_id = $1 ORDER BY window_days DESC LIMIT 1", [eventId]);
   const m = row?.metrics ?? (deps ? await computeScorecard(db, deps, eventId, 30, { write: false }).catch(() => null) : null);
   const line = (goal: number, actual: number): GoalLine => ({ goal, actual, short_by: Math.max(0, goal - actual) });
   const out: GoalResult = { ...none };
@@ -506,8 +507,10 @@ export async function goalResult(db: Db, deps: LifecycleDeps | undefined, eventI
     out.accounts = line(g.a, r.n);
   }
   if (g.p !== null) {
-    const actual = m ? Number(m.influence.sourced.cents) + Number(m.influence.influenced.cents) : 0;
-    out.pipeline = { goal_cents: Number(g.p), actual_cents: actual, short_by_cents: Math.max(0, Number(g.p) - actual) };
+    // A scorecard made with no CRM connected has no pipeline to read. That is "not read", never $0 of the goal.
+    const read = Boolean(m?.influence?.available);
+    const actual = read && m ? Number(m.influence.sourced.cents) + Number(m.influence.influenced.cents) : null;
+    out.pipeline = { goal_cents: Number(g.p), actual_cents: actual, short_by_cents: actual === null ? null : Math.max(0, Number(g.p) - actual), read };
   }
   return out;
 }
@@ -518,7 +521,7 @@ export function goalWords(r: GoalResult, withMoney: boolean): string[] {
   const out: string[] = [];
   if (r.meetings) out.push(`Held ${r.meetings.actual} of ${r.meetings.goal} meetings`);
   if (r.accounts) out.push(`Met ${r.accounts.actual} of ${r.accounts.goal} target accounts`);
-  if (r.pipeline && withMoney) out.push(`${dollars(r.pipeline.actual_cents)} of ${dollars(r.pipeline.goal_cents)} pipeline`);
+  if (r.pipeline && withMoney) out.push(r.pipeline.read !== false && r.pipeline.actual_cents !== null ? `${dollars(r.pipeline.actual_cents)} of ${dollars(r.pipeline.goal_cents)} pipeline` : `Pipeline not read, no CRM connected (goal ${dollars(r.pipeline.goal_cents)})`);
   return out;
 }
 
@@ -534,6 +537,8 @@ export async function planView(db: Db, deps: LifecycleDeps | undefined, eventId:
   const involvements = await db.query<{ id: string; kind: string; label: string; status: string; dropped_reason: string | null; conference_event_id: string | null; pass_count: number | null; hosted_format: string | null; headcount: number | null; talk_title: string | null; speaker: string | null }>(
     "SELECT id, kind, label, status, dropped_reason, conference_event_id, pass_count, hosted_format, headcount, talk_title, speaker FROM involvements WHERE event_id = $1 ORDER BY created_at, id", [eventId]);
   const hosted = involvements.some((i) => i.kind === "hosted" && i.status !== "dropped");
+  // A hosted event reads its guest list: the host waits on nobody until a guest is listed and not yet invited.
+  const [gc] = hosted ? await db.query<{ total: number; listed: number }>("SELECT count(*)::int AS total, count(*) FILTER (WHERE status = 'listed')::int AS listed FROM event_guests WHERE event_id = $1 AND removed_at IS NULL", [eventId]) : [undefined];
   const side = await db.query<{ id: string; name: string; starts_on: string; hosted_format: string; plan_stage: string }>(
     "SELECT ev.id, ev.name, ev.starts_on::text AS starts_on, i.hosted_format, ev.plan_stage FROM involvements i JOIN events ev ON ev.id = i.event_id WHERE i.conference_event_id = $1 AND i.status <> 'dropped' ORDER BY ev.starts_on, ev.name", [eventId]);
   const people = await db.query<{ id: string; person: string; roles: string[]; team: string; involvement_id: string | null; seat_request_id: string | null; seat_status: string | null }>(
@@ -557,7 +562,7 @@ export async function planView(db: Db, deps: LifecycleDeps | undefined, eventId:
   const assessment = await assessmentView(db, eventId);
   const view = {
     event: { id: e.id, name: e.name, venue: e.venue, starts_on: e.starts_on, last_day: e.last_day, country: e.country ?? null, stage: e.stage, decline_reason: e.decline_reason, approval_mode: e.approval_mode ?? "per_seat", hosted },
-    stage_line: { plan_stage, plan_stage_label: planStageLabel(plan_stage), list_stage: e.stage, list_stage_label: stageLabel(e.stage), waiting_on: planWaitingOn(e, { hosted, submitted: Boolean(e.plan_submitted_at) }), paused: e.stage === "paused" },
+    stage_line: { plan_stage, plan_stage_label: planStageLabel(plan_stage), list_stage: e.stage, list_stage_label: stageLabel(e.stage), waiting_on: planWaitingOn(e, { hosted, submitted: Boolean(e.plan_submitted_at), guests: gc }), paused: e.stage === "paused" },
     reason: e.reason || "", reason_words: e.reason ? null : "No reason was written",
     goal: { meetings_held: e.goal_meetings_held, accounts_met: e.goal_accounts_met, pipeline_cents: e.goal_pipeline_cents },
     result: { ...result, words: goalWords(result, money) },
