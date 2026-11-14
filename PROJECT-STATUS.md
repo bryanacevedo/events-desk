@@ -1,5 +1,20 @@
 # Events Desk: project status
 
+## Redesign step 1, finished (2026-11-14)
+
+Worktree `.wt/ev1b`, branch `ev1b`. Spec `docs/EVENT-PLAN.md` (progress and deviations in section 18), decisions 47 to 57.
+
+**Built since session 2:** the live-mode Slack plan card (Approve and Decline, approver mapped through `userMap`, never the maker); sponsorship with its package, the standard eight deliverables and promised against received (0050); `list_source` on every upload, row and person (0051); Overview "This week" and "The year" (Direction A, provisional); the assessment with quoted evidence, the organizer request email (drafted from a template, copied and sent by the person, expected date and follow-up tracked) and past events read against their goals (0052); the demo seed (AWS re:Invent 2026 in flight with deliverables late, today and this week; Money20/20 USA 2026 and Dreamforce 2026 read against goals; a late GITEX follow-up; re:Invent's list "emailed by the organizer"); `restampDemoPlan` keeps those dates true on any day; README plan section.
+
+**Gates, 2026-11-14:** full suite 1,342 passed, 12 skipped, no timeouts; `tsc` clean; design-lint and screen-copy clean; both audits against the demo (see the ship notes).
+
+**Open:**
+- The assessment step has not run against the real model: no API key was in the environment. A hand-labelled recording stands in (`evals/assessment.hand-recording.json`); record the real one with `ANTHROPIC_API_KEY=... LIVE_SPEND=1 EVALS_MAX_ITEMS=7 node scripts/record-evals.ts assessment_propose`. The step is listed in `evals/recordings/stale.json` until then.
+- Bryan picks one of three Overview directions (`~/Developer/events-desk-review/step1/overview-directions/index.html`); A is built provisionally.
+- The re:Invent assessment answers are marked sample answers, not facts about the organizer.
+- Orrery customer dinner, Lisbon, is still the pending seat suggestion.
+- Money20/20 USA 2026 and Dreamforce 2026 now end scored in the demo.
+
 ## Redesign step 1, session 2 (2026-11-14): leftovers done
 
 Worktree `~/Developer/events-desk/.claude/worktrees/admiring-kepler-c6dcf2`, branch `claude/admiring-kepler-c6dcf2`. Spec `docs/EVENT-PLAN.md` (progress in section 18), decisions 47 to 50, 54 to 56.

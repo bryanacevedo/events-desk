@@ -701,3 +701,7 @@ Done: the New plan form (Events, planners), editing on the Plan tab (reason, goa
 22. **`seedPlan(db, { today })`.** `seedDemoPlan` stays as an alias. The demo's "today" is `DEMO_TODAY` or the wall clock (the deps clock does not exist yet when the seed runs), and `restampDemoPlan(db, today)` runs at every demo boot after migrations, so a snapshot built weeks ago still shows work due this week. `seedPastResults` runs in the boot's background pass after `seedDemoStages`, and `make demo-snapshot` waits for it.
 23. **Not done: the Orrery customer dinner, Lisbon.** Section 10 turns it into a standalone hosted plan in `planning`; it is still the pending seat suggestion it was.
 24. **Reads.** The plan read carries `assessment` and `organizer_request`; `GET /api/events/:id/assessment` carries the same, with no money. The assessment and the request are not drawn on a hosted event, which has no organizer list. Fetching a page is refused in the demo, follows no redirects, and connects to the address it checked, so a host that answers differently the second time is not followed. Promises read counted ones first.
+
+## 19. Progress (finish of step 1, 2026-11-14)
+
+Done: everything in section 13 sessions 2 and 3 except the real-model recording of `assessment_propose` (see deviation notes above and PROJECT-STATUS). Overview shows Direction A provisionally; the three directions are in `~/Developer/events-desk-review/step1/overview-directions/`. Full suite 1,342 passed, 12 skipped.
