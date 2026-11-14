@@ -1,5 +1,13 @@
 # Events Desk: project status
 
+## Redesign step 2, server side (2026-11-14)
+
+Worktree `.wt/ev2`, branch `ev2`. Spec `docs/HOSTED.md` (what was built and where it differs: section 23), migration 0053.
+
+**Built:** guest lists with one owner each, invitations drafted from a template and logged when the host sends them, the public RSVP link (one 404 for every bad token, 30 bad tokens a minute per address), waitlist and promotion under a row lock, reminders and logistics from a transactional sender that does not depend on the sequencer, country rules, expected no-shows (default, set, history), venue dates in the week's deadlines, check-in with walk-ins and undo, closing attendance, the two follow-up groups with the owners' notes, co-host split and lead rule, Luma and Splash imports, target accounts and suggestions, and the demo's dinners. Also fixed: a goal's pipeline line no longer reads "$0 of $800,000" when the scorecard had no CRM.
+
+**Open:** client screens (Guests tab, Check-in, the RSVP page) are not built; the live transactional sender is not proven against a provider; the CRM fill of target accounts is step 7; the demo snapshot needs rebuilding (`make demo-snapshot`) to carry the new dinners.
+
 ## Redesign step 1, finished (2026-11-14)
 
 Worktree `.wt/ev1b`, branch `ev1b`. Spec `docs/EVENT-PLAN.md` (progress and deviations in section 18), decisions 47 to 57.
@@ -12,7 +20,7 @@ Worktree `.wt/ev1b`, branch `ev1b`. Spec `docs/EVENT-PLAN.md` (progress and devi
 - The assessment step has not run against the real model: no API key was in the environment. A hand-labelled recording stands in (`evals/assessment.hand-recording.json`); record the real one with `ANTHROPIC_API_KEY=... LIVE_SPEND=1 EVALS_MAX_ITEMS=7 node scripts/record-evals.ts assessment_propose`. The step is listed in `evals/recordings/stale.json` until then.
 - Bryan picks one of three Overview directions (`~/Developer/events-desk-review/step1/overview-directions/index.html`); A is built provisionally.
 - The re:Invent assessment answers are marked sample answers, not facts about the organizer.
-- Orrery customer dinner, Lisbon, is still the pending seat suggestion.
+- Orrery customer dinner, Lisbon, was a pending seat suggestion; step 2 made it a hosted plan.
 - Money20/20 USA 2026 and Dreamforce 2026 now end scored in the demo.
 
 ## Redesign step 1, session 2 (2026-11-14): leftovers done

@@ -324,3 +324,19 @@ The email asking an organizer for the attendee list is two fixed texts (the ask,
 ## 57. Deadlines are read, not stored twice (2026-11-14)
 
 The spec numbered this decision 55, which the demo's in-flight plan already took, so it is 57. `event_deadlines` is a view over deliverables and sponsorship payments (the organizer request joins it in `0052`). "This week" is anything late plus today and the six days after it, not done, on an event that is not declined. Nothing about a deadline is copied into a second table, so a person marking a deliverable done is the only write, and the week, the Plan tab and the year agree by construction. Later steps add their own rows to the view.
+
+## 58. Hosted guests are not gate subjects (2026-11-14)
+
+A guest on a hosted event's list is a person the host invites personally, not a contact on an attendee list sold to a sequencer. The gate (`gate.ts`) reads `contacts` and the sequences' consent and legal-basis machinery, so it is not consulted and not edited. The desk's one outreach check for a guest is the country rule, plus a refusal for an address that opted out or is known not to be theirs.
+
+## 59. An unknown country blocks email (2026-11-14)
+
+`config/defaults.json` `email_country_rules.blocked` lists the countries the desk never emails (IT, CH, SE, DK, BE, AT, NO, DE: Account Desk's defaults plus Germany, which Bryan named). A guest whose country is blocked, or not known, is never emailed by the desk. A guest's own yes does not lift a block. The host writes to those guests by hand. These are Events Desk's defaults until Account Desk's editable rules.
+
+## 60. The transactional sender is separate from the sequencer (2026-11-14)
+
+Confirmations, reminders and a seat that opened go through one module that is not a sequence, has no cadence and no cold step. It runs whatever `INTEGRATED_WITH` names. A send whose outcome is unknown is never repeated, and a second run of the same kind inside ten minutes is refused. Live mode without `TRANSACTIONAL_URL` and `TRANSACTIONAL_KEY` refuses to send and says why.
+
+## 61. The no-show default (2026-11-14)
+
+Expected no-shows start at a stated 20 percent (`hosted.noshow_default_pct`), the planner may set a number for the event, and the team's own history replaces the default once two hosted events with attendance closed hold ten yes answers. The page says which one it uses. Pheedloop's medians (28 percent for free events) are a reason to over-confirm, not a forecast for an invited dinner.

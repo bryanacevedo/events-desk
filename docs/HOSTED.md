@@ -259,3 +259,16 @@ These override anything above they contradict.
 20. **The bad-token limit** keys the same way the public demo's limit does (last `x-forwarded-for` entry, else "local").
 21. **The 22 numbered seeds** in section 17: Golden Gate is the dinner run from list to reminder; Lakeside, Riverbend and Cascadia are closed history with follow-up groups; Capitol carries check-in with a walk-in on the demo's day; the same dinner is not required to carry all phases. The CRM account fill is deferred to step 7 (section 19) and noted for Bryan.
 22. New decisions 58 to 61: hosted guests are not gate subjects; unknown country blocks mail; transactional sender separate from the sequencer; the no-show default. `docs/SPEC.md` links this file.
+
+## 23. Built (server side, 2026-11-14), and where it differs
+
+Migration `0053_hosted.sql`; modules `src/shared/rsvp.ts`, `src/shared/country-rules.ts`, `src/server/hosted.ts`, `hosted-view.ts`, `hosted-reminders.ts`, `hosted-routes.ts`, `rsvp.ts`, `transactional.ts`, `guest-import.ts`, `integration.ts`, `seed-hosted.ts`. Client screens are not built here.
+
+1. **Added columns.** `event_venues.guarantee_confirmed_on` and `venue_cancellation_steps.done` make a venue date stay late until it is marked done (21.6). `reminder_sends.outcome` also takes `queued` and `unknown`. `transactional_outbox.run_id` carries the run (21.10). `event_guests.prior_status` is as 21.5.
+2. **`reminder_preview` and `sendReminder` live in `hosted-reminders.ts`,** not `hosted.ts`; the sender interface is in `transactional.ts` as listed. Reads are in `hosted-view.ts`.
+3. **The country message** is 21.8's, not section 7's older wording.
+4. **No key joins `LIVE_REQUIRED`.** Live mode starts without `TRANSACTIONAL_URL` and `TRANSACTIONAL_KEY`; it refuses to send a reminder and the page says why (21.11).
+5. **Nominations.** Anyone may nominate a guest for themselves; the nominator becomes the owner and cannot name another. Everything else on the list is the host's, a planner's, leadership's or GTM's.
+6. **By-account lead rule.** The side that owns an account keeps all its guests: ours when any guest of that account is ours. A guest with no account is grouped by company name.
+7. **The demo carries the year's hosted dinners.** The real-events demo does not run `seedYear`, so `seedPlan` now also creates Riverbend, Cascadia, Lakeside, Capitol and Golden Gate (through `seedHosted` in `seed-year.ts`) and fills them (`seed-hosted.ts`). `restampDemoPlan` moves the Golden Gate guarantee and its two cancellation steps, and Capitol's day to the demo's day. The Orrery dinner is `evt_orrery_lisbon_dinner`, in planning, with Maya Ortiz as host and six listed guests.
+8. **A goal's pipeline line says when it was not read.** A scorecard written with no CRM has no pipeline to read, and the Result line read "$0 of $800,000 pipeline" as if it had been measured. `goalResult` now returns `read: false` and null figures, and the words say "Pipeline not read, no CRM connected (goal $800,000)". The demo snapshot was checked: its Money20/20 USA 2026 scorecard has $649,038 read, so the demo with its sample CRM reads against the goal; the `$0` came from a build with no CRM.
