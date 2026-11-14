@@ -72,14 +72,19 @@ export async function importGuests(db: Db, deps: HostedDeps, actor: string, even
     for (const [i, raw] of rows.entries()) {
       const r = readRow(source, raw);
       if ("skip" in r) { if (r.skip === "empty") out.skipped_empty++; else out.skipped.push({ row: i + 2, why: r.skip! }); continue; }
-      const existing = r.email
+      let existing = r.email
         ? (await q<GuestRow>(`SELECT ${GUEST_COLS} FROM event_guests WHERE event_id = $1 AND lower(email) = $2 AND removed_at IS NULL FOR UPDATE`, [eventId, r.email]))[0]
         : (await q<GuestRow>(`SELECT ${GUEST_COLS} FROM event_guests WHERE event_id = $1 AND lower(name) = lower($2) AND lower(company) = lower($3) AND removed_at IS NULL FOR UPDATE`, [eventId, r.name, r.company]))[0];
+      // A row with an email that nobody has: the same person may already be on the list without one. They get the email, not a duplicate.
+      if (!existing && r.email) {
+        existing = (await q<GuestRow>(`SELECT ${GUEST_COLS} FROM event_guests WHERE event_id = $1 AND (email IS NULL OR email = '') AND lower(name) = lower($2) AND lower(company) = lower($3) AND removed_at IS NULL ORDER BY created_at, id LIMIT 1 FOR UPDATE`, [eventId, r.name, r.company]))[0];
+        if (existing) { await q("UPDATE event_guests SET email = $2 WHERE id = $1", [existing.id, r.email]); await logGuest(q, eventId, existing.id, "status", "Email filled in by an import", actor, now); }
+      }
       const when = (r.checkedInAt && !Number.isNaN(Date.parse(r.checkedInAt)) ? new Date(r.checkedInAt) : now).toISOString();
       if (existing) {
         out.already_there++;
         if (importMove(existing.status, r.status)) {
-          if (r.status === "attended") await q("UPDATE event_guests SET status = 'attended', prior_status = $2, checked_in_at = $3, checked_in_by = $4, waitlisted_at = NULL WHERE id = $1", [existing.id, existing.status === "attended" ? null : existing.status, when, actor]);
+          if (r.status === "attended") await q("UPDATE event_guests SET status = 'attended', prior_status = $2, checked_in_at = $3, checked_in_by = $4 WHERE id = $1", [existing.id, existing.status === "attended" ? null : existing.status, when, actor]);
           else await q("UPDATE event_guests SET status = $2, rsvp_at = coalesce(rsvp_at, $3), waitlisted_at = CASE WHEN $2 = 'waitlist' THEN coalesce(waitlisted_at, $3::timestamptz) ELSE NULL END WHERE id = $1", [existing.id, r.status, now.toISOString()]);
           await logGuest(q, eventId, existing.id, "status", `Moved forward by an import: ${existing.status} to ${r.status}`, actor, now);
           out.moved_forward++;

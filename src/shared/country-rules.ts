@@ -4,17 +4,19 @@
 export const COUNTRY_BLOCKED = "Not emailed in this country";
 export const COUNTRY_UNKNOWN = "Their country is not known, so no email until it is";
 
+/** The countries the desk knows (the same 25 as the outbound desk's gate). Anything else is unknown, so it is not emailed. */
+const KNOWN = new Set(["US", "CA", "GB", "DE", "FR", "NL", "ES", "IE", "BR", "AU", "SG", "IT", "BE", "SE", "DK", "PL", "AT", "PT", "FI", "CH", "NO", "IN", "JP", "MX", "NZ"]);
 const NAMES: Record<string, string> = {
-  italy: "IT", switzerland: "CH", sweden: "SE", denmark: "DK", belgium: "BE", austria: "AT", norway: "NO", germany: "DE", "united states": "US", usa: "US", "united kingdom": "GB", uk: "GB",
-  france: "FR", spain: "ES", portugal: "PT", netherlands: "NL", ireland: "IE", canada: "CA", mexico: "MX", brazil: "BR", australia: "AU", singapore: "SG", japan: "JP", india: "IN", poland: "PL", finland: "FI",
-  "dominican republic": "DO", argentina: "AR", colombia: "CO",
+  "united states": "US", "united states of america": "US", usa: "US", america: "US", canada: "CA", "united kingdom": "GB", uk: "GB", "great britain": "GB", england: "GB", scotland: "GB", wales: "GB",
+  germany: "DE", france: "FR", netherlands: "NL", "the netherlands": "NL", holland: "NL", spain: "ES", ireland: "IE", brazil: "BR", australia: "AU", singapore: "SG", italy: "IT", belgium: "BE",
+  sweden: "SE", denmark: "DK", poland: "PL", austria: "AT", portugal: "PT", finland: "FI", switzerland: "CH", norway: "NO", india: "IN", japan: "JP", mexico: "MX", "new zealand": "NZ",
 };
 
-/** An ISO code in upper case, or null when the text is empty or not a country this knows. A two-letter code is taken as typed. */
+/** An ISO code in upper case, or null when the text is empty or not a country this knows. A two-letter code counts only when it is one of the known ones ("UK" is GB). */
 export function normalizeCountry(v: unknown): string | null {
   const s = typeof v === "string" ? v.trim() : "";
   if (!s) return null;
-  if (/^[A-Za-z]{2}$/.test(s)) return s.toUpperCase();
+  if (/^[A-Za-z]{2}$/.test(s)) { const c = s.toUpperCase() === "UK" ? "GB" : s.toUpperCase(); return KNOWN.has(c) ? c : null; }
   return NAMES[s.toLowerCase()] ?? null;
 }
 

@@ -48,6 +48,17 @@ describe("Golden Gate Field Dinner, from the list to the reminder", () => {
     expect(h.reminders.last_run).toMatchObject({ kind: "reminder", sent_count: 5 });
   });
 
+  it("every invitation, yes answer and the reminder is dated before the demo's day, and Send reminder works now", async () => {
+    const day = new Date(`${TODAY}T15:00:00Z`);
+    const future = await q<{ n: number }>("SELECT count(*)::int AS n FROM guest_invitations WHERE event_id = $1 AND (logged_at > $2::timestamptz OR sent_on > $2::date)", [GOLDEN_GATE, day.toISOString()]);
+    expect(future[0].n).toBe(0);
+    expect((await q("SELECT 1 FROM event_guests WHERE event_id = $1 AND rsvp_at > $2::timestamptz", [GOLDEN_GATE, day.toISOString()])).length).toBe(0);
+    expect((await q("SELECT 1 FROM reminder_runs WHERE event_id = $1 AND created_at > $2::timestamptz", [GOLDEN_GATE, day.toISOString()])).length).toBe(0);
+    const r = await app.request(`/api/events/${GOLDEN_GATE}/reminders`, { method: "POST", headers: { "x-actor": encodeURIComponent(CAMILLE), "content-type": "application/json" }, body: JSON.stringify({ kind: "reminder" }) });
+    expect(r.status).toBe(201);
+    expect(((await r.json()) as any).sent).toBe(5);
+  });
+
   it("the venue has a minimum spend on the plan's own line, a guarantee in 13 days, and two cancellation steps in date order", async () => {
     const h = await hosted(GOLDEN_GATE);
     expect(h.venue).toMatchObject({ name: "Ferry Building Room", minimum_spend_cents: 400_000, guarantee_headcount: 10, guarantee_by: "2026-11-26" });

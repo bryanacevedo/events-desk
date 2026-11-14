@@ -96,5 +96,5 @@ export function importMove(from: GuestStatus, to: GuestStatus): boolean {
   return ORDER.indexOf(to) > ORDER.indexOf(from);
 }
 
-/** Registered guests plus anyone who is in the room count against capacity. */
+/** Only a registered guest holds a place. A waitlisted guest does not, and neither does anyone who has attended or been marked no-show (the door does not enforce capacity). */
 export const HOLDS_A_PLACE: GuestStatus[] = ["registered"];

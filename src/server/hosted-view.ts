@@ -4,7 +4,7 @@
 import type { Db } from "./db.ts";
 import { newId, RuleError } from "./events.ts";
 import { eventCost } from "./closeout.ts";
-import { forRep } from "./money.ts";
+import { canPlan, forRep } from "./money.ts";
 import { reminderPreview } from "./hosted-reminders.ts";
 import {
   capacityOf, dayIn, firstName, GUEST_COLS, hostedConfig, hostedEvent, HostedInvalid, mailBlock, nowOf, readHosted, shortDay, text, type GuestRow, type HostedDeps, type HostedEvent, type HostedRow,
@@ -71,21 +71,33 @@ export async function putVenue(db: Db, deps: HostedDeps, actor: string, eventId:
   const now = nowOf(deps);
   return db.tx(async (q) => {
     const ev = await hostedEvent(q, eventId);
-    const [old] = await q<{ guarantee_confirmed_on: string | null }>("SELECT guarantee_confirmed_on::text AS guarantee_confirmed_on FROM event_venues WHERE event_id = $1", [eventId]);
-    let line: string | null = null;
-    if (input.budget_line_id) {
-      const [l] = await q<{ id: string; category: string }>("SELECT id, category FROM budget_lines WHERE id = $1 AND event_id = $2", [input.budget_line_id, eventId]);
-      if (!l) throw new HostedInvalid("That budget line is not on this event's plan.");
-      if (l.category !== "dinners" && l.category !== "other") throw new HostedInvalid("The venue sits on a dinners line or an other line.");
-      line = l.id;
+    const [old] = await q<{ name: string; address: string; budget_line_id: string | null; minimum_spend_cents: number | null; guarantee_headcount: number | null; guarantee_by: string | null; guarantee_confirmed_on: string | null; note: string }>(
+      "SELECT name, address, budget_line_id, minimum_spend_cents::float8 AS minimum_spend_cents, guarantee_headcount, guarantee_by::text AS guarantee_by, guarantee_confirmed_on::text AS guarantee_confirmed_on, note FROM event_venues WHERE event_id = $1", [eventId]);
+    // A field missing from the body keeps what is stored. The money fields change only for someone who can see money; for anyone else they are ignored, never erased.
+    const money = canPlan(actor);
+    const has = (k: keyof VenueInput) => input[k] !== undefined;
+    let line: string | null = old?.budget_line_id ?? null;
+    if (money && has("budget_line_id")) {
+      line = null;
+      if (input.budget_line_id) {
+        const [l] = await q<{ id: string; category: string }>("SELECT id, category FROM budget_lines WHERE id = $1 AND event_id = $2", [input.budget_line_id, eventId]);
+        if (!l) throw new HostedInvalid("That budget line is not on this event's plan.");
+        if (l.category !== "dinners" && l.category !== "other") throw new HostedInvalid("The venue sits on a dinners line or an other line.");
+        line = l.id;
+      }
     }
-    const by = input.guarantee_by ? ymd(input.guarantee_by, "the guarantee day") : null;
+    const minimum = money && has("minimum_spend_cents") ? wholeOrNull(input.minimum_spend_cents, "the minimum spend") : old?.minimum_spend_cents ?? null;
+    const headcount = has("guarantee_headcount") ? wholeOrNull(input.guarantee_headcount, "the headcount guarantee") : old?.guarantee_headcount ?? null;
+    const by = has("guarantee_by") ? (input.guarantee_by ? ymd(input.guarantee_by, "the guarantee day") : null) : old?.guarantee_by ?? null;
     const confirmed = input.guarantee_confirmed === undefined ? old?.guarantee_confirmed_on ?? null : input.guarantee_confirmed ? old?.guarantee_confirmed_on ?? dayIn(now, ev.zone) : null;
+    const name = has("name") ? text(input.name).slice(0, 160) : old?.name ?? "";
+    const address = has("address") ? text(input.address).slice(0, 300) : old?.address ?? "";
+    const note = has("note") ? text(input.note).slice(0, 600) : old?.note ?? "";
     await q(
       `INSERT INTO event_venues (event_id, name, address, budget_line_id, minimum_spend_cents, guarantee_headcount, guarantee_by, guarantee_confirmed_on, note) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        ON CONFLICT (event_id) DO UPDATE SET name = EXCLUDED.name, address = EXCLUDED.address, budget_line_id = EXCLUDED.budget_line_id, minimum_spend_cents = EXCLUDED.minimum_spend_cents,
          guarantee_headcount = EXCLUDED.guarantee_headcount, guarantee_by = EXCLUDED.guarantee_by, guarantee_confirmed_on = EXCLUDED.guarantee_confirmed_on, note = EXCLUDED.note`,
-      [eventId, text(input.name).slice(0, 160), text(input.address).slice(0, 300), line, wholeOrNull(input.minimum_spend_cents, "the minimum spend"), wholeOrNull(input.guarantee_headcount, "the headcount guarantee"), by, confirmed, text(input.note).slice(0, 600)]);
+      [eventId, name, address, line, minimum, headcount, by, confirmed, note]);
     if (input.steps !== undefined) {
       if (!Array.isArray(input.steps) || input.steps.length > 20) throw new HostedInvalid("A venue has up to 20 cancellation steps.");
       await q("DELETE FROM venue_cancellation_steps WHERE event_id = $1", [eventId]);
@@ -192,6 +204,7 @@ export async function hostedView(db: Db, deps: HostedDeps, eventId: string, acto
   const venue = await venueView(db.query, ev, est, registered, today);
   const cohost = await cohostView(db, eventId);
   const reminders = await reminderPreview(db, eventId, "reminder", { live: deps.live, hasSender: Boolean(deps.sender) });
+  const [{ n: queuedUnsent }] = await db.query<{ n: number }>("SELECT count(*)::int AS n FROM transactional_outbox WHERE event_id = $1 AND state = 'queued'", [eventId]);
   const hosts = (await db.query<{ person: string }>("SELECT person FROM event_people WHERE event_id = $1 AND removed_at IS NULL AND 'host' = ANY(roles) ORDER BY created_at, id", [eventId])).map((p) => p.person);
   const next = guests.find((g) => g.status === "listed" && g.can_email) ?? null;
   const [lastRun] = await db.query<{ id: string; kind: string; created_at: string; sent_count: number; skipped: unknown }>("SELECT id, kind, created_at::text AS created_at, sent_count, skipped FROM reminder_runs WHERE event_id = $1 ORDER BY created_at DESC, id DESC LIMIT 1", [eventId]);
@@ -208,7 +221,7 @@ export async function hostedView(db: Db, deps: HostedDeps, eventId: string, acto
     can_write: flags.can_write, can_check_in: flags.can_check_in, can_see_money: flags.money,
     empty: guests.length === 0, empty_words: guests.length === 0 ? "No guests yet" : null,
     guests, counts, estimate: est, venue, cohost,
-    reminders: { can_send: reminders.can_send, refusal: reminders.refusal, audience_count: reminders.count, skipped: reminders.skipped, last_run: lastRun ?? null },
+    reminders: { can_send: reminders.can_send, refusal: reminders.refusal, queued_unsent: queuedUnsent, not_sent: queuedUnsent > 0 && !deps.sender ? "Not sent: no sender is set up" : null, audience_count: reminders.count, skipped: reminders.skipped, last_run: lastRun ?? null },
     primary: next ? { action: "invite", guest_id: next.id, name: next.name } : registered > 0 && !ev.webinar ? { action: "remind", guest_id: null, name: null } : { action: "none", guest_id: null, name: null },
     ...(cost ? { cost: { total_cents: cost.total_cents, per_attendee_cents: counts.attended ? Math.round(cost.total_cents / counts.attended) : null } } : {}),
   };
@@ -284,7 +297,11 @@ export async function myGuests(db: Db, actor: string, flags: Pick<Flags, "money"
 export interface ConferenceSuggestion { company_id: string; name: string; owner: string | null; owner_decision: string | null; owner_words: string; can_add_by: string | null }
 
 /** Target accounts with an open deal or an owner that are not on the list, with their owner; and, for an event that hangs off a conference, that conference's tier 1 companies (a suggestion list only). */
-export async function suggestions(db: Db, eventId: string) {
+export async function suggestions(db: Db, eventId: string, flags: { money: boolean } = { money: false }) {
+  const out = await suggestionsRaw(db, eventId);
+  return flags.money ? out : asRep(out);
+}
+async function suggestionsRaw(db: Db, eventId: string) {
   const ev = await hostedEvent(db.query, eventId);
   const accounts = await db.query<{ id: string; name: string; domain: string | null; country: string | null; owner: string | null; open_deal: string | null; deal_stage: string | null }>(
     `SELECT t.id, t.name, t.domain, t.country, t.owner, t.open_deal, t.deal_stage FROM target_accounts t

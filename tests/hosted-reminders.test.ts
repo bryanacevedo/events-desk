@@ -174,3 +174,26 @@ describe("one send per guest, and live mode needs a key", () => {
     expect(await sendReminder(db, { now: () => BEFORE }, CAMILLE, id, "reminder")).toMatchObject({ sent: 1 });
   });
 });
+
+describe("the ten-minute check looks only at runs that already happened", () => {
+  it("a run dated in the future does not block a reminder now", async () => {
+    const db = await freshDb();
+    const id = await hostedDinner(db, { capacity: 10 });
+    await yes(db, depsAt(BEFORE), id, "Ana Ruiz");
+    const later = new Date(BEFORE.getTime() + 9 * 86_400_000);
+    await sendReminder(db, { now: () => later }, CAMILLE, id, "reminder");
+    expect(await sendReminder(db, { now: () => BEFORE }, CAMILLE, id, "reminder")).toMatchObject({ sent: 1 });
+    await expect(sendReminder(db, { now: () => new Date(BEFORE.getTime() + 60_000) }, CAMILLE, id, "reminder")).rejects.toThrow(/last 10 minutes/);
+  });
+
+  it("live mode with no sender leaves the rows queued and the page says so", async () => {
+    const db = await freshDb();
+    const id = await hostedDinner(db, { capacity: 1 });
+    await yes(db, depsAt(BEFORE), id, "Ana Ruiz");
+    await db.query("INSERT INTO transactional_outbox (id, event_id, kind, to_email, subject, body, created_at) VALUES ('tx_q1', $1, 'reminder', 'a@b.example', 's', 'b', now())", [id]);
+    const { hostedView } = await import("../src/server/hosted-view.ts");
+    const v = await hostedView(db, { now: () => BEFORE, live: true, sender: null } as never, id, CAMILLE, { money: true, can_write: true, can_check_in: true }) as any;
+    expect(v.reminders.not_sent).toBe("Not sent: no sender is set up");
+    expect((await db.query("SELECT state FROM transactional_outbox WHERE id = 'tx_q1'"))[0]).toEqual({ state: "queued" });
+  });
+});

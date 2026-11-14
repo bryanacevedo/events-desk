@@ -81,23 +81,24 @@ async function goldenGate(db: Db, today: string) {
   const accounts = await db.query<{ id: string; name: string }>("SELECT id, name FROM target_accounts ORDER BY lower(name)");
   const acct = new Map(accounts.map((a) => [a.name, a.id]));
   await hostThe(db, id, MAYA, { capacity: 5, address: "1 Ferry Building, San Francisco", welcome: "Ten seats at one table, no slides, good wine." });
+  // Every date here is before the seed's own day (invitations, answers, the reminder), so none reads as the future on the demo's day.
   // Twenty-two guests: sixteen from accounts and deals, six nominated by AEs. Two of the unanswered are in countries the desk does not email, one has no country: the host writes those by hand.
   const list = people(22, 40).map((p, i): GuestInput => ({ ...p, source: i < 16 ? (i % 3 === 0 ? "deal" : "account") : "nomination", ...(i < 14 ? { account_id: acct.get(COMPANIES[i % 14])!, company: COMPANIES[i % 14], owner: undefined } : {}) }));
   list[19].country = "DE"; list[20].country = "SE"; list[21].country = null;
   const ids: string[] = [];
-  for (const [i, g] of list.entries()) ids.push((await addGuest(db, i < 16 ? MAYA : (g.owner as string), id, { ...g, nominated_by: i >= 16 ? (g.owner as string) : undefined }, { at: at(addDays(on, -30)) })).id);
+  for (const [i, g] of list.entries()) ids.push((await addGuest(db, i < 16 ? MAYA : (g.owner as string), id, { ...g, nominated_by: i >= 16 ? (g.owner as string) : undefined }, { at: at(addDays(today, -20)) })).id);
   // Eleven invited by the host from their own mailbox (logged, never sent by the desk).
-  for (const [i, gid] of ids.slice(0, 11).entries()) await logInvitation(db, MAYA, id, gid, { sent_on: addDays(on, -24 + (i % 6)), mailbox: "maya@orrery.example" }, { now: at(addDays(on, -24 + (i % 6)), 10, i) });
+  for (const [i, gid] of ids.slice(0, 11).entries()) await logInvitation(db, MAYA, id, gid, { sent_on: addDays(today, -16 + (i % 6)), mailbox: "maya@orrery.example" }, { now: at(addDays(today, -16 + (i % 6)), 10, i) });
   // Five yes, then a sixth yes at capacity 5: the waitlist. Two decline. Three have not answered.
-  for (const [i, gid] of ids.slice(0, 6).entries()) await answer(db, clock(at(addDays(on, -18 + i), 11, i)), gid, "yes", i === 1 ? { dietary: "No shellfish" } : i === 4 ? { dietary: "Vegetarian" } : {});
-  for (const gid of ids.slice(6, 8)) await answer(db, clock(at(addDays(on, -16), 14)), gid, "no", { note: "Cannot make it." });
+  for (const [i, gid] of ids.slice(0, 6).entries()) await answer(db, clock(at(addDays(today, -12 + i), 11, i)), gid, "yes", i === 1 ? { dietary: "No shellfish" } : i === 4 ? { dietary: "Vegetarian" } : {});
+  for (const gid of ids.slice(6, 8)) await answer(db, clock(at(addDays(today, -8), 14)), gid, "no", { note: "Cannot make it." });
   // Capacity rises to 10 afterwards. Raising it promotes nobody: the host moves the waitlisted guest in.
   await patchHosted(db, MAYA, id, { capacity: 10 });
   // One reminder, to the registered only.
-  await sendReminder(db, clock(at(addDays(on, -9), 9)), MAYA, id, "reminder", { origin: "https://events-desk.example" });
+  await sendReminder(db, clock(at(addDays(today, -3), 9)), MAYA, id, "reminder", { origin: "https://events-desk.example" });
   // The venue sits on the dinner's budget line: a minimum spend, a guarantee in 13 days, and two cancellation steps.
   const [line] = await db.query<{ id: string }>("SELECT id FROM budget_lines WHERE event_id = $1 AND category = 'dinners' ORDER BY id LIMIT 1", [id]);
-  await putVenue(db, clock(at(today)), MAYA, id, {
+  await putVenue(db, clock(at(today)), "Camille Laurent", id, {
     name: "Ferry Building Room", address: "1 Ferry Building, San Francisco", budget_line_id: line.id, minimum_spend_cents: 400_000, guarantee_headcount: 10, guarantee_by: addDays(today, 13), note: "Private room, seated, one menu.",
     steps: [{ id: GG_STEP_FREE, by_date: addDays(today, 5), rule: "Free cancellation ends", fee_cents: 0 }, { id: GG_STEP_FEE, by_date: addDays(today, 13), rule: "Half the minimum spend is owed after this", fee_cents: 200_000 }],
   });

@@ -104,7 +104,7 @@ export async function sendReminder(db: Db, deps: HostedDeps, actor: string, even
     if (ev.webinar) throw new RuleError("A webinar has registrants, not reminders from here.");
     if (ev.stage === "declined") throw new RuleError("This event was declined, so there is nothing to remind.");
     const h = await lockHosted(q, eventId);
-    const [recent] = await q("SELECT 1 FROM reminder_runs WHERE event_id = $1 AND kind = $2 AND created_at > $3::timestamptz - ($4::text || ' minutes')::interval LIMIT 1", [eventId, kind, now.toISOString(), String(MIN_GAP_MINUTES)]);
+    const [recent] = await q("SELECT 1 FROM reminder_runs WHERE event_id = $1 AND kind = $2 AND created_at <= $3::timestamptz AND created_at > $3::timestamptz - ($4::text || ' minutes')::interval LIMIT 1", [eventId, kind, now.toISOString(), String(MIN_GAP_MINUTES)]);
     if (recent) throw new RuleError(`A ${kind} went out in the last ${MIN_GAP_MINUTES} minutes. Wait before sending another.`);
     const { audience, skipped } = await audienceOf(q, eventId);
     if (!audience.length) throw new RuleError("Nobody is registered with an email the desk may use.");

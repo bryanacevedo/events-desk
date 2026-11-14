@@ -401,7 +401,7 @@ export async function checkIn(db: Db, deps: HostedDeps, actor: string, eventId: 
     if (g.status === "attended") throw new RuleError("They are already checked in.");
     const err = transition(g.status, "attended", { by: "host" });
     if (err) throw new RuleError(err);
-    await q("UPDATE event_guests SET status = 'attended', prior_status = $2, checked_in_at = $3, checked_in_by = $4, waitlisted_at = NULL WHERE id = $1", [gid, g.status, now.toISOString(), actor]);
+    await q("UPDATE event_guests SET status = 'attended', prior_status = $2, checked_in_at = $3, checked_in_by = $4 WHERE id = $1", [gid, g.status, now.toISOString(), actor]);
     await logGuest(q, eventId, gid, "status", `Checked in${g.status === "no_show" ? " after the door closed" : ""}`, actor, now);
     return { id: gid, status: "attended" as GuestStatus };
   });
@@ -418,6 +418,11 @@ export async function undoCheckIn(db: Db, deps: HostedDeps, actor: string, event
     const refusal = undoTransition(g.prior_status, { closed: Boolean(h.closed_at) });
     if (refusal) throw new RuleError(refusal);
     const back = g.prior_status as GuestStatus;
+    // Checking in leaves waitlisted_at as it was, so a guest who goes back to the waitlist keeps their place in line. Going back to registered must not put the room over capacity.
+    if (back === "registered") {
+      const cap = capacityOf(h, await hostedEvent(q, eventId));
+      if (cap !== null && (await registeredCount(q, eventId)) >= cap) throw new RuleError("The room is full, so this check-in cannot go back to registered. Move someone first.");
+    }
     await q("UPDATE event_guests SET status = $2, prior_status = NULL, checked_in_at = NULL, checked_in_by = NULL, waitlisted_at = CASE WHEN $2 = 'waitlist' THEN coalesce(waitlisted_at, $3::timestamptz) ELSE NULL END WHERE id = $1", [gid, back, now.toISOString()]);
     await logGuest(q, eventId, gid, "status", `Check-in undone, back to ${back}`, actor, now);
     return { id: gid, status: back };

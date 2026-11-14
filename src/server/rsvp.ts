@@ -13,6 +13,12 @@ const SAFE = /^[A-Za-z0-9_-]{1,64}$/;
 export const BAD_LINK = "This link is not valid.";
 export class BadToken extends Error {}
 
+/** The event a guest's link belongs to. A link whose event is no longer hosted is as dead as any bad token: the same 404. */
+async function hostedOf(q: Db["query"], eventId: string) {
+  try { return await hostedEvent(q, eventId); }
+  catch (e) { if (e instanceof RuleError) throw new BadToken(BAD_LINK); throw e; }
+}
+
 /** The one row a token names, or a BadToken. The lookup is keyed on the token alone. */
 async function byToken(q: Db["query"], token: string, lock = false): Promise<GuestRow> {
   const [g] = await q<GuestRow>(`SELECT ${GUEST_COLS} FROM event_guests WHERE rsvp_token = $1 AND removed_at IS NULL${lock ? " FOR UPDATE" : ""}`, [SAFE.test(String(token)) ? String(token) : "-"]);
@@ -32,23 +38,25 @@ export interface PublicRsvp {
 }
 
 async function viewOf(q: Db["query"], g: GuestRow, now: Date): Promise<PublicRsvp> {
-  const ev = await hostedEvent(q, g.event_id);
+  const ev = await hostedOf(q, g.event_id);
   const h = await readHosted(q, g.event_id);
   const [v] = await q<{ name: string; address: string }>("SELECT name, address FROM event_venues WHERE event_id = $1", [g.event_id]);
   const began = dayIn(now, ev.zone) >= ev.starts_on;
   const cap = capacityOf(h, ev);
   const full = cap !== null && (await registeredCount(q, g.event_id)) >= cap;
   const answered = g.status === "attended" || g.status === "no_show";
-  const open = h.rsvp_open && !full;
+  const declined = ev.stage === "declined";
+  const open = h.rsvp_open && !full && !declined;
   let message: string | null = null;
   if (ev.webinar) message = "This event takes registrations from the organizer, not here.";
+  else if (declined) message = REFUSAL.passed;
   else if (answered || began) message = began ? REFUSAL.passed : "Your answer is closed.";
   else if (!open && g.status !== "registered" && g.status !== "waitlist") message = "The list is full. You can still tell us you cannot come.";
   return {
     event: { name: ev.name, day: ev.starts_on, doors_at: h.doors_at, venue_name: v?.name || ev.venue, address: h.address || v?.address || "", host_name: h.host_name, welcome: h.welcome },
     guest: { first_name: firstName(g.name), status: g.status, dietary: g.dietary },
     list_open: open,
-    can_answer: !ev.webinar && !answered && !began,
+    can_answer: !ev.webinar && !answered && !began && !declined,
     message,
   };
 }
@@ -69,10 +77,11 @@ export async function answerRsvp(db: Db, deps: HostedDeps, token: string, body: 
   const ids: (string | null)[] = [];
   const view = await db.tx(async (q) => {
     const peek = await byToken(q, token);
-    const ev = await hostedEvent(q, peek.event_id);
+    const ev = await hostedOf(q, peek.event_id);
     if (ev.webinar) throw new RuleError("This event takes registrations from the organizer, not here.");
     const h = await lockHosted(q, peek.event_id);
     const g = await byToken(q, token, true);
+    if (ev.stage === "declined") throw new RuleError(REFUSAL.passed);
     if (g.status === "attended" || g.status === "no_show") throw new RuleError("Your answer is closed.");
     const dayBegan = dayIn(now, ev.zone) >= ev.starts_on;
     const cap = capacityOf(h, ev);
@@ -114,7 +123,7 @@ const failures = new Map<string, { n: number; at: number }>();
 /** The same key the public demo's write limit uses: the last x-forwarded-for entry, else "local". */
 export const addressOf = (c: Context) => (c.req.header("x-forwarded-for") ?? "").split(",").pop()!.trim() || "local";
 
-function overLimit(ip: string, now: number) { const w = failures.get(ip); return Boolean(w && now - w.at < 60_000 && w.n > BAD_PER_MINUTE); }
+function overLimit(ip: string, now: number) { const w = failures.get(ip); return Boolean(w && now - w.at < 60_000 && w.n >= BAD_PER_MINUTE); }
 function countFailure(ip: string, now: number) {
   const w = failures.get(ip);
   const cur = w && now - w.at < 60_000 ? w : { n: 0, at: now };

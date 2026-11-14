@@ -5,6 +5,7 @@ import { createApp } from "../src/server/app.ts";
 import { recordEventCost } from "../src/server/closeout.ts";
 import { checkIn, closeAttendance, patchHosted, updateGuest } from "../src/server/hosted.ts";
 import { putCohost, putVenue } from "../src/server/hosted-view.ts";
+import { addPerson } from "../src/server/plan.ts";
 import { mockLlm } from "../src/server/providers.ts";
 import { freshDb } from "./helpers.ts";
 import { AFTER, BEFORE, depsAt, hostedDinner, ON_THE_DAY, tokenOf, yes } from "./hosted-helpers.ts";
@@ -46,7 +47,7 @@ describe("a rep's hosted reads", () => {
       const r = await app.request(path, { headers: as("Priya Nair") });
       if (r.status !== 200) continue;
       const j = await r.json();
-      if (!/rsvp|suggestions/.test(path)) found.push(...money(j).map((f) => `${path}: ${f}`));
+      if (!/rsvp/.test(path)) found.push(...money(j).map((f) => `${path}: ${f}`));
       expect(JSON.stringify(j), path).not.toMatch(/"[a-z_]*cents"/);
     }
     expect(found).toEqual([]);
@@ -58,6 +59,32 @@ describe("a rep's hosted reads", () => {
     expect(page.cohost).toMatchObject({ partner: "Partner Co", our_share_percent: 60, note: "" });
     expect(page.guests).toHaveLength(2);
     expect(page.guests.find((g: any) => g.id === a).notes).toBe("");
+  });
+
+  it("a rep's suggestions carry no deal text with a dollar figure, and a planner's still do", async () => {
+    const { db, id, app } = await setup();
+    await db.query("INSERT INTO target_accounts (id, name, owner, open_deal, deal_stage, created_by) VALUES ('tac_2', 'Zed Corp', 'Maya Ortiz', 'Renewal worth $90,000', 'Won $90,000', 'x')");
+    const rep = JSON.stringify(await (await app.request(`/api/events/${id}/guests/suggestions`, { headers: as("Priya Nair") })).json());
+    expect(rep).not.toContain("$90,000");
+    expect(rep).toContain("Zed Corp");
+    expect(JSON.stringify(await (await app.request(`/api/events/${id}/guests/suggestions`, { headers: as(CAMILLE) })).json())).toContain("$90,000");
+  });
+
+  it("a venue PUT without a field keeps what is stored, and only someone who sees money changes the money fields", async () => {
+    const { db, id, app } = await setup();
+    const put = (who: string, body: unknown) => app.request(`/api/events/${id}/venue`, { method: "PUT", headers: { ...as(who), "content-type": "application/json" }, body: JSON.stringify(body) });
+    const read = async () => (await db.query<any>("SELECT name, address, budget_line_id, minimum_spend_cents::float8 AS m, guarantee_headcount, guarantee_by::text AS by, note FROM event_venues WHERE event_id = $1", [id]))[0];
+    const first = await read();
+    expect((await put(CAMILLE, { guarantee_headcount: 9 })).status).toBe(200);
+    expect(await read()).toEqual({ ...first, guarantee_headcount: 9 });
+    // A host with no money rights: the money fields are ignored, never erased.
+    await addPerson(db, CAMILLE, id, { person: "Priya Nair", roles: ["host"] });
+    const r = await put("Priya Nair", { note: "Use the side door.", minimum_spend_cents: 1, budget_line_id: null });
+    expect(r.status).toBe(200);
+    expect(await read()).toEqual({ ...first, guarantee_headcount: 9, note: "Use the side door." });
+    // The planner can clear them on purpose.
+    expect((await put(CAMILLE, { minimum_spend_cents: null })).status).toBe(200);
+    expect((await read()).m).toBeNull();
   });
 
   it("leadership and a planner read the same page with the figures", async () => {

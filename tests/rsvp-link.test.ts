@@ -47,8 +47,7 @@ describe("a bad link answers one 404", () => {
     const g = await guest(db, id, "Ana Ruiz");
     const tok = await tokenOf(db, g.id);
     for (let i = 0; i < 30; i++) expect((await get(`bad${i}`, "9.9.9.9")).status).toBe(404);
-    expect((await get("bad31", "9.9.9.9")).status).toBe(404);
-    expect((await get("bad32", "9.9.9.9")).status).toBe(429);
+    expect((await get("bad31", "9.9.9.9")).status).toBe(429);
     expect((await get(tok, "9.9.9.9")).status).toBe(429);
     expect((await get(tok, "8.8.8.8")).status).toBe(200);
   });
@@ -106,5 +105,28 @@ describe("what the page says", () => {
     expect((await post(await tokenOf(db, b.id), { answer: "no", note: "Travelling" })).status).toBe(200);
     expect((await post(ta, { answer: "maybe" })).status).toBe(400);
     expect((await post(ta, { answer: "yes", dietary: "x".repeat(301) })).status).toBe(400);
+  });
+});
+
+describe("a link whose event is gone or declined", () => {
+  it("a real token whose event is no longer hosted answers the same 404 as any bad token", async () => {
+    const g = await guest(db, id, "Ana Ruiz");
+    const tok = await tokenOf(db, g.id);
+    await db.query("UPDATE involvements SET status = 'dropped', dropped_reason = 'Not hosting' WHERE event_id = $1 AND kind = 'hosted'", [id]);
+    const r = await get(tok);
+    expect(r.status).toBe(404);
+    expect(await r.text()).toBe('{"error":"This link is not valid."}');
+    expect((await post(tok, { answer: "yes" })).status).toBe(404);
+  });
+
+  it("a declined event refuses an answer with the date sentence, and the page reads read only", async () => {
+    const g = await guest(db, id, "Ana Ruiz");
+    const tok = await tokenOf(db, g.id);
+    await db.query("UPDATE events SET stage = 'declined', decline_reason = 'Not going ahead' WHERE id = $1", [id]);
+    const r = await post(tok, { answer: "yes" });
+    expect(r.status).toBe(409);
+    expect(((await r.json()) as any).error).toBe("The date has passed.");
+    const v = (await (await get(tok)).json()) as any;
+    expect(v).toMatchObject({ can_answer: false, list_open: false, message: "The date has passed." });
   });
 });

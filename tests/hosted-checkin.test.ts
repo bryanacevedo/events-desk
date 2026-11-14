@@ -56,6 +56,32 @@ describe("check-in", () => {
   });
 });
 
+describe("undo keeps the waitlist place and the room", () => {
+  it("a waitlisted guest checked in and undone is back on the waitlist with their first place in line", async () => {
+    const db = await freshDb();
+    const id = await hostedDinner(db, { capacity: 1 });
+    await yes(db, depsAt(BEFORE), id, "Ana Ruiz");
+    const w = await yes(db, depsAt(BEFORE), id, "Ben Cole");
+    expect(await statusOf(db, w)).toBe("waitlist");
+    const [{ at: before }] = await db.query<{ at: string }>("SELECT waitlisted_at::text AS at FROM event_guests WHERE id = $1", [w]);
+    await checkIn(db, depsAt(ON_THE_DAY), CAMILLE, id, w);
+    await undoCheckIn(db, depsAt(ON_THE_DAY), CAMILLE, id, w);
+    const [back] = await db.query<{ status: string; at: string }>("SELECT status, waitlisted_at::text AS at FROM event_guests WHERE id = $1", [w]);
+    expect(back).toEqual({ status: "waitlist", at: before });
+  });
+
+  it("refuses when going back to registered would put the room over capacity", async () => {
+    const db = await freshDb();
+    const id = await hostedDinner(db, { capacity: 1 });
+    const a = await yes(db, depsAt(BEFORE), id, "Ana Ruiz");
+    await checkIn(db, depsAt(ON_THE_DAY), CAMILLE, id, a);
+    await yes(db, depsAt(BEFORE), id, "Ben Cole");
+    expect(await statusOf(db, a)).toBe("attended");
+    await expect(undoCheckIn(db, depsAt(ON_THE_DAY), CAMILLE, id, a)).rejects.toThrow(/room is full/);
+    expect(await statusOf(db, a)).toBe("attended");
+  });
+});
+
 describe("closing attendance", () => {
   it("refuses before the event's day, then makes every registered guest a no-show and leaves the rest as they were", async () => {
     const db = await freshDb();

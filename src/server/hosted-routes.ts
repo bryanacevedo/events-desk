@@ -61,7 +61,8 @@ export function mountHosted(app: Hono<any>, db: Db, cfg: Cfg) {
     const input: GuestInput = w ? b : { ...b, source: "nomination", nominated_by: actor, owner: actor, side: "us" };
     if (!w && b.owner && b.owner !== actor) return refuse("You nominate guests for yourself. The host or a planner assigns an owner.", 403);
     return run(async () => {
-      if (b.conference_company) await conferenceOwnerGateFor(db, id(c), b.conference_company, actor);
+      // The owner-kept rule holds whenever the company is one the owner kept, however the guest was sent.
+      for (const co of new Set([b.conference_company, b.company].map((x) => (typeof x === "string" ? x.trim() : "")).filter(Boolean))) await conferenceOwnerGateFor(db, id(c), co, actor);
       return addGuest(db, actor, id(c), input, { at: deps().now?.() });
     }, 201);
   });
@@ -138,7 +139,7 @@ export function mountHosted(app: Hono<any>, db: Db, cfg: Cfg) {
     const { csv, source } = await csvOf(c);
     return run(() => importGuests(db, deps(c), actorOf(c), id(c), source, csv));
   });
-  app.get("/api/events/:id/guests/suggestions", (c) => run(() => suggestions(db, id(c))));
+  app.get("/api/events/:id/guests/suggestions", (c) => run(() => suggestions(db, id(c), { money: canPlan(actorOf(c)) })));
   app.post("/api/target-accounts", async (c) => {
     if (!canPlan(actorOf(c))) return refuse("Target accounts are written by planners, leadership and GTM Engineering.", 403);
     const b = (await body(c)) as TargetInput;
