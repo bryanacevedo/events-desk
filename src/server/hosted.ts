@@ -167,7 +167,8 @@ export async function addGuest(db: Db, actor: string, eventId: string, input: Gu
 /** What a guest's owner may change on their own: notes. The host, a planner, a lead and GTM may change the rest. */
 export async function updateGuest(db: Db, actor: string, eventId: string, gid: string, patch: GuestInput, opts: { ownerOnly?: boolean } = {}) {
   return db.tx(async (q) => {
-    await hostedEvent(q, eventId);
+    const ev = await hostedEvent(q, eventId);
+    if (ev.webinar && patch.seat !== undefined) throw new RuleError("A webinar has no seating.");
     const g = await guestOf(q, eventId, gid, true);
     const sets: string[] = [], vals: unknown[] = [gid];
     const put = (col: string, v: unknown) => { vals.push(v); sets.push(`${col} = $${vals.length}`); };

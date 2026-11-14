@@ -33,7 +33,7 @@ export async function hostedDinner(db: Db, over: { capacity?: number | null; for
 
 /** A guest with an email and a country that may be emailed, added by Camille. */
 export const guest = (db: Db, id: string, name: string, over: GuestInput = {}) =>
-  addGuest(db, CAMILLE, id, { name, email: `${name.toLowerCase().replace(/[^a-z]+/g, ".")}@acme.example`, company: "Acme", country: "US", owner: "Maya Ortiz", ...over });
+  addGuest(db, CAMILLE, id, { name, email: `${name.toLowerCase().replace(/[^a-z0-9]+/g, ".")}@acme.example`, company: "Acme", country: "US", owner: "Maya Ortiz", ...over });
 
 export const invite = (db: Db, id: string, gid: string, at = BEFORE) => logInvitation(db, CAMILLE, id, gid, {}, { now: at });
 
@@ -44,6 +44,13 @@ export async function statusOf(db: Db, gid: string) { return (await db.query<{ s
 export async function yes(db: Db, deps: HostedDeps, id: string, name: string, over: GuestInput = {}) {
   const g = await guest(db, id, name, over);
   await invite(db, id, g.id);
+  await answerRsvp(db, deps, await tokenOf(db, g.id), { answer: "yes" });
+  return g.id;
+}
+
+/** A guest who answers yes on their own link without a logged invitation (the host may have sent the link by hand). */
+export async function answered(db: Db, deps: HostedDeps, id: string, name: string, over: GuestInput = {}) {
+  const g = await guest(db, id, name, over);
   await answerRsvp(db, deps, await tokenOf(db, g.id), { answer: "yes" });
   return g.id;
 }

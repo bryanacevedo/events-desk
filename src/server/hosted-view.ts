@@ -49,8 +49,8 @@ export async function noshowEstimate(q: Q, ev: HostedEvent, h: HostedRow): Promi
   }
   const [c] = await q<{ yes: number; attended: number; reg: number }>(
     "SELECT count(*) FILTER (WHERE status IN ('registered', 'attended', 'no_show') AND source <> 'walk_in')::int AS yes, count(*) FILTER (WHERE status = 'attended')::int AS attended, count(*) FILTER (WHERE status = 'registered')::int AS reg FROM event_guests WHERE event_id = $1 AND removed_at IS NULL", [ev.id]);
-  const keep = 1 - Math.min(90, rate) / 100;
-  return { rate_pct: rate, basis, yes: c.yes, expected_attending: h.closed_at ? c.attended : Math.round(c.reg * keep), confirm_to_fill: cap === null ? null : Math.ceil(cap / keep), capacity: cap, words };
+  const pct = Math.min(90, rate);
+  return { rate_pct: rate, basis, yes: c.yes, expected_attending: h.closed_at ? c.attended : Math.round((c.reg * (100 - pct)) / 100), confirm_to_fill: cap === null ? null : Math.ceil((cap * 100) / (100 - pct)), capacity: cap, words };
 }
 
 /* ------------------------------------------------------------------ the venue and the co-host */
