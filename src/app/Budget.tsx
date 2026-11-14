@@ -11,7 +11,32 @@ import { useActor } from "./App";
 import { ExpandRow, Flag } from "./Patterns";
 import { money, shortDate } from "./words";
 
-type View = Awaited<ReturnType<typeof budgetView>>;
+type PlanTable = { events: { event_id: string; name: string; starts_on: string; plan_stage: string; planned_cents: number; contracted_cents: number; actual_cents: number }[]; total_planned_cents: number; total_contracted_cents: number; total_actual_cents: number };
+type View = Awaited<ReturnType<typeof budgetView>> & { plan?: PlanTable };
+const STAGE_WORDS: Record<string, string> = { planning: "Planning", confirmed: "Confirmed", preparing: "Preparing", live: "Live", following_up: "Following up", judged: "Judged" };
+const cell = (c: number, none = false) => (none && c === 0 ? <>none</> : <><i>$</i>{(c / 100).toLocaleString("en-US", { maximumFractionDigits: 0 })}</>);
+
+/** What each event planned, what its agreements oblige, and what was paid, with the year's totals. Under the ticket block, which stays as it was. */
+function PlanByEvent({ plan, year, open }: { plan: PlanTable; year: number; open: (id: string) => string }) {
+  if (!plan.events.length) return null;
+  return (
+    <section aria-label="Plan by event">
+      <div className="grp"><h2 className="display">Plan by event</h2><span className="mute">{year}</span></div>
+      <div className="yr bp">
+        <div className="yr-h"><span /><span>Event</span><span>Stage</span><span className="m">Planned</span><span className="m">Contracted</span><span className="m">Actual</span></div>
+        {plan.events.map((e) => (
+          <a key={e.event_id} href={open(e.event_id)} className="yr-r" data-row={e.event_id} data-opens-sheet="">
+            <span className="date">{shortDate(e.starts_on).replace(/^\w+,? /, "")}</span>
+            <span className="ev"><em>{e.name}</em></span>
+            <span className={`stage${e.plan_stage === "judged" ? " done" : ""}`}>{STAGE_WORDS[e.plan_stage] ?? e.plan_stage}</span>
+            <span className="money"><span className="m"><span className="lbl">Planned</span>{cell(e.planned_cents, true)}</span><span className="m"><span className="lbl">Contracted</span>{cell(e.contracted_cents, true)}</span><span className="m"><span className="lbl">Actual</span>{cell(e.actual_cents)}</span></span>
+          </a>
+        ))}
+        <div className="yr-t"><span className="date" /><span className="t">Year total</span><span className="money"><span className="m"><span className="lbl">Planned</span>{cell(plan.total_planned_cents)}</span><span className="m"><span className="lbl">Contracted</span>{cell(plan.total_contracted_cents)}</span><span className="m"><span className="lbl">Actual</span>{cell(plan.total_actual_cents)}</span></span></div>
+      </div>
+    </section>
+  );
+}
 type Q = View["quarters"][number];
 type Sums = Pick<Q, "budget_cents" | "spent" | "committed" | "waiting">;
 const k = (cents: number) => (Math.abs(cents) >= 1_000_000 ? `$${(cents / 100_000).toFixed(0)}k` : money(cents));
@@ -180,6 +205,8 @@ export function Budget({ go, search }: { go: (to: string) => void; search: URLSe
           <div className="pager small"><button type="button" className="textlink" disabled={v.page <= 1} onClick={() => to({ page: String(v.page - 1) })}>Previous</button><span className="mute">{v.page} of {v.pages}</span><button type="button" className="textlink" disabled={v.page >= v.pages} onClick={() => to({ page: String(v.page + 1) })}>Next</button></div>
         )}
       </section>
+
+      {v.plan && <PlanByEvent plan={v.plan} year={v.year} open={withSheet} />}
 
       <div className="bsplit">
         {([["By team", v.by_team], ["By region", v.by_region]] as const).map(([title, rows]) => (

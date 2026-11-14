@@ -4,6 +4,8 @@ import type { ActivityRow, EventRow } from "../shared/domain";
 import type { CardLines, Settings } from "../shared/cost";
 import type { ListSummary } from "../server/uploads";
 import type { DeliveredLately, LiveRow, OutreachNeed, ResultRow } from "../server/overview";
+import type { DeadlineRow, YearRow } from "../server/plan";
+import type { ListSource } from "../shared/plan";
 import type { Spread } from "../shared/tiering";
 import type { CompanyRow, PersonRow } from "../server/event-views";
 
@@ -34,7 +36,9 @@ export interface Pending {
   id: string; kind: "seats" | "card" | "research" | "outreach"; requested_by: string; event_id: string; name: string; seat_count: number; seat_price_cents: number;
   lines: CardLines | null; credits_cap: number | null; llm_cap: number | null; est_cents: number | null;
 }
-export type { DeliveredLately, LiveRow, OutreachNeed, ResultRow };
+export type { DeliveredLately, LiveRow, OutreachNeed, ResultRow, DeadlineRow, YearRow };
+/** The year plan. A rep's read has no key that holds dollars, so every `*_cents` is optional. */
+export interface YearPlanRead { year: number; today: string; events: (Omit<YearRow, "planned_cents" | "contracted_cents" | "actual_cents" | "goal"> & { planned_cents?: number; contracted_cents?: number; actual_cents?: number; goal: { meetings_held: number | null; accounts_met: number | null; pipeline_cents?: number | null } })[]; total_planned_cents?: number; total_contracted_cents?: number; total_actual_cents?: number }
 
 /** An event people can ask for a seat at. `event_id` is the live event row, when someone has asked. */
 export interface CatalogEntry {
@@ -75,10 +79,10 @@ export async function get<T>(path: string): Promise<T | null> {
   }
 }
 
-export async function send<T = unknown>(method: "POST" | "PATCH" | "PUT" | "DELETE", path: string, actor: string, body?: unknown, raw?: { bytes: ArrayBuffer; filename: string; type: string }): Promise<Result<T>> {
+export async function send<T = unknown>(method: "POST" | "PATCH" | "PUT" | "DELETE", path: string, actor: string, body?: unknown, raw?: { bytes: ArrayBuffer; filename: string; type: string; headers?: Record<string, string> }): Promise<Result<T>> {
   const headers: Record<string, string> = { "x-actor": encodeURIComponent(actor) };
   let payload: BodyInit | undefined;
-  if (raw) { headers["x-filename"] = encodeURIComponent(raw.filename); headers["content-type"] = raw.type; payload = raw.bytes; }
+  if (raw) { headers["x-filename"] = encodeURIComponent(raw.filename); Object.assign(headers, raw.headers); headers["content-type"] = raw.type; payload = raw.bytes; }
   else if (body !== undefined) { headers["content-type"] = "application/json"; payload = JSON.stringify(body); }
   try {
     const r = await fetch(path, { method, headers, body: payload });
@@ -94,6 +98,8 @@ export interface PlanInvolvement { id: string; kind: "passes" | "sponsorship" | 
 export interface PlanPerson { id: string; person: string; roles: string[]; team: string; involvement_id: string | null; seat_request_id: string | null; seat_status: "pending" | "approved" | "declined" | null }
 export interface PlanBudgetCategory { category: string; label: string; line_ids: string[]; planned_cents: number; contracted_cents: number | null; actual_cents: number | null }
 export interface GoalLine { goal: number; actual: number; short_by: number }
+export interface PlanDeliverable { id: string; kind: string; label: string; due_on: string | null; owner: string; done: boolean; done_by: string | null; note: string; due_words: string; group: "late" | "today" | "week" | null }
+export interface PlanPromise { id: string; item: string; label: string; promised_qty: number | null; received_qty: number | null; received_on: string | null; note: string; words: string }
 export interface PlanData {
   event: { id: string; name: string; venue: string; starts_on: string; last_day: string; stage: string; decline_reason: string | null; approval_mode: "per_seat" | "budget"; hosted: boolean };
   stage_line: { plan_stage: string; plan_stage_label: string; list_stage: string; list_stage_label: string; waiting_on: string; paused: boolean };
@@ -103,5 +109,9 @@ export interface PlanData {
   approval: { submitted_at: string | null; approved_by: string | null; approved_at: string | null; approved_budget_cents?: number | null; requested_by: string; approvers: string[]; over_budget: boolean; over_plan: boolean; waiting_seats: number };
   involvements: PlanInvolvement[]; side_events: { id: string; name: string; starts_on: string; hosted_format: string; plan_stage: string }[]; who_goes: PlanPerson[];
   notes: string[]; judged_at: string | null; can_plan: boolean;
+  /** The package. Prices (`*_cents`) are leadership's and planners'. `tier_name` is the tier, read under another key because db.ts turns a key named tier into a number. */
+  sponsorship: { id: string; involvement_id: string; tier_name: string; price_cents?: number; contract_signed_on: string | null; deposit_cents?: number | null; deposit_due_on: string | null; deposit_paid_on: string | null; balance_due_on: string | null; balance_paid_on: string | null } | null;
+  deliverables: PlanDeliverable[]; promises: PlanPromise[]; deadlines: { kind: string; ref_id: string; label: string; due_on: string; owner: string; due_words: string; group: "late" | "today" | "week" | null }[];
+  list_source: { list_source: ListSource; source_note: string } | null;
   budget?: { lines: { id: string; category: string; label: string; planned_cents: number; contracted_cents: number | null }[]; categories: PlanBudgetCategory[]; ai_actual_cents: number; total_planned_cents: number; total_contracted_cents: number; total_actual_cents: number; approved_budget_cents: number | null };
 }

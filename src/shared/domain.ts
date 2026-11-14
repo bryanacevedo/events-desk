@@ -75,6 +75,10 @@ export interface EventRow {
   approval_mode?: "per_seat" | "budget";
   plan_approved_at?: string | null;
   judged_at?: string | null;
+  /** How the team takes part, in words ("Passes, sponsorship, talk"), and for a hosted event its format and the conference it hangs off. */
+  involvement_words?: string;
+  hosted_format?: string | null;
+  conference_event_id?: string | null;
 }
 
 export interface ActivityRow {

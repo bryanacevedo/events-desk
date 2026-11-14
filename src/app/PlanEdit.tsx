@@ -24,7 +24,7 @@ export function Editable({ can, label, view, editor }: { can: boolean; label: st
 }
 
 /** One editor's save and cancel, and its one sentence of error. */
-function Form({ onSave, onCancel, saveWord = "Save", children, ready = true }: { onSave: () => Promise<{ ok: boolean; error?: string } | { ok: true } | { ok: false; error: string }>; onCancel: () => void; saveWord?: string; children: ReactNode; ready?: boolean }) {
+export function Form({ onSave, onCancel, saveWord = "Save", children, ready = true }: { onSave: () => Promise<{ ok: boolean; error?: string } | { ok: true } | { ok: false; error: string }>; onCancel: () => void; saveWord?: string; children: ReactNode; ready?: boolean }) {
   const [busy, setBusy] = useState(false), [error, setError] = useState("");
   const submit = async (ev: { preventDefault(): void }) => {
     ev.preventDefault();

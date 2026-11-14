@@ -3,7 +3,7 @@
 
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import type { EventRow } from "../shared/domain";
-import { get, type LiveRow, type OutreachNeed, type ResultRow } from "./api";
+import { get, type DeadlineRow, type LiveRow, type OutreachNeed, type ResultRow, type YearPlanRead } from "./api";
 import { Link, useActor } from "./App";
 import { EventLogo } from "./EventLogo";
 import { Chevron, SheetButton, ShowMore } from "./Patterns";
@@ -94,12 +94,92 @@ function untilt(ev: PointerEvent<HTMLDivElement>) {
   c.style.removeProperty("--rx");
 }
 
+const GROUP_WORDS: Record<DeadlineRow["group"], string> = { late: "Late", today: "Today", week: "This week" };
+const goWords = (g: { meetings_held: number | null; accounts_met: number | null }) => [g.meetings_held !== null ? plural(g.meetings_held, "meeting") : "", g.accounts_met !== null ? plural(g.accounts_met, "account") : ""].filter(Boolean).join(", ") || "No goal was set";
+const day = (ymd: string) => new Date(`${ymd.slice(0, 10)}T12:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+
+/** Direction A (provisional, Bryan has not picked): the week as a full-width hairline ledger grouped Late, Today, This week. Status is the due word in ink. */
+function Week({ rows, go, logos }: { rows: DeadlineRow[]; go: (to: string) => void; logos: Map<string, string | null> }) {
+  return (
+    <section className="ov" aria-label="This week">
+      <div className="ov-h"><h2 className="display">This week</h2>{rows.length > 0 && <span>{rows.length}</span>}</div>
+      {rows.length === 0 ? <p className="mute tray-empty">Nothing is due this week.</p> : (
+        <div className="led">
+          {(["late", "today", "week"] as const).map((g) => {
+            const mine = rows.filter((r) => r.group === g);
+            if (!mine.length) return null;
+            return (
+              <div className={`led-g ${g}`} key={g}>
+                <h3 className="led-gh">{GROUP_WORDS[g]}<span>{mine.length}</span></h3>
+                <div className="led-rows">
+                  {mine.map((r) => (
+                    <Link to={`/event/${r.event_id}`} go={go} className="led-r" key={`${r.kind}:${r.ref_id}`} data-row={`${r.kind}:${r.ref_id}`}>
+                      <span className="what">{r.label}</span>
+                      <span className="meta"><span className="ev"><EventLogo name={r.event_name} website={logos.get(r.event_id)} size={24} /><em>{r.event_name}</em></span><span className="own">{r.owner}</span></span>
+                      <span className="swap"><span className="due">{r.due_words}</span><span className="go">Open<Chevron right /></span></span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** One table, events in date order with a Today rule and, for leadership and planners, a total row. A rep's read has no money keys, so no money columns are drawn. */
+function Year({ year, go, logos }: { year: YearPlanRead; go: (to: string) => void; logos: Map<string, string | null> }) {
+  const lead = year.total_planned_cents !== undefined;
+  const ids = new Set(year.events.map((e) => e.event_id));
+  const firstUpcoming = year.events.findIndex((e) => e.starts_on.slice(0, 10) >= year.today);
+  const amount = (c: number | undefined, none = false) => (c === undefined ? null : none && c === 0 ? <>none</> : <><i>$</i>{(c / 100).toLocaleString("en-US", { maximumFractionDigits: 0 })}</>);
+  return (
+    <section className="ov" aria-label="The year">
+      <div className="ov-h"><h2 className="display">The year</h2><span>{year.year}</span></div>
+      {year.events.length === 0 ? <p className="mute tray-empty">No events this year.</p> : (
+        <div className={`yr${lead ? "" : " norep"}`}>
+          <div className="yr-h"><span /><span>Event</span><span>Taking part</span><span>Stage</span><span className="g">Goal</span>{lead && <><span className="m">Planned</span><span className="m">Contracted</span><span className="m">Actual</span></>}</div>
+          {year.events.map((e, i) => {
+            const past = e.starts_on.slice(0, 10) < year.today;
+            const under = Boolean(e.conference_event_id && ids.has(e.conference_event_id));
+            return (
+              <div key={e.event_id}>
+                {i === firstUpcoming && i > 0 && <div className="yr-now"><span>Today</span></div>}
+                <Link to={`/event/${e.event_id}`} go={go} className={`yr-r${past ? " past" : ""}${under ? " under" : ""}`} data-row={e.event_id}>
+                  <span className="date">{day(e.starts_on)}{e.involvement_words && <span className="lbl"> · {e.involvement_words}</span>}</span>
+                  <span className="ev"><EventLogo name={e.name} website={logos.get(e.event_id)} size={28} /><em>{e.name}</em></span>
+                  <span className="inv">{e.involvement_words}</span>
+                  <span className={`stage${e.plan_stage === "judged" ? " done" : ""}`}>{e.plan_stage_label}</span>
+                  <span className={`goal${e.goal.meetings_held === null && e.goal.accounts_met === null ? " none" : ""}`}>{goWords(e.goal)}</span>
+                  {lead && <span className="money">
+                    <span className="m"><span className="lbl">Planned</span>{amount(e.planned_cents, true)}</span>
+                    <span className="m"><span className="lbl">Contracted</span>{amount(e.contracted_cents, true)}</span>
+                    <span className="m"><span className="lbl">Actual</span>{amount(e.actual_cents)}</span>
+                  </span>}
+                </Link>
+              </div>
+            );
+          })}
+          {firstUpcoming === -1 && <div className="yr-now"><span>Today</span></div>}
+          {lead && <div className="yr-t"><span className="date" /><span className="t">Year total</span><span className="money">
+            <span className="m"><span className="lbl">Planned</span>{amount(year.total_planned_cents)}</span>
+            <span className="m"><span className="lbl">Contracted</span>{amount(year.total_contracted_cents)}</span>
+            <span className="m"><span className="lbl">Actual</span>{amount(year.total_actual_cents)}</span>
+          </span></div>}
+        </div>
+      )}
+    </section>
+  );
+}
+
 export function Overview({ go, sheetId }: { go: (to: string) => void; sheetId: string | null }) {
   const { needs, actor } = useActor();
-  const [ov, setOv] = useState<{ needs: OutreachNeed[]; live: LiveRow[]; results: ResultRow[] } | null>(null);
+  const [ov, setOv] = useState<{ needs: OutreachNeed[]; live: LiveRow[]; results: ResultRow[]; year: YearPlanRead | null; deadlines: DeadlineRow[] } | null>(null);
   const rail = useRef<HTMLDivElement>(null);
   const todayMark = useRef<HTMLDivElement>(null);
-  useEffect(() => { get<{ needs: OutreachNeed[]; live: LiveRow[]; results: ResultRow[] }>("/api/overview").then((j) => setOv({ needs: j?.needs ?? [], live: j?.live ?? [], results: j?.results ?? [] })); }, [needs]);
+  useEffect(() => { get<{ needs: OutreachNeed[]; live: LiveRow[]; results: ResultRow[]; year?: YearPlanRead; deadlines?: DeadlineRow[] }>("/api/overview").then((j) => setOv({ needs: j?.needs ?? [], live: j?.live ?? [], results: j?.results ?? [], year: j?.year ?? null, deadlines: j?.deadlines ?? [] })); }, [needs]);
   // Open on today: the first upcoming card sits at the left edge, the past is one move left.
   useEffect(() => {
     const r = rail.current, m = todayMark.current;
@@ -112,6 +192,7 @@ export function Overview({ go, sheetId }: { go: (to: string) => void; sheetId: s
   const today = todayYmd();
   const all = [...needs.events].sort((a, b) => a.starts_on.localeCompare(b.starts_on) || a.name.localeCompare(b.name));
   const byId = new Map(all.map((e) => [e.id, e]));
+  const logos = new Map(all.map((e) => [e.id, e.website ?? null]));
   const firstUpcoming = all.findIndex((e) => e.starts_on.slice(0, 10) >= today);
   const seatsWaiting = needs.approvals.filter((a) => a.kind === "seats");
   const waitingLogos = [...new Map(needs.requests.filter((r) => r.status === "pending").map((r) => [r.event_id, r])).values()].slice(0, 5);
@@ -134,6 +215,9 @@ export function Overview({ go, sheetId }: { go: (to: string) => void; sheetId: s
           <button type="button" className="arrow" onClick={() => step(1)} aria-label="Later events">→</button>
         </div>
       </header>
+
+      {ov && <Week rows={ov.deadlines} go={go} logos={logos} />}
+      {ov?.year && <Year year={ov.year} go={go} logos={logos} />}
 
       <section className="railwrap" aria-label="Events in date order">
         <div className="rail" ref={rail} tabIndex={0} onKeyDown={onKey} onPointerMove={tilt} onPointerOut={untilt} aria-label="Events, left is earlier, right is later">

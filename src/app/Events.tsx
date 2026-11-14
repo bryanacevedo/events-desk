@@ -27,6 +27,7 @@ const REGIONS: [string, string, string[]][] = [
   ["apac", "Asia Pacific", ["Thailand", "Japan", "Singapore", "Australia", "India"]],
 ];
 const regionOf = (country: string) => REGIONS.find((r) => r[2].includes(country))?.[0] ?? "other";
+const PLAN_STAGE_WORDS: Record<string, string> = { planning: "Planning", confirmed: "Confirmed", preparing: "Preparing", live: "Live", following_up: "Following up", judged: "Judged" };
 const TIMES = { coming: "Coming", past: "Past", all: "All" } as const;
 type TimeKey = keyof typeof TIMES;
 /** The states an event can be in, in the order of its life: the same steps as its header. */
@@ -97,7 +98,10 @@ export function Events({ go, sheetId, requesting, preselect, search }: { go: (to
   const isPast = (r: Row) => r.ends_on < today;
   const inTime = (r: Row) => time === "all" || (time === "past") === isPast(r);
   const windowRows = rows.filter(inTime);
-  const shown = windowRows.filter((r) => (!region || regionOf(r.country) === region) && (!state || stateOf(r, today, needs).key === state) && (!q || `${r.name} ${r.place} ${r.country}`.toLowerCase().includes(q)));
+  const filtered = windowRows.filter((r) => (!region || regionOf(r.country) === region) && (!state || stateOf(r, today, needs).key === state) && (!q || `${r.name} ${r.place} ${r.country}`.toLowerCase().includes(q)));
+  // A hosted event that hangs off a conference sits right under it.
+  const shown = filtered.filter((r) => !(r.e?.conference_event_id && filtered.some((o) => o.e?.id === r.e!.conference_event_id)))
+    .flatMap((r) => [r, ...filtered.filter((o) => o.e?.conference_event_id && o.e.conference_event_id === r.e?.id)]);
   const regions = REGIONS.filter((r) => rows.some((x) => regionOf(x.country) === r[0]));
 
   // The scale: days from today, compressed, over the window. Coming starts at today; Past ends there.
@@ -192,10 +196,10 @@ export function Events({ go, sheetId, requesting, preselect, search }: { go: (to
             const inner = (
               <>
                 <EventLogo name={r.name} website={r.website} size={28} />
-                <div className="tl-name"><p className="name">{r.name}</p><p className="small mute">{r.place}</p></div>
+                <div className={`tl-name${r.e?.conference_event_id && shown.some((o) => o.e?.id === r.e!.conference_event_id) ? " under" : ""}`}><p className="name">{r.name}</p><p className="small mute">{[r.place, r.e?.involvement_words].filter(Boolean).join(" · ")}</p></div>
                 {r.c
                   ? <p className="tl-state none"><span className="tl-req">Request a seat</span></p>
-                  : <p className={`tl-state ${s.tone}`}><span className="tl-words"><b>{s.words}</b>{s.who && <span>{s.who}</span>}</span></p>}
+                  : <p className={`tl-state ${s.tone}`}><span className="tl-words"><b>{s.words}</b>{(() => { const pw = r.e?.plan_stage ? PLAN_STAGE_WORDS[r.e.plan_stage] : ""; const t = [pw && pw !== s.words ? pw : "", s.who].filter(Boolean).join(", "); return t ? <span>{t}</span> : null; })()}</span></p>}
                 <div className="tl-track">
                   {runway && (
                     <div className={`tl-bar ${s.tone}`} style={{ left: `${Math.min(todayX, x1)}%`, width: `${Math.max(0, x1 - todayX)}%` }} role="img" aria-label={`${done} of 5 steps done`}>

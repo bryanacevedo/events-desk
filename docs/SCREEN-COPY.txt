@@ -23,6 +23,7 @@ Last day of the event
 My event is not listed
 No event has finished sending yet.
 Not read: the card ran out
+Nothing is due this week.
 Nothing needs anyone right now.
 One company per line: name, employees, industry, business model, expected tier, kind (won, lost or bad fit)
 One ticket ###
@@ -38,6 +39,7 @@ Saved. Their outreach is stopped, and a task for today is in the CRM.
 Saved. Their outreach is stopped.
 Says unsubscribe, read as something else
 Seats are for leadership and GTM Engineering.
+Sponsor session or side event
 That company is not on this event.
 That deal is no longer credited here.
 That did not go through. Try again.
@@ -55,4 +57,5 @@ Travel per person, dollars (optional)
 Up to ##
 Usage is for leadership and GTM Engineering.
 Waiting on # to run this.
+Where the list came from
 Where the pipeline came from

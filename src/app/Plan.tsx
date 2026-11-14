@@ -9,7 +9,12 @@ import { useActor } from "./App";
 import { Icon } from "./icons";
 import { Fold } from "./Motion";
 import { DeclineBox, Editable, GoalEditor, InvolvementEditor, LinesEditor, PersonEditor, ReasonEditor } from "./PlanEdit";
+import { SponsorBlock } from "./PlanSponsor";
+import { Upload } from "./Upload";
+import { LIST_SOURCE_WORDS } from "../shared/plan";
 import { money, num, shortDate } from "./words";
+
+const XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
 type PV = "a" | "b" | "c";
 const VIEW_WORDS: [PV, string][] = [["a", "One ledger"], ["b", "By involvement"], ["c", "What needs me"]];
@@ -153,13 +158,19 @@ export function PlanTab({ id, listRows, onChange }: { id: string; listRows: numb
   const budget = b ? <Editable can={canEdit} label="Edit budget lines" view={budgetView} editor={(close) => <LinesEditor id={id} lines={b.lines} done={close} saved={saved} />} /> : null;
   const whoView = people.length ? <ul className="pl-rows">{people.map((x) => <PersonRow key={x.id} p={x} />)}</ul> : <p className="mute">Nobody is going yet.</p>;
   const who = <Editable can={canEdit && p.event.approval_mode === "budget"} label="Add a person" view={whoView} editor={(close) => <PersonEditor id={id} hosted={p.event.hosted} done={close} saved={saved} />} />;
+  const src = p.list_source ? [LIST_SOURCE_WORDS[p.list_source.list_source], p.list_source.list_source === "other" ? p.list_source.source_note : ""].filter(Boolean).join(": ") : "";
+  const canUpload = p.event.stage === "approved" && !p.event.hosted && listRows === 0;
   const audience = (
-    <ul className="pl-rows">
-      <li className="pl-row"><span className="pl-what"><b>Attendee list</b></span><span className="pl-end">{listRows > 0 ? `${num(listRows)} rows` : "Not uploaded"}</span></li>
-      <li className="pl-row"><span className="pl-what"><b>Assessment</b></span><span className="pl-end mute">None yet</span></li>
-      <li className="pl-row"><span className="pl-what"><b>Request to the organizer</b></span><span className="pl-end mute">None yet</span></li>
-    </ul>
+    <>
+      <ul className="pl-rows">
+        <li className="pl-row"><span className="pl-what"><b>Attendee list</b>{src && <span>{src}</span>}</span><span className="pl-end">{listRows > 0 ? `${num(listRows)} rows` : "Not uploaded"}</span></li>
+        <li className="pl-row"><span className="pl-what"><b>Assessment</b></span><span className="pl-end mute">None yet</span></li>
+        <li className="pl-row"><span className="pl-what"><b>Request to the organizer</b></span><span className="pl-end mute">None yet</span></li>
+      </ul>
+      {canUpload && <Upload primary label="Add the attendee list" path={`/api/events/${id}/upload`} accept={`.csv,.xlsx,text/csv,${XLSX}`} onDone={() => { void saved(); }} />}
+    </>
   );
+  const sponsorship = live.some((i) => i.kind === "sponsorship") ? <SponsorBlock id={id} p={p} canEdit={canEdit} saved={saved} /> : null;
   const notes = p.notes.length > 0 && <ul className="pl-notes" aria-label="Needs a look">{p.notes.map((n) => <li key={n}>{n}</li>)}</ul>;
 
   let body: ReactNode;
@@ -172,6 +183,7 @@ export function PlanTab({ id, listRows, onChange }: { id: string; listRows: numb
         {budget && <Sec title="Budget">{budget}</Sec>}
         <Sec title="Who goes">{who}</Sec>
         <Sec title="Audience">{audience}</Sec>
+        {sponsorship && <Sec title="Sponsorship">{sponsorship}</Sec>}
       </div>
     );
   } else if (view === "b") {
@@ -187,6 +199,7 @@ export function PlanTab({ id, listRows, onChange }: { id: string; listRows: numb
           {kinds.map((k) => live.filter((i) => i.kind === k).map((i) => (
             <Sec key={i.id} title={i.label || (k === "hosted" ? HOSTED_WORDS[i.hosted_format ?? ""] : "") || KIND_WORDS[k]}>
               <ul className="pl-rows"><InvolvementRow i={i} bare /></ul>
+              {k === "sponsorship" && sponsorship}
               {k === "passes" && people.length > 0 && <><h3 className="pl-h3">Who goes</h3><ul className="pl-rows">{loose.map((x) => <PersonRow key={x.id} p={x} />)}</ul></>}
               {k === "hosted" && people.length > 0 && <><h3 className="pl-h3">Who hosts</h3><ul className="pl-rows">{people.map((x) => <PersonRow key={x.id} p={x} withSeat={false} />)}</ul></>}
               {k !== "talk" && trayCats(k).length > 0 && <><h3 className="pl-h3">Budget</h3><Budget cats={trayCats(k)} total={trayCats(k).length > 1 ? { planned: trayCats(k).reduce((n, c) => n + c.planned_cents, 0), contracted: trayCats(k).some((c) => c.contracted_cents !== null) ? trayCats(k).reduce((n, c) => n + (c.contracted_cents ?? 0), 0) : null, actual: trayCats(k).reduce((n, c) => n + (c.actual_cents ?? 0), 0) } : undefined} /></>}
@@ -229,7 +242,9 @@ export function PlanTab({ id, listRows, onChange }: { id: string; listRows: numb
           <section className="pl-sec" aria-label="Needs me now"><h2>Needs me now</h2><div className="pl-body">
             {open.length ? <ul className="pl-rows">{[...new Set(open)].map((t) => <li className="pl-row" key={t}><span className="pl-what"><b>{t}</b></span></li>)}</ul> : <p className="mute">Nothing is open.</p>}
           </div></section>
-          <section className="pl-sec" aria-label="This week"><h2>This week</h2><div className="pl-body"><p className="mute">No deadlines yet.</p></div></section>
+          <section className="pl-sec" aria-label="Deadlines"><h2>Deadlines</h2><div className="pl-body">
+            {p.deadlines.length ? <ul className="pl-rows">{p.deadlines.map((d) => <li className="pl-row" key={`${d.kind}:${d.ref_id}`}><span className="pl-what"><b>{d.label}</b><span>{d.owner || "No owner yet"}</span></span><span className={`pl-end${d.group === "late" || d.group === "today" ? " pl-strong" : ""}`}>{d.due_words}</span></li>)}</ul> : <p className="mute">Nothing is due.</p>}
+          </div></section>
         </div>
         <div className="pl-main folds pl-folds">
           <Fold icon={<Icon.history />} title="Why we go" peek={p.reason ? "Written" : "Not written"}>{reason}</Fold>
@@ -237,6 +252,7 @@ export function PlanTab({ id, listRows, onChange }: { id: string; listRows: numb
           <Fold icon={<Icon.grid />} title="Taking part" peek={live.length ? String(live.length) : "Nothing yet"}>{taking}</Fold>
           {b && <Fold icon={<Icon.cost />} title="Budget" peek={dollars(b.total_planned_cents)}>{budget}</Fold>}
           <Fold icon={<Icon.people />} title="Who goes" peek={people.length ? `${people.length}` : "Nobody yet"}>{who}</Fold>
+          {sponsorship && <Fold icon={<Icon.cost />} title="Sponsorship" peek={p.sponsorship?.tier_name || "Package"}>{sponsorship}</Fold>}
           <Fold icon={<Icon.lists />} title="Audience" peek={listRows > 0 ? `${num(listRows)} rows` : "List not uploaded"}>{audience}</Fold>
         </div>
       </div>

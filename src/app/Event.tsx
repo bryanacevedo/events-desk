@@ -16,6 +16,7 @@ import { Cases, openCases } from "./Cases";
 import { Motion } from "./Motion";
 import { ResultView } from "./Result";
 import { PlanTab } from "./Plan";
+import { Upload } from "./Upload";
 import { To } from "./To";
 import { Chevron, FileButton, ShowMore, SheetButton } from "./Patterns";
 import { isGtm } from "../shared/roles";
@@ -101,25 +102,6 @@ function useUrlState(keys: string[], defaults: Record<string, string>) {
 /** Numbers set as a line of type, each with its word. */
 function Figures({ items, small }: { items: (readonly [number | string, string])[]; small?: boolean }) {
   return <dl className={`figs${small ? " small" : ""}`}>{items.map(([n, w]) => <div key={w}><dd>{typeof n === "number" ? num(n) : n}</dd><dt>{w}</dt></div>)}</dl>;
-}
-
-function Upload({ label, path, accept, onDone, primary, small }: { label: string; path: string; accept: string; onDone: (data?: unknown) => void; primary?: boolean; small?: boolean }) {
-  const { actor } = useActor();
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-  const pick = async (file: File | undefined) => {
-    if (!file) return;
-    setBusy(true); setError("");
-    const r = await send("POST", path, actor, undefined, { bytes: await file.arrayBuffer(), filename: file.name, type: fileType(file.name) });
-    setBusy(false);
-    if (r.ok) onDone(r.data); else setError(r.error);
-  };
-  return (
-    <div className="actions">
-      <label className={`btn${primary ? "" : " line"}${small ? " small" : ""}`}>{busy ? "Reading the file…" : label}<input className="sr-only" type="file" accept={accept} aria-label={label} onChange={(ev) => pick(ev.target.files?.[0])} disabled={busy} /></label>
-      {error && <p role="alert" className="error">{error}</p>}
-    </div>
-  );
 }
 
 function EndEvent({ id, onDone }: { id: string; onDone: () => void }) {

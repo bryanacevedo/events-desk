@@ -155,3 +155,20 @@ export const roomClosingCard = (r: { event: string; days: number; url?: string }
   text: `${r.event} ended ${r.days} days ago. This channel is closing.`,
   blocks: [say(`*${esc(r.event)} ended ${r.days} days ago.* This channel is closing now. Its history stays searchable, and the event's page keeps everything else.`), ...(r.url ? [{ type: "actions", elements: [link("Open event", r.url)] }] : [])],
 });
+
+/* ------------------------------------------------------------ the plan */
+
+/** A plan asked for, to the approvers' channel: who wrote it, why, what it takes part in, the planned total, with Approve and Decline.
+    The approver is the Slack user who presses a button, never the maker. The value is the event's id. */
+export function planCard(p: { event: string; event_id: string; maker: string; reason: string; involvements: string[]; goals: string[]; planned: string; starts_on: string; url?: string }): CardMessage {
+  return {
+    text: `${p.maker} asks for approval of the ${p.event} plan, ${p.planned}`,
+    blocks: [
+      header(`${p.event}: plan for approval`),
+      say(`*${esc(p.maker)}* asks you to approve *${esc(p.planned)}* for ${esc(day(p.starts_on))}.\n*Why:* ${quote(p.reason)}`),
+      small([p.involvements.length ? esc(p.involvements.join(", ")) : "", p.goals.length ? esc(p.goals.join(", ")) : "No goal set"].filter(Boolean).join("  ·  ")),
+      { type: "actions", elements: [button("Approve", "plan_approve", p.event_id, "primary"), button("Decline", "plan_decline", p.event_id), ...(p.url ? [link("Open the plan", p.url)] : [])] },
+      small("Nobody approves their own plan. The person who wrote it cannot press these."),
+    ],
+  };
+}

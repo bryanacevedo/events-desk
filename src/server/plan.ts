@@ -12,9 +12,10 @@ import { DESK, type LifecycleDeps } from "./lifecycle-deps.ts";
 import { LAST_DAY_SQL } from "./motion.ts";
 import { dollars, eventBudget, plannedTotal } from "./budget-lines.ts";
 import { canPlan, forRep } from "./money.ts";
+import { sponsorshipView } from "./sponsorship.ts";
 import { DEFAULT_FLOW, type EventRow, type Flow } from "../shared/domain.ts";
 import {
-  HOSTED_FORMATS, INVOLVEMENT_KINDS, INVOLVEMENT_WORDS, PERSON_ROLES, PREPARE_DAYS_BEFORE, planStageLabel, planStageOf, planWaitingOn,
+  dueGroup, dueWords, HOSTED_FORMATS, HOSTED_WORDS, INVOLVEMENT_KINDS, weekWindow, type DueGroup, type HostedFormat, INVOLVEMENT_WORDS, PERSON_ROLES, PREPARE_DAYS_BEFORE, planStageLabel, planStageOf, planWaitingOn,
   type InvolvementKind, type PersonRole, type PlanStage,
 } from "../shared/plan.ts";
 import { stageLabel } from "../shared/domain.ts";
@@ -550,6 +551,8 @@ export async function planView(db: Db, deps: LifecycleDeps | undefined, eventId:
   for (const n of ownWaiting) notes.push(`${n}'s own pass waits on another approver.`);
   if (over_plan) notes.push(money ? `Over plan by ${dollars(budget.total_actual_cents - budget.total_planned_cents)}.` : "Over plan.");
   const result = await goalResult(db, deps, eventId);
+  const sponsor = await sponsorshipView(db, eventId, today);
+  const deadlines = (await eventDeadlines(db, eventId, today));
   const view = {
     event: { id: e.id, name: e.name, venue: e.venue, starts_on: e.starts_on, last_day: e.last_day, country: e.country ?? null, stage: e.stage, decline_reason: e.decline_reason, approval_mode: e.approval_mode ?? "per_seat", hosted },
     stage_line: { plan_stage, plan_stage_label: planStageLabel(plan_stage), list_stage: e.stage, list_stage_label: stageLabel(e.stage), waiting_on: planWaitingOn(e, { hosted, submitted: Boolean(e.plan_submitted_at) }), paused: e.stage === "paused" },
@@ -558,10 +561,88 @@ export async function planView(db: Db, deps: LifecycleDeps | undefined, eventId:
     result: { ...result, words: goalWords(result, money) },
     approval: { submitted_at: e.plan_submitted_at, approved_by: e.plan_approved_by, approved_at: e.plan_approved_at ?? null, approved_budget_cents: approvedAmount, requested_by: e.requested_by, approvers, over_budget, over_plan, waiting_seats: waitingSeats.length },
     involvements, side_events: side, who_goes: people,
+    sponsorship: sponsor.sponsorship, deliverables: sponsor.deliverables, promises: sponsor.promises, deadlines,
+    list_source: await currentListSource(db, eventId),
     notes,
     judged_at: e.judged_at ?? null,
     can_plan: money,
     ...(money ? { budget } : {}),
   };
   return money ? view : forRep(view);
+}
+
+
+/* ------------------------------------------------------------------ deadlines, the week and the year */
+
+export interface DeadlineRow { event_id: string; event_name: string; kind: string; ref_id: string; label: string; due_on: string; owner: string; due_words: string; group: DueGroup }
+
+const DEADLINE_SQL = `SELECT d.event_id, e.name AS event_name, d.kind, d.ref_id, d.label, d.due_on::text AS due_on, d.owner
+  FROM event_deadlines d JOIN events e ON e.id = d.event_id WHERE e.parent_event_id IS NULL AND e.stage <> 'declined' AND NOT d.done`;
+
+/** What is open on one event, soonest first, with the due words. Done rows are left out. */
+export async function eventDeadlines(db: Db, eventId: string, today: string) {
+  const rows = await db.query<Omit<DeadlineRow, "due_words" | "group">>(`${DEADLINE_SQL} AND d.event_id = $1 ORDER BY d.due_on, d.label, d.ref_id`, [eventId]);
+  return rows.map((r) => ({ ...r, due_words: dueWords(r.due_on, today), group: dueGroup(r.due_on, today) }));
+}
+
+/** The week across every event: anything late, then today and the six days after it. Not done, not on a declined event, and day eight is not in it. */
+export async function weekDeadlines(db: Db, today: string): Promise<DeadlineRow[]> {
+  const { to } = weekWindow(today);
+  const rows = await db.query<Omit<DeadlineRow, "due_words" | "group">>(`${DEADLINE_SQL} AND d.due_on <= $1::date ORDER BY d.due_on, e.name, d.label, d.ref_id`, [to]);
+  return rows.map((r) => ({ ...r, due_words: dueWords(r.due_on, today), group: dueGroup(r.due_on, today) as DueGroup }));
+}
+
+/** How an event takes part, in words: "Passes, sponsorship, talk", or the hosted format. Dropped involvements are left out. */
+export function involvementWords(rows: { kind: string; hosted_format: string | null }[]): string {
+  const words = rows.map((i) => (i.kind === "hosted" ? HOSTED_WORDS[(i.hosted_format ?? "dinner") as HostedFormat] ?? "Hosted" : INVOLVEMENT_WORDS[i.kind as InvolvementKind]));
+  return words.map((w, i) => (i ? w.toLowerCase() : w)).join(", ");
+}
+
+export async function involvementsByEvent(db: Db) {
+  const rows = await db.query<{ event_id: string; kind: string; hosted_format: string | null; conference_event_id: string | null }>(
+    "SELECT event_id, kind, hosted_format, conference_event_id FROM involvements WHERE status <> 'dropped' ORDER BY created_at, id");
+  const by = new Map<string, { kind: string; hosted_format: string | null; conference_event_id: string | null }[]>();
+  for (const r of rows) by.set(r.event_id, [...(by.get(r.event_id) ?? []), r]);
+  return by;
+}
+
+export interface YearRow {
+  event_id: string; name: string; starts_on: string; last_day: string; country: string | null; plan_stage: PlanStage; plan_stage_label: string;
+  involvement_words: string; hosted_format: string | null; conference_event_id: string | null; conference_name: string | null;
+  goal: { meetings_held: number | null; accounts_met: number | null; pipeline_cents: number | null };
+  planned_cents: number; contracted_cents: number; actual_cents: number;
+}
+
+/** The year's plan: every event that starts in the year, except a top-up and a declined one, once, in date order. A side event is its own row and is never added into its
+    conference. Totals are the sum of the rows. Actual is what eventBudget reads from eventCost, so it equals the Cost tab to the cent. A rep's read has no key holding cents. */
+export async function yearPlan(db: Db, deps: LifecycleDeps | undefined, actor: string, year?: number) {
+  const today = todayOf(deps);
+  const y = year ?? Number(today.slice(0, 4));
+  const events = await db.query<EventRow & { goal_meetings_held: number | null; goal_accounts_met: number | null; goal_pipeline_cents: number | null }>(
+    `SELECT ${EVENT_COLS}, goal_meetings_held, goal_accounts_met, goal_pipeline_cents::float8 AS goal_pipeline_cents FROM events
+     WHERE parent_event_id IS NULL AND stage <> 'declined' AND extract(year FROM starts_on) = $1::int ORDER BY starts_on, name, id`, [y]);
+  const invs = await involvementsByEvent(db);
+  const names = new Map((await db.query<{ id: string; name: string }>("SELECT id, name FROM events WHERE parent_event_id IS NULL")).map((n) => [n.id, n.name]));
+  const rows: YearRow[] = [];
+  for (const e of events) {
+    const b = await eventBudget(db, e.id);
+    const mine = invs.get(e.id) ?? [];
+    const hosted = mine.find((i) => i.kind === "hosted");
+    const stage = stageNow(e, deps);
+    rows.push({
+      event_id: e.id, name: e.name, starts_on: e.starts_on, last_day: e.last_day ?? e.starts_on, country: e.country ?? null, plan_stage: stage, plan_stage_label: planStageLabel(stage),
+      involvement_words: involvementWords(mine), hosted_format: hosted?.hosted_format ?? null, conference_event_id: hosted?.conference_event_id ?? null, conference_name: hosted?.conference_event_id ? names.get(hosted.conference_event_id) ?? null : null,
+      goal: { meetings_held: e.goal_meetings_held, accounts_met: e.goal_accounts_met, pipeline_cents: e.goal_pipeline_cents },
+      planned_cents: b.total_planned_cents, contracted_cents: b.total_contracted_cents, actual_cents: b.total_actual_cents,
+    });
+  }
+  const sum = (k: "planned_cents" | "contracted_cents" | "actual_cents") => rows.reduce((n, r) => n + r[k], 0);
+  const out = { year: y, today, events: rows, total_planned_cents: sum("planned_cents"), total_contracted_cents: sum("contracted_cents"), total_actual_cents: sum("actual_cents") };
+  return canPlan(actor) ? out : forRep(out);
+}
+
+/** Where the event's current list came from: the first list's source, for the Plan tab's audience block. */
+export async function currentListSource(db: Db, eventId: string) {
+  const [u] = await db.query<{ list_source: string; source_note: string }>("SELECT list_source, source_note FROM uploads WHERE event_id = $1 ORDER BY created_at, id LIMIT 1", [eventId]);
+  return u ?? null;
 }

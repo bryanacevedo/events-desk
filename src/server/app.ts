@@ -28,7 +28,8 @@ import type { Settings } from "../shared/cost.ts";
 import { isGtm, SETTINGS_REFUSAL } from "../shared/roles.ts";
 import { canPlan, forRep, isLead, MONEY_REFUSAL } from "./money.ts";
 import { mountPlanRoutes } from "./plan-routes.ts";
-import { stageNow } from "./plan.ts";
+import { involvementsByEvent, involvementWords, stageNow, todayOf, weekDeadlines, yearPlan } from "./plan.ts";
+import { isListSource, type ListSourceInput } from "../shared/plan.ts";
 import { mountSettingsView } from "./settings-view.ts";
 import { mountSeatRoutes } from "./seat-routes.ts";
 import { mountBudgetRoutes } from "./budget-routes.ts";
@@ -139,7 +140,13 @@ export function createApp(db: Db, cfg: AppConfig) {
   mountEventViews(app, db);
   mountPlanRoutes(app, db, cfg);
   // "Did it pay?" is company money: anyone else gets the overview without it.
-  app.get("/api/overview", async (c) => { const o = await overview(db, cfg.lifecycle); return c.json(isLead(c.get("actor")) ? o : { ...o, results: [], needs: o.needs.filter((n) => n.kind !== "costs") }); });
+  // The year plan and the week's deadlines sit beside what was already here. A rep's year has no key holding dollars (yearPlan answers through forRep).
+  app.get("/api/overview", async (c) => {
+    const o = await overview(db, cfg.lifecycle);
+    const year = await yearPlan(db, cfg.lifecycle, c.get("actor"));
+    const deadlines = await weekDeadlines(db, todayOf(cfg.lifecycle));
+    return c.json(isLead(c.get("actor")) ? { ...o, year, deadlines } : { ...o, results: [], needs: o.needs.filter((n) => n.kind !== "costs"), year, deadlines });
+  });
 
   /* The ICP: one seller per install, one line of versions. A document is uploaded, a person sees the cost and starts the compile,
      confirms the draft, tests it on companies with known answers, and publishes. Nothing here is used for tiering until published. */
@@ -192,7 +199,8 @@ export function createApp(db: Db, cfg: AppConfig) {
   app.get("/api/events", async (c) => {
     const events = await db.query<EventRow>(`SELECT ${EVENT_COLS}, catalog_id, (SELECT u.uploaded_by FROM uploads u WHERE u.event_id = events.id ORDER BY u.created_at, u.id LIMIT 1) AS uploaded_by, ${WEBSITE} FROM events WHERE parent_event_id IS NULL ORDER BY starts_on, name`);
     // The plan stage is read on the spot at the desk's clock, so a screen is never a tick behind.
-    const shown = events.map((e) => ({ ...e, plan_stage: stageNow(e, cfg.lifecycle) }));
+    const invs = await involvementsByEvent(db);
+    const shown = events.map((e) => { const mine = invs.get(e.id) ?? [], h = mine.find((i) => i.kind === "hosted"); return { ...e, plan_stage: stageNow(e, cfg.lifecycle), involvement_words: involvementWords(mine), hosted_format: h?.hosted_format ?? null, conference_event_id: h?.conference_event_id ?? null }; });
     return c.json({ events: isLead(c.get("actor")) ? shown : shown.map((e) => ({ ...e, seat_price_cents: null })), demo: cfg.demo });
   });
 
@@ -264,9 +272,11 @@ export function createApp(db: Db, cfg: AppConfig) {
 
   // New registrations for a delivered event. The Run step opens at once; if the card cannot be made yet the top-up waits at `mapped` and the panel asks again.
   app.post("/api/events/:id/new-registrations", async (c) => {
+    const source = sourceOf(c);
+    if (typeof source === "string") return bad(source);
     const bytes = new Uint8Array(await c.req.arrayBuffer());
     if (bytes.length > 20_000_000) return bad("That file is too large.");
-    const out = await createTopUp(db, c.req.param("id"), c.get("actor"), decodeURIComponent(c.req.header("x-filename") ?? "").slice(0, 200), bytes);
+    const out = await createTopUp(db, c.req.param("id"), c.get("actor"), decodeURIComponent(c.req.header("x-filename") ?? "").slice(0, 200), bytes, source);
     if (out.top_up_id) await quote(out.top_up_id, c.get("actor"), "two_card", "mapped").catch((e) => { if (!(e instanceof RuleError)) throw e; });
     return c.json(out, 201);
   });
@@ -425,11 +435,20 @@ export function createApp(db: Db, cfg: AppConfig) {
     });
   }
 
+  /** Where a list came from, from x-list-source and x-source-note. Absent means other, so old callers keep working; a value outside the five is refused. */
+  const sourceOf = (c: { req: { header(n: string): string | undefined } }): ListSourceInput | string => {
+    const kind = c.req.header("x-list-source")?.trim() || "other";
+    if (!isListSource(kind)) return "Choose where the list came from: web_app_download, app_download, emailed_by_organizer, sponsor_export or other.";
+    return { kind, note: decodeURIComponent(c.req.header("x-source-note") ?? "").slice(0, 200) };
+  };
+
   app.post("/api/events/:id/upload", async (c) => {
+    const source = sourceOf(c);
+    if (typeof source === "string") return bad(source);
     const bytes = new Uint8Array(await c.req.arrayBuffer());
     if (bytes.length > 20_000_000) return bad("That file is too large.");
     const filename = decodeURIComponent(c.req.header("x-filename") ?? "").slice(0, 200);
-    const out = await ingestUpload(db, c.req.param("id"), c.get("actor"), filename, bytes);
+    const out = await ingestUpload(db, c.req.param("id"), c.get("actor"), filename, bytes, source);
     await autoQuote(c.req.param("id"));
     return c.json((await db.query<EventRow>(`SELECT ${EVENT_COLS} FROM events WHERE id = $1`, [c.req.param("id")]))[0] ?? out);
   });

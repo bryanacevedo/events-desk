@@ -61,3 +61,58 @@ export function planWaitingOn(e: Pick<EventRow, "stage"> & { approval_mode?: App
   if (plan.hosted && e.stage === "approved") return "Nobody";
   return waitingOn(e as { stage: Stage });
 }
+
+/* ------------------------------------------------------------------ where a list came from (4.3) */
+
+export const LIST_SOURCES = ["web_app_download", "app_download", "emailed_by_organizer", "sponsor_export", "other"] as const;
+export type ListSource = (typeof LIST_SOURCES)[number];
+export const LIST_SOURCE_WORDS: Record<ListSource, string> = {
+  web_app_download: "Downloaded from the web app", app_download: "Downloaded from the app", emailed_by_organizer: "Emailed by the organizer", sponsor_export: "Sponsor export", other: "Other",
+};
+export interface ListSourceInput { kind: ListSource; note: string }
+export const isListSource = (v: unknown): v is ListSource => typeof v === "string" && (LIST_SOURCES as readonly string[]).includes(v);
+
+/* ------------------------------------------------------------------ sponsorship, deliverables and the week (4.2) */
+
+export const DELIVERABLE_KINDS = ["logo_copy", "booth_graphics", "staff_badges", "sponsor_session", "freight", "electrical", "internet", "lead_retrieval", "other"] as const;
+export type DeliverableKind = (typeof DELIVERABLE_KINDS)[number];
+/** The standard eight, made with every sponsorship, with no dates: the dates come from the exhibitor manual and a person types them. */
+export const STANDARD_DELIVERABLES: readonly { kind: DeliverableKind; label: string }[] = [
+  { kind: "logo_copy", label: "Logo and copy" }, { kind: "booth_graphics", label: "Booth graphics" }, { kind: "staff_badges", label: "Staff badges" },
+  { kind: "sponsor_session", label: "Sponsor session or side event" }, { kind: "freight", label: "Freight" }, { kind: "electrical", label: "Electrical" },
+  { kind: "internet", label: "Internet" }, { kind: "lead_retrieval", label: "Lead retrieval" },
+];
+
+export const PROMISE_ITEMS = ["passes", "booth", "talk", "logo", "lead_retrieval", "attendee_list", "meeting_rooms", "side_event", "other"] as const;
+export type PromiseItem = (typeof PROMISE_ITEMS)[number];
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const dayOf = (ymd: string) => ymd.slice(0, 10);
+const utc = (ymd: string) => Date.parse(`${dayOf(ymd)}T00:00:00Z`);
+/** Whole days from `a` to `b` (b minus a). */
+export const daysBetween = (a: string, b: string) => Math.round((utc(b) - utc(a)) / 86_400_000);
+/** "14 Oct": a day as the desk writes it, with no year. */
+export const shortDay = (ymd: string) => { const [, m, d] = dayOf(ymd).split("-").map(Number); return `${d} ${MONTHS[m - 1]}`; };
+
+/** The words for a promise. Counted: "10 passes: 8 issued". Not counted and not received: "Attendee list: not received". Received: "Attendee list: received 14 Oct". */
+export function promiseWords(p: { label: string; promised_qty: number | null; received_qty: number | null; received_on: string | null }): string {
+  if (p.promised_qty !== null) return `${p.promised_qty} ${p.label.replace(/^\d+\s+/, "").toLowerCase()}: ${p.received_qty ?? 0} issued`;
+  return p.received_on ? `${p.label}: received ${shortDay(p.received_on)}` : `${p.label}: not received`;
+}
+
+/** When something is due, in words: "3 days late", "Today", "Tomorrow", "Due Thursday" inside the week, "Due 14 Oct" beyond it, "No date yet" with none. Status is a word in ink. */
+export function dueWords(due: string | null, today: string): string {
+  if (!due) return "No date yet";
+  const n = daysBetween(today, due);
+  if (n < 0) return n === -1 ? "1 day late" : `${-n} days late`;
+  if (n === 0) return "Today";
+  if (n === 1) return "Tomorrow";
+  if (n <= 6) return `Due ${WEEKDAYS[new Date(utc(due)).getUTCDay()]}`;
+  return `Due ${shortDay(due)}`;
+}
+
+/** The week's window: today to six days out. Anything before today is late and always shows. */
+export function weekWindow(today: string): { from: string; to: string } { return { from: dayOf(today), to: addDays(dayOf(today), 6) }; }
+export type DueGroup = "late" | "today" | "week";
+export const dueGroup = (due: string, today: string): DueGroup | null => { const n = daysBetween(today, due); return n < 0 ? "late" : n === 0 ? "today" : n <= 6 ? "week" : null; };

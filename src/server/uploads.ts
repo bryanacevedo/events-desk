@@ -6,13 +6,18 @@ import { EVENT_COLS, logActivity, moveWithin, newId, RuleError } from "./events.
 import { mapColumns, normalize, type QualityReport } from "../shared/ingest.ts";
 import { linkEventQuietly, pruneQuietly } from "./person-record.ts";
 import { parseUpload, sniff } from "./xlsx-read.ts";
+import type { ListSource, ListSourceInput } from "../shared/plan.ts";
+
+/** Where a list came from. No header means `other`, so old callers keep working. */
+export const OTHER_SOURCE: ListSourceInput = { kind: "other", note: "" };
+export const sourceNote = (s: ListSourceInput) => s.note.trim().slice(0, 200);
 
 export const MAX_ROWS = 50_000;
 export const TYPES = { xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", xls: "application/vnd.ms-excel", csv: "text/csv; charset=utf-8", other: "application/octet-stream" } as const;
 
 export const toBytes = (file: string | Uint8Array | ArrayBuffer) => (typeof file === "string" ? new TextEncoder().encode(file) : file instanceof Uint8Array ? file : new Uint8Array(file));
 
-export async function ingestUpload(db: Db, eventId: string, actor: string, filename: string, file: string | Uint8Array | ArrayBuffer) {
+export async function ingestUpload(db: Db, eventId: string, actor: string, filename: string, file: string | Uint8Array | ArrayBuffer, source: ListSourceInput = OTHER_SOURCE) {
   // POST /upload is the first list and replacing it. New registrations have their own way in.
   const [at] = await db.query<{ stage: string; parent_event_id: string | null }>("SELECT stage, parent_event_id FROM events WHERE id = $1", [eventId]);
   if (at?.parent_event_id) throw new RuleError("New registrations cannot take another attendee list.");
@@ -45,8 +50,8 @@ export async function ingestUpload(db: Db, eventId: string, actor: string, filen
       : await moveWithin(q, eventId, "mapped", actor, { detail: `Uploaded ${filename || "an attendee list"} with ${parsed.rows.length} rows` });
     const uploadId = newId("upl");
     await q(
-      "INSERT INTO uploads (id, event_id, filename, mapping, ignored, row_count, uploaded_by, quality) VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, $6, $7, $8::jsonb)",
-      [uploadId, eventId, filename, JSON.stringify(map), JSON.stringify(ignored), parsed.rows.length, actor, JSON.stringify(data.quality)],
+      "INSERT INTO uploads (id, event_id, filename, mapping, ignored, row_count, uploaded_by, quality, list_source, source_note) VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, $6, $7, $8::jsonb, $9, $10)",
+      [uploadId, eventId, filename, JSON.stringify(map), JSON.stringify(ignored), parsed.rows.length, actor, JSON.stringify(data.quality), source.kind, sourceNote(source)],
     );
     // The file as received, so the first list can always be had back. A Uint8Array binds as bytea on PGlite and on postgres.js alike.
     await q("INSERT INTO upload_files (upload_id, event_id, content_type, bytes) VALUES ($1, $2, $3, $4)", [uploadId, eventId, TYPES[sniff(bytes)], bytes]);
@@ -60,23 +65,24 @@ export async function ingestUpload(db: Db, eventId: string, actor: string, filen
 
     const rowIds = new Map(data.sourceRows.map((r) => [r.row_number, newId("row")]));
     await q(
-      `INSERT INTO source_rows (id, event_id, upload_id, row_number, raw, kind, company_id, drop_reason, dropped_at, website, issues)
-       SELECT id, $2, $3, row_number, raw, kind, company_id, drop_reason, CASE WHEN drop_reason IS NULL THEN NULL ELSE now() END, website, issues
+      `INSERT INTO source_rows (id, event_id, upload_id, row_number, raw, kind, company_id, drop_reason, dropped_at, website, issues, list_source)
+       SELECT id, $2, $3, row_number, raw, kind, company_id, drop_reason, CASE WHEN drop_reason IS NULL THEN NULL ELSE now() END, website, issues, $4
        FROM jsonb_to_recordset($1::jsonb) AS x(id text, row_number int, raw jsonb, kind text, company_id text, drop_reason text, website text, issues jsonb)`,
       [JSON.stringify(data.sourceRows.map((r) => ({
         id: rowIds.get(r.row_number), row_number: r.row_number, raw: r.raw, kind: r.kind,
         company_id: r.company_key ? companyIds.get(r.company_key) : null, drop_reason: r.drop_reason, website: r.website, issues: [...new Set(r.issues)],
-      }))), eventId, uploadId],
+      }))), eventId, uploadId, source.kind],
     );
     await q(
-      `INSERT INTO contacts (id, event_id, source_row_id, company_id, full_name, title, email, linkedin, drop_reason, dropped_at)
-       SELECT id, $2, source_row_id, company_id, full_name, title, email, linkedin, drop_reason, CASE WHEN drop_reason IS NULL THEN NULL ELSE now() END
+      `INSERT INTO contacts (id, event_id, source_row_id, company_id, full_name, title, email, linkedin, drop_reason, dropped_at, list_source)
+       SELECT id, $2, source_row_id, company_id, full_name, title, email, linkedin, drop_reason, CASE WHEN drop_reason IS NULL THEN NULL ELSE now() END, $3
        FROM jsonb_to_recordset($1::jsonb) AS x(id text, source_row_id text, company_id text, full_name text, title text, email text, linkedin text, drop_reason text)`,
       [JSON.stringify(data.contacts.map((c) => ({
         id: newId("con"), source_row_id: rowIds.get(c.row_number), company_id: c.company_key ? companyIds.get(c.company_key) : null,
         full_name: c.full_name, title: c.title, email: c.email, linkedin: c.linkedin, drop_reason: c.drop_reason,
-      }))), eventId],
+      }))), eventId, source.kind],
     );
+    // The organizer-request hook (task 3 of a later session): a list that arrives `emailed_by_organizer` moves an open organizer request to received here.
     await logActivity(q, eventId, actor, "mapped", `Mapped ${Object.keys(map).length} columns, ignored ${ignored.length}. Attendee list quality: ${data.quality.verdict}`);
     // The event row is unchanged; the quality report rides along as one extra field.
     return { ...event, quality: data.quality };
@@ -90,7 +96,7 @@ export async function ingestUpload(db: Db, eventId: string, actor: string, filen
 export interface ListSummary {
   /** The list quality report from Layer 0, or null for an event uploaded before it existed. */
   quality: QualityReport | null;
-  upload: { filename: string; row_count: number; mapping: Record<string, number>; ignored: string[]; uploaded_by: string } | null;
+  upload: { filename: string; row_count: number; mapping: Record<string, number>; ignored: string[]; uploaded_by: string; list_source: ListSource; source_note: string } | null;
   companies: number;
   people: number;
   company_only: number;
@@ -101,7 +107,7 @@ export interface ListSummary {
 
 export async function listSummary(db: Db, eventId: string): Promise<ListSummary> {
   // The first list says who brought it and how it was mapped. Rows received is that list's rows plus each top-up's new rows.
-  const [upload] = await db.query<ListSummary["upload"] & object>("SELECT filename, (SELECT sum(x.row_count)::int FROM uploads x WHERE x.event_id = $1) AS row_count, mapping, ignored, uploaded_by FROM uploads WHERE event_id = $1 ORDER BY created_at, id LIMIT 1", [eventId]);
+  const [upload] = await db.query<ListSummary["upload"] & object>("SELECT filename, (SELECT sum(x.row_count)::int FROM uploads x WHERE x.event_id = $1) AS row_count, mapping, ignored, uploaded_by, list_source, source_note FROM uploads WHERE event_id = $1 ORDER BY created_at, id LIMIT 1", [eventId]);
   const [counts] = await db.query<{ companies: number; people: number; company_only: number }>(
     `SELECT (SELECT count(*)::int FROM companies WHERE event_id = $1) AS companies,
             (SELECT count(*)::int FROM contacts WHERE event_id = $1 AND dropped_at IS NULL AND source IS DISTINCT FROM 'onsite') AS people,
@@ -126,12 +132,12 @@ export async function listSummary(db: Db, eventId: string): Promise<ListSummary>
 
 /* ------------------------------------------------------------ the list block */
 
-export interface UploadItem { id: string; filename: string; uploaded_by: string; created_at: string; row_count: number; has_file: boolean; file_rows: number | null; already_in: number | null; top_up_id: string | null }
+export interface UploadItem { id: string; list_source: ListSource; source_note: string; filename: string; uploaded_by: string; created_at: string; row_count: number; has_file: boolean; file_rows: number | null; already_in: number | null; top_up_id: string | null }
 
 /** Every list received for the event, oldest first: the first list and the new registrations merged into it. A replacement removes the list it replaces. */
 export async function listUploads(db: Db, eventId: string): Promise<UploadItem[]> {
   return db.query<UploadItem>(
-    `SELECT u.id, u.filename, u.uploaded_by, u.created_at, u.row_count, u.file_rows, u.already_in, u.top_up_id, EXISTS (SELECT 1 FROM upload_files f WHERE f.upload_id = u.id) AS has_file
+    `SELECT u.id, u.list_source, u.source_note, u.filename, u.uploaded_by, u.created_at, u.row_count, u.file_rows, u.already_in, u.top_up_id, EXISTS (SELECT 1 FROM upload_files f WHERE f.upload_id = u.id) AS has_file
      FROM uploads u WHERE u.event_id = $1 ORDER BY u.created_at, u.id`, [eventId]);
 }
 

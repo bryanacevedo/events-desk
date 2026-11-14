@@ -308,3 +308,11 @@ Bryan chose re:Invent as the plan in flight (spec section 17). The real-events s
 ## 56. Editing a plan happens where it is read; declining needs a reason (2026-11-14)
 
 The Plan tab edits the reason, the goal, the budget lines, who goes and the ways of taking part in place, for planners only, each with one save button. Budget lines save one at a time. A plan is made from Events, "New plan", for planners: a listed conference, one that is not listed, or a hosted event. The approver's second choice is Decline, which asks for the reason the database demands and ends the event as declined. The Approve button stays the one primary action.
+
+## 51. Every list carries where it came from (2026-11-14)
+
+`list_source` is on the upload, each source row and each attendee contact: downloaded from the web app, downloaded from the app, emailed by the organizer, sponsor export, other (with a note). It is its own column, separate from `contacts.source` (attendee, prospect, onsite). It is recorded and shown; the gate does not read it (Bryan, 2026-11-13). The upload screens ask for it before the file picker works; a caller that sends no header is stored as "other", and a value outside the five is refused by the route and by the database. A top-up keeps its own source through the merge. Prospects and walk-ups have none.
+
+## 57. Deadlines are read, not stored twice (2026-11-14)
+
+The spec numbered this decision 55, which the demo's in-flight plan already took, so it is 57. `event_deadlines` is a view over deliverables and sponsorship payments (the organizer request joins it in `0052`). "This week" is anything late plus today and the six days after it, not done, on an event that is not declined. Nothing about a deadline is copied into a second table, so a person marking a deliverable done is the only write, and the week, the Plan tab and the year agree by construction. Later steps add their own rows to the view.

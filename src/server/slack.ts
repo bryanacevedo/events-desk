@@ -3,7 +3,7 @@
    function the demo panel calls. */
 
 import type { EventRoom, LifecycleDeps, Notifier } from "./lifecycle-deps.ts";
-import type { CardMessage } from "./slack-cards.ts";
+import { planCard, type CardMessage } from "./slack-cards.ts";
 import { answerDebrief, pastScores } from "./closeout.ts";
 import { bookMeeting, recordOutcome } from "./meetings.ts";
 import { decideOwner } from "./owners.ts";
@@ -13,6 +13,9 @@ import type { Hono } from "hono";
 import { currentUploader, decideApproval } from "./approvals.ts";
 import { cardBreakdown } from "../shared/vendors.ts";
 import { decideSeat, GOALS } from "./seats.ts";
+import { approvePlan, declinePlan, todayOf } from "./plan.ts";
+import { dollars as planDollars, plannedTotal } from "./budget-lines.ts";
+import { INVOLVEMENT_WORDS, type InvolvementKind } from "../shared/plan.ts";
 import type { Db } from "./db.ts";
 import { logActivity, RuleError } from "./events.ts";
 import { welcomeRoom } from "./event-room.ts";
@@ -145,6 +148,17 @@ export async function postSeatRequest(db: Db, cfg: SlackConfig, requestId: strin
       ] },
     ],
   });
+}
+
+/** A plan asked for, to the approvers' channel, with Approve and Decline. Live mode only: the demo decides on the panel. The decision is the Slack user's, mapped to a name for the maker check. */
+export async function postPlanCard(db: Db, cfg: SlackConfig, eventId: string) {
+  const [e] = await db.query<{ id: string; name: string; requested_by: string; reason: string; starts_on: string; goal_meetings_held: number | null; goal_accounts_met: number | null; goal_pipeline_cents: number | null }>(
+    "SELECT id, name, requested_by, reason, starts_on::text AS starts_on, goal_meetings_held, goal_accounts_met, goal_pipeline_cents::float8 AS goal_pipeline_cents FROM events WHERE id = $1", [eventId]);
+  if (!e) return;
+  const invs = (await db.query<{ kind: InvolvementKind }>("SELECT kind FROM involvements WHERE event_id = $1 AND status <> 'dropped' ORDER BY created_at, id", [eventId])).map((i) => INVOLVEMENT_WORDS[i.kind]);
+  const goals = [e.goal_meetings_held !== null ? `${e.goal_meetings_held} meetings` : "", e.goal_accounts_met !== null ? `${e.goal_accounts_met} target accounts` : "", e.goal_pipeline_cents !== null ? `${planDollars(Number(e.goal_pipeline_cents))} pipeline` : ""].filter(Boolean);
+  const m = planCard({ event: e.name, event_id: e.id, maker: e.requested_by, reason: e.reason, involvements: invs, goals, planned: planDollars(await plannedTotal(db.query, eventId)), starts_on: e.starts_on, url: cfg.appUrl ? `${cfg.appUrl.replace(/\/+$/, "")}/event/${e.id}` : undefined });
+  await postCard(db, cfg, eventId, "a plan approval", { channel: cfg.seatsChannel ?? cfg.channel, text: m.text, blocks: m.blocks });
 }
 
 const input = (block_id: string, label: string, optional = false) => ({
@@ -288,6 +302,23 @@ export function mountSlack(app: Hono<any>, db: Db, cfg: SlackConfig, kick?: (eve
         } catch (e) { if (!(e instanceof RuleError)) throw e; await respond(e.message); }
         return c.body(null, 200);
       }
+      if (action?.action_id === "plan_decline") {
+        await slackCall(cfg, "views.open", { trigger_id: p.trigger_id, view: modal("plan_decline_reason", "Decline the plan", [input("reason", "Why are you declining it?")], action.value) });
+        return c.body(null, 200);
+      }
+      if (action?.action_id === "plan_approve") {
+        const respond = (text: string, replace: boolean) => (cfg.fetch ?? fetch)(p.response_url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(replace ? { replace_original: true, text } : { response_type: "ephemeral", replace_original: false, text }) });
+        try {
+          // The approver is the Slack user, checked against the approver list; the maker is a name, so both go through userMap before they are compared.
+          const r = await approvePlan(db, { eventId: String(action.value), actor, userMap: cfg.userMap, today: todayOf(lifecycle) });
+          kick?.(String(action.value));
+          await respond(r.changed ? `Plan approved by <@${actor}>.` : "Already approved.", true);
+        } catch (e) {
+          if (!(e instanceof RuleError)) throw e;
+          await respond(e.message, false);
+        }
+        return c.body(null, 200);
+      }
       if (action?.action_id === "decline") {
         await slackCall(cfg, "views.open", { trigger_id: p.trigger_id, view: modal("decline_reason", "Decline", [input("reason", "Why are you declining?")], action.value) });
         return c.body(null, 200);
@@ -314,13 +345,14 @@ export function mountSlack(app: Hono<any>, db: Db, cfg: SlackConfig, kick?: (eve
         const named = Object.entries(cfg.userMap ?? {}).find(([, id]) => id === actor)?.[0];
         if (lifecycle && named && v.callback_id === "debrief_write") { await answerDebrief(db, v.private_metadata, named, field(v, "body")); return c.json({ response_action: "clear" }); }
         if (lifecycle && named && v.callback_id === "meeting_book") { await bookMeeting(db, lifecycle, { contact_id: v.private_metadata, scheduled_at: field(v, "when"), source: "reply", rep: named }, named); return c.json({ response_action: "clear" }); }
+        if (v.callback_id === "plan_decline_reason") await declinePlan(db, { eventId: v.private_metadata, actor, userMap: cfg.userMap, today: todayOf(lifecycle), reason: field(v, "reason") });
         if (v.callback_id === "decline_reason") {
           if (v.private_metadata.startsWith("sr_")) await decideSeat(db, { requestId: v.private_metadata, actor, decision: "decline", reason: field(v, "reason"), userMap: cfg.userMap });
           else await decideApproval(db, { approvalId: v.private_metadata, actor: await actorFor(db, cfg, v.private_metadata, actor), decision: "decline", reason: field(v, "reason") });
         }
       } catch (e) {
         if (!(e instanceof RuleError)) throw e;
-        return c.json({ response_action: "errors", errors: { [v.callback_id === "decline_reason" ? "reason" : "name"]: e.message } });
+        return c.json({ response_action: "errors", errors: { [v.callback_id === "decline_reason" || v.callback_id === "plan_decline_reason" ? "reason" : "name"]: e.message } });
       }
       return c.json({ response_action: "clear" });
     }

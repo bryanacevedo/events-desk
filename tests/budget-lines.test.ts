@@ -7,6 +7,7 @@ import { recordTicket } from "../src/server/budget.ts";
 import { eventCost, recordEventCost } from "../src/server/closeout.ts";
 import type { Db } from "../src/server/db.ts";
 import { addInvolvement, addPerson } from "../src/server/plan.ts";
+import { saveSponsorship } from "../src/server/sponsorship.ts";
 import { freshDb } from "./helpers.ts";
 import { deliveredInMotion, fakeCrm } from "./lifecycle-harness.ts";
 import { approvedPlan, as, CAMILLE, DAN, draftPlan, MAYA, one } from "./plan-helpers.ts";
@@ -107,3 +108,40 @@ describe("budget lines", () => {
     expect((await app.request(`/api/events/${id}/budget-lines`, { method: "POST", headers: as(MAYA), body: JSON.stringify({ category: "swag", planned_cents: 5000 }) })).status).toBe(403);
   });
 });
+
+describe("the sponsorship's budget line", () => {
+  it("saving an unsigned package writes planned, signing writes contracted once, and saving twice never makes a second line", async () => {
+    const id = await approvedPlan(db);
+    const { id: iid } = await addInvolvement(db, CAMILLE, id, { kind: "sponsorship", label: "Gold" });
+    const lines = () => db.query<{ planned_cents: number; contracted_cents: number | null }>("SELECT planned_cents::float8 AS planned_cents, contracted_cents::float8 AS contracted_cents FROM budget_lines WHERE event_id = $1 AND category = 'sponsorship'", [id]);
+    await saveSponsorship(db, CAMILLE, id, iid, { tier: "Gold", price_cents: 2_500_000 });
+    expect(await lines()).toEqual([{ planned_cents: 2_500_000, contracted_cents: null }]);
+    await saveSponsorship(db, CAMILLE, id, iid, { contract_signed_on: "2026-11-01" });
+    await saveSponsorship(db, CAMILLE, id, iid, { contract_signed_on: "2026-11-01" });
+    expect(await lines()).toEqual([{ planned_cents: 2_500_000, contracted_cents: 2_500_000 }]);
+    // A price change after signing moves the contracted figure; unsigning again clears it.
+    await saveSponsorship(db, CAMILLE, id, iid, { price_cents: 2_400_000 });
+    expect((await lines())[0].contracted_cents).toBe(2_400_000);
+    await saveSponsorship(db, CAMILLE, id, iid, { contract_signed_on: null });
+    expect(await lines()).toEqual([{ planned_cents: 2_400_000, contracted_cents: null }]);
+    // Paying is the ledger's: actual is read from eventCost, and the package stores no paid amount.
+    await recordEventCost(db, id, DAN, "sponsorship", 1_000_000, "Deposit");
+    expect((await cat(id, "sponsorship")).actual_cents).toBe(1_000_000);
+    expect((await eventBudget(db, id)).total_actual_cents).toBe((await eventCost(db, id)).total_cents);
+  });
+
+  it("the package saved through the route is planner-only and its keys never say committed", async () => {
+    const id = await approvedPlan(db);
+    const { id: iid } = await addInvolvement(db, CAMILLE, id, { kind: "sponsorship" });
+    const app = createApp(db, { demo: true });
+    const put = (who: string, b: object) => app.request(`/api/events/${id}/sponsorships/${iid}`, { method: "PUT", headers: as(who), body: JSON.stringify(b) });
+    expect((await put(MAYA, { price_cents: 100 })).status).toBe(403);
+    expect((await put(CAMILLE, { price_cents: -5 })).status).toBe(400);
+    expect((await put(CAMILLE, { price_cents: 100, deposit_cents: 500 })).status).toBe(400);
+    expect((await put(CAMILLE, { price_cents: 2_000_000, tier: "Gold", deposit_cents: 500_000, deposit_due_on: "2026-12-01" })).status).toBe(200);
+    expect((await one<{ n: number }>(db, "SELECT count(*)::int AS n FROM sponsorships WHERE event_id = $1", [id])).n).toBe(1);
+    const view = await (await app.request(`/api/events/${id}/plan`, { headers: as(CAMILLE) })).json();
+    expect(JSON.stringify(view)).not.toMatch(/committed/);
+  });
+});
+

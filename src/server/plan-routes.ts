@@ -7,12 +7,13 @@ import { RuleError } from "./events.ts";
 import { canPlan, isLead, MONEY_REFUSAL } from "./money.ts";
 import { eventBudget, removeBudgetLine, setBudgetLine, type BudgetLineInput } from "./budget-lines.ts";
 import { Forbidden, Invalid } from "./seats.ts";
+import { addDeliverable, addPromise, saveSponsorship, SponsorshipInvalid, updateDeliverable, updatePromise, type DeliverableInput, type PackageInput, type PromiseInput } from "./sponsorship.ts";
 import {
   addInvolvement, addPerson, approvePlan, askToGoOn, closeResult, createPlan, declinePlan, dropInvolvement, planView, PlanInvalid, removePerson, submitPlan,
   todayOf, updateInvolvement, updatePerson, updatePlan, type InvolvementInput, type PersonInput, type PlanInput,
 } from "./plan.ts";
 import type { LifecycleDeps } from "./lifecycle-deps.ts";
-import type { SlackConfig } from "./slack.ts";
+import { postPlanCard, type SlackConfig } from "./slack.ts";
 
 export const PLANNER_REFUSAL = "Plans are written by the field marketer, leadership and GTM Engineering.";
 type Cfg = { demo: boolean; slack?: SlackConfig; lifecycle?: LifecycleDeps };
@@ -25,7 +26,7 @@ export function mountPlanRoutes(app: Hono<any>, db: Db, cfg: Cfg) {
   const run = async <T>(fn: () => Promise<T>, status: 200 | 201 = 200) => {
     try { return Response.json(await fn(), { status }); }
     catch (e) {
-      if (e instanceof PlanInvalid || e instanceof Invalid) return refuse(e.message, 400);
+      if (e instanceof PlanInvalid || e instanceof Invalid || e instanceof SponsorshipInvalid) return refuse(e.message, 400);
       if (e instanceof Forbidden) return refuse(e.message, 403);
       throw e;
     }
@@ -51,7 +52,12 @@ export function mountPlanRoutes(app: Hono<any>, db: Db, cfg: Cfg) {
   });
   app.post("/api/events/:id/plan/submit", async (c) => {
     if (!planner(c)) return refuse(PLANNER_REFUSAL, 403);
-    return run(() => submitPlan(db, actorOf(c), id(c), { today: todayOf(cfg.lifecycle) }));
+    // Live mode (Slack configured, not the demo) posts the plan card to the approvers' channel, and the decision is taken there.
+    return run(async () => {
+      const r = await submitPlan(db, actorOf(c), id(c), { today: todayOf(cfg.lifecycle) });
+      if (cfg.slack && !cfg.demo && !r.auto_approved) await postPlanCard(db, cfg.slack, id(c));
+      return r;
+    });
   });
   // The panel decision exists in demo mode only. A live setup decides on the plan card in Slack, as it does for seats.
   if (cfg.demo) {
@@ -120,5 +126,32 @@ export function mountPlanRoutes(app: Hono<any>, db: Db, cfg: Cfg) {
   app.delete("/api/events/:id/budget-lines/:lid", async (c) => {
     if (!planner(c)) return refuse(PLANNER_REFUSAL, 403);
     return run(() => removeBudgetLine(db, actorOf(c), id(c), c.req.param("lid") as string));
+  });
+
+  // Sponsorship: the package writes its budget line in the same transaction. A rep gets none of it as money (planView answers through forRep).
+  app.put("/api/events/:id/sponsorships/:iid", async (c) => {
+    if (!planner(c)) return refuse(PLANNER_REFUSAL, 403);
+    const b = (await body(c)) as PackageInput;
+    return run(() => saveSponsorship(db, actorOf(c), id(c), c.req.param("iid") as string, b));
+  });
+  app.post("/api/events/:id/deliverables", async (c) => {
+    if (!planner(c)) return refuse(PLANNER_REFUSAL, 403);
+    const b = (await body(c)) as DeliverableInput;
+    return run(() => addDeliverable(db, actorOf(c), id(c), b), 201);
+  });
+  // A planner changes anything; the person a deliverable is assigned to may mark their own done. The function decides, and refuses with a 403.
+  app.patch("/api/events/:id/deliverables/:did", async (c) => {
+    const b = (await body(c)) as DeliverableInput;
+    return run(() => updateDeliverable(db, actorOf(c), id(c), c.req.param("did") as string, b, { planner: planner(c) }));
+  });
+  app.post("/api/events/:id/promises", async (c) => {
+    if (!planner(c)) return refuse(PLANNER_REFUSAL, 403);
+    const b = (await body(c)) as PromiseInput;
+    return run(() => addPromise(db, actorOf(c), id(c), b), 201);
+  });
+  app.patch("/api/events/:id/promises/:pid", async (c) => {
+    if (!planner(c)) return refuse(PLANNER_REFUSAL, 403);
+    const b = (await body(c)) as PromiseInput;
+    return run(() => updatePromise(db, actorOf(c), id(c), c.req.param("pid") as string, b));
   });
 }

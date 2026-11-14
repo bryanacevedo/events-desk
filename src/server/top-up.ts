@@ -11,7 +11,8 @@ import { linkEventQuietly, linkQuietly } from "./person-record.ts";
 import type { Crm } from "./providers.ts";
 import { refreshSheet } from "./sheet-delivery.ts";
 import { mockSheets, type SheetPublisher } from "./sheets.ts";
-import { MAX_ROWS, toBytes, TYPES } from "./uploads.ts";
+import { MAX_ROWS, OTHER_SOURCE, sourceNote, toBytes, TYPES } from "./uploads.ts";
+import type { ListSourceInput } from "../shared/plan.ts";
 import { parseUpload, sniff } from "./xlsx-read.ts";
 import { classifyEmail, nameSet } from "../shared/layer0.ts";
 import { mapColumns, normalize, type Ingested, type IngestContact, type IngestSourceRow } from "../shared/ingest.ts";
@@ -60,7 +61,7 @@ function personIsIn(index: ReturnType<typeof indexPeople>, c: IngestContact, com
 /* ------------------------------------------------------------------ create */
 
 /** Reads the file, keeps only who the parent does not have, and creates the top-up at `mapped` in one transaction. With nothing new, no top-up exists and the file is not kept. */
-export async function createTopUp(db: Db, parentId: string, actor: string, filename: string, file: string | Uint8Array | ArrayBuffer): Promise<TopUpCounts> {
+export async function createTopUp(db: Db, parentId: string, actor: string, filename: string, file: string | Uint8Array | ArrayBuffer, source: ListSourceInput = OTHER_SOURCE): Promise<TopUpCounts> {
   const bytes = toBytes(file);
   const parsed = await parseUpload(file);
   if (!parsed.rows.length) throw new RuleError("That file has no rows.");
@@ -123,8 +124,8 @@ export async function createTopUp(db: Db, parentId: string, actor: string, filen
 
     const uploadId = newId("upl");
     await q(
-      "INSERT INTO uploads (id, event_id, filename, mapping, ignored, row_count, uploaded_by, quality, file_rows, already_in, top_up_id) VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, $6, $7, $8::jsonb, $9, $10, $2)",
-      [uploadId, id, filename, JSON.stringify(map), JSON.stringify(ignored), fresh.length, actor, JSON.stringify(data.quality), parsed.rows.length, alreadyIn]);
+      "INSERT INTO uploads (id, event_id, filename, mapping, ignored, row_count, uploaded_by, quality, file_rows, already_in, top_up_id, list_source, source_note) VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, $6, $7, $8::jsonb, $9, $10, $2, $11, $12)",
+      [uploadId, id, filename, JSON.stringify(map), JSON.stringify(ignored), fresh.length, actor, JSON.stringify(data.quality), parsed.rows.length, alreadyIn, source.kind, sourceNote(source)]);
     await q("INSERT INTO upload_files (upload_id, event_id, content_type, bytes) VALUES ($1, $2, $3, $4)", [uploadId, id, TYPES[sniff(bytes)], bytes]);
 
     // Each new row's company: a copy of the parent's, or a new one for this top-up.
@@ -148,22 +149,22 @@ export async function createTopUp(db: Db, parentId: string, actor: string, filen
 
     const rowIds = new Map(fresh.map((r) => [r.row_number, newId("row")]));
     await q(
-      `INSERT INTO source_rows (id, event_id, upload_id, row_number, raw, kind, company_id, website, issues)
-       SELECT id, $2, $3, row_number, raw, kind, company_id, website, issues
+      `INSERT INTO source_rows (id, event_id, upload_id, row_number, raw, kind, company_id, website, issues, list_source)
+       SELECT id, $2, $3, row_number, raw, kind, company_id, website, issues, $4
        FROM jsonb_to_recordset($1::jsonb) AS x(id text, row_number int, raw jsonb, kind text, company_id text, website text, issues jsonb)`,
       [JSON.stringify(fresh.map((r) => ({
         id: rowIds.get(r.row_number), row_number: r.row_number, raw: r.raw, kind: r.kind,
         company_id: r.company_key ? companyIds.get(r.company_key) : null, website: r.website, issues: [...new Set(r.issues)],
-      }))), id, uploadId]);
+      }))), id, uploadId, source.kind]);
     const people = fresh.flatMap((r) => { const c = contactByRow.get(r.row_number); return c ? [c] : []; });
     await q(
-      `INSERT INTO contacts (id, event_id, source_row_id, company_id, full_name, title, email, linkedin)
-       SELECT id, $2, source_row_id, company_id, full_name, title, email, linkedin
+      `INSERT INTO contacts (id, event_id, source_row_id, company_id, full_name, title, email, linkedin, list_source)
+       SELECT id, $2, source_row_id, company_id, full_name, title, email, linkedin, $3
        FROM jsonb_to_recordset($1::jsonb) AS x(id text, source_row_id text, company_id text, full_name text, title text, email text, linkedin text)`,
       [JSON.stringify(people.map((c) => ({
         id: newId("con"), source_row_id: rowIds.get(c.row_number), company_id: c.company_key ? companyIds.get(c.company_key) : null,
         full_name: c.full_name, title: c.title, email: c.email, linkedin: c.linkedin,
-      }))), id]);
+      }))), id, source.kind]);
     await logActivity(q, id, actor, "mapped", `${filename || "A file"}: ${fresh.length} new, ${alreadyIn} already in, ${dropped} not usable`);
     return { ...counts, top_up_id: id };
   });

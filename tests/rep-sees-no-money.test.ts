@@ -12,6 +12,7 @@ import { clock, deliveredInMotion, fakeCrm, MAYA, personAt } from "./lifecycle-h
 import { setBudgetLine } from "../src/server/budget-lines.ts";
 import { addInvolvement, addPerson, updatePlan } from "../src/server/plan.ts";
 import { approvedPlan, CAMILLE } from "./plan-helpers.ts";
+import { saveSponsorship, updateDeliverable } from "../src/server/sponsorship.ts";
 
 let db: Db;
 beforeEach(async () => { db = await freshDb(); });
@@ -82,3 +83,30 @@ describe("a plan's reads carry no company money to a rep, and a planner reads wh
     expect(year.plan.events.map((e) => e.event_id)).toContain(id);
   });
 });
+
+describe("sponsorship, deadlines and the year reach a rep with no dollars", () => {
+  it("the plan read, the overview's year and week, the events list and the list source carry no money, and the money reads stay refused", async () => {
+    const id = await approvedPlan(db, { passes_cents: 300_000, starts_on: "2026-12-05", ends_on: "2026-12-06" });
+    const { id: spo } = await addInvolvement(db, CAMILLE, id, { kind: "sponsorship", label: "Gold" });
+    await saveSponsorship(db, CAMILLE, id, spo, { tier: "Gold", price_cents: 2_500_000, contract_signed_on: "2026-10-01", deposit_cents: 1_000_000, deposit_due_on: "2026-11-15", balance_due_on: "2026-11-30" });
+    await updatePlan(db, CAMILLE, id, { goal_pipeline_cents: 40_000_000, goal_meetings_held: 25 });
+    const [d] = await db.query<{ id: string }>("SELECT id FROM sponsorship_deliverables WHERE event_id = $1 ORDER BY position", [id]);
+    await updateDeliverable(db, CAMILLE, id, d.id, { due_on: "2026-11-14", owner: MAYA }, { planner: true });
+    const app = createApp(db, { demo: true, lifecycle: { now: () => new Date("2026-11-13T12:00:00Z") } as never });
+    const found: string[] = [];
+    for (const path of [`/api/events/${id}/plan`, "/api/overview", "/api/events", `/api/events/${id}`]) {
+      const r = await app.request(path, { headers: as(MAYA) });
+      expect(r.status, path).toBe(200);
+      found.push(...money(await r.json()).map((f) => `${path}: ${f}`));
+    }
+    expect(found).toEqual([]);
+    const rep = await (await app.request("/api/overview", { headers: as(MAYA) })).json() as { year: { events: unknown[] }; deadlines: { label: string }[] };
+    expect(rep.year.events).toHaveLength(1);
+    expect(rep.deadlines.map((x) => x.label)).toContain("Sponsorship deposit");
+    for (const path of [`/api/events/${id}/budget-lines`, "/api/budget", "/api/results"]) expect((await app.request(path, { headers: as(MAYA) })).status, path).toBe(403);
+    // The planner reads the year's money on the same route, and the plan per event on Budget.
+    const planner = await (await app.request("/api/overview", { headers: as(CAMILLE) })).json() as { year: { total_planned_cents: number } };
+    expect(planner.year.total_planned_cents).toBeGreaterThan(0);
+  });
+});
+
