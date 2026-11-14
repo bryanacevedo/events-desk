@@ -83,15 +83,12 @@ export function assessmentRecording(items: DevItem[] = assessmentDev()): { out: 
 const short = (s: string | undefined, n = 70) => (s === undefined ? "nothing" : s.length > n ? `${s.slice(0, n - 1)}...` : s);
 /** Why a cell the model did not match differs, in words a reader can check against the page. Written from the first real run; a cell not listed here has no note. */
 export const CELL_NOTES: Record<string, string> = {
-  "faq_browse_only/terms": "The labelled sentence is the last in the sponsors paragraph; the model gave no terms answer. A real miss.",
-  "registration_terms/download": "The page bars attendees from downloading and says the organizer emails an opted-in list to sponsors. The label reads the second, the model the first. Both are supported by the page; the question does not say whose download it asks about.",
   "registration_terms/directory_tickets": "The page says the directory is visible to other registered attendees. The label left the question open; the model's answer is supported.",
   "registration_terms/directory_fields": "The page names name, job title and company. The label left it open; the model's answer is supported.",
   "app_store_listing/directory_tickets": "The model took 'free to download for registered attendees' as who sees the directory. That is about downloading the app, so the answer is a stretch.",
-  "app_store_listing/download": "The page says browse and filter in the app and nothing about downloading the list. The model answered 'app' (download from the app). A real error: it read 'in the app' as 'downloadable from the app'.",
+  "app_store_listing/download": "The page says browse and filter in the app and nothing about downloading the list. The label left it open; the model's answer, browse only, is supported. Before the question was reworded (2026-11-14) the model answered 'app' here.",
   "sponsor_prospectus/can_hide": "The page includes only attendees who agreed to share at registration, which the model read as opt-in. A fair reading the label did not make.",
   "money2020_note/directory_tickets": "The note says registrants can view the list. The label left it open; the model's answer is supported.",
-  "money2020_note/download": "The note says registrants can view, sort and filter in the app and nothing about downloading. The model answered 'app', not 'browse only'. A real error, the same one as on the app store page.",
 };
 
 export function assessmentReport(rec = assessmentRecording(), items: DevItem[] = assessmentDev()): string {

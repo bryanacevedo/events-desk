@@ -157,7 +157,7 @@ const proposalsOf = (reply: string): unknown[] => {
   return parsed && Array.isArray(parsed.answers) ? parsed.answers : [];
 };
 
-const questionsText = () => QUESTIONS.map((q) => `- ${q.id}: ${q.label} ${q.type === "choice" ? `One of: ${q.values.join(", ")}.` : q.type === "list" ? `A comma list from: ${q.values.join(", ")}.` : `Short free text, at most ${q.max} characters.`}`).join("\n");
+const questionsText = () => QUESTIONS.map((q) => `- ${q.id}: ${q.ask ?? q.label} ${q.type === "choice" ? `One of: ${q.values.join(", ")}.` : q.type === "list" ? `A comma list from: ${q.values.join(", ")}.` : `Short free text, at most ${q.max} characters.`}`).join("\n");
 
 /** The filled prompt for a page that is already in the form it is sent (markers neutralised, cut to length). The recording script and the step itself both use it. */
 export const assessmentPrompt = (sent: string) => fill(STEP, { questions: questionsText(), page: sent });

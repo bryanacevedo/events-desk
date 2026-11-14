@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { GATES, scoreCompanies, scoreConcierge, scoreReview, scoreTitles } from "../src/evals/score.ts";
 import { isFresh, recordingOf, staleManifest, strictMode } from "../src/evals/recordings.ts";
 import { promptHash, type Step } from "../src/server/prompts.ts";
+import { assessmentRecording } from "../src/evals/assessment.ts";
 import { titleRule, type Settings } from "../src/shared/cost.ts";
 
 const list = JSON.parse(readFileSync("evals/list.json", "utf8"));
@@ -59,12 +60,15 @@ describe("recorded model runs", () => {
    evals/recordings/stale.json with what to re-run, and CI (EVALS_STRICT=1) fails until it is re-recorded. */
 describe("stale recordings are declared, never passed quietly", () => {
   const manifest = staleManifest();
-  const steps = ["company_tier", "second_look", "website_read", "title_parse", "perspective", "title_tier", "review", "concierge"] as const;
+  const steps = ["company_tier", "second_look", "website_read", "title_parse", "perspective", "title_tier", "review", "concierge", "assessment_propose"] as const;
+  // The assessment recording also carries a hash of every filled prompt (the questions are filled into the template, so a change to a question's wording
+  // leaves the template hash alone), which assessmentRecording() checks. Company tier and second look are checked in their own tests.
+  const inputsOk = (step: Step): boolean | null => (step === "company_tier" || step === "second_look" ? true : step === "assessment_propose" ? assessmentRecording().out !== null : null);
   for (const step of steps) {
     const r = recordingOf(step);
     const declared = manifest[step];
-    it(`${step}: ${r ? (isFresh(step, r, step === "company_tier" || step === "second_look" ? true : null) ? "fresh" : declared ? "STALE (declared)" : "STALE (undeclared)") : declared ? "not recorded (declared)" : "not recorded"}`, () => {
-      const fresh = r ? isFresh(step, r) : false;
+    it(`${step}: ${r ? (isFresh(step, r, inputsOk(step)) ? "fresh" : declared ? "STALE (declared)" : "STALE (undeclared)") : declared ? "not recorded (declared)" : "not recorded"}`, () => {
+      const fresh = r ? isFresh(step, r, inputsOk(step)) : false;
       if (r && fresh && declared && step !== "company_tier" && step !== "second_look") throw new Error(`${step} is fresh but evals/recordings/stale.json still lists it. Remove the entry.`);
       if (r && !fresh) {
         // eslint-disable-next-line no-console

@@ -14,6 +14,8 @@ export interface Question {
   id: QuestionId;
   /** What the screen asks. */
   label: string;
+  /** What the model is asked, when the screen's words are too short to say whose answer it is. */
+  ask?: string;
   /** `choice`: one of `values`. `list`: a comma list drawn from `values`. `text`: free text up to `max` characters. */
   type: "choice" | "list" | "text";
   values: readonly string[];
@@ -27,7 +29,7 @@ export const QUESTIONS: readonly Question[] = [
   { id: "directory_tickets", label: "Which tickets see it?", type: "text", values: [], words: {}, max: 300 },
   { id: "directory_fields", label: "What does it show about a person?", type: "list", values: ["name", "title", "company", "photo", "email", "linkedin", "country", "other"], words: { name: "Name", title: "Title", company: "Company", photo: "Photo", email: "Email", linkedin: "LinkedIn", country: "Country", other: "Other" }, max: 0 },
   { id: "can_hide", label: "Can an attendee hide?", type: "choice", values: ["yes", "no", "opt_in", "unknown"], words: { yes: "Yes", no: "No", opt_in: "Only by opting in", unknown: "Not known" }, max: 0 },
-  { id: "download", label: "Can the list be downloaded?", type: "choice", values: ["web_app", "app", "emailed", "browse_only", "none", "unknown"], words: { web_app: "Download from the web app", app: "Download from the app", emailed: "Emailed by the organizer", browse_only: "Browse only", none: "No list", unknown: "Not known" }, max: 0 },
+  { id: "download", label: "Can the list be downloaded?", ask: "Can the attendee list itself be taken away as a file, and by whom? web_app: the page says a ticket holder or sponsor can download or export the list from the web app. app: the same, from the mobile app. emailed: the page says the organizer sends the list to sponsors or exhibitors (an emailed file is a download for them). browse_only: the page says the list can only be viewed, searched or filtered. Viewing, searching or filtering the list in an app is browse_only and never app. none: the page says there is no list. Answer only when the page says one of these.", type: "choice", values: ["web_app", "app", "emailed", "browse_only", "none", "unknown"], words: { web_app: "Download from the web app", app: "Download from the app", emailed: "Emailed by the organizer", browse_only: "Browse only", none: "No list", unknown: "Not known" }, max: 0 },
   { id: "sponsor_adds", label: "What does a sponsor get beyond that?", type: "list", values: ["lead_retrieval", "opt_in_list", "meeting_program", "in_app_search", "none"], words: { lead_retrieval: "Lead retrieval", opt_in_list: "Opt-in list", meeting_program: "Meeting program", in_app_search: "In-app search", none: "Nothing more" }, max: 0 },
   { id: "terms", label: "What do the terms say about using the list?", type: "text", values: [], words: {}, max: 300 },
 ];
