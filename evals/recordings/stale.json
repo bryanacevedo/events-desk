@@ -10,11 +10,5 @@
     "reason": "New prompt (the Summary perspective), never run against a real model. It is gated at run time by the checks in src/server/perspective-check.ts, not by an accuracy score, so there is nothing to score in CI. Three real calls were made on 2026-11-09 (decision 27): 8 of 9 parts passed the checks first time, the ninth was a shown false reject that is now fixed. Three is too few to call a rate.",
     "rerun": "none planned; make one real call on a delivered two-card event and read the activity line",
     "calls_estimate": 0
-  },
-  "assessment_propose": {
-    "since": "2026-11-14",
-    "reason": "New prompt, not yet recorded from the real model: there was no ANTHROPIC_API_KEY in the environment when step 1 session 3 was built. The step is built, replayed and tested from evals/assessment.hand-recording.json, a hand-labelled file that is NOT the model's output. Session 3's exit criterion (a recording from the real model) is open.",
-    "rerun": "ANTHROPIC_API_KEY=... LIVE_SPEND=1 EVALS_MAX_ITEMS=7 node scripts/record-evals.ts assessment_propose",
-    "calls_estimate": 7
   }
 }

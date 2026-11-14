@@ -8,7 +8,7 @@ Worktree `.wt/ev2`, branch `ev2`. Spec `docs/HOSTED.md` (section 21 holds the go
 
 **Gates:** full suite 1,427 passed, 12 skipped; tsc, design-lint, screen-copy clean; both audits pass against the demo; two goldfish reviews (spec, then spec against code), every Major fixed.
 
-**Open:** the live transactional sender is unproven against a provider; `assessment_propose` real-model recording not made (not authorised for this agent); CRM account fill for target accounts waits for step 7; Bryan picks the three direction sets.
+**Open:** the live transactional sender is unproven against a provider; `assessment_propose` has a real-model recording (2026-11-14) and is scored, 16 of 19 labelled answers matched, `download` is the weak question; CRM account fill for target accounts waits for step 7; Bryan picks the three direction sets.
 
 ## Redesign step 2, server side (2026-11-14)
 
@@ -29,7 +29,7 @@ Worktree `.wt/ev1b`, branch `ev1b`. Spec `docs/EVENT-PLAN.md` (progress and devi
 **Gates, 2026-11-14:** full suite 1,342 passed, 12 skipped, no timeouts; `tsc` clean; design-lint and screen-copy clean; both audits against the demo (see the ship notes).
 
 **Open:**
-- The assessment step has not run against the real model: no API key was in the environment. A hand-labelled recording stands in (`evals/assessment.hand-recording.json`); record the real one with `ANTHROPIC_API_KEY=... LIVE_SPEND=1 EVALS_MAX_ITEMS=7 node scripts/record-evals.ts assessment_propose`. The step is listed in `evals/recordings/stale.json` until then.
+- The assessment step was recorded from the real model on 2026-11-14 (`evals/recordings/assessment_propose.json`, claude-opus-5-5, 7 calls, $0.06) and is scored against the hand labels by `src/evals/assessment.ts` (`tests/assessment-evals.test.ts`, `node scripts/eval-report.ts`): 16 of 19 labelled answers, floors per question, no invented quote, injection page clean. The demo, the seed and the logic tests replay the hand-labelled recording (`evals/assessment.hand-recording.json`), never the real one. Re-record after any prompt change: `LIVE_SPEND=1 EVALS_MAX_ITEMS=7 node scripts/record-evals.ts assessment_propose`.
 - Bryan picks one of three Overview directions (`~/Developer/events-desk-review/step1/overview-directions/index.html`); A is built provisionally.
 - The re:Invent assessment answers are marked sample answers, not facts about the organizer.
 - Orrery customer dinner, Lisbon, was a pending seat suggestion; step 2 made it a hosted plan.

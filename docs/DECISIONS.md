@@ -340,3 +340,13 @@ Confirmations, reminders and a seat that opened go through one module that is no
 ## 61. The no-show default (2026-11-14)
 
 Expected no-shows start at a stated 20 percent (`hosted.noshow_default_pct`), the planner may set a number for the event, and the team's own history replaces the default once two hosted events with attendance closed hold ten yes answers. The page says which one it uses. Pheedloop's medians (28 percent for free events) are a reason to over-confirm, not a forecast for an invited dinner.
+
+## 62. The assessment is scored against labels, and the demo never replays the real model (2026-11-14)
+
+The assessment step was recorded from the real model (claude-opus-5-5, 7 calls, $0.06) and scored against the builder's labels on seven pages. Of 19 labelled answers it matched 16 (84 percent; the 95 percent interval is 62 to 94, and the set is small). By question: `directory_present` 4 of 4, `directory_tickets` 1 of 1, `directory_fields` 2 of 2, `can_hide` 2 of 2, `sponsor_adds` 4 of 4, `download` 2 of 4, `terms` 1 of 2. No quote was invented, and the page carrying an instruction produced no download answer.
+
+The misses are specific. On two pages the model read "browse and filter in the app" as "download from the app", which is wrong; the page says nothing about downloading. It left out one terms sentence. On the registration terms it answered `none` where the label says `emailed`; the page supports both readings, so that one is a gap in the question, which does not say whose download it asks about. It also answered five questions the labels leave open; four of those are supported by the page and one (`directory_tickets` on the app store page) is a stretch. A person confirms each answer, so a wrong one costs a rejection, not a wrong fact.
+
+Floors per question sit below this first run (0.9 for the directory, 0.4 for `download` and `terms`, 0.5 for the rest), so a worse prompt or model fails and noise does not. They are not tuned on the labels. We did not relabel to match the model.
+
+The demo, the seed and the logic tests replay the hand-labelled recording, not the real one. The real model's answer on the Money20/20 note was `app`, which would have seeded the sample plan with a wrong download answer and left a proposal unconfirmed; the demo needs the same answers every time. The real recording is only scored. Re-record after any prompt change; the freshness test fails until it is.

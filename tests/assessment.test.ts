@@ -1,15 +1,16 @@
 /* The assessment: a model proposes answers from a page a person gave the desk, code keeps only those whose quote is in the page, and a person confirms each one.
-   The model is replayed from the recording (the hand-labelled one until a real-model recording exists) and scripted where a case needs a particular reply. */
+   The logic here runs on the hand-labelled recording (a person's answers, always the same) or a scripted reply where a case needs one. How well the real model's
+   recording matches the labels is scored in tests/assessment-evals.test.ts. */
 
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "../src/server/app.ts";
 import type { Db } from "../src/server/db.ts";
-import { addSource, confirmAssessment, fetchPageText, isPublicAddress, proposeAnswers, rejectAnswer, reuseLastYear, setAnswer, stripTags } from "../src/server/assessment.ts";
-import { assessmentDev, assessmentPage, HAND_RECORDING, REAL_RECORDING } from "../src/server/assessment-sim.ts";
+import { addSource, assessmentPrompt, confirmAssessment, fetchPageText, isPublicAddress, proposeAnswers, rejectAnswer, reuseLastYear, setAnswer, stripTags } from "../src/server/assessment.ts";
+import { assessmentDev, assessmentPage, handLlm, HAND_RECORDING, simulatedAssessment } from "../src/server/assessment-sim.ts";
 import { MAX_TOKENS, SCHEMAS } from "../src/server/anthropic.ts";
 import { promptHash } from "../src/server/prompts.ts";
-import { mockLlm, type Llm } from "../src/server/providers.ts";
+import type { Llm } from "../src/server/providers.ts";
 import { QUESTION_IDS, conferenceKey, normalizeText, pageSent, quoteIn, validProposal } from "../src/shared/assessment.ts";
 import { isFresh, recordingOf, staleManifest, type Recording } from "../src/evals/recordings.ts";
 import { freshDb } from "./helpers.ts";
@@ -123,12 +124,12 @@ describe("the model's proposals, against the page it was sent", () => {
 });
 
 describe("replayed from the recording", () => {
-  const rec = JSON.parse(readFileSync(existsSync(REAL_RECORDING) ? REAL_RECORDING : HAND_RECORDING, "utf8")) as Recording & { hand_labelled?: boolean };
+  const rec = JSON.parse(readFileSync(HAND_RECORDING, "utf8")) as Recording & { hand_labelled?: boolean };
 
   it("every labelled page gives exactly the answers a person labelled, and no more", async () => {
     for (const item of assessmentDev()) {
       const { id, sid } = await withSource(assessmentPage(item), item.source_kind, { name: `Page ${item.id}` });
-      const r = await proposeAnswers(db, mockLlm, id, LEO, sid);
+      const r = await proposeAnswers(db, handLlm, id, LEO, sid);
       expect(r.dropped, item.id).toBe(0);
       expect((await rows(id)).map((x) => [x.question, x.answer]).sort(), item.id).toEqual(item.answers.map((a) => [a.question, a.answer]).sort());
     }
@@ -137,35 +138,30 @@ describe("replayed from the recording", () => {
   it("the page carrying an instruction yields no download answer", async () => {
     const item = dev("injection");
     const { id, sid } = await withSource(assessmentPage(item), "event_page");
-    const r = await proposeAnswers(db, mockLlm, id, LEO, sid);
+    const r = await proposeAnswers(db, handLlm, id, LEO, sid);
     expect(r.kept).toBe(0);
     expect((await rows(id)).some((x) => x.question === "download")).toBe(false);
   });
 
   it("a page the demo does not know gets no answers and the demo's line", async () => {
     const { id, sid } = await withSource("This is some other page about a conference that the sample set does not hold.");
-    const r = await proposeAnswers(db, { ...mockLlm, simulated: true }, id, LEO, sid);
+    const r = await proposeAnswers(db, handLlm, id, LEO, sid);
     expect(r).toMatchObject({ kept: 0, dropped: 0, note: "The demo reads only the sample pages." });
   });
 
-  it("the recording's hash matches the prompt that runs today", () => {
+  it("the hand-labelled recording is what it says it is, and its hash matches the prompt that runs today", () => {
+    expect(rec.hand_labelled).toBe(true);
+    expect(rec.model).toBe("hand-labelled");
     expect(rec.prompt_hash).toBe(promptHash("assessment_propose", rec.model));
-    expect(isFresh("assessment_propose", rec)).toBe(true);
     for (const item of assessmentDev()) expect(typeof rec.outputs[item.id]).toBe("string");
   });
 
-  it("is honest about what it is: a real-model recording is fresh and not in stale.json; until one is made the hand-labelled file says so and the step is declared", () => {
+  it("the real model's recording is declared stale only when it is missing or old, and is never what the logic tests replay", () => {
     const real = recordingOf("assessment_propose");
     const declared = staleManifest().assessment_propose;
-    if (real) {
-      expect(isFresh("assessment_propose", real)).toBe(true);
-      expect(declared).toBeUndefined();
-      expect(real.model).not.toBe("hand-labelled");
-    } else {
-      expect(rec.hand_labelled).toBe(true);
-      expect(rec.model).toBe("hand-labelled");
-      expect(declared?.calls_estimate).toBeGreaterThan(0);
-    }
+    if (real) { expect(isFresh("assessment_propose", real)).toBe(true); expect(declared).toBeUndefined(); expect(real.model).not.toBe("hand-labelled"); }
+    else expect(declared?.calls_estimate).toBeGreaterThan(0);
+    expect(JSON.parse(simulatedAssessment(assessmentPrompt(pageSent(assessmentPage(assessmentDev()[0])))))).toEqual(JSON.parse(rec.outputs[assessmentDev()[0].id]));
   });
 
   it("every labelled quote is in its page, and the step has a schema and room for its answer", () => {
@@ -178,7 +174,7 @@ describe("replayed from the recording", () => {
 describe("confirming, editing and rejecting", () => {
   it("confirming records who and when, and the assessment cannot be confirmed with a proposal still open", async () => {
     const { id, sid } = await withSource(assessmentPage(dev("faq_browse_only")));
-    await proposeAnswers(db, mockLlm, id, LEO, sid);
+    await proposeAnswers(db, handLlm, id, LEO, sid);
     await expect(confirmAssessment(db, LEO, id)).rejects.toThrow(/still proposed/);
     for (const q of QUESTION_IDS) await setAnswer(db, CAMILLE, id, q, { confirm: true });
     const done = await rows(id);
@@ -191,7 +187,7 @@ describe("confirming, editing and rejecting", () => {
 
   it("with answers still missing it says how many", async () => {
     const { id, sid } = await withSource(assessmentPage(dev("registration_terms")));
-    await proposeAnswers(db, mockLlm, id, LEO, sid);
+    await proposeAnswers(db, handLlm, id, LEO, sid);
     for (const q of ["directory_present", "can_hide", "download", "sponsor_adds", "terms"]) await setAnswer(db, LEO, id, q, { confirm: true });
     await expect(confirmAssessment(db, LEO, id)).rejects.toThrow("2 of 7 questions still need an answer.");
   });
@@ -365,7 +361,7 @@ describe("reading a page from a link", () => {
 describe("over HTTP", () => {
   it("anyone reads the assessment, writes sources and answers; the demo refuses a link; confirm needs all seven", async () => {
     const id = await draftPlan(db);
-    const app = createApp(db, { demo: true, llm: mockLlm });
+    const app = createApp(db, { demo: true, llm: handLlm });
     const call = (who: string, method: string, path: string, body?: unknown) => app.request(path, { method, headers: as(who), body: body === undefined ? undefined : JSON.stringify(body) });
     expect((await call(LEO, "GET", `/api/events/${id}/assessment`)).status).toBe(200);
     expect((await call(LEO, "POST", `/api/events/${id}/assessment/sources`, { input: "fetched", source_kind: "faq", url: "https://example.com/faq" })).status).toBe(400);
