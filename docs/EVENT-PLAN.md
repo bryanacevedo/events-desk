@@ -705,3 +705,7 @@ Done: the New plan form (Events, planners), editing on the Plan tab (reason, goa
 ## 19. Progress (finish of step 1, 2026-11-14)
 
 Done: everything in section 13 sessions 2 and 3 except the real-model recording of `assessment_propose` (see deviation notes above and PROJECT-STATUS). Overview shows Direction A provisionally; the three directions are in `~/Developer/events-desk-review/step1/overview-directions/`. Full suite 1,342 passed, 12 skipped.
+
+## 20. Progress (step 2, 2026-11-14)
+
+Hosted events are built in `docs/HOSTED.md` (migration 0053, decisions 58 to 61). The Orrery customer dinner in Lisbon is a hosted plan, and the Money20/20 USA 2026 pipeline line reads "not read" instead of $0 when no CRM was connected. Step 1's open items otherwise stand.

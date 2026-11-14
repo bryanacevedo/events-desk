@@ -1,5 +1,15 @@
 # Events Desk: project status
 
+## Redesign step 2, hosted events (2026-11-14)
+
+Worktree `.wt/ev2`, branch `ev2`. Spec `docs/HOSTED.md` (section 21 holds the goldfish fixes, 23 and 24 the build's deviations), decisions 58 to 61, migration 0053.
+
+**Built:** guest list (target accounts, nominations, Luma and Splash CSV), personal invitations drafted and logged (the desk never sends them), the public RSVP link (192-bit token, one 404 for every bad link), waitlist under a row lock, reminders and seat-open mail only to registered guests from a transactional sender that does not depend on the sequencer, expected no-shows (20 percent default, your own history after two closed dinners), venue minimum, guarantee and cancellation steps (into the week's deadlines), phone check-in with walk-ins and undo, closing attendance into attended and no-show follow-up groups with owners' notes, co-host split and lead rule. Screens: Guests tab, check-in, public RSVP, hosted Result, My day guests. Directions in `~/Developer/events-desk-review/step2/` (recommended ones built provisionally: guests B, check-in C, RSVP B). Orrery customer dinner in Lisbon is now a hosted plan. The demo's Money20/20 "$0 of $800,000" was a reading error (an unread pipeline printed as $0); it now says not read.
+
+**Gates:** full suite 1,427 passed, 12 skipped; tsc, design-lint, screen-copy clean; both audits pass against the demo; two goldfish reviews (spec, then spec against code), every Major fixed.
+
+**Open:** the live transactional sender is unproven against a provider; `assessment_propose` real-model recording not made (not authorised for this agent); CRM account fill for target accounts waits for step 7; Bryan picks the three direction sets.
+
 ## Redesign step 2, server side (2026-11-14)
 
 Worktree `.wt/ev2`, branch `ev2`. Spec `docs/HOSTED.md` (what was built and where it differs: section 23), migration 0053.
