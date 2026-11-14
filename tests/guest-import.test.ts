@@ -160,3 +160,22 @@ describe("target accounts and suggestions", () => {
     void guest; void yes;
   });
 });
+
+describe("an import row with an email matches a guest who has none", () => {
+  it("fills the email in by name and company instead of duplicating", async () => {
+    const db = await freshDb();
+    const id = await hostedDinner(db, { capacity: 10 });
+    const g = await guest(db, id, "Ana Ruiz", { email: undefined, company: "Acme" });
+    const r = await importGuests(db, depsAt(BEFORE), CAMILLE, id, "luma", "name,email,approval_status,company\nAna Ruiz,ana@acme.example,approved,Acme\n");
+    expect(r).toMatchObject({ added: 0, already_there: 1 });
+    expect((await db.query<{ email: string }>("SELECT email FROM event_guests WHERE id = $1", [g.id]))[0].email).toBe("ana@acme.example");
+    expect((await db.query("SELECT 1 FROM event_guests WHERE event_id = $1", [id])).length).toBe(1);
+  });
+});
+
+describe("country names", () => {
+  it("only the known codes and names count, and UK is GB", async () => {
+    const { normalizeCountry } = await import("../src/shared/country-rules.ts");
+    expect(["uk", "GB", "us", "Germany", "ZZ", "XX", "Atlantis", ""].map(normalizeCountry)).toEqual(["GB", "GB", "US", "DE", null, null, null, null]);
+  });
+});
