@@ -65,7 +65,7 @@ async function insertContacts(db: Db, eventId: string, filename: string, rows: W
 
 export async function seedWorld(db: Db, opts: { today?: string } = {}) {
   const w = worldData();
-  const byName = async (name: string) => (await db.query<{ id: string }>("SELECT id FROM events WHERE name = $1 AND parent_event_id IS NULL ORDER BY id LIMIT 1", [name]))[0]?.id ?? null;
+  const byName = async (name: string) => (await db.query<{ id: string }>("SELECT id FROM events WHERE name = $1 AND parent_event_id IS NULL ORDER BY (id ~ '^evt_[a-z0-9]{12}$'), id LIMIT 1", [name]))[0]?.id ?? null;
   const full = new Map(w.events.map((e) => [e.id, e]));
 
   // 1. The 18 events. A conference is the same event the demo already has: it takes the world's id. Everything else is made as a hosted or planned event, with the world's id in its own.

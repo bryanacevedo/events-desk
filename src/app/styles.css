@@ -3118,3 +3118,7 @@ a:hover > .swap .due, a:focus-visible > .swap .due { opacity: 0; transform: tran
 .m-defer { display: grid; gap: 14px; margin: 0 0 18px; padding: 18px 20px; border-radius: 20px; background: color-mix(in srgb, var(--sand) 48%, white); justify-items: start; }
 .m-defer-t { margin: 0; font: 500 18px/24px var(--display); }
 .m-defer .m-rows { width: 100%; }
+.m-deskp { display: grid; gap: 10px; width: 100%; }
+.m-deskp .m-act { display: flex; gap: 8px; align-items: center; }
+.m-deskp .m-act input { flex: 1 1 200px; width: auto; min-width: 0; }
+.m-deskp .m-rows li b { font-variant-numeric: tabular-nums; }

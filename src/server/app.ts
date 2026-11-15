@@ -3,6 +3,7 @@
 import { worldSlice } from "./world-slice.ts";
 import { definitionVersions, listDefinitions, readDefinition } from "./definitions.ts";
 import { START, refusalFor, integrationView, integrationCounts } from "./integration.ts";
+import { deskCampaignRead, panelView, playStatus, setBookingUrl } from "./desk-panel.ts";
 import { readFileSync } from "node:fs";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
@@ -56,6 +57,8 @@ type Ctx = { Variables: { actor: string } };
 const RSVP_ANSWER = /^\/api\/rsvp\/[^/]+$/;
 /** The extension's two routes, by exact method and path. */
 const CAPTURE_ROUTE = /^(GET \/api\/capture\/events|POST \/api\/capture\/people)$/;
+/** Account Desk reads one event's name, dates and booking link with its own Bearer key, checked in the route (docs/SHARED-WORLD.md 13.6). */
+const DESK_READ_ROUTE = /^GET \/api\/desk\/campaigns\/[^/]+$/;
 /** What the public demo refuses outright: the capture routes, capture keys, recordings and their frames. */
 const DIRECTORY_ONLY = /^\/api\/(capture\/|capture-keys(\/|$)|events\/[^/]+\/recordings$|recordings\/)/;
 
@@ -99,7 +102,7 @@ export function createApp(db: Db, cfg: AppConfig) {
     // The directory and the recordings read other people's pages and spend on vision: not in the public demo, for anyone.
     if (cfg.publicDemo && DIRECTORY_ONLY.test(c.req.path)) return bad("This public demo does not read directories or recordings. To try it, run the desk yourself.", 403);
     // The extension's two routes take their own Bearer key, checked in the route, and no write key or acting name. Exactly these two and nothing else.
-    if (CAPTURE_ROUTE.test(`${c.req.method} ${c.req.path}`)) return next();
+    if (CAPTURE_ROUTE.test(`${c.req.method} ${c.req.path}`) || DESK_READ_ROUTE.test(`${c.req.method} ${c.req.path}`)) return next();
     if (c.req.method === "GET") {
       // Reads say who is acting too. Usage is company money: leadership's and GTM Engineering's. Budget and Results also admit a planner (decision 54), who writes the plans they show.
       c.set("actor", decodeURIComponent(c.req.header("x-actor") ?? "").trim().slice(0, 60));
@@ -158,6 +161,11 @@ export function createApp(db: Db, cfg: AppConfig) {
   app.get("/api/definitions/:name/versions", async (c) => { const d = await definitionVersions(db, c.req.param("name")); return d ? c.json(d) : bad("That definition does not exist.", 404); });
   app.get("/api/integration", async (c) => c.json({ ...integrationView(cfg.lifecycle?.crm?.name), ...(await integrationCounts(db)) }));
   app.get("/api/world", (c) => c.json(worldSlice()));
+  // The Outreach panel under account_desk: counts and the booking link now, the play status on its own route so the page never waits for Account Desk.
+  app.get("/api/events/:id/desk-panel", async (c) => c.json(await panelView(db, c.req.param("id"))));
+  app.get("/api/events/:id/desk-plays", async (c) => c.json(await playStatus(db, c.req.param("id"))));
+  app.put("/api/events/:id/booking-url", async (c) => c.json(await setBookingUrl(db, c.req.param("id"), (await c.req.json().catch(() => ({})))?.booking_url)));
+  app.get("/api/desk/campaigns/:ref", async (c) => { const r = await deskCampaignRead(db, c.req.param("ref"), c.req.header("authorization")); return c.json(r.body as never, r.status as never); });
   app.get("/api/health", async (c) => {
     const stale = tickStale();
     const [a] = await db.query<{ n: number }>("SELECT count(*)::int AS n FROM alerts WHERE day = $1", [new Date().toISOString().slice(0, 10)]).catch(() => [{ n: -1 }]);

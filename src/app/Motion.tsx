@@ -85,6 +85,46 @@ function SequenceDetail({ s, act, busy }: { s: Sequence; act: Act; busy: boolean
 }
 
 
+const MEMBER_WORDS: [string, string][] = [["targeted", "Targeted"], ["sent", "Sent"], ["responded", "Responded"], ["waitlist", "Waitlist"], ["declined", "Declined"], ["registered", "Registered"], ["no_show", "No show"], ["attended", "Attended"], ["met", "Met"]];
+
+/** The deferral panel's own part (docs/SHARED-WORLD.md 13.6): the booking link a person sets, the people by status from this desk's own table, and Account Desk's play status in words, read on its own so the panel never waits for it. */
+function DeskPanel({ id, actor }: { id: string; actor: string }) {
+  const [p, setP] = useState<{ booking_url: string | null; counts: Record<string, number>; held: number; plays_read: boolean } | null>(null);
+  const [plays, setPlays] = useState<{ state: string; lines: string[]; last_good_at: string | null } | null>(null);
+  const [url, setUrl] = useState(""), [err, setErr] = useState(""), [copied, setCopied] = useState(false);
+  useEffect(() => {
+    let live = true;
+    get<NonNullable<typeof p>>(`/api/events/${id}/desk-panel`).then((r) => { if (!live || !r) return; setP(r); setUrl(r.booking_url ?? ""); }).catch(() => {});
+    get<NonNullable<typeof plays>>(`/api/events/${id}/desk-plays`).then((r) => { if (live) setPlays(r); }).catch(() => { if (live) setPlays({ state: "unavailable", lines: [], last_good_at: null }); });
+    return () => { live = false; };
+  }, [id]);
+  if (!p) return null;
+  const save = async () => {
+    if (url.trim() === (p.booking_url ?? "")) return;
+    const r = await send<{ booking_url: string | null }>("PUT", `/api/events/${id}/booking-url`, actor, { booking_url: url });
+    if (!r.ok) { setErr(r.error); return; }
+    setErr(""); setP({ ...p, booking_url: r.data?.booking_url ?? null }); setUrl(r.data?.booking_url ?? "");
+  };
+  const copy = async () => { try { await navigator.clipboard.writeText(url.trim()); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* the field is selectable */ } };
+  const any = MEMBER_WORDS.filter(([k]) => p.counts[k] > 0);
+  const at = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : null);
+  return (
+    <div className="m-deskp">
+      <form className="m-act" onSubmit={(e) => { e.preventDefault(); void save(); }}>
+        <input type="url" aria-label="Booking link" placeholder="Booking link" value={url} onChange={(e) => setUrl(e.target.value)} onBlur={() => void save()} />
+        <button type="button" className="btn small line" disabled={!url.trim()} onClick={copy}>{copied ? "Copied" : "Copy"}</button>
+      </form>
+      {err && <p className="m-note" role="alert">{err}</p>}
+      <ul className="m-rows m-wide">
+        {any.length ? any.map(([k, label]) => <li key={k}><span>{label}</span><b>{num(p.counts[k])}</b></li>) : <li><span>People in the CRM</span><b>0</b></li>}
+        {p.held > 0 && <li><span>Waiting on CRM</span><b>{num(p.held)}</b></li>}
+        {plays?.lines.map((l) => { const [name, ...rest] = l.split(": "); return <li key={l}><span>{name}</span><b className="m-text">{rest.join(": ")}</b></li>; })}
+        {plays?.state === "unavailable" && <li><span>Play status unavailable</span>{plays.last_good_at && <b className="m-text">last read {at(plays.last_good_at)}</b>}</li>}
+      </ul>
+    </div>
+  );
+}
+
 export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
   const { actor, demo, needs } = useActor();
   // What the event cost and returned is leadership's and GTM Engineering's view, as on Budget.
@@ -145,6 +185,7 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
         <div className="m-defer">
           <p className="m-defer-t">Account Desk runs the outreach for this event.</p>
           {deferTo.links.account_desk && <a className="btn line small" href={deferTo.links.account_desk} target="_blank" rel="noreferrer">Open in Account Desk</a>}
+          <DeskPanel id={id} actor={actor} />
           <ul className="m-rows m-wide">
             {([["Badge scans and notes", "Met at the booth"], ["Replies", "Replies"], ["Meetings", "Meetings"]] as const).map(([label, fold]) => (
               <li key={label} className="brow opens" role="button" tabIndex={0} onClick={() => openFold(fold)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openFold(fold); } }}><span>{label}</span><Chevron right /></li>
