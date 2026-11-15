@@ -10,6 +10,10 @@ Worktree `.wt/ev6-events-desk`, branch `ev6/overview-views`. Decisions 81 and 82
 
 **Bryan's picks, recorded (decision 82):** email gate stays, sponsorship kit offer stays, Get the attendee list C, Scanner tab B, phone scanner A (a B rebuild was started and dropped; nothing of it is in the code).
 
+**Prompt caching (bl_117) brought in:** the three `cache/prompt-caching` commits are cherry-picked onto this branch (its DECISIONS entry is now 83, its marker test `tests/prompt-cache.test.ts` kept). Its measured numbers are from 2026-11-14 real calls on the same code (about 90% lower input cost once warm); the re-measure Bryan asked for was not repeated in this session, no new spend.
+
+**Review:** an Opus review of the Overview diff found a squeezed timeline week when nothing is late, an optimistic pick that could be overwritten or lost on a failed save, hidden money labels on desktop and a bar that overflowed at year end; all four are fixed.
+
 **Not done:** step 6 itself (into the shared world: SPEC, goldfish review, three directions, build) has not been started; it is 4 to 5 sessions by its own brief and the context of this session was spent. It needs a fresh session, which also owns the Account Desk and CRM Desk agreements it names.
 
 ## Redesign step 5, speaking and the social kit (2026-11-14)
