@@ -90,7 +90,7 @@ describe("seedReal and seedPlan on 2026-11-13", () => {
     const e = await planView(db, undefined, M2020, DAN);
     expect(e.reason.length).toBeGreaterThan(40);
     expect(e.goal).toEqual({ meetings_held: 16, accounts_met: 10, pipeline_cents: 80_000_000 });
-    expect(e.involvements.map((i) => i.kind).sort()).toEqual(["passes", "sponsorship"]);
+    expect(e.involvements.map((i) => i.kind).sort()).toEqual(["passes", "sponsorship", "talk"]);
     const d = await delivs(M2020);
     expect(Object.keys(d)).toHaveLength(8);
     expect(Object.values(d).every((x) => x.done && x.due_on! >= "2026-09-01" && x.due_on! <= "2026-10-31")).toBe(true);
