@@ -29,6 +29,7 @@ import { isGtm, SETTINGS_REFUSAL } from "../shared/roles.ts";
 import { canPlan, forRep, isLead, MONEY_REFUSAL } from "./money.ts";
 import { mountPlanRoutes } from "./plan-routes.ts";
 import { mountHosted } from "./hosted-routes.ts";
+import { mountSpeaking } from "./speaking-routes.ts";
 import { mountScans } from "./scan-routes.ts";
 import { mountDirectory } from "./directory-routes.ts";
 import type { OrganizerAdapter } from "./organizer-api.ts";
@@ -65,7 +66,7 @@ export function createApp(db: Db, cfg: AppConfig) {
   app.use("*", secureHeaders({ xFrameOptions: "DENY", referrerPolicy: "strict-origin-when-cross-origin", crossOriginEmbedderPolicy: false, crossOriginResourcePolicy: false,
     contentSecurityPolicy: { defaultSrc: ["'self'"], imgSrc: ["'self'", "data:", "blob:", "https://www.google.com", "https://*.gstatic.com", "https://images.unsplash.com"], styleSrc: ["'self'", "'unsafe-inline'"], scriptSrc: ["'self'", "'wasm-unsafe-eval'"], workerSrc: ["'self'"], mediaSrc: ["'self'", "blob:"], manifestSrc: ["'self'"], connectSrc: ["'self'"], fontSrc: ["'self'", "data:"], frameAncestors: ["'none'"], objectSrc: ["'none'"], baseUri: ["'self'"] } }));
   // No body is read whole before its size is known: files may be about 20 MB (21,000,000 bytes), everything else 1 MB.
-  const FILE_ROUTE = /^\/api\/(events\/[^/]+\/(upload|new-registrations|review|top-ups|guests\/import)|icp\/documents|target-accounts\/import)(\/|$)/;
+  const FILE_ROUTE = /^\/api\/(events\/[^/]+\/(upload|new-registrations|review|top-ups|guests\/import)|icp\/documents|target-accounts\/import|kit\/photo)(\/|$)/;
   // A screen recording's frame is one picture: 4 MB, and not a file route (docs/DIRECTORY.md 13.3).
   const FRAME_ROUTE = /^\/api\/recordings\/[^/]+\/frames$/;
   app.use("*", async (c, next) => {
@@ -108,7 +109,7 @@ export function createApp(db: Db, cfg: AppConfig) {
       const actor = decodeURIComponent(c.req.header("x-actor") ?? "").trim();
       if (!actor) return bad("Say who you are before making changes.");
       c.set("actor", actor.slice(0, 60));
-      if (cfg.publicDemo && /^\/api\/(events\/[^/]+\/(upload|new-registrations|review|guests\/import)|target-accounts\/import)$/.test(c.req.path)) return bad("This public demo does not take files. To try your own list, run it yourself: the README shows how.", 403);
+      if (cfg.publicDemo && /^\/api\/(events\/[^/]+\/(upload|new-registrations|review|guests\/import)|target-accounts\/import|kit\/photo|events\/[^/]+\/organizer-kit)$/.test(c.req.path)) return bad("This public demo does not take files. To try your own list, run it yourself: the README shows how.", 403);
       // Settings and the ICP are GTM Engineering's. Acting as is not security; this keeps the desk honest until a real login.
       if (/^\/api\/(icp|settings)(\/|$)/.test(c.req.path) && !isGtm(c.get("actor"))) return bad(SETTINGS_REFUSAL, 403);
     }
@@ -159,6 +160,7 @@ export function createApp(db: Db, cfg: AppConfig) {
   mountEventViews(app, db);
   mountPlanRoutes(app, db, cfg);
   mountHosted(app, db, cfg);
+  mountSpeaking(app, db, cfg);
   // "Did it pay?" is company money: anyone else gets the overview without it.
   // The year plan and the week's deadlines sit beside what was already here. A rep's year has no key holding dollars (yearPlan answers through forRep).
   app.get("/api/overview", async (c) => {

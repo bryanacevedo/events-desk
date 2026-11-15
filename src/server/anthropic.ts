@@ -13,7 +13,7 @@ export const DEFAULT_MODEL = "claude-opus-5-5";
 
 /** Output room per step. Hidden thinking is counted inside max_tokens, so a step that thinks and then writes needs room for both: at 2048 the Summary's
     three paragraphs can be cut off after the thinking, and a cut-off reply is returned empty (below), which reads as invalid JSON. */
-export const MAX_TOKENS: Record<string, number> = { icp_compile: 8000, perspective: 8000, assessment_propose: 4000, scan_read: 2000, directory_read: 4000 };
+export const MAX_TOKENS: Record<string, number> = { icp_compile: 8000, perspective: 8000, assessment_propose: 4000, cfp_read: 3000, scan_read: 2000, directory_read: 4000 };
 const DEFAULT_MAX_TOKENS = 2048;
 
 /** Steps whose reply must be exactly this JSON, so the API holds the model to it (structured output) instead of the prompt asking nicely. */

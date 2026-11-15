@@ -53,6 +53,9 @@ const reopen = (q: Db["query"], a: Row) => (a.status === "confirmed"
 export function isPublicAddress(ip: string): boolean {
   const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(ip);
   if (mapped) return isPublicAddress(mapped[1]);
+  // The same address written in hex groups (::ffff:7f00:1) is still the IPv4 inside it.
+  const hex = /^(?:0{0,4}:){0,5}ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/i.exec(ip);
+  if (hex) { const a = parseInt(hex[1], 16), b = parseInt(hex[2], 16); return isPublicAddress(`${a >> 8}.${a & 255}.${b >> 8}.${b & 255}`); }
   if (isIP(ip) === 4) {
     const [a, b, c] = ip.split(".").map(Number);
     if (a === 0 || a === 10 || a === 127 || a >= 224) return false;
@@ -75,7 +78,8 @@ export function isPublicAddress(ip: string): boolean {
 }
 
 /** HTML to plain text: script and style removed, tags become spaces, entities decoded, whitespace collapsed, cut to 40,000 characters. */
-export function stripTags(html: string): string {
+export function stripTags(html: string, keepLinks = false): string {
+  if (keepLinks) html = html.replace(/<a\b[^>]*?\bhref\s*=\s*["']([^"']+)["'][^>]*>([\s\S]*?)<\/a\s*>/gi, (_m, href, inner) => `${inner} (${href}) `);
   const t = html.replace(/<!--[\s\S]*?-->/g, " ").replace(/<(script|style|noscript|template|svg)\b[\s\S]*?<\/\1\s*>/gi, " ").replace(/<\/?(p|div|br|li|ul|ol|h[1-6]|tr|td|th|section|article|header|footer|dt|dd)\b[^>]*>/gi, "\n").replace(/<[^>]*>/g, " ");
   return decodeEntities(t).replace(/[ \t\f\v ]+/g, " ").replace(/\s*\n\s*/g, "\n").trim().slice(0, PAGE_MAX);
 }
@@ -85,7 +89,7 @@ export const PASTE_INSTEAD = "The page could not be read. Paste its text instead
 
 /** One public https page. The host is resolved first, every address must be public, and the connection is made to the address checked, so a host that answers differently the second time is not followed.
     No redirects are followed. Times out after 5 seconds and reads at most 1 MB. Returns plain text. */
-export async function fetchPageText(rawUrl: string, resolve: (host: string) => Promise<string[]> = async (h) => (await lookup(h, { all: true })).map((a) => a.address)): Promise<string> {
+export async function fetchPageText(rawUrl: string, resolve: (host: string) => Promise<string[]> = async (h) => (await lookup(h, { all: true })).map((a) => a.address), keepLinks = false): Promise<string> {
   let u: URL;
   try { u = new URL(rawUrl); } catch { throw new AssessmentInvalid("That is not a web address."); }
   if (u.protocol !== "https:") throw new AssessmentInvalid("Only https addresses can be read.");
@@ -104,7 +108,7 @@ export async function fetchPageText(rawUrl: string, resolve: (host: string) => P
       const chunks: Buffer[] = [];
       let size = 0;
       res.on("data", (c: Buffer) => { size += c.length; chunks.push(c); if (size >= FETCH_MAX_BYTES) { res.destroy(); } });
-      const done = () => resolveBody(stripTags(Buffer.concat(chunks).subarray(0, FETCH_MAX_BYTES).toString("utf8")));
+      const done = () => resolveBody(stripTags(Buffer.concat(chunks).subarray(0, FETCH_MAX_BYTES).toString("utf8"), keepLinks));
       res.on("end", done); res.on("close", done); res.on("error", fail);
     });
     req.setTimeout(FETCH_TIMEOUT_MS, () => { req.destroy(); fail(); });

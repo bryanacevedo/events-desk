@@ -2,6 +2,7 @@
    the money rules and the motion run inside it, unchanged. A planner writes the plan; an approver who did not write it approves the planned total,
    and that approval covers the passes inside it. moveWithin stays the only writer of events.stage. */
 
+import { offerForInvolvement } from "./kit-offers.ts";
 import { readFileSync } from "node:fs";
 import type { Db } from "./db.ts";
 import { defaultSettings, getSettings } from "./approvals.ts";
@@ -210,6 +211,7 @@ export async function updateInvolvement(db: Db, actor: string, eventId: string, 
     if (patch.status !== undefined) { if (!["planned", "confirmed"].includes(patch.status)) throw new PlanInvalid("An involvement is planned or confirmed. Dropping it needs a reason."); put("status", patch.status); }
     if (patch.pass_count !== undefined && i.kind === "passes") put("pass_count", num(patch.pass_count, "the number of passes"));
     if (patch.headcount !== undefined && i.kind === "hosted") put("headcount", num(patch.headcount, "the expected guests"));
+    if (i.kind === "talk" && (patch.talk_title !== undefined || patch.speaker !== undefined) && (await q("SELECT 1 FROM talks WHERE involvement_id = $1", [iid])).length) throw new RuleError("This talk has its own page. Change its title and speaker there.");
     if (i.kind === "talk") { if (patch.talk_title !== undefined) put("talk_title", text(patch.talk_title).slice(0, 200)); if (patch.speaker !== undefined) put("speaker", text(patch.speaker).slice(0, 80)); }
     if (patch.conference_event_id !== undefined && i.kind === "hosted") {
       if (patch.conference_event_id) {
@@ -221,6 +223,7 @@ export async function updateInvolvement(db: Db, actor: string, eventId: string, 
     }
     if (!sets.length) throw new PlanInvalid("Say what to change.");
     await q(`UPDATE involvements SET ${sets.join(", ")} WHERE id = $1`, vals);
+    if (patch.status === "confirmed" && i.status !== "confirmed") await offerForInvolvement(q, eventId, iid, i.kind, actor);
     await logActivity(q, eventId, actor, "plan", `Changed ${INVOLVEMENT_WORDS[i.kind as InvolvementKind].toLowerCase()}`);
     return { id: iid };
   });

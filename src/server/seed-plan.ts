@@ -11,6 +11,9 @@ import { addInvolvement, addPerson, approvePlan, createPlan, submitPlan, updateP
 import { addPromise, saveSponsorship, standardDeliverables, updateDeliverable } from "./sponsorship.ts";
 import { addSource, closeOrganizerRequest, confirmAssessment, draftOrganizerRequest, markRequestCopied, patchOrganizerRequest, proposeAnswers, setAnswer } from "./assessment.ts";
 import { mockLlm } from "./providers.ts";
+import { addCall, acceptTalk, approveAbstract, approveSlides, createTalk, saveTalk, slidesSent, submitTalk } from "./talks.ts";
+import { putPhoto } from "./social-kit.ts";
+import { Resvg } from "@resvg/resvg-js";
 import { bookMeeting, recordOutcome } from "./meetings.ts";
 import { recordEventCost, writeScorecards } from "./closeout.ts";
 import { moveMotion } from "./motion-state.ts";
@@ -91,6 +94,7 @@ export async function seedPlan(db: Db, opts: { today?: string } | string = {}) {
   await seedMadrid(db, today);
   await seedGitex(db, today);
   await seedPastEvents(db, today);
+  await seedSpeaking(db, today);
   // The hosted dinners and their guest lists, written through the code the routes use.
   await seedHostedYear(db, today);
 }
@@ -241,4 +245,22 @@ export async function seedPastResults(db: Db, deps: LifecycleDeps) {
     // The real path: the 30-day scorecard is computed and kept as written, and the motion moves on to scored, as it does for any event thirty days after its last day.
     await writeScorecards(db, { ...deps, now: () => new Date(`${addDays(e.last_day, 30)}T12:00:00Z`) }, { only: [id] });
   }
+}
+
+/** Speaking (docs/SPEAKING.md 9): Money20/20 Europe 2027 as a candidate event with its call, and an accepted talk with approved slides on Money20/20 USA 2026. Written through the real rules, so a second person approves each. */
+async function seedSpeaking(db: Db, today: string) {
+  const eu = await createPlan(db, CAMILLE, { name: "Money20/20 Europe 2027", venue: "Amsterdam", country: "Netherlands", starts_on: "2027-06-08", ends_on: "2027-06-10", reason: "The European buyers on our target list meet in Amsterdam once a year, and its call for content is open. We would go to speak first and decide on a booth after." });
+  await addCall(db, CAMILLE, eu.id, { title: "Call for content", url: "https://europe.money2020.com/", closes_on: "2026-11-27", notes: "Sample entry from the organizer's published dates. Check the link before you use it.", route: "editorial" });
+  const { id: inv } = await addInvolvement(db, CAMILLE, M2020, { kind: "talk", label: "Breakout session" });
+  const talk = await createTalk(db, CAMILLE, M2020, { involvement_id: inv, id: "tlk_seed_m2020" });
+  await saveTalk(db, CAMILLE, talk.id, { title: "Billing without surprises", abstract: "Usage-based pricing breaks the monthly close when finance learns the number on the last day. This session walks through how a payments team can show every customer the same figure the ledger will show, what to do when the two differ, and what the first ninety days of a rollout looked like.", speaker: CAMILLE, slide_due_on: "2026-10-02", rehearsal_on: "2026-10-12" });
+  await approveAbstract(db, DAN, talk.id);
+  await submitTalk(db, CAMILLE, talk.id, "2026-06-20");
+  await acceptTalk(db, DAN, talk.id);
+  await saveTalk(db, CAMILLE, talk.id, { slides_url: "https://slides.example.com/billing-without-surprises" });
+  await approveSlides(db, DAN, talk.id);
+  await slidesSent(db, CAMILLE, talk.id, "2026-10-01");
+  // A placeholder portrait the demo person uploaded, so the kit is seen with a photo. It is drawn here, not a real person's picture, and it can be removed.
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><rect width="400" height="400" fill="#C9D2CC"/><circle cx="200" cy="160" r="72" fill="#5E6A62"/><path d="M60 400 C60 290 140 250 200 250 C260 250 340 290 340 400 Z" fill="#5E6A62"/></svg>';
+  await putPhoto(db, CAMILLE, new Uint8Array(new Resvg(svg).render().asPng()), "upload");
 }

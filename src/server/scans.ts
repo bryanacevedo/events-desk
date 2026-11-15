@@ -26,7 +26,7 @@ export class ScanForeign extends RuleError {}
 export class ScanForbidden extends RuleError {}
 
 export interface ScanInput {
-  id: string; method: Method; raw_payload?: string; fields?: Record<string, unknown>; registrant_id?: string; temperature?: string; qualifiers?: Record<string, unknown>; note?: string; promise?: string; promise_owner?: string | null;
+  talk_id?: string; id: string; method: Method; raw_payload?: string; fields?: Record<string, unknown>; registrant_id?: string; temperature?: string; qualifiers?: Record<string, unknown>; note?: string; promise?: string; promise_owner?: string | null;
   next_step?: string; next_step_on?: string | null; marketing_consent?: boolean; notice_version?: number; scanned_at?: string; seconds?: number | null; met?: boolean; device?: string; photo_kind?: "badge" | "card";
 }
 export interface ScanRow {
@@ -137,6 +137,9 @@ export async function ingestScan(db: Db, deps: LifecycleDeps, eventId: string, r
       [input.id, eventId, rep, method, raw, JSON.stringify(fields), registrant, temperature, JSON.stringify(answers), s(input.note, 4000), s(input.promise, 1000), input.promise_owner ? s(input.promise_owner, 60) : null, s(input.next_step, 300), nextOn,
         consent, version, wording, consent ? scannedAt.toISOString() : null, scannedAt.toISOString(), now.toISOString(), Number.isInteger(input.seconds) && input.seconds! >= 0 && input.seconds! <= 3600 ? input.seconds : null, input.met === true, s(input.device, 80)]);
     if (ins.length) {
+      // From the session: the talk gets the credit when it is one of this event's accepted talks. A talk that is no longer valid leaves the scan stored without it, never refused.
+      const tid = typeof input.talk_id === "string" ? input.talk_id : null;
+      if (tid && (await q("SELECT 1 FROM talks WHERE id = $1 AND event_id = $2 AND status = 'accepted'", [tid, eventId])).length) await q("UPDATE scans SET talk_id = $2 WHERE id = $1", [input.id, tid]);
       await logActivity(q, eventId, rep, "scan", `${rep} scanned someone (${METHOD_WORDS[method].toLowerCase()})`);
       return "new";
     }
@@ -413,14 +416,14 @@ export async function resolveReview(db: Db, actor: string, scanId: string, decis
 
 /* ------------------------------------------------------------------ reading */
 
-export interface ScanView extends ScanRow { name: string | null; company: string | null; qualifier_labels: { label: string; answer: string }[]; has_photo: boolean }
+export interface ScanView extends ScanRow { name: string | null; company: string | null; qualifier_labels: { label: string; answer: string }[]; has_photo: boolean; talk_title: string | null }
 
 /** A rep reads their own scans; a planner reads every one. */
 export async function listScans(db: Db, actor: string, eventId: string, opts: { limit?: number } = {}) {
   const all = planner(actor);
   const st = await readSettings(db.query, eventId);
-  const rows = await db.query<ScanRow & { name: string | null; company: string | null; has_photo: boolean }>(
-    `SELECT ${SCAN_COLS.split(", ").map((c) => (c.includes(" AS ") ? `s.${c}` : `s.${c}`)).join(", ")}, k.full_name AS name, co.name AS company, EXISTS (SELECT 1 FROM scan_photos p WHERE p.scan_id = s.id) AS has_photo
+  const rows = await db.query<ScanRow & { name: string | null; company: string | null; has_photo: boolean; talk_title: string | null }>(
+    `SELECT ${SCAN_COLS.split(", ").map((c) => (c.includes(" AS ") ? `s.${c}` : `s.${c}`)).join(", ")}, k.full_name AS name, co.name AS company, EXISTS (SELECT 1 FROM scan_photos p WHERE p.scan_id = s.id) AS has_photo, (SELECT t.title FROM talks t WHERE t.id = s.talk_id) AS talk_title
      FROM scans s LEFT JOIN contacts k ON k.id = s.contact_id LEFT JOIN companies co ON co.id = k.company_id WHERE s.event_id = $1 ${all ? "" : "AND s.rep = $3"} ORDER BY s.scanned_at DESC LIMIT $2`,
     all ? [eventId, opts.limit ?? 500] : [eventId, opts.limit ?? 500, actor]);
   const scans: ScanView[] = rows.map((r) => ({ ...r, qualifier_labels: st.qualifiers.filter((x) => r.qualifiers[x.id]).map((x) => ({ label: x.label, answer: r.qualifiers[x.id] })) }));
@@ -461,7 +464,7 @@ export async function scansCsv(db: Db, actor: string, eventId: string) {
   const lines = [csvRow(CSV_HEAD)];
   for (const r of [...scans].reverse()) {
     lines.push(csvRow([r.scanned_at, r.rep, METHOD_WORDS[r.method], r.fields.name ?? r.name ?? "", r.fields.email ?? "", r.fields.company ?? r.company ?? "", r.fields.title ?? "", r.fields.phone ?? "", r.fields.country ?? "", r.temperature,
-      r.qualifier_labels.map((x) => `${x.label}: ${x.answer}`).join("; "), r.note, r.promise, r.promise_owner ?? "", r.next_step, r.next_step_on ?? "", r.marketing_consent ? "Yes" : "No", STATE_WORDS[r.state], r.id]));
+      r.qualifier_labels.map((x) => `${x.label}: ${x.answer}`).join("; "), r.note, r.promise, r.promise_owner ?? "", r.next_step, r.next_step_on ?? "", r.marketing_consent ? "Yes" : "No", STATE_WORDS[r.state], r.id, r.talk_title ?? ""]));
   }
   return lines.join("\r\n") + "\r\n";
 }

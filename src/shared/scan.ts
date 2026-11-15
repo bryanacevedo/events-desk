@@ -158,7 +158,7 @@ export function csvCell(v: unknown): string {
 }
 export const csvRow = (cells: unknown[]) => cells.map(csvCell).join(",");
 
-export const CSV_HEAD = ["Scanned", "Rep", "Method", "Name", "Email", "Company", "Title", "Phone", "Country", "Interest", "Qualifiers", "Note", "Promised", "Promise owner", "Next step", "Next step on", "Marketing consent", "State", "Scan id"];
+export const CSV_HEAD = ["Scanned", "Rep", "Method", "Name", "Email", "Company", "Title", "Phone", "Country", "Interest", "Qualifiers", "Note", "Promised", "Promise owner", "Next step", "Next step on", "Marketing consent", "State", "Scan id", "From the session"];
 
 /** The magic bytes decide the type of a photo, never the client's word. */
 export function imageMime(bytes: Uint8Array): "image/jpeg" | "image/png" | "image/webp" | null {

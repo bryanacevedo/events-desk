@@ -8,6 +8,7 @@ import { DEFAULT_FLOW } from "../shared/domain.ts";
 import { readFileSync } from "node:fs";
 import type { Db } from "./db.ts";
 import { defaultSettings, getSettings } from "./approvals.ts";
+import { offerKit } from "./kit-offers.ts";
 import { logActivity, moveWithin, newId, RuleError } from "./events.ts";
 import { isGtm } from "../shared/roles.ts";
 import { askToGo } from "./plan.ts";
@@ -181,6 +182,7 @@ export async function decideSeat(db: Db, d: SeatDecision) {
       await q("UPDATE seat_requests SET catalog_id = $2 WHERE id = $1", [r.id, cid]);
       await q("UPDATE events SET catalog_id = $2 WHERE id = $1", [ev.id, cid]);
     }
+    if (status === "approved") await offerKit(q, { eventId: ev.id, person: r.requester, role: "attending", reason: "seat_approved", sourceId: r.id, actor: d.actor });
     const c = await recount(q, ev.id);
     if (ev.approval_mode === "budget") {
       // Seats on a plan are settled one by one here, and never move the plan: approving a seat cannot approve the plan, and declining the last seat cannot decline it.

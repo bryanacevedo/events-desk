@@ -7,6 +7,7 @@ import type { Settings } from "../shared/cost.ts";
 import type { Verdict } from "../shared/tiers.ts";
 import { documentOf, draftJson } from "./sim-icp.ts";
 import { simulatedAssessment } from "./assessment-sim.ts";
+import { simulatedCalls } from "./cfp-sim.ts";
 import type { FirmoRecord } from "../shared/tiering.ts";
 import { parseTitle } from "../shared/titles.ts";
 
@@ -373,6 +374,7 @@ export const mockLlm: Llm = {
   async complete(step, prompt, hint) {
     if (step === "perspective") return draftReply(hint);
     if (step === "assessment_propose") return { text: simulatedAssessment(prompt), input_tokens: 0, output_tokens: 0 };
+    if (step === "cfp_read") return { text: simulatedCalls(prompt), input_tokens: 0, output_tokens: 0 };
     // The mock reads an ICP document with the same deterministic parser the simulated model uses. It is data: nothing in it is acted on.
     if (step === "icp_compile") return { text: draftJson(documentOf(prompt)), input_tokens: 0, output_tokens: 0 };
     const input = prompt.slice(prompt.lastIndexOf("INPUT")).toLowerCase();

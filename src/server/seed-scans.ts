@@ -48,6 +48,8 @@ export async function seedScans(db: Db, deps: LifecycleDeps) {
   await put(CAMILLE, { method: "badge_id", raw_payload: "48213-A7", scanned_at: at(1, "13:22"), temperature: "warm" });
   await put(DAN, { method: "badge_id", raw_payload: "48220-B2", scanned_at: at(1, "14:05"), temperature: "cold" });
   await put(CAMILLE, { method: "badge_id", raw_payload: "00000-XX", scanned_at: at(1, "13:40"), temperature: "warm" }, { organizer: fakeOrganizer({}) });
+  // The session: Camille's scans are credited to her talk, the way a rep picks it on the scan screen.
+  await db.query("UPDATE scans SET talk_id = 'tlk_seed_m2020' WHERE event_id = $1 AND rep = $2 AND EXISTS (SELECT 1 FROM talks WHERE id = 'tlk_seed_m2020')", [SCAN_EVENT, CAMILLE]);
 }
 
 const addDay = (ymd: string, n: number) => new Date(Date.parse(`${ymd}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);

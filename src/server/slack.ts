@@ -59,7 +59,7 @@ function cardFacts(card: Parameters<typeof cardBreakdown>[0]) {
 }
 const dollars = (cents: number) => `$${(cents / 100).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
 
-async function slackCall(cfg: SlackConfig, method: string, payload: unknown) {
+export async function slackCall(cfg: SlackConfig, method: string, payload: unknown) {
   const r = await (cfg.fetch ?? fetch)(`https://slack.com/api/${method}`, {
     method: "POST",
     signal: AbortSignal.timeout(15_000),
