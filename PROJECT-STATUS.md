@@ -1,5 +1,19 @@
 # Events Desk: project status
 
+## Redesign step 6, part 2 of 4: member, activity and money writes, the world read (2026-11-15)
+
+Worktree `.wt/ev6c-events-desk`, branch `ev6c/shared-world-2`. Spec `docs/SHARED-WORLD.md` sections 12 (goldfish-reviewed by a fresh Opus agent before code: 1 Blocker, 10 Majors, 12 Nits, all in 12.8), decisions 88 to 90, migration 0059. Needs from other repos: `~/Developer/events-rethink/steps/step-6-cross-repo.md` (items 12 to 15 added).
+
+**Built:** `src/server/crm-sync.ts`, a sweep from state before each outbox drain: one member per event and address with the highest status (sequence number in the key, so an undone check-in is sent), meetings (create, then a status update that waits), sends, matched replies, accepted debrief quotes; the event campaign queued for any event with someone to write; a member row waits without an attempt and an alert rises after 24 hours; the CRM's echo of our own meetings is skipped; erasure now reaches guests and `crm_sync`; `no_show` mapped and an unknown status throws; one drain at a time; `publishAll` at boot; TRUNCATE guard; CRM Desk's own hash fixture; per-row DESIGN 2b table test with a coverage gate (`tests/integration-2b.test.ts`); `GET /api/world` reading the pinned lumen-world events_desk slice (`samples/lumen-world`, commit 400566a, hashes checked). Tests `crm-sync`, `shared-world-part2`, `integration-2b`.
+
+**Built and off:** campaign money (`CRM_CAMPAIGN_MONEY=usd`). CRM Desk has no budget or actual cost fields on campaigns at all (checked), so it stays off until its item 7 adds them hidden from members.
+
+**Not built:** Targeted, Waitlist and Declined are counted, not sent (part 3, needs CRM Desk). Market Desk's ICP and tier are not read (cross-repo item 11 unanswered). The world's events are not loaded as the demo's events (part 3, with the additions). A reschedule does not change the CRM meeting. `calendar_event_id` is not sent (not in CRM Desk's docs on main).
+
+**Live check pending Render build minutes.** Pushed to main without waiting on a deploy; live stays on the last good build until Bryan fixes billing.
+
+**Hand-off for part 3:** release held statuses once CRM Desk carries them (remove them from the sweep's skip list in `crm-sync.ts`), the target-accounts trigger, the world additions, and the deferral panel's counts and play status. Part 4: rehearsal, demo snapshot, film notes.
+
 ## Redesign step 6, part 1 of 4: into the shared world (2026-11-15)
 
 Worktree `.wt/ev6b-events-desk`, branch `ev6b/shared-world`. Spec `docs/SHARED-WORLD.md` (goldfish-reviewed by a fresh Opus agent before code: 2 Blockers, 8 Majors, 13 Nits, all handled in section 11). Decisions 84 to 87, migration 0058. Needs from other repos: `~/Developer/events-rethink/steps/step-6-cross-repo.md`.

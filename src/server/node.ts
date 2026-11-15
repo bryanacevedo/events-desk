@@ -22,6 +22,7 @@ import { processEvent, type Deps } from "./pipeline.ts";
 import { retryMerges } from "./top-up.ts";
 import { mockLlm, mockVendors, noCrm } from "./providers.ts";
 import { chooseCrm } from "./crm-desk.ts";
+import { publishAll } from "./definitions.ts";
 import { checkIntegration } from "./integration.ts";
 import { sheetsFor } from "./sheets.ts";
 import { exampleDns, systemDns } from "./identity.ts";
@@ -64,6 +65,8 @@ const migrations = readdirSync(join(root, "migrations")).filter((f) => f.endsWit
   .map((name) => ({ name, sql: readFileSync(join(root, "migrations", name), "utf8") }));
 await migrate(db, migrations);
 if (migrateOnly) { console.log("Migrations applied."); await db.close(); process.exit(0); }
+// The published definitions are current from the first request, not from the first read.
+await publishAll(db).catch((e) => console.error("definitions", e));
 
 // The demo's "today" for the plan dates that must read as near (DEMO_TODAY, else the wall clock). The sample plan's dates are offsets from it.
 const demoToday = process.env.DEMO_TODAY ?? new Date().toISOString().slice(0, 10);

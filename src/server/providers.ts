@@ -321,6 +321,11 @@ export interface Crm {
   findTaskByKey?(key: string): Promise<{ id: string } | null>;
   createTask?(a: { record: CrmRecord; subject: string; body: string; due: string; key: string }): Promise<{ id: string }>;
   createLead?(a: { email: string; full_name: string | null; company: string; domain: string | null; key: string }): Promise<{ id: string }>;
+  /** One activity on a person's timeline. The key is the desk's: a repeat with it answers the same activity. A meeting carries its status, time and zone. Absent means no activity is written. */
+  createActivity?(a: { record: CrmRecord; type: string; direction: "in" | "out" | null; subject: string; body?: string; at: string; key: string; meeting?: { status: string; at: string; timezone: string } }): Promise<{ id: string }>;
+  updateActivity?(a: { id: string; meeting_status: string }): Promise<void>;
+  /** Campaign money in whole US cents. Written only when the install says CRM Desk hides it from members. */
+  updateCampaignMoney?(a: { campaign: string; budget_cents: number; actual_cost_cents: number }): Promise<void>;
   /** Meetings logged in the CRM since a moment, one row per meeting and attendee. */
   meetings?(since: string): Promise<{ id: string; email: string; start: string; timezone: string | null; organizer: string | null; status: "booked" | "held" | "cancelled" }[]>;
   /** Opportunities on each account, by `ref`. */

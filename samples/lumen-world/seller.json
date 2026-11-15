@@ -1,0 +1,36 @@
+{
+  "competitors": [
+    "Meterly",
+    "Billform",
+    "Chargewell",
+    "Ledgerline",
+    "Quotient Billing"
+  ],
+  "domain": "lumenledger.example",
+  "home_currency": "USD",
+  "name": "Lumen Ledger",
+  "note": "Lumen Ledger, its competitors and every company in this world are invented.",
+  "product": "Usage-based billing and revenue recognition for B2B software companies.",
+  "sending_domains": [
+    "getlumenledger.example",
+    "lumenledger-hq.example",
+    "trylumenledger.example",
+    "hellolumenledger.example",
+    "meetlumenledger.example",
+    "lumenledgerapp.example"
+  ],
+  "tech": [
+    "Salesforce",
+    "Snowflake",
+    "NetSuite",
+    "Stripe",
+    "HubSpot",
+    "BigQuery",
+    "QuickBooks",
+    "Zuora",
+    "Chargebee",
+    "Databricks",
+    "SAP",
+    "Legacy on-prem ERP"
+  ]
+}

@@ -116,7 +116,7 @@ describe("who hears about a reply", () => {
     await db.query("UPDATE crm_outbox SET status = 'queued' WHERE kind IN ('task', 'campaign_member')");
     await drainOutbox(db, crm);
     expect(made).toContain("task");
-    expect(made).toContain("member:Responded");
+    expect(made).toContain("member:responded");
   });
 
   it("a reply nobody can be matched to is kept and raises an alert, and a stranger's opt-out still counts", async () => {
@@ -167,7 +167,7 @@ describe("the event's CRM campaign", () => {
     const m = await bookMeeting(db, h.deps, { contact_id: ana.id, scheduled_at: "2027-01-15T15:00:00Z", source: "manual", rep: "R" }, "R");
     await recordOutcome(db, h.deps, m.id, "held", "R");
     await drainOutbox(db, c.crm);
-    expect(c.statuses).toEqual(["Met"]);
+    expect(c.statuses).toEqual(["met"]);
   });
 
   it("a member waits until the campaign exists, instead of landing nowhere", async () => {
@@ -179,7 +179,8 @@ describe("the event's CRM campaign", () => {
     c.records[ana.email] = [{ id: "003", object: "Lead", email: ana.email, email_opt_out: false, do_not_contact: false, do_not_call: false, bounced_at: null }];
     const { queueCreate } = await import("../src/server/crm-outbox.ts");
     await db.tx((q) => queueCreate(q, "campaign_member", "cm:two", null, { email: ana.email, full_name: "Ana Ruiz", company: "T", domain: null, event_id: h.id, campaign: "x" }));
-    expect((await drainOutbox(db, c.crm)).failed).toBe(1);
+    expect((await drainOutbox(db, c.crm)).failed).toBe(0);
+    expect((await db.query<{ status: string; attempts: number }>("SELECT status, attempts FROM crm_outbox WHERE desk_key = 'cm:two'"))[0]).toEqual({ status: "queued", attempts: 0 });
     expect(c.members).toHaveLength(0);
   });
 });

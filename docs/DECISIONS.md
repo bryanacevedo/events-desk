@@ -455,3 +455,15 @@ Closed with 409 `owned_by_account_desk`: tools, legal basis, drafts, launch step
 ## 87. A hosted side event is a child campaign; a child waits for its parent and says so (2026-11-15)
 
 Campaign type is `webinar` for a hosted webinar and `event` otherwise (the adapter used to ignore the event kind). A hosted event under a conference is created with `parent_id` set to the conference's CRM campaign; if that campaign is not in the CRM yet the row stays queued with "parent not in the CRM yet" and uses no attempt. `queueCampaign` queues the conference first; its callers (plan confirmation) come in part 2. Events Desk publishes `campaign_member_statuses` at `/api/definitions`, versioned and hashed as CRM Desk's are (migration 0058, append-only). Declined, Waitlist and Targeted are in the definition but are not sent until CRM Desk carries them.
+
+## 88. What the CRM holds about an event's people is a sweep from state, not a call at each change (2026-11-15)
+
+A guest's status moves in a dozen places, so `syncCrm` (`src/server/crm-sync.ts`) runs before each outbox drain, derives each member's status (one member is one address per event; the highest of guest status, sequence, reply, held meeting), and queues a row when it differs from `crm_sync`. The key carries a sequence (`cm:<event>:<email>:<status>:<n>`), so a check-in undone is sent. Waitlist, Declined and Listed are counted and not sent until CRM Desk carries them (part 3). `no_show` is mapped and an unknown status throws; nothing is sent under another meaning. A member row waits, without an attempt, while its event's campaign is not in the CRM, and an alert rises after 24 hours. `/motion/checklist`, `/campaign` and `/release` stay closed under `account_desk` for sequences drafted earlier: they start sending.
+
+## 89. Activities come from state too, and a meeting this desk wrote is not booked again when the CRM sends it back (2026-11-15)
+
+Meetings (create, then a status update that waits for the create), sends (from touches), matched replies (no body), and accepted debrief quotes (never the model's fact text; only when one person at that account held a meeting). The CRM's change feed returns every meeting, so `ingestCrmMeetings` skips any activity id that is the result of this desk's own write. A reschedule changes nothing in the CRM in part 2. Erasure now also clears a hosted guest's address, and the sweep skips an erased address.
+
+## 90. Campaign money is built and off (2026-11-15)
+
+`budget_cents` is the plan's lines; `actual_cost_cents` is tickets bought plus recorded cost lines, whole USD cents, no AI or travel estimate. It is written only when `CRM_CAMPAIGN_MONEY=usd`, which a person sets after CRM Desk hides the two fields from members (cross-repo item 7); the flag is checked in the sweep, the drain and the adapter, so a row queued while on is not sent after it is turned off. The shared world is read from a pinned copy of lumen-world's own events_desk slice (`samples/lumen-world`), verified against its manifest.

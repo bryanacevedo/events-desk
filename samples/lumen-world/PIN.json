@@ -1,0 +1,7 @@
+{
+  "repository": "lumen-world",
+  "commit": "400566a1be83199b361fd37d7e43865753847b9b",
+  "release": "release/world-v1.1.0",
+  "how": "python -m lumen_world slice release/world-v1.1.0 events_desk OUT, then clock.json, events.csv, seller.json, team.csv and manifest.json copied by hand (public files only; no truth, portraits or companies). The manifest is the slice's own and lists more files than are kept here.",
+  "note": "Only v1.1.0 is a tag; the status of lumen-world says 1.2.0 on main. Pinned by commit."
+}

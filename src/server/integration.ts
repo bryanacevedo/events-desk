@@ -50,7 +50,7 @@ export function integrationView(crmName: string | undefined, env: Env = process.
   return {
     with: integratedWith(env), crm, crm_named_not_connected: has("crm_desk", env) && crm !== "crm_desk",
     links: deskLinks(env),
-    sequencer: sequencerOn(env) ? "events_desk" : "account_desk", icp: icpOwnUpload(env) ? "events_desk" : "market_desk", campaigns: "events_desk",
+    sequencer: sequencerOn(env) ? "events_desk" : "account_desk", icp: icpOwnUpload(env) ? "events_desk" : "market_desk", campaigns: "events_desk", campaign_money: (env.CRM_CAMPAIGN_MONEY ?? "").toLowerCase() === "usd" ? "on" : "off",
   };
 }
 

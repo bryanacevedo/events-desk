@@ -1,0 +1,16 @@
+email,name,title,team,region,timezone,manager_email,started_on,left_on,selling_hours_month,crm_desk_role,market_desk_role,account_desk_role,events_desk_role,portrait,note
+elena.duarte@lumenledger.example,Elena Duarte,VP of Sales,Sales leadership,Global,America/New_York,,2022-09-12,,0,manager,manager,manager,approver,women/44,
+sam.kowalski@lumenledger.example,Sam Kowalski,Head of Revenue Operations,Revenue Operations,Global,America/New_York,elena.duarte@lumenledger.example,2023-02-01,,0,admin,revops,gtm,gtm,men/32,"Market Desk calls the role revops, Account Desk gtm (Market Desk decision 9)"
+maya.okafor@lumenledger.example,Maya Okafor,SDR,SDR,Americas,America/New_York,elena.duarte@lumenledger.example,2025-03-03,,100,member,plan,sdr,rep,women/90,
+daniel.reyes@lumenledger.example,Daniel Reyes,SDR,SDR,Americas,America/Chicago,elena.duarte@lumenledger.example,2024-08-19,,100,member,plan,sdr,rep,men/46,
+tom.whitaker@lumenledger.example,Tom Whitaker,SDR,SDR,Americas,America/Los_Angeles,elena.duarte@lumenledger.example,2025-06-02,,100,member,plan,sdr,rep,men/11,
+leah.ahn@lumenledger.example,Leah Ahn,SDR,SDR,Americas,America/Denver,elena.duarte@lumenledger.example,2025-09-01,,100,member,plan,sdr,rep,women/33,Was Grace Osei in Account Desk; renamed by Bryan's decision 6
+priya.natarajan@lumenledger.example,Priya Natarajan,SDR,SDR,Europe,Europe/London,elena.duarte@lumenledger.example,2024-01-08,,100,member,plan,sdr,rep,women/57,
+jonas.weber@lumenledger.example,Jonas Weber,SDR,SDR,Europe,Europe/Berlin,elena.duarte@lumenledger.example,2025-09-01,,100,member,plan,sdr,rep,men/52,
+nadia.haddad@lumenledger.example,Nadia Haddad,SDR,SDR,Europe,Europe/Berlin,elena.duarte@lumenledger.example,2026-12-01,,100,member,plan,sdr,,women/12,Starts after the demo's now: a future hire with no work yet
+grace.lindqvist@lumenledger.example,Grace Lindqvist,Account Executive,AE,Americas,America/New_York,elena.duarte@lumenledger.example,2023-05-15,,40,member,plan,,rep,women/68,
+omar.bello@lumenledger.example,Omar Bello,Account Executive,AE,Americas,America/Chicago,elena.duarte@lumenledger.example,2024-02-05,,40,member,plan,,rep,men/22,
+hannah.mercer@lumenledger.example,Hannah Mercer,Account Executive,AE,Europe,Europe/London,elena.duarte@lumenledger.example,2023-11-06,,40,member,plan,,rep,women/26,
+lukas.brandt@lumenledger.example,Lukas Brandt,Account Executive,AE,Europe,Europe/Berlin,elena.duarte@lumenledger.example,2025-04-07,,40,member,plan,,rep,men/75,
+dan.whitlock@lumenledger.example,Dan Whitlock,Field Marketing Manager,Marketing,Global,America/New_York,elena.duarte@lumenledger.example,2024-04-15,,0,member,,,approver,men/64,Owns the event calendar and approves event seats
+ruth.osei@lumenledger.example,Ruth Osei,Finance Analyst,Finance,Global,America/New_York,,2024-10-01,,0,viewer,,,,women/79,Reports outside sales

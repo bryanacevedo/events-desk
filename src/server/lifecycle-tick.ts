@@ -5,6 +5,7 @@ import { roomStep } from "./event-room.ts";
 import type { Db } from "./db.ts";
 import { closeOut } from "./motion.ts";
 import { drainQuietly } from "./crm-outbox.ts";
+import { longWaiting } from "./crm-sync.ts";
 import { extractDebriefs, integrityCheck, proposeEdits, sendDebriefPrompts, writeScorecards } from "./closeout.ts";
 import { nowOf, type LifecycleDeps } from "./lifecycle-deps.ts";
 import { ingestCrmMeetings, meetingReminders } from "./meetings.ts";
@@ -93,5 +94,7 @@ async function tickOnce(db: Db, deps: LifecycleDeps, opts: { flags?: boolean; ni
   await quietly("post-event", () => postEventStep(db, deps));
   await quietly("score", () => writeScorecards(db, deps));
   await quietly("outbox", () => drainQuietly(db, deps.crm));
+  // A CRM row that has waited over 24 hours for its campaign or parent: one alert per event per day, so it never waits silently.
+  await quietly("crm wait", async () => { for (const w of await longWaiting(db)) await raiseAlert(db, deps, `crm_wait:${w.event_id}`, `${w.n} write${w.n === 1 ? "" : "s"} for an event have waited over 24 hours for its campaign in the CRM.`); });
   if (opts.nightly) { await quietly("digest", () => dailyDigest(db, deps)); await quietly("purge", () => purgeOldBodies(db, deps)); await quietly("learn", () => proposeEdits(db)); await quietly("integrity", () => integrityCheck(db, deps)); }
 }

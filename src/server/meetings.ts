@@ -72,10 +72,7 @@ export async function recordOutcome(db: Db, deps: LifecycleDeps, meetingId: stri
     await q("UPDATE meetings SET status = $2, outcome_at = $3 WHERE id = $1", [m.id, status, now.toISOString()]);
     await q("UPDATE holds SET expires_at = $2 WHERE cause = 'meeting' AND cause_id = $1 AND released_at IS NULL", [m.id, new Date(now.getTime() + AFTER_OUTCOME_HOLD_DAYS * DAY).toISOString()]);
     await addTouch(q, { domain: m.domain, contact_id: m.contact_id, event_id: m.event_id, kind: `meeting_${status}`, source: actor, dedup_key: `mtg_out:${m.id}:${status}:${now.getTime()}` });
-    if (status === "held" && m.contact_id && canWrite(deps.crm)) {
-      const [p] = await q<{ person_id: string | null; email: string | null; full_name: string | null; company: string; name: string }>("SELECT k.person_id, k.email, k.full_name, co.name AS company, e.name FROM contacts k JOIN companies co ON co.id = k.company_id JOIN events e ON e.id = $2 WHERE k.id = $1", [m.contact_id, m.event_id]);
-      if (p?.email) await queueCreate(q, "campaign_member", `cm:${m.event_id}:${m.contact_id}:met`, p.person_id, { email: p.email.toLowerCase(), full_name: p.full_name, company: p.company, domain: m.domain, event_id: m.event_id, campaign: p.name, status: "Met" });
-    }
+    // A held meeting becomes Met in the CRM through the sweep (crm-sync.ts), not a row queued here.
     await logActivity(q, m.event_id, actor, "meeting", `Recorded ${status.replace("_", " ")} on a meeting`);
     return { id: m.id, status };
   });
@@ -124,6 +121,9 @@ export async function ingestCrmMeetings(db: Db, deps: LifecycleDeps) {
     const key = `${m.id}:${m.email.toLowerCase()}`;
     if (seen.has(key)) continue;
     seen.add(key);
+    // A meeting this desk wrote to the CRM comes back through the same change feed: it is already ours, not a second booking.
+    const [ours] = await db.query("SELECT 1 FROM crm_outbox WHERE kind IN ('activity', 'activity_update') AND result_id = $1 LIMIT 1", [m.id]);
+    if (ours) continue;
     const [known] = await db.query<{ scheduled_at: string; status: string }>("SELECT scheduled_at::text AS scheduled_at, status FROM meetings WHERE external_key = $1", [`cal:crm:${key}`]);
     if (known && Date.parse(known.scheduled_at) === Date.parse(m.start) && (m.status !== "cancelled" || known.status === "cancelled") && (m.status !== "held" || known.status === "held")) continue;
     const r = await ingestCalendar(db, deps, [{ id: `crm:${key}`, attendee_email: m.email, start: m.start, timezone: m.timezone ?? "UTC", cancelled: m.status === "cancelled", organizer: m.organizer }]);

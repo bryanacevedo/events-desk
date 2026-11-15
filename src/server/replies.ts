@@ -92,7 +92,7 @@ async function positiveTrail(q: Q, m: Msg, p: Who, code: string, ctx: { crm?: Cr
   if (!canWrite(ctx.crm) || !p.email) return;
   const base = { email: p.email.toLowerCase(), full_name: p.full_name, company: p.company, domain: p.domain, event_id: m.event_id };
   await queueCreate(q, "lead", `lead:${p.email.toLowerCase()}`, p.person_id, base);
-  await queueCreate(q, "campaign_member", `cm:${m.event_id}:${m.contact_id}`, p.person_id, { ...base, campaign: p.event, status: "Responded" });
+  // Responded is written by the sweep (crm-sync.ts) from the matched reply.
   await queueCreate(q, "task", `task:${m.id}`, p.person_id, { ...base, subject: `${p.full_name ?? "Someone"} at ${p.company} replied (${code.replace(/_/g, " ")})`, body: m.body ?? "", due: ctx.now.toISOString().slice(0, 10) });
 }
 

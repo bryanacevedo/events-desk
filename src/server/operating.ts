@@ -283,6 +283,9 @@ export async function forgetPerson(db: Db, deps: LifecycleDeps, email: string, a
     // Copies elsewhere: notes on their history and CRM writes not yet sent.
     await q("UPDATE touches SET reason = '' WHERE contact_id = ANY($1::text[])", [ids]);
     await q("UPDATE crm_outbox SET status = 'cancelled' WHERE status = 'queued' AND lower(payload->>'email') = $1", [e]);
+    await q("DELETE FROM crm_sync WHERE kind = 'member' AND ref LIKE $1 ESCAPE '\\'", ["%:" + e.replace(/[\\%_]/g, (m) => "\\" + m)]);
+    // A hosted guest with that address: the address goes and the guest is removed, so the CRM sweep has nobody to write about.
+    await q("UPDATE event_guests SET email = NULL, removed_at = coalesce(removed_at, now()), removed_reason = coalesce(removed_reason, 'Erasure request') WHERE lower(email) = $1", [e]);
     await q("INSERT INTO suppressions (id, kind, email, reason, created_by) VALUES ($1, 'opt_out', $2, 'Erasure request', $3)", [newId("sup"), e, actor]);
     return { contacts: ids.length };
   });

@@ -9,7 +9,13 @@ import { CrmAlreadyExists, heatOf, type AccountType, type Crm, type CrmAccount, 
 
 type Fetch = typeof fetch;
 const TYPES: Record<string, AccountType> = { customer: "customer", prospect: "prospect", partner: "partner", competitor: "competitor" };
-const MEMBER: Record<string, string> = { sent: "sent", invited: "sent", registered: "registered", attended: "attended", met: "met", "no show": "no_show", responded: "responded" };
+const MEMBER: Record<string, string> = { sent: "sent", invited: "sent", registered: "registered", attended: "attended", met: "met", "no show": "no_show", no_show: "no_show", responded: "responded" };
+/** A status this desk has no CRM Desk meaning for is never sent as another one (docs/SHARED-WORLD.md 12.8). */
+const meaning = (status: string | undefined) => {
+  const m = MEMBER[(status ?? "Sent").toLowerCase()];
+  if (!m) throw new Error(`No CRM Desk meaning for the status ${status}.`);
+  return m;
+};
 const MEETING: Record<string, "booked" | "held" | "cancelled"> = { booked: "booked", held: "held", cancelled: "cancelled", no_show: "cancelled" };
 // An erased person: the outbox reads `.id`, and a null id is its "nobody to write to", a finished write.
 const NOBODY = { id: null as unknown as string };
@@ -123,7 +129,7 @@ export function crmDeskCrm(url: string, key: string, doFetch: Fetch = fetch, tim
     },
     async createCampaignMember(a) {
       if (stub(a.record.id)) return { id: a.record.id };
-      const status = MEMBER[(a.status ?? "Sent").toLowerCase()] ?? "sent";
+      const status = meaning(a.status);
       const r = await call("POST", `/campaigns/${a.campaign}/members`, { contact: a.record.id, status });
       if (erased(r)) return NOBODY;
       if (r.status === 409 && r.json?.code === "already_member") throw new CrmAlreadyExists();
@@ -132,8 +138,28 @@ export function crmDeskCrm(url: string, key: string, doFetch: Fetch = fetch, tim
     },
     async updateCampaignMemberStatus(a) {
       if (stub(a.record.id)) return;
-      const r = await call("POST", `/campaigns/${a.campaign}/members`, { contact: a.record.id, status: MEMBER[a.status.toLowerCase()] ?? "sent", update: true });
+      const r = await call("POST", `/campaigns/${a.campaign}/members`, { contact: a.record.id, status: meaning(a.status), update: true });
       if (r.status >= 400 && !(r.status === 409 && r.json?.code === "already_member") && !erased(r)) throw new Error(`CRM Desk refused the status: ${r.status}`);
+    },
+    async createActivity(a) {
+      if (stub(a.record.id)) return { id: a.record.id };
+      const body: Record<string, unknown> = { type: a.type, subject: a.subject, contact: a.record.id, occurred_at: a.at, external_id: "events_desk:" + a.key };
+      if (a.direction) body.direction = a.direction;
+      if (a.body) body.body = a.body;
+      if (a.meeting) Object.assign(body, { meeting_status: a.meeting.status, meeting_at: a.meeting.at, meeting_timezone: a.meeting.timezone });
+      const r = await call("POST", "/activities", body);
+      if (erased(r)) return NOBODY;
+      if (r.status >= 400) throw new Error(`CRM Desk refused the activity: ${r.status} ${r.json?.code ?? ""}`);
+      return { id: r.json.id };
+    },
+    async updateActivity(a) {
+      const r = await call("PATCH", `/activities/${a.id}`, { meeting_status: a.meeting_status });
+      if (r.status >= 400 && !erased(r)) throw new Error(`CRM Desk refused the meeting status: ${r.status} ${r.json?.code ?? ""}`);
+    },
+    async updateCampaignMoney(a) {
+      // Off unless the install says CRM Desk hides these fields from members (cross-repo item 7); checked here as well as in the sweep and the drain.
+      if ((process.env.CRM_CAMPAIGN_MONEY ?? "").toLowerCase() !== "usd") throw new Error("Campaign money is off.");
+      await ok("PATCH", `/campaigns/${a.campaign}`, { budget_cents: a.budget_cents, actual_cost_cents: a.actual_cost_cents });
     },
     // A task made with the desk's key as its external id is the same task when made again.
     async findTaskByKey() { return null; },

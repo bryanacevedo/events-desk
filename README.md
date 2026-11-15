@@ -96,7 +96,7 @@ For events whose attendee directory can only be browsed. Load `extension/` unpac
 
 ## Running beside the other desks
 
-`INTEGRATED_WITH` names the desks present (`account_desk`, `market_desk`, `crm_desk`); unset means alone. With `account_desk`, Account Desk runs the outreach: new sequence work is closed here and the Outreach tab says so. With `market_desk`, the ICP page is read-only. `GET /api/integration` says what is on, and `GET /api/definitions` publishes the campaign member statuses with a version and hash. Spec: `docs/SHARED-WORLD.md`.
+`INTEGRATED_WITH` names the desks present (`account_desk`, `market_desk`, `crm_desk`); unset means alone. With `account_desk`, Account Desk runs the outreach: new sequence work is closed here and the Outreach tab says so. With `market_desk`, the ICP page is read-only. `GET /api/integration` says what is on, and `GET /api/definitions` publishes the campaign member statuses with a version and hash. Spec: `docs/SHARED-WORLD.md`. With `CRM=crmdesk`, a sweep before each outbox drain writes each person's campaign status (sent, registered, attended, no show, responded, met), meeting, send, reply and accepted-debrief activities; campaign money is built and off until `CRM_CAMPAIGN_MONEY=usd`, which waits for CRM Desk to hide and carry the two fields. `GET /api/world` reads the pinned Lumen Ledger slice in `samples/lumen-world`.
 
 ## The scanner
 
