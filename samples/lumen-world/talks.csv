@@ -1,0 +1,2 @@
+talk_id,event_id,title,speaker_email,speaker_name,speaker_events_desk_role,status,session_date,session_time,confidence,note
+tk_673062cd93,ev_e1a8e0a65d,Pricing by usage without a surprise at month end,dan.whitlock@lumenledger.example,Dan Whitlock,approver,accepted,2027-05-11,11:00,invented,"The title, the day and the time are invented; the speaker is on the roster."

@@ -1,0 +1,41 @@
+event_id,name,title,email,company,domain,status,registered_at,invited_at,responded_at
+ev_11c1de1ec2,Aaliyah Amari,Controller,aaliyah.amari@prilracloud.example,Prilra Software,prilracloud.example,declined,,2026-09-21T18:00:00+00:00,2026-09-27T18:00:00+00:00
+ev_11c1de1ec2,Aaliyah Chen,Head of Revenue Operations,aaliyahchen@zenawood.example,Zenawood,zenawood.example,attended,2026-09-21T13:00:00+00:00,2026-09-08T13:00:00+00:00,2026-09-21T13:00:00+00:00
+ev_11c1de1ec2,Astrid Carvalho,CFO,acarvalho@halerwood.example,Halerwood,halerwood.example,waitlist,,2026-09-08T16:00:00+00:00,2026-09-15T17:00:00+00:00
+ev_11c1de1ec2,Adebayo Novak,VP Finance,adebayo@torarburypipe.example,Torarbury Pipe,torarburypipe.example,attended,2026-10-06T20:00:00+00:00,2026-09-23T15:00:00+00:00,2026-10-06T20:00:00+00:00
+ev_11c1de1ec2,Adebayo Ibarra,Director of Accounting,adebayo@venoix.example,Venoix Money,venoix.example,attended,2026-09-16T23:00:00+00:00,2026-09-14T20:00:00+00:00,2026-09-16T23:00:00+00:00
+ev_11c1de1ec2,Amara Mbeki,Controller,ambeki@linioline.example,Linioline Data,linioline.example,declined,,2026-09-11T14:00:00+00:00,2026-09-12T14:00:00+00:00
+ev_11c1de1ec2,Ana Richter,Vice President of Finance,ana.richter@elarmorepipe.example,Elarmore Warehouse,elarmorepipe.example,attended,2026-09-25T16:00:00+00:00,2026-09-14T13:00:00+00:00,2026-09-25T16:00:00+00:00
+ev_11c1de1ec2,Aneesh Ibarra,Head of Revenue Operations,aneesh.ibarra@davowicklabs.example,Davowick Cloud,davowicklabs.example,waitlist,,2026-09-10T13:00:00+00:00,2026-09-17T16:00:00+00:00
+ev_11c1de1ec2,Ayesha Petrov,Head of Revenue Operations,ayesha.petrov@korenpas.example,Korenpas Lend,korenpas.example,declined,,2026-09-18T17:00:00+00:00,2026-09-23T17:00:00+00:00
+ev_11c1de1ec2,Benedikt Eriksen,Vice President of Finance,benedikt.eriksen@dorenvelfinance.example,Dorenvel Money,dorenvelfinance.example,declined,,2026-09-09T16:00:00+00:00,2026-09-12T21:00:00+00:00
+ev_11c1de1ec2,Benedikt Novak,Head of Accounting,benedikt.novak@pelioix.example,Pelioix Machines,pelioix.example,declined,,2026-09-21T16:00:00+00:00,2026-09-29T19:00:00+00:00
+ev_11c1de1ec2,Bilal Delgado,Controller,bilal.delgado@havedor.example,Havedor Money,havedor.example,attended,2026-09-24T20:00:00+00:00,2026-09-18T18:00:00+00:00,2026-09-24T20:00:00+00:00
+ev_11c1de1ec2,Blessing Bakker,VP Revenue Operations,blessing@lumaworthmoney.example,Lumaworth,lumaworthmoney.example,attended,2026-09-21T17:00:00+00:00,2026-09-15T14:00:00+00:00,2026-09-21T17:00:00+00:00
+ev_11c1de1ec2,Bruno Alvarez,Head of Accounting,bruno@ashenixconsulting.example,Ashenix,ashenixconsulting.example,attended,2026-09-20T21:00:00+00:00,2026-09-10T19:00:00+00:00,2026-09-20T21:00:00+00:00
+ev_11c1de1ec2,Camila Novak,CFO,camila.novak@coruson.example,Coruson,coruson.example,attended,2026-09-23T22:00:00+00:00,2026-09-22T19:00:00+00:00,2026-09-23T22:00:00+00:00
+ev_11c1de1ec2,Dalia Ivanova,Head of Accounting,dalia.ivanova@seliodorcapital.example,Seliodor Lend,seliodorcapital.example,waitlist,,2026-09-20T19:00:00+00:00,2026-09-22T21:00:00+00:00
+ev_11c1de1ec2,Diego Lindqvist,Head of Revenue Operations,diego@quinofinbuild.example,Quinofin Deploy,quinofinbuild.example,declined,,2026-09-25T14:00:00+00:00,2026-09-28T19:00:00+00:00
+ev_11c1de1ec2,Dmitri Suzuki,VP Finance,dmitri.suzuki@doranson.example,Doranson,doranson.example,waitlist,,2026-09-14T16:00:00+00:00,2026-09-17T16:00:00+00:00
+ev_11c1de1ec2,Dmitri Nwosu,Corporate Controller,dmitrinwosu@junumont.example,Junumont HQ,junumont.example,waitlist,,2026-09-21T20:00:00+00:00,2026-09-26T22:00:00+00:00
+ev_11c1de1ec2,Esther Ibarra,CFO,esther@kelanfieldpay.example,Kelanfield Money,kelanfieldpay.example,attended,2026-10-01T21:00:00+00:00,2026-09-23T17:00:00+00:00,2026-10-01T21:00:00+00:00
+ev_11c1de1ec2,Felix Amari,Corporate Controller,famari@briutra.example,Briutra,briutra.example,attended,2026-09-24T20:00:00+00:00,2026-09-15T20:00:00+00:00,2026-09-24T20:00:00+00:00
+ev_11c1de1ec2,Freya Santos,Director of Billing Operations,fsantos@beliham.example,Beliham Apps,beliham.example,attended,2026-09-22T23:00:00+00:00,2026-09-21T20:00:00+00:00,2026-09-22T23:00:00+00:00
+ev_11c1de1ec2,Hana Sokolov,Director of Accounting,hanasokolov@junioline.example,Junioline Lend,junioline.example,attended,2026-10-02T19:00:00+00:00,2026-09-23T16:00:00+00:00,2026-10-02T19:00:00+00:00
+ev_11c1de1ec2,Isaac Haddad,Director of Billing Operations,isaac.haddad@marulgate.example,Marulgate Stream,marulgate.example,no_show,2026-09-23T19:00:00+00:00,2026-09-15T14:00:00+00:00,2026-09-23T19:00:00+00:00
+ev_11c1de1ec2,Jakob Lopez,Director of Accounting,jakob.lopez@xanoyardworks.example,Xanoyard Cloud,xanoyardworks.example,attended,2026-09-25T19:00:00+00:00,2026-09-18T15:00:00+00:00,2026-09-25T19:00:00+00:00
+ev_11c1de1ec2,Jonas Haddad,Head of Accounting,jhaddad@eveson.example,Eveson Stream,eveson.example,declined,,2026-09-10T17:00:00+00:00,2026-09-20T19:00:00+00:00
+ev_11c1de1ec2,Laila Silva,Corporate Controller,laila.silva@yararfinmed.example,Yararfin Health,yararfinmed.example,attended,2026-09-23T15:00:00+00:00,2026-09-11T13:00:00+00:00,2026-09-23T15:00:00+00:00
+ev_11c1de1ec2,Laila Mbeki,Head of Accounting,laila@sorigatecloud.example,Sorigate Apps,sorigatecloud.example,waitlist,,2026-09-18T16:00:00+00:00,2026-09-27T16:00:00+00:00
+ev_11c1de1ec2,Dr. Mateo Ibarra,VP Finance,mateo.ibarra@falorin.example,Falorin Store,falorin.example,attended,2026-10-06T17:00:00+00:00,2026-09-25T13:00:00+00:00,2026-10-06T17:00:00+00:00
+ev_11c1de1ec2,Miguel Kapoor,Director of Accounting,miguel.kapoor@wynara.example,Wynara,wynara.example,declined,,2026-09-18T13:00:00+00:00,2026-09-21T16:00:00+00:00
+ev_11c1de1ec2,Paolo Zhang,Revenue Operations Manager,paolo.zhang@falogatedata.example,Falogate Graph,falogatedata.example,attended,2026-09-19T17:00:00+00:00,2026-09-13T17:00:00+00:00,2026-09-19T17:00:00+00:00
+ev_11c1de1ec2,Ravi Hartmann,Head of Billing,ravi@merilpath.example,Merilpath Software,merilpath.example,declined,,2026-09-20T18:00:00+00:00,2026-09-22T18:00:00+00:00
+ev_11c1de1ec2,Rhea Murphy,Head of Finance,rhea.murphy@grenartralabs.example,Grenartra HQ,grenartralabs.example,waitlist,,2026-09-19T16:00:00+00:00,2026-09-20T21:00:00+00:00
+ev_11c1de1ec2,Sebastian Hansen,Director of Accounting,sebastianhansen@praestone.example,Praestone Capital,praestone.example,attended,2026-09-23T19:00:00+00:00,2026-09-19T14:00:00+00:00,2026-09-23T19:00:00+00:00
+ev_11c1de1ec2,Seo-yeon Larsen,Head of Billing,seoyeon.larsen@xanorson.example,Xanorson,xanorson.example,declined,,2026-09-19T20:00:00+00:00,2026-09-28T23:00:00+00:00
+ev_11c1de1ec2,Soren Torres,Controller,soren.torres@pelolquist.example,Pelolquist,pelolquist.example,no_show,2026-10-07T13:00:00+00:00,2026-09-24T13:00:00+00:00,2026-10-07T13:00:00+00:00
+ev_11c1de1ec2,Soren Moreau,Revenue Operations Manager,soren@selaeckcomponents.example,Selaeck,selaeckcomponents.example,waitlist,,2026-09-15T13:00:00+00:00,2026-09-18T18:00:00+00:00
+ev_11c1de1ec2,Valentina Laine,Vice President of Finance,valentinalaine@havarn.example,Havarn Build,havarn.example,attended,2026-09-23T22:00:00+00:00,2026-09-12T18:00:00+00:00,2026-09-23T22:00:00+00:00
+ev_11c1de1ec2,Valentina Yamamoto,VP Revenue Operations,vyamamoto@sorolckstore.example,Sorolck,sorolckstore.example,attended,2026-10-03T18:00:00+00:00,2026-09-19T14:00:00+00:00,2026-10-03T18:00:00+00:00
+ev_11c1de1ec2,Yara Quinn,Director of Billing Operations,yquinn@zenirwoodmarket.example,Zenirwood Bazaar,zenirwoodmarket.example,attended,2026-09-26T16:00:00+00:00,2026-09-20T13:00:00+00:00,2026-09-26T16:00:00+00:00

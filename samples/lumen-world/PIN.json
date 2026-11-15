@@ -1,7 +1,22 @@
 {
   "repository": "lumen-world",
-  "commit": "400566a1be83199b361fd37d7e43865753847b9b",
-  "release": "release/world-v1.1.0",
-  "how": "python -m lumen_world slice release/world-v1.1.0 events_desk OUT, then clock.json, events.csv, seller.json, team.csv and manifest.json copied by hand (public files only; no truth, portraits or companies). The manifest is the slice's own and lists more files than are kept here.",
-  "note": "Only v1.1.0 is a tag; the status of lumen-world says 1.2.0 on main. Pinned by commit."
+  "tag": "v1.3.0",
+  "commit": "f9d183dd39fd7fbfd9ee0df6a452daca25a497ab",
+  "release": "release/world-v1.3.0",
+  "world_version": "1.3.0",
+  "how": "python -m lumen_world slice release/world-v1.3.0 events_desk OUT, then node scripts/world-refresh.mjs OUT --tag v1.3.0 --commit f9d183dd39fd7fbfd9ee0df6a452daca25a497ab. Public files only (no truth, portraits or companies). The manifest is the slice's own and lists more files than are kept here.",
+  "files": {
+    "clock.json": "4d480c7654856043b6d03743c90c27ff8c1594729bb1b06442c5b253702ee17b",
+    "events.csv": "ec979a835a609090dd76479ee8913317db2e7085a0ba6a41c9f298dbd581eaa5",
+    "seller.json": "5cc021e26bb6e5f37bf6c0cc8250ced9892751657c1f256d66d41d7c2e131ed2",
+    "team.csv": "2957fdd7e4379c687c2aed7e5fbe7d876e04c78e96fe4be8c1d0fae91bc9ad25",
+    "events_extra.csv": "bed50166fea6c0370b1574beff4f3e7f6143d24fd0b835379d84463b1cd5c57d",
+    "events_desk_clock.json": "b83e29063f2a1f6d2f80a0bbd891dbfc86970060a198279961283e6f0eda42d5",
+    "events_desk_attendance.csv": "8acf2e59618c9023515fb9af1def760e31de5dc5ddff7aea393fa5b7ffda9ba5",
+    "events_desk_guests.csv": "6d5165204f2b09900fdd7ad79cec29071c8d8d326e4beb9fdf78e525a3c5a358",
+    "events_desk_targets.csv": "6c2a541e954e0d19d10c47a661e5341676d4de0adf04e4320e726b06b9a5f4ea",
+    "assessment_facts.json": "62f1525a49eb31f57f2a65ca5cc46e5b78c43a7686c2185a44bf5973d75caaa8",
+    "sponsorships.csv": "349ab266ed3da562284fd75e2fe97b5da4f54208519e03f1e7d46232d41929fa",
+    "talks.csv": "0cb55275a706a0008af50532fb67a32675032da7d76dc0fb55704a8e759ee29f"
+  }
 }

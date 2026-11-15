@@ -88,12 +88,13 @@ async function handAssessment(db: Db, id: string, answers: Record<string, [strin
   await confirmAssessment(db, CAMILLE, id);
 }
 
-export async function seedPlan(db: Db, opts: { today?: string } | string = {}) {
+export async function seedPlan(db: Db, opts: { today?: string; /** The shared world replaces the demo's own side dinner at Money20/20 USA (decision 91). */ world?: boolean } | string = {}) {
   const today = typeof opts === "string" ? opts : opts.today ?? todayDefault();
+  const world = typeof opts === "string" ? false : Boolean(opts.world);
   await seedReinvent(db, today);
   await seedMadrid(db, today);
   await seedGitex(db, today);
-  await seedPastEvents(db, today);
+  await seedPastEvents(db, today, world);
   await seedSpeaking(db, today);
   // The hosted dinners and their guest lists, written through the code the routes use.
   await seedHostedYear(db, today);
@@ -163,7 +164,7 @@ async function seedGitex(db: Db, today: string) {
 }
 
 /** The two past events and the side dinner at Money20/20 USA 2026. Meetings and the scorecard wait for the delivered lists (seedPastResults). */
-async function seedPastEvents(db: Db, today: string) {
+async function seedPastEvents(db: Db, today: string, world = false) {
   // Money20/20 USA 2026: the past event with a goal it fell short of, a sponsorship whose deliverables are all done, promises not all kept, and a browse-only assessment.
   const id = M2020;
   await updatePlan(db, CAMILLE, id, { reason: "Money20/20 USA is where the payments and fintech buyers on our target list meet once a year. Fifteen passes put the field team on the floor all week, and a booth gave the meetings a place to happen.", goal_meetings_held: 16, goal_accounts_met: 10, goal_pipeline_cents: 80_000_000 });
@@ -194,12 +195,14 @@ async function seedPastEvents(db: Db, today: string) {
   for (const q of ["directory_present", "download"]) await setAnswer(db, CAMILLE, id, q, { confirm: true });
   for (const q of ["directory_tickets", "directory_fields", "can_hide", "sponsor_adds", "terms"]) await setAnswer(db, CAMILLE, id, q, { answer: "unknown", source_kind: "first_hand" });
   await confirmAssessment(db, CAMILLE, id);
-  // A side dinner at the conference: its own hosted event, naming the conference it hangs off.
-  const d = await createPlan(db, CAMILLE, { name: "Customer dinner at Money20/20 USA 2026", venue: "Las Vegas", country: "United States", starts_on: "2026-10-19", reason: "Six customers and four prospects at one table in the middle of the week, away from the show floor.", hosted: { format: "dinner", conference_event_id: id, headcount: 10 } }, { id: DINNER_M2020 });
-  await addPerson(db, CAMILLE, d.id, { person: CAMILLE, roles: ["host"] });
-  await setBudgetLine(db, CAMILLE, d.id, { category: "dinners", label: "Dinner", planned_cents: 600_000 });
-  await submitPlan(db, CAMILLE, d.id, { today });
-  await approvePlan(db, { eventId: d.id, actor: DAN, today });
+  // A side dinner at the conference: its own hosted event, naming the conference it hangs off. Under the shared world the world's own dinner (seed-world.ts) takes its place.
+  if (!world) {
+    const d = await createPlan(db, CAMILLE, { name: "Customer dinner at Money20/20 USA 2026", venue: "Las Vegas", country: "United States", starts_on: "2026-10-19", reason: "Six customers and four prospects at one table in the middle of the week, away from the show floor.", hosted: { format: "dinner", conference_event_id: id, headcount: 10 } }, { id: DINNER_M2020 });
+    await addPerson(db, CAMILLE, d.id, { person: CAMILLE, roles: ["host"] });
+    await setBudgetLine(db, CAMILLE, d.id, { category: "dinners", label: "Dinner", planned_cents: 600_000 });
+    await submitPlan(db, CAMILLE, d.id, { today });
+    await approvePlan(db, { eventId: d.id, actor: DAN, today });
+  }
 
   // Dreamforce 2026: a goal it met.
   const df = DREAMFORCE;

@@ -28,6 +28,8 @@ import { sheetsFor } from "./sheets.ts";
 import { exampleDns, systemDns } from "./identity.ts";
 import { seed } from "./seed.ts";
 import { restampDemoPlan, seedPastResults } from "./seed-plan.ts";
+import { seedWorldScored } from "./seed-world.ts";
+import { worldData } from "./world-slice.ts";
 import { seedScans } from "./seed-scans.ts";
 import { seedDirectory } from "./seed-directory.ts";
 import { swapcardAdapter } from "./organizer-api.ts";
@@ -69,12 +71,14 @@ if (migrateOnly) { console.log("Migrations applied."); await db.close(); process
 await publishAll(db).catch((e) => console.error("definitions", e));
 
 // The demo's "today" for the plan dates that must read as near (DEMO_TODAY, else the wall clock). The sample plan's dates are offsets from it.
-const demoToday = process.env.DEMO_TODAY ?? new Date().toISOString().slice(0, 10);
+// Under the shared world (WORLD=lumen, the demo's default; docs/SHARED-WORLD.md 13.3) it is the world's own Events Desk date, 2026-11-24.
+const worldOn = mode.demo && (process.env.WORLD ?? "lumen") === "lumen";
+const demoToday = process.env.DEMO_TODAY ?? (worldOn ? worldData().today : new Date().toISOString().slice(0, 10));
 const empty = (await db.query<{ n: number }>("SELECT count(*)::int AS n FROM events"))[0]?.n === 0;
 const mayLoadSample = !url || process.env.SEED_SAMPLE === "1";
 if ((mode.demo && !fromSnapshot) || (empty && mayLoadSample && !fromSnapshot)) {
   const t0 = Date.now();
-  await seed(db, mode.demo ? { real: true, today: demoToday } : {});
+  await seed(db, mode.demo ? { real: true, today: demoToday, world: worldOn } : {});
   console.log(`Loaded the sample events in ${Date.now() - t0} ms.${mode.demo ? " Includes the flagship with about 1,650 rows." : ""}`);
 }
 
@@ -133,6 +137,7 @@ if (!demoMotionReady) void (async () => {
         await seedDemoStages(db, lifecycle!, demoSetup!.tools);
         // The past events read against their goals: held meetings topped up through the real paths, then the 30-day scorecard.
         await seedPastResults(db, lifecycle!);
+        if (worldOn) await seedWorldScored(db, lifecycle!);
         // A day's scans on the same past event, and Tokyo set up for the one coming.
         await seedScans(db, lifecycle!);
         // The extension's reads on the same past event, and a finished screen recording on Tokyo.

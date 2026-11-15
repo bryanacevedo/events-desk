@@ -1,0 +1,78 @@
+{
+  "event_id": "ev_d81ee8da8d",
+  "event_name": "Money20/20 USA 2026",
+  "facts": {
+    "attendee_mix_by_sector": {
+      "confidence": "unknown",
+      "note": "not in the world's source list",
+      "source": null,
+      "status": "unknown",
+      "value": null
+    },
+    "attendee_mix_by_seniority": {
+      "confidence": "unknown",
+      "note": "not in the world's source list",
+      "source": null,
+      "status": "unknown",
+      "value": null
+    },
+    "city": {
+      "confidence": "secondary",
+      "source": "https://www.openbankingtracker.com/events/money2020-usa-2026",
+      "status": "known",
+      "value": "Las Vegas"
+    },
+    "dates": {
+      "confidence": "secondary",
+      "source": "https://www.openbankingtracker.com/events/money2020-usa-2026",
+      "status": "known",
+      "value": {
+        "end": "2026-10-21",
+        "start": "2026-10-18"
+      }
+    },
+    "organiser_publishes": {
+      "confidence": "unknown",
+      "source": "https://us.money2020.com",
+      "status": "partly_known",
+      "value": {
+        "agenda": "unknown",
+        "attendee_list": "unknown",
+        "sponsor_list": "unknown",
+        "website": "https://us.money2020.com"
+      }
+    },
+    "side_dinner_cost_usd": {
+      "confidence": "invented",
+      "note": "Lumen Ledger's own dinner, a child of this event; the cost is invented",
+      "source": null,
+      "status": "invented",
+      "value": 6840
+    },
+    "size_class": {
+      "confidence": "secondary",
+      "source": "https://www.openbankingtracker.com/events/money2020-usa-2026",
+      "status": "known",
+      "value": "flagship"
+    },
+    "theme": {
+      "confidence": "secondary",
+      "source": "https://www.openbankingtracker.com/events/money2020-usa-2026",
+      "status": "known",
+      "value": "Payments and fintech"
+    },
+    "ticket_price_usd": {
+      "confidence": "unknown",
+      "note": "REAL_EVENTS holds no price for this event; none is guessed",
+      "source": null,
+      "status": "unknown",
+      "value": null
+    },
+    "venue": {
+      "confidence": "secondary",
+      "source": "https://www.openbankingtracker.com/events/money2020-usa-2026",
+      "status": "known",
+      "value": "The Venetian"
+    }
+  }
+}

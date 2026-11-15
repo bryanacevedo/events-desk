@@ -50,7 +50,7 @@ describe("the adapter", () => {
 describe("the world slice", () => {
   it("is the pinned events_desk slice: hashes match its manifest, 18 events, the seller, the clock, the roster", () => {
     const w = worldSlice();
-    expect(w.pin).toMatchObject({ commit: "400566a1be83199b361fd37d7e43865753847b9b", world_version: "1.1.0" });
+    expect(w.pin).toMatchObject({ tag: "v1.3.0", commit: "f9d183dd39fd7fbfd9ee0df6a452daca25a497ab", world_version: "1.3.0" });
     expect(w.seller.name).toBe("Lumen Ledger");
     expect(w.now).toBe("2026-11-12T14:00:00+00:00");
     expect(w.events).toHaveLength(18);
