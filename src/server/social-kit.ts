@@ -251,7 +251,9 @@ export async function kitSheet(db: Db, actor: string, offerId: string, opts: { s
   const { facts } = await factsFor(db, o);
   const photo = await db.query<{ source: string }>("SELECT source FROM kit_photos WHERE person = $1", [o.person]);
   const own = o.person === actor;
+  const [ok] = canPlan(actor) ? await db.query<{ color: string | null; hashtag: string; has_logo: boolean }>("SELECT color, hashtag, logo IS NOT NULL AS has_logo FROM organizer_kits WHERE event_id = $1", [o.event_id]) : [];
   return {
+    organizer_kit: canPlan(actor) ? (ok ?? { color: null, hashtag: "", has_logo: false }) : null,
     id: o.id, event_id: o.event_id, role: o.role, person: o.person, own, post_url: o.post_url, caption_index: o.caption,
     captions: captions(facts), role_line: ROLE_LINE[o.role],
     photo: own ? (photo[0]?.source ?? null) : null, slack_available: own && opts.slack,

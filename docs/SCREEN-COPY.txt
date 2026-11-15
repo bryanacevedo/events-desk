@@ -20,6 +20,7 @@ Add a way of taking part
 Budget is for leadership and GTM Engineering.
 Choose one video, or screenshots of the list.
 Confirmed by #, #
+Counted by this desk, not a finding
 Declined by ##
 Domain not set up to send
 Each side keeps the guests it invited
@@ -35,7 +36,10 @@ It will share the list
 Keep it as my rule
 Last day of the event
 Leave out the answer to #
+Logo, PNG up to 500 KB
 My event is not listed
+Needs a second person to approve the abstract
+Needs a second person to approve the slides
 No email, no CRM task.
 No event has finished sending yet.
 Not read: the card ran out
@@ -59,8 +63,10 @@ Saved. Their outreach is stopped, and a task for today is in the CRM.
 Saved. Their outreach is stopped.
 Say when you sent it
 Says unsubscribe, read as something else
+Scans marked from the session, and meetings held with those people.
 Screen recording, for an app with no website
 Seats are for leadership and GTM Engineering.
+Send the slides to the organizer
 Shown once. It cannot be read again after this closes.
 Sponsor session or side event
 That company is not on this event.
@@ -81,6 +87,8 @@ The side that owns the account keeps all its guests
 This browser cannot read that video. Take screenshots of the list and choose them instead.
 This browser will not keep scans after the page closes. Sync before you leave.
 This draft was thrown away.
+This kit could not be opened.
+This looks like Slack's default picture
 Those notes are not here.
 To change anything, write to #.
 Travel per person, dollars (optional)
@@ -91,4 +99,6 @@ Ways to get it, in order
 Web portal, with the browser extension
 Where the file came from
 Where the pipeline came from
+Why you are passing on #
 Will not share the list
+You post this yourself. Events Desk never posts for you.

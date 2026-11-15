@@ -13,6 +13,7 @@ import { Budget } from "./Budget";
 import { Usage } from "./Usage";
 import { MyDay } from "./MyDay";
 import { Results } from "./Results";
+import { Speaking } from "./Speaking";
 import { More } from "./More";
 import { PersonAvatar } from "./PersonAvatar";
 import { Settings } from "./Settings";
@@ -55,13 +56,14 @@ export function Link({ to, go, className, children, ...rest }: { to: string; go:
   return <a href={to} className={className} {...rest} onClick={(ev) => { if (ev.metaKey || ev.ctrlKey || ev.button !== 0) return; ev.preventDefault(); go(to); }}>{children}</a>;
 }
 
-type Place = "overview" | "events" | "seats" | "budget" | "results" | "usage" | "more" | "settings" | "event" | "myday";
+type Place = "overview" | "events" | "seats" | "budget" | "results" | "speaking" | "usage" | "more" | "settings" | "event" | "myday";
 function placeOf(pathname: string): Place {
   if (/^\/event\//.test(pathname)) return "event";
   if (pathname === "/events") return "events";
   if (pathname === "/seats") return "seats";
   if (pathname === "/budget") return "budget";
   if (pathname === "/results") return "results";
+  if (pathname === "/speaking") return "speaking";
   if (pathname === "/usage") return "usage";
   if (pathname === "/my-day") return "myday";
   if (pathname === "/more") return "more";
@@ -81,8 +83,14 @@ export function App() {
   useEffect(() => { get<{ demo: boolean }>("/api/health").then((h) => setDemo(Boolean(h?.demo))); }, []);
   useEffect(() => { refresh(); }, [pathname, refresh]);
   // How many people are waiting on whoever is acting, across events.
-  const [waiting, setWaiting] = useState(0), [dayHas, setDayHas] = useState(false);
+  const [waiting, setWaiting] = useState(0), [dayHas, setDayHas] = useState(false), [speaks, setSpeaks] = useState(false), [kits, setKits] = useState(0);
   useEffect(() => { get<{ replies: unknown[]; meetings: unknown[]; captures: unknown[]; notes?: unknown[] }>(`/api/motion/my-day?rep=${encodeURIComponent(actor)}`).then((d) => { setWaiting((d?.replies.length ?? 0) + (d?.notes?.length ?? 0)); setDayHas(Boolean(d && (d.replies.length || d.meetings.length || d.captures.length || d.notes?.length))); }); }, [actor, pathname]);
+
+  // Someone who is not a planner still reaches Speaking when a talk names them. Their kits keep My day in their menu.
+  useEffect(() => {
+    get<{ talks: unknown[] }>("/api/speaking").then((d) => setSpeaks(Boolean(d && d.talks.length)));
+    get<{ offers: { person: string }[] }>("/api/kit/offers").then((d) => setKits((d?.offers ?? []).filter((o) => o.person === actor).length));
+  }, [actor, pathname]);
 
   const search = new URLSearchParams(beforeHash.split("?")[1] ?? "");
   const eventId = pathname.match(/^\/event\/([^/]+)/)?.[1];
@@ -93,8 +101,10 @@ export function App() {
   setDemoCalendar(Boolean(demo));
   const approver = Boolean(needs?.approvers.includes(actor)), lead = approver || isGtm(actor);
   // My day is the rep's page: replies, meetings, people met. Leadership's day is the seat queue on Overview and Seats, so an empty My day stays out of their menu.
-  const showDay = !lead || dayHas;
-  const navAt = ["overview", ...(showDay ? ["myday"] : []), "events", ...(lead ? ["seats"] : []), ...(lead ? ["budget", "results", "usage"] : [])].indexOf(place);
+  const plans = lead || Boolean(needs?.planners.includes(actor));
+  const showDay = !lead || dayHas || kits > 0;
+  const showSpeaking = plans || speaks;
+  const navAt = ["overview", ...(showDay ? ["myday"] : []), "events", ...(lead ? ["seats"] : []), ...(lead ? ["budget", "results"] : []), ...(showSpeaking ? ["speaking"] : []), ...(lead ? ["usage"] : [])].indexOf(place);
   if (demo === null) return null;
 
   const item = (to: string, p: Place, label: string, icon: ReactNode, cls: string, badge?: number) => (
@@ -120,6 +130,7 @@ export function App() {
             {lead && item("/seats", "seats", "Seats", <Icon.seats />, "navitem", approver ? count : 0)}
             {lead && item("/budget", "budget", "Budget", <Icon.budget />, "navitem")}
             {lead && item("/results", "results", "Results", <Icon.results />, "navitem")}
+            {showSpeaking && item("/speaking", "speaking", "Speaking", <Icon.speaking />, "navitem")}
             {lead && item("/usage", "usage", "Usage", <Icon.usage />, "navitem")}
           </div>
           <span className="spacer" />
@@ -144,11 +155,12 @@ export function App() {
           {place === "seats" && (lead ? <Seats go={go} search={search} requesting={search.get("request") === "1"} preselect={search.get("catalog")} /> : <p className="md-clear">Seats are for leadership and GTM Engineering.</p>)}
           {place === "budget" && (lead ? <Budget go={go} search={search} /> : <p className="md-clear">Budget is for leadership and GTM Engineering.</p>)}
           {place === "results" && (lead ? <Results go={go} /> : <p className="md-clear">Results are for leadership and GTM Engineering.</p>)}
+          {place === "speaking" && <Speaking />}
           {place === "usage" && (lead ? <Usage go={go} search={search} /> : <p className="md-clear">Usage is for leadership and GTM Engineering.</p>)}
           {/* A reply, meeting or deal opened from an event sheet opens over whichever page the sheet was on. The event page and My day draw their own. */}
           {!["event", "myday"].includes(place) && <ObjectSheets />}
           {place === "myday" && <MyDay />}
-          {place === "more" && <More go={go} showDay={approver && showDay} />}
+          {place === "more" && <More go={go} showDay={approver && showDay} showSpeaking={showSpeaking} />}
           {place === "settings" && <Settings go={go} compileId={search.get("compile")} section={search.get("section")} />}
           {place === "event" && <Event key={eventId} id={eventId!} go={go} />}
         </main>
@@ -159,7 +171,7 @@ export function App() {
           {lead ? item("/seats", "seats", "Seats", <Icon.seats />, "tab", approver ? count : 0) : showDay && item("/my-day", "myday", "My day", <Icon.calendar />, "tab", waiting)}
           {lead && item("/budget", "budget", "Budget", <Icon.budget />, "tab")}
           {/* More holds Usage and Settings, which are leadership's and GTM's. For anyone else it would be an empty page. */}
-          {lead && <Link to="/more" go={go} className="tab" aria-current={["more", "usage", "settings"].includes(place) ? "page" : undefined}><span className="ico"><Icon.more /></span><span className="lbl">More</span></Link>}
+          {(lead || showSpeaking) && <Link to="/more" go={go} className="tab" aria-current={["more", "usage", "settings", "speaking"].includes(place) ? "page" : undefined}><span className="ico"><Icon.more /></span><span className="lbl">More</span></Link>}
         </nav>
       </div>
     </AppCtx.Provider>

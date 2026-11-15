@@ -1,5 +1,13 @@
 # Events Desk: project status
 
+## Redesign step 5, speaking and the social kit (2026-11-14)
+
+Worktree `.wt/ev5-events-desk`, branch `ev5/speaking`. Spec `docs/SPEAKING.md`, decisions 74 to 80, migration 0056. Baseline before the work: the full suite was green (the Chrome tests need the sandbox off here).
+
+**Built:** calls for papers per event with the model proposing from a page and the person adding; the talk with its states and the two-person approvals (CHECKs in the database); scan credit and a Talks part in the Result; the kit (offers fired by seat approval, talk accepted, hosted or sponsorship confirmed; photo from upload or Slack on tap; organizer kit; six PNGs by Satori and Resvg; template captions; post link pasted back; posting counts). Screens: the Speaking page, the talk section in the Plan tab, the kit sheet, a Kits ledger on My day, a "From the session" pick on the phone scanner. Design: three directions in `~/Developer/events-desk-review/step5/`, A with C's kit sheet built provisionally.
+
+**Not proven, for Bryan:** the Slack photo against a real workspace (tested with a stand-in; the scope `users.profile:read` is needed); the real model reading a real call page (the demo and tests use the simulated reader); the organizer's real kit assets; whether the LinkedIn post sizes are right (only the banner is LinkedIn's own figure).
+
 ## Redesign step 4, the directory extension and the screen recording (2026-11-14)
 
 Worktree `.wt/ev4-events-desk`, branch `ev4/extension`. Spec `docs/DIRECTORY.md` (section 13 holds the goldfish fixes), decisions 69 to 73, migration 0055.

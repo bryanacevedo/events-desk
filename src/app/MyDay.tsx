@@ -3,10 +3,12 @@
    is folded at the bottom. */
 
 import { useEffect, useState } from "react";
-import { get, type HostedMine } from "./api";
+import { get, type HostedMine, type KitOffer } from "./api";
 import { Link, useActor } from "./App";
 import { copyText } from "./Guests";
+import { isGtm } from "../shared/roles";
 import { Icon } from "./icons";
+import { KitRows, KitSheet } from "./Kit";
 import { dayIn, headIn, MeetingRows, meetTime, NoteRows, ObjectSheets, openObject, ReplyRows, type NoteRowData } from "./Objects";
 import { Chevron } from "./Patterns";
 import { PersonAvatar } from "./PersonAvatar";
@@ -34,8 +36,8 @@ export function MyDay() {
   const mySeats = (needs?.requests ?? []).filter((r) => r.requester === actor && (r.status === "pending" || r.status === "declined"));
   const [d, setD] = useState<Day | null>(null), [allReplies, setAllReplies] = useState(false);
   const sheet = openObject();
-  const [mine, setMine] = useState<HostedMine | null>(null);
-  const load = async () => { setD(await get<Day>(`/api/motion/my-day?rep=${encodeURIComponent(actor)}`)); setMine(await get<HostedMine>("/api/hosted/mine")); };
+  const [allKits, setAllKits] = useState(false), [mine, setMine] = useState<HostedMine | null>(null), [kits, setKits] = useState<KitOffer[]>([]), [kit, setKit] = useState<KitOffer | null>(null);
+  const load = async () => { setD(await get<Day>(`/api/motion/my-day?rep=${encodeURIComponent(actor)}`)); setMine(await get<HostedMine>("/api/hosted/mine")); setKits(((await get<{ offers: KitOffer[] }>("/api/kit/offers"))?.offers ?? []).filter((o) => o.person === actor)); };
   useEffect(() => { load(); }, [actor]);
   if (!d) return null;
   const today = new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
@@ -75,7 +77,15 @@ export function MyDay() {
 
       {(mine?.count ?? 0) > 0 && <HostedGuests mine={mine!} go={go} />}
 
-      {!d.replies.length && !d.meetings.length && !(mine?.count ?? 0) && <p className="md-clear">Nothing waiting on you.</p>}
+      {kits.length > 0 && (
+        <div className="m-sec">
+          <h2 className="md-h">Your kits<span>{kits.length}</span></h2>
+          <KitRows offers={allKits ? kits : kits.slice(0, 3)} open={setKit} />
+          {kits.length > 3 && <button type="button" className="xmore" onClick={() => setAllKits(!allKits)}>{allKits ? "Fewer" : `All ${kits.length}`}<Chevron /></button>}
+        </div>
+      )}
+
+      {!d.replies.length && !d.meetings.length && !(mine?.count ?? 0) && !kits.length && <p className="md-clear">Nothing waiting on you.</p>}
 
       {(d.slots.length > 0 || d.captures.length > 0 || mySeats.length > 0) && (
         <div className="folds">
@@ -122,6 +132,7 @@ export function MyDay() {
         </div>
       )}
       <ObjectSheets changed={load} />
+      {kit && <KitSheet offerId={kit.id} eventName={kit.event_name} planner={isGtm(actor) || Boolean(needs?.approvers.includes(actor) || needs?.planners.includes(actor))} close={() => setKit(null)} changed={() => void load()} />}
     </section>
   );
 }

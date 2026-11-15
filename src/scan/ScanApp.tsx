@@ -12,7 +12,7 @@ import "./scan.css";
 const PEOPLE = PERSONAS.map((p) => p.name);
 const NEXT_STEPS = ["Nothing yet", "Send a note", "Call", "Book a meeting", "Send pricing", "Introduce a colleague"];
 
-interface Cfg { event: { id: string; name: string; starts_on: string; ends_on: string; zone: string }; qualifiers: { id: string; label: string }[]; notice: { text: string; version: number }; promise_owners: string[]; organizer_ready?: boolean }
+interface Cfg { event: { id: string; name: string; starts_on: string; ends_on: string; zone: string }; qualifiers: { id: string; label: string }[]; notice: { text: string; version: number }; promise_owners: string[]; organizer_ready?: boolean; talks?: { id: string; title: string }[] }
 const fallbackCfg = (id: string): Cfg => ({ event: { id, name: "Scanner", starts_on: "", ends_on: "", zone: "UTC" }, qualifiers: [], notice: { text: DEFAULT_NOTICE, version: 1 }, promise_owners: [] });
 
 interface Draft {
@@ -52,7 +52,15 @@ export function ScanApp() {
       if (saved) setCfg(saved);
       try {
         const r = await fetch(`/api/events/${eventId}/scanner`, { headers: { "x-actor": encodeURIComponent(actorRef.current) } });
-        if (r.ok) { const j = (await r.json()) as Cfg; setCfg(j); setCfgNote(""); await putMeta(`config:${eventId}`, j); }
+        if (r.ok) {
+          const j = (await r.json()) as Cfg;
+          // The accepted talks of this event, for "From the session". Kept in the phone's copy so the choice is there with no signal.
+          if (!j.talks) {
+            const sp = await fetch(`/api/events/${eventId}/speaking`, { headers: { "x-actor": encodeURIComponent(actorRef.current) } }).catch(() => null);
+            if (sp?.ok) j.talks = ((await sp.json()) as { talks: { id: string; title: string; status: string }[] }).talks.filter((t) => t.status === "accepted" && t.title).map((t) => ({ id: t.id, title: t.title }));
+          }
+          setCfg(j); setCfgNote(""); await putMeta(`config:${eventId}`, j);
+        }
         else if (!saved) setCfgNote("This event could not be found.");
       } catch { if (!saved) setCfgNote("No signal and nothing saved yet: typing works, with the standard notice."); }
     })();
@@ -233,6 +241,10 @@ function Sheet({ draft, cfg, actor, unsynced, onClose, onSaved }: { draft: Draft
   const [note, setNote] = useState(""), [promise, setPromise] = useState(""), [owner, setOwner] = useState(actor);
   const [step, setStep] = useState(NEXT_STEPS[0]), [on, setOn] = useState("");
   const [consent, setConsent] = useState(false), [error, setError] = useState(""), [busy, setBusy] = useState(false), [asking, setAsking] = useState(false);
+  // "From the session": none the first time, then the last choice on this phone, as long as that talk is still one of the event's.
+  const talks = cfg.talks ?? [];
+  const [talk, setTalkState] = useState(() => { try { const t = localStorage.getItem(`scan-talk:${cfg.event.id}`) ?? ""; return talks.some((x) => x.id === t) ? t : ""; } catch { return ""; } });
+  const setTalk = (t: string) => { setTalkState(t); try { localStorage.setItem(`scan-talk:${cfg.event.id}`, t); } catch { /* private window */ } };
   const photoOnly = Boolean(draft.photo) && !confirming;
   const wasChanged = useMemo(() => JSON.stringify(f) !== JSON.stringify(draft.fields) || note || promise, [f, draft.fields, note, promise]);
 
@@ -260,7 +272,7 @@ function Sheet({ draft, cfg, actor, unsynced, onClose, onSaved }: { draft: Draft
     const input = {
       id: draft.id, method: draft.method, raw_payload: draft.raw, fields, temperature: heat, qualifiers: q, note, promise, promise_owner: promise.trim() ? owner : null,
       next_step: step === NEXT_STEPS[0] ? "" : step, next_step_on: on || null, marketing_consent: consent, notice_version: cfg.notice.version, scanned_at: new Date(draft.scannedAt).toISOString(),
-      seconds: Math.round((now - draft.openedAt) / 1000), device: /iPhone|iPad/.test(navigator.userAgent) ? "iOS" : /Android/.test(navigator.userAgent) ? "Android" : "web",
+      seconds: Math.round((now - draft.openedAt) / 1000), ...(talk ? { talk_id: talk } : {}), device: /iPhone|iPad/.test(navigator.userAgent) ? "iOS" : /Android/.test(navigator.userAgent) ? "Android" : "web",
     };
     const item: QueueItem = { id: draft.id, event_id: cfg.event.id, rep: actor, input, label: { name: fields.name ?? null, company: fields.company ?? null }, saved_at: draft.scannedAt, sent: false };
     if (draft.photo) { await putBlob(draft.id, draft.photo); item.photo = { kind: draft.method === "card_photo" ? "card" : "badge", total: draft.photo.size, sent_bytes: 0, read: false }; }
@@ -282,6 +294,7 @@ function Sheet({ draft, cfg, actor, unsynced, onClose, onSaved }: { draft: Draft
         {!confirming && (
           <>
             <div className="sc-heat" role="group" aria-label="Interest">{(["hot", "warm", "cold"] as const).map((h) => <button type="button" key={h} aria-pressed={heat === h} onClick={() => setHeat(h)}>{h[0].toUpperCase() + h.slice(1)}</button>)}</div>
+            {talks.length > 0 && <label className="sc-field"><span>From the session</span><select className="sc-input" value={talk} onChange={(e) => setTalk(e.target.value)}><option value="">None</option>{talks.map((x) => <option key={x.id} value={x.id}>{x.title}</option>)}</select></label>}
             {cfg.qualifiers.length > 0 && <div className="sc-quals">{cfg.qualifiers.map((x) => (
               <div className="sc-qrow" key={x.id}><span>{x.label}</span>
                 <div className="sc-seg" role="group" aria-label={x.label}>{(["yes", "no"] as const).map((a) => <button type="button" key={a} aria-pressed={q[x.id] === a} onClick={() => setQ({ ...q, [x.id]: q[x.id] === a ? undefined as never : a })}>{a === "yes" ? "Yes" : "No"}</button>)}</div></div>))}</div>}

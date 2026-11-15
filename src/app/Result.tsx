@@ -6,7 +6,7 @@
 import { EventLogo } from "./EventLogo";
 import { companyDisplayName as co, dealDisplayName } from "../shared/names";
 import { useEffect, useState, type CSSProperties } from "react";
-import { get, send, type PlanData } from "./api";
+import { get, send, type PlanData, type SpeakingData } from "./api";
 import { Link, useActor } from "./App";
 import { Icon } from "./icons";
 import { Fold } from "./Motion";
@@ -215,6 +215,48 @@ function GoalOutcome({ id }: { id: string }) {
   );
 }
 
+/** What the event's talks produced, and what posting the kit lined up with. Only what the desk's own rows say: scans picked as from the session, the people placed from them, the hot ones and the meetings held with those people. */
+function TalksPart({ id }: { id: string }) {
+  const { actor } = useActor();
+  const [d, setD] = useState<SpeakingData | null>(null);
+  useEffect(() => { get<SpeakingData>(`/api/events/${id}/speaking`).then(setD); }, [id, actor]);
+  if (!d) return null;
+  const talks = d.talks.filter((t) => t.status === "accepted"), post = d.posting && d.posting.people > 0 ? d.posting : null;
+  if (!talks.length && !post) return null;
+  return (
+    <>
+      {talks.length > 0 && (
+        <section className="pl-sec rs-goal" aria-label="Talks"><h2>Talks</h2>
+          <div className="pl-body">
+            <div className="pl-bt" role="table" aria-label="Talks" style={{ "--n": 4 } as CSSProperties}>
+              <div className="pl-bt-row pl-bt-head" role="row"><span role="columnheader">Talk</span><span role="columnheader">Scans</span><span role="columnheader">People placed</span><span role="columnheader">Hot</span><span role="columnheader">Meetings held</span></div>
+              {talks.map((t) => (
+                <div className="pl-bt-row" role="row" key={t.id}>
+                  <span role="rowheader"><b>{t.title}</b>{t.speaker && <i className="pl-nc"> {t.speaker}</i>}</span>
+                  <span role="cell" data-col="Scans">{num(t.scans)}</span><span role="cell" data-col="People placed">{num(t.placed)}</span><span role="cell" data-col="Hot">{num(t.hot)}</span><span role="cell" data-col="Meetings held">{num(t.meetings_held)}</span>
+                </div>
+              ))}
+            </div>
+            <p className="mute">Scans marked from the session, and meetings held with those people.</p>
+          </div>
+        </section>
+      )}
+      {post && (
+        <section className="pl-sec rs-goal" aria-label="Posting"><h2>Posting</h2>
+          <div className="pl-body">
+            <div className="pl-bt" role="table" aria-label="Posting" style={{ "--n": 2 } as CSSProperties}>
+              <div className="pl-bt-row pl-bt-head" role="row"><span role="columnheader" /><span role="columnheader">People</span><span role="columnheader">Meetings held</span></div>
+              <div className="pl-bt-row" role="row"><span role="rowheader"><b>Posted</b></span><span role="cell" data-col="People">{num(post.posted)}</span><span role="cell" data-col="Meetings held">{num(post.meetings_posters)}</span></div>
+              <div className="pl-bt-row" role="row"><span role="rowheader"><b>Did not post</b></span><span role="cell" data-col="People">{num(post.not_posted)}</span><span role="cell" data-col="Meetings held">{num(post.meetings_others)}</span></div>
+            </div>
+            <p className="mute">Counted by this desk, not a finding</p>
+          </div>
+        </section>
+      )}
+    </>
+  );
+}
+
 export function ResultView({ id, name, onChange }: { id: string; name: string; onChange: () => void }) {
   const { actor, needs } = useActor();
   const lead = isGtm(actor) || Boolean(needs?.approvers.includes(actor));
@@ -236,6 +278,7 @@ export function ResultView({ id, name, onChange }: { id: string; name: string; o
           </Fold>
         </div>
       )}
+      <TalksPart id={id} />
       <ObjectSheets changed={changed} />
     </section>
   );

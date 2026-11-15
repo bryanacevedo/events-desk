@@ -454,6 +454,7 @@ export async function scannerConfig(db: Db, actor: string, eventId: string, orga
     event: { id: ev.id, name: ev.name, starts_on: ev.starts_on, ends_on: ev.ends_on ?? ev.starts_on, zone },
     qualifiers: st.qualifiers, notice: { text: st.notice_text, version: st.notice_version }, organizer: st.organizer, organizer_ready: organizerReady(st.organizer, ref), set_up: st.set_up,
     promise_owners: (await db.query<{ person: string }>("SELECT DISTINCT person FROM event_people WHERE event_id = $1 ORDER BY person", [eventId]).catch(() => [])).map((r) => r.person),
+    talks: await db.query<{ id: string; title: string }>("SELECT id, title FROM talks WHERE event_id = $1 AND status = 'accepted' ORDER BY created_at", [eventId]),
     mine: mine.n, can_setup: planner(actor), setup_refs: planner(actor) ? ref : undefined,
   };
 }

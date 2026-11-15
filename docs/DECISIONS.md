@@ -394,3 +394,32 @@ The video never leaves the person's computer. The page plays it locally, takes a
 ## 73. The recording read is counted and capped, not on the cost card (2026-11-14)
 
 Same reasoning as the scanner's photo read (decision 65): the vision call (`directory_read`) is not a priced vendor step, so the cap is the spend control. Each frame is counted in `llm_calls` before the call, inside a transaction that holds the event row, and the frame's own row is taken first so a repeat returns the stored result and calls nothing; a thrown call marks the frame failed and is never retried by the desk. Caps: 250 frames a recording and 800 frame reads an event (counted from the call rows), and 3,000 reads an event in all. The model's reply is checked in code (`checkFrame`): a person is kept only when the transcription holds the name, a title, company or place not in the transcription is thrown away, and at most 40 people a frame are taken. That check cannot defend against a frame that steers the model, since the transcription and the people come from one reply, so a name or company that reads like an instruction, a link or a sentence is held to check, and every read is shown to a person before it is brought in. In the demo the simulated model cannot see, so it is refused where a person would wait for a read that can never come.
+
+## 74. A call hangs off an event, and a candidate event is a plan (2026-11-14)
+
+A call for papers has an `event_id`, because a candidate event is already an `events` row in the planning stage, and the model read that finds calls is counted in `llm_calls`, which needs an event. A catalog entry with no plan has no call: make it a plan first. Money20/20 Europe 2027 is that plan in the demo, with its call closing 27 November 2026.
+
+## 75. The author never approves, in the schema as well as the code (2026-11-14)
+
+Market Desk's two-person pattern, with the database as the backstop: `talks_abstract_two_people` and `talks_slides_two_people` refuse an approver equal to the author, and refuse an approval with no author (a NULL cannot pass). The author is the last person who changed the words, so editing after an approval clears it and makes the editor the author. A submitted abstract is frozen, and slides cannot change once sent. Planners approve; the speaker writes; a rep who is neither reads only.
+
+## 76. The model proposes calls, the person adds them (2026-11-14)
+
+`cfp_read` reads one page the person gives and proposes calls. A proposal is kept only with a real date, a quote found in the page and a link that is the page's own or appears in it (links are kept as text when the page is fetched for this step), and nothing is stored until the person adds it. Five reads an event, counted before the call, not on the cost card. `isPublicAddress` now also refuses IPv4-mapped IPv6 written in hex groups.
+
+## 77. The kit fires inside the write that makes it true, and holds no image (2026-11-14)
+
+An offer row is written by `decideSeat` (a one-line insert; the function is otherwise unchanged), by a talk becoming accepted, and by a hosted or sponsorship involvement becoming confirmed. Images are drawn when the person opens the kit and kept nowhere, so a removed photo leaves no copy. The roles a person can ask for come from rows the desk holds. Sponsoring is fired from a confirmed sponsorship, which the brief did not list; the template needed a path.
+
+## 78. The photo is the person's, from an upload or Slack on their tap (2026-11-14)
+
+One photo per person, checked by its bytes and 2 MB. The Slack photo is fetched once, on the person's tap, only when Slack is connected and knows them, from Slack's own image hosts over https. Removing deletes the row. The organizer's kit is a colour, a hashtag and a PNG logo a planner saves (PNG only, so nothing in it can name a file or an address). No fallback logo is fetched.
+
+## 79. The desk draws six files for five sizes and never posts (2026-11-14)
+
+Satori and Resvg with IBM Plex Sans bundled from the installed `@fontsource` package. LinkedIn post landscape and 4:5 count as one size in the brief; there are six files. Captions are templates. A pasted post link is checked as text (https on linkedin.com) and never fetched. A test reads the source for any request to LinkedIn or its posting API. The Result's posting count is the desk's own, labelled as not a finding.
+
+## 80. The follow-up names the talk where the rep makes it (2026-11-14)
+
+Scanned people are a rep's and never sequenced, so no sequence template changed. A scan picked "from the session" carries `talk_id` (only an accepted talk of that event; otherwise the scan is stored without it, because scans sync from an offline queue), and the talk shows on the scan list, the CSV and the rep's hand-off.
+

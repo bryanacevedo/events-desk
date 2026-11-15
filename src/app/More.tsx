@@ -4,7 +4,7 @@ import { Link, useActor } from "./App";
 import { isGtm } from "../shared/roles";
 import { Icon } from "./icons";
 
-export function More({ go, showDay }: { go: (to: string) => void; showDay: boolean }) {
+export function More({ go, showDay, showSpeaking }: { go: (to: string) => void; showDay: boolean; showSpeaking: boolean }) {
   const { actor, needs } = useActor();
   const lead = Boolean(needs?.approvers.includes(actor)) || isGtm(actor);
   return (
@@ -13,6 +13,7 @@ export function More({ go, showDay }: { go: (to: string) => void; showDay: boole
       <nav className="morelist" aria-label="More">
         {showDay && <Link to="/my-day" go={go} className="navitem"><span className="ico"><Icon.calendar /></span><span className="lbl">My day</span></Link>}
         {lead && <Link to="/results" go={go} className="navitem"><span className="ico"><Icon.results /></span><span className="lbl">Results</span></Link>}
+        {showSpeaking && <Link to="/speaking" go={go} className="navitem"><span className="ico"><Icon.speaking /></span><span className="lbl">Speaking</span></Link>}
         {lead && <Link to="/usage" go={go} className="navitem"><span className="ico"><Icon.usage /></span><span className="lbl">Usage</span></Link>}
         {isGtm(actor) && <Link to="/settings" go={go} className="navitem"><span className="ico"><Icon.settings /></span><span className="lbl">Settings</span></Link>}
       </nav>

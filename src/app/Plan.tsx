@@ -4,7 +4,7 @@
    Money is leadership's and planners'. The server sends a rep no money; a section that would be empty for them is not drawn. */
 
 import { useEffect, useState, type ReactNode } from "react";
-import { get, send, type PlanBudgetCategory, type PlanData, type PlanInvolvement, type PlanPerson } from "./api";
+import { get, send, type KitOffer, type PlanBudgetCategory, type PlanData, type PlanInvolvement, type PlanPerson } from "./api";
 import { useActor } from "./App";
 import { Icon } from "./icons";
 import { Fold } from "./Motion";
@@ -12,6 +12,8 @@ import { DeclineBox, Editable, GoalEditor, InvolvementEditor, LinesEditor, Perso
 import { SponsorBlock } from "./PlanSponsor";
 import { AssessmentBlock, OrganizerBlock } from "./PlanAssessment";
 import { GetList } from "./Directory";
+import { KitSheet } from "./Kit";
+import { TalkBlock } from "./PlanTalk";
 import { LIST_SOURCE_WORDS } from "../shared/plan";
 import { money, num, shortDate } from "./words";
 
@@ -74,12 +76,12 @@ function InvolvementRow({ i, bare }: { i: PlanInvolvement; bare?: boolean }) {
   );
 }
 
-function PersonRow({ p, withSeat = true }: { p: PlanPerson; withSeat?: boolean }) {
+function PersonRow({ p, withSeat = true, kit }: { p: PlanPerson; withSeat?: boolean; kit?: { label: string; run: () => void } | null }) {
   return (
     <li className="pl-row">
       <span className="pl-what"><b>{p.person}</b><span>{p.team}</span></span>
       <span className="pl-mid">{p.roles.map((r) => ROLE_WORDS[r] ?? r).join(", ")}</span>
-      <span className={`pl-end${p.seat_status === "pending" ? " pl-strong" : ""}`}>{withSeat ? (p.seat_status ? SEAT_WORDS[p.seat_status] : "No pass") : ""}</span>
+      <span className={`pl-end${p.seat_status === "pending" ? " pl-strong" : ""}`}>{withSeat ? (p.seat_status ? SEAT_WORDS[p.seat_status] : "No pass") : ""}{kit && <button type="button" className="btn line small pl-inline" onClick={kit.run} aria-label={`${kit.label} for ${p.person}`}>{kit.label}</button>}</span>
     </li>
   );
 }
@@ -109,7 +111,8 @@ export function PlanTab({ id, listRows, onChange }: { id: string; listRows: numb
   const [p, setP] = useState<PlanData | null>(null);
   const [view, setView] = useState<PV>(() => readView(actor));
   const [busy, setBusy] = useState(false), [error, setError] = useState("");
-  const load = async () => setP(await get<PlanData>(`/api/events/${id}/plan`));
+  const [kits, setKits] = useState<KitOffer[]>([]), [kit, setKit] = useState<string | null>(null);
+  const load = async () => { setP(await get<PlanData>(`/api/events/${id}/plan`)); setKits((await get<{ offers: KitOffer[] }>(`/api/kit/offers?event=${id}`))?.offers ?? []); };
   const saved = async () => { await load(); onChange(); };
   useEffect(() => { load(); }, [id, actor]);
   useEffect(() => { setView(readView(actor)); }, [actor]);
@@ -139,6 +142,15 @@ export function PlanTab({ id, listRows, onChange }: { id: string; listRows: numb
   const b = p.budget;
   const total = b ? { planned: b.total_planned_cents, contracted: b.categories.some((c) => c.contracted_cents !== null) ? b.total_contracted_cents : null, actual: b.total_actual_cents } : undefined;
   const people = p.who_goes;
+  /** A person's kit: open the one the desk offered, or, on their own row, ask for it. A planner opens anyone's. */
+  const KIT_ROLE: Record<string, string> = { attend: "attending", speak: "speaking", host: "hosting" };
+  const kitFor = (x: PlanPerson) => {
+    const offer = kits.find((o) => o.person === x.person);
+    if (offer) return { label: "Kit", run: () => setKit(offer.id) };
+    const role = x.roles.map((r) => KIT_ROLE[r]).find(Boolean);
+    if (x.person !== actor || !role) return null;
+    return { label: "Make my kit", run: async () => { setError(""); const r = await send<{ id: string }>("POST", `/api/events/${id}/kit`, actor, { role }); if (!r.ok) { setError(r.error); return; } await load(); setKit(r.data.id); } };
+  };
 
   /* The sections, written once and laid out three ways. */
   const reason = (
@@ -156,7 +168,7 @@ export function PlanTab({ id, listRows, onChange }: { id: string; listRows: numb
   const taking = <Editable can={canEdit && !p.event.hosted} label="Add a way of taking part" view={takingView} editor={(close) => <InvolvementEditor id={id} have={live.map((i) => i.kind)} done={close} saved={saved} />} />;
   const budgetView = b ? <Budget cats={b.categories} total={b.categories.length > 1 ? total : undefined} aiCents={b.ai_actual_cents} /> : null;
   const budget = b ? <Editable can={canEdit} label="Edit budget lines" view={budgetView} editor={(close) => <LinesEditor id={id} lines={b.lines} done={close} saved={saved} />} /> : null;
-  const whoView = people.length ? <ul className="pl-rows">{people.map((x) => <PersonRow key={x.id} p={x} />)}</ul> : <p className="mute">Nobody is going yet.</p>;
+  const whoView = people.length ? <ul className="pl-rows">{people.map((x) => <PersonRow key={x.id} p={x} kit={kitFor(x)} />)}</ul> : <p className="mute">Nobody is going yet.</p>;
   const who = <Editable can={canEdit && p.event.approval_mode === "budget"} label="Add a person" view={whoView} editor={(close) => <PersonEditor id={id} hosted={p.event.hosted} done={close} saved={saved} />} />;
   const src = p.list_source ? [LIST_SOURCE_WORDS[p.list_source.list_source], p.list_source.list_source === "other" ? p.list_source.source_note : ""].filter(Boolean).join(": ") : "";
   const canUpload = p.event.stage === "approved" && !p.event.hosted && listRows === 0;
@@ -190,6 +202,7 @@ export function PlanTab({ id, listRows, onChange }: { id: string; listRows: numb
         <Sec title="Who goes">{who}</Sec>
         <Sec title="Audience">{audience}</Sec>
         {sponsorship && <Sec title="Sponsorship">{sponsorship}</Sec>}
+        {live.filter((i) => i.kind === "talk").map((i) => <Sec key={i.id} title={i.label || "Talk"}><TalkBlock eventId={id} involvement={i} saved={saved} /></Sec>)}
       </div>
     );
   } else if (view === "b") {
@@ -205,9 +218,10 @@ export function PlanTab({ id, listRows, onChange }: { id: string; listRows: numb
           {kinds.map((k) => live.filter((i) => i.kind === k).map((i) => (
             <Sec key={i.id} title={i.label || (k === "hosted" ? HOSTED_WORDS[i.hosted_format ?? ""] : "") || KIND_WORDS[k]}>
               <ul className="pl-rows"><InvolvementRow i={i} bare /></ul>
+              {k === "talk" && <TalkBlock eventId={id} involvement={i} saved={saved} />}
               {k === "sponsorship" && sponsorship}
-              {k === "passes" && people.length > 0 && <><h3 className="pl-h3">Who goes</h3><ul className="pl-rows">{loose.map((x) => <PersonRow key={x.id} p={x} />)}</ul></>}
-              {k === "hosted" && people.length > 0 && <><h3 className="pl-h3">Who hosts</h3><ul className="pl-rows">{people.map((x) => <PersonRow key={x.id} p={x} withSeat={false} />)}</ul></>}
+              {k === "passes" && people.length > 0 && <><h3 className="pl-h3">Who goes</h3><ul className="pl-rows">{loose.map((x) => <PersonRow key={x.id} p={x} kit={kitFor(x)} />)}</ul></>}
+              {k === "hosted" && people.length > 0 && <><h3 className="pl-h3">Who hosts</h3><ul className="pl-rows">{people.map((x) => <PersonRow key={x.id} p={x} withSeat={false} kit={kitFor(x)} />)}</ul></>}
               {k !== "talk" && trayCats(k).length > 0 && <><h3 className="pl-h3">Budget</h3><Budget cats={trayCats(k)} total={trayCats(k).length > 1 ? { planned: trayCats(k).reduce((n, c) => n + c.planned_cents, 0), contracted: trayCats(k).some((c) => c.contracted_cents !== null) ? trayCats(k).reduce((n, c) => n + (c.contracted_cents ?? 0), 0) : null, actual: trayCats(k).reduce((n, c) => n + (c.actual_cents ?? 0), 0) } : undefined} /></>}
             </Sec>
           )))}
@@ -259,6 +273,7 @@ export function PlanTab({ id, listRows, onChange }: { id: string; listRows: numb
           {b && <Fold icon={<Icon.cost />} title="Budget" peek={dollars(b.total_planned_cents)}>{budget}</Fold>}
           <Fold icon={<Icon.people />} title="Who goes" peek={people.length ? `${people.length}` : "Nobody yet"}>{who}</Fold>
           {sponsorship && <Fold icon={<Icon.cost />} title="Sponsorship" peek={p.sponsorship?.tier_name || "Package"}>{sponsorship}</Fold>}
+          {live.filter((i) => i.kind === "talk").map((i) => <Fold key={i.id} icon={<Icon.speaking />} title={i.label || "Talk"} peek={i.talk_title || "No title yet"}><TalkBlock eventId={id} involvement={i} saved={saved} /></Fold>)}
           <Fold icon={<Icon.lists />} title="Audience" peek={listRows > 0 ? `${num(listRows)} rows` : "List not uploaded"}>{audience}</Fold>
         </div>
       </div>
@@ -280,6 +295,7 @@ export function PlanTab({ id, listRows, onChange }: { id: string; listRows: numb
       {canDecline && <div className="pl-decline"><DeclineBox id={id} saved={saved} /></div>}
       {view !== "c" && notes}
       {body}
+      {kit && <KitSheet offerId={kit} eventName={p.event.name} planner={p.can_plan} close={() => setKit(null)} changed={() => void load()} />}
     </section>
   );
 }

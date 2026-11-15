@@ -151,3 +151,21 @@ export type HostedPage = Awaited<ReturnType<typeof hostedView>>;
 export type HostedFollowUp = Awaited<ReturnType<typeof followUp>>;
 export type HostedMine = Awaited<ReturnType<typeof myGuests>>;
 export type { GuestOut, Invitation, ReminderPreview, ReminderSent, ImportResult, PublicRsvp };
+
+/* Speaking and the kit (docs/SPEAKING.md). The shapes are the server's own, read through its return types. */
+import type { speakingView } from "../server/talks";
+import type { kitSheet, listOffers } from "../server/social-kit";
+export type SpeakingData = Awaited<ReturnType<typeof speakingView>>;
+export type CallItem = SpeakingData["calls"][number];
+export type TalkItem = SpeakingData["talks"][number];
+export type KitOffer = Awaited<ReturnType<typeof listOffers>>[number];
+export type KitSheetData = Awaited<ReturnType<typeof kitSheet>>;
+export interface CallProposal { title: string; closes_on: string; link: string; quote: string; source_url: string | null }
+
+/** An image the desk draws for the person, fetched with the acting person's name (an <img> cannot send it) and handed back as a blob address. */
+export async function fetchBlob(path: string, actor: string): Promise<Blob | null> {
+  try {
+    const r = await fetch(path, { headers: { "x-actor": encodeURIComponent(actor) } });
+    return r.ok ? await r.blob() : null;
+  } catch { return null; }
+}

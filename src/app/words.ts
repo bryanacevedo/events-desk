@@ -123,3 +123,6 @@ export const CASE_WORDS: Record<string, string> = {
 export const caseWords = (k: string) => CASE_WORDS[k] ?? k.replace(/_/g, " ");
 
 export const num = (n: number) => n.toLocaleString("en-US");
+
+/** A day as a person writes it in a sentence: "3 Nov". */
+export const dm = (ymd: string) => noon(ymd.slice(0, 10)).toLocaleDateString("en-GB", { day: "numeric", month: "short" });

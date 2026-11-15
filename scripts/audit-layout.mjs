@@ -40,6 +40,10 @@ const hostedPages = [
   ...(past ? [[`/event/${past}#result`, "Dan Whitlock"], [`/event/${past}#guests`, MAYA]] : []),
   ...(today ? [[`/event/${today}#check-in`, MAYA], [`/event/${today}#result`, "Dan Whitlock"]] : []),
   ["/my-day", MAYA],
+  // Speaking and the kit (docs/SPEAKING.md): the page for a planner and for a rep, My day with kits, and the Plan tab with its talk.
+  ["/speaking", "Camille Laurent"], ["/speaking", MAYA], ["/my-day", "Camille Laurent"],
+  ...(byName("Money20/20 Europe 2027") ? [[`/event/${byName("Money20/20 Europe 2027")}`, "Camille Laurent"]] : []),
+  ...(byName("Money20/20 USA") ? [[`/event/${byName("Money20/20 USA")}#result`, "Dan Whitlock"]] : []),
   // The Scanner tab (docs/SCANNER.md 10): scans from a day, and one set up with none yet.
   ...(byName("Money20/20 USA") ? [[`/event/${byName("Money20/20 USA")}#scanner`, "Camille Laurent"], [`/event/${byName("Money20/20 USA")}#scanner`, MAYA]] : []),
   ...(byName("Salesforce World Tour Tokyo") ? [[`/event/${byName("Salesforce World Tour Tokyo")}#scanner`, "Camille Laurent"]] : []),

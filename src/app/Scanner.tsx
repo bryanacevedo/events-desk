@@ -11,7 +11,7 @@ import { num, plural } from "./words";
 
 interface Cfg { qualifiers: { id: string; label: string }[]; notice: { text: string; version: number }; organizer: "swapcard" | null; organizer_ready: boolean; set_up: boolean; can_setup: boolean; setup_refs?: { event_ref: string; exhibitor_ref: string }; mine: number }
 interface Row {
-  id: string; rep: string; method: keyof typeof METHOD_WORDS; state: ScanState; state_detail: string; temperature: string; name: string | null; company: string | null; scanned_at: string; met: boolean; review: "open" | "same" | "different" | null; seconds: number | null;
+  id: string; rep: string; method: keyof typeof METHOD_WORDS; state: ScanState; state_detail: string; temperature: string; name: string | null; company: string | null; scanned_at: string; met: boolean; review: "open" | "same" | "different" | null; seconds: number | null; talk_title?: string | null;
 }
 interface Review { scan_id: string; rep: string; scan_name: string | null; scan_company: string | null; near_id: string; near_name: string | null; near_company: string | null; near_rep: string | null; why: string }
 interface Page { scans: Row[]; counts: Record<string, number>; reviews: Review[]; seconds: { rep: string; n: number; median: number }[]; reads?: { used: number; cap: number }; all: boolean }
@@ -35,6 +35,7 @@ export function Scanner({ id, eventName }: { id: string; eventName: string }) {
   if (!cfg || !page) return <div className="empty" data-ready="1">Loading the scanner.</div>;
 
   const link = `${location.origin}/scan/${id}`;
+  const hasTalk = page.scans.some((r) => r.talk_title);
   const rows = page.scans.filter((r) => (filter === "all" ? true : filter === "near" ? r.review === "open" : filter === "confirm" ? r.state === "to_confirm" : filter === "lookup" ? r.state === "lookup_pending" : r.state === "failed" || r.state === "needs_fields"));
   const shown = all ? rows : rows.slice(0, 16);
   const reviews = page.reviews.length, waiting = page.counts.lookup_pending ?? 0, total = page.scans.length;
@@ -92,7 +93,7 @@ export function Scanner({ id, eventName }: { id: string; eventName: string }) {
           </div>
           <div className="seg filters" role="group" aria-label="Show">{FILTERS.filter(([k]) => k === "all" || count(k) > 0 || filter === k).map(([k, label]) => <button type="button" key={k} aria-pressed={filter === k} onClick={() => { setFilter(k); setAll(false); }}>{label}{k !== "all" && <span className="mute"> {count(k)}</span>}{k === "all" && <span className="mute"> {total}</span>}</button>)}</div>
           <div className="sn-scroll"><table className="sn-table">
-            <thead><tr><th>Time</th><th>Person</th><th className="co">Company</th><th className="rep">Rep</th><th className="meth">Method</th><th className="src">Source</th><th>Interest</th><th>State</th></tr></thead>
+            <thead><tr><th>Time</th><th>Person</th><th className="co">Company</th><th className="rep">Rep</th><th className="meth">Method</th><th className="src">Source</th>{hasTalk && <th className="co">From the session</th>}<th>Interest</th><th>State</th></tr></thead>
             <tbody>{shown.map((r) => (
               <tr key={r.id}>
                 <td>{clock(r.scanned_at)}</td>
@@ -100,7 +101,7 @@ export function Scanner({ id, eventName }: { id: string; eventName: string }) {
                 <td className="co mute">{r.company ?? ""}</td>
                 <td className="rep">{r.rep}</td>
                 <td className="meth mute">{METHOD_WORDS[r.method]}</td>
-                <td className="src mute">{source(r)}</td>
+                <td className="src mute">{source(r)}</td>{hasTalk && <td className="co mute">{r.talk_title ?? ""}</td>}
                 <td className={r.temperature === "hot" ? "strong" : ""}>{r.temperature[0].toUpperCase() + r.temperature.slice(1)}</td>
                 <td className={quiet(r) ? "mute" : "strong"} title={r.state_detail || undefined}>{stateWord(r)}</td>
               </tr>))}</tbody>
