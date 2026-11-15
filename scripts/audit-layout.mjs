@@ -233,7 +233,7 @@ for (const width of widths) {
     }, width);
     if (eventPage && volumes.some((id) => path === `/event/${id}`)) {
       const st = await page.getAttribute("[data-ready]", "data-stage");
-      const ok = st === "approved" ? await page.locator("label.btn", { hasText: "Add the attendee list" }).count() : st === "delivered" ? await page.locator("button.prow, [role=tablist]").count() : await page.locator("[data-run], [data-cases], .corow").count();
+      const ok = st === "approved" ? await page.locator("label.btn:has-text(\"Add the attendee list\"), section.gs[aria-label=\"Get the attendee list\"]").count() : st === "delivered" ? await page.locator("button.prow, [role=tablist]").count() : await page.locator("[data-run], [data-cases], .corow").count();
       if (!ok) found.push(`the ${st} event page shows nothing of its stage`);
     }
     for (const f of found) { problems++; console.log(`${width}px ${path}  ${f}`); }
