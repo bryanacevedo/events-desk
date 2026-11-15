@@ -67,6 +67,8 @@ describe("the talk and its two people", () => {
   });
   it("slides: a second person approves, they cannot be sent before, and a link change after sending is refused", async () => {
     const id = await talkOn(await fresh());
+    await expect(approveSlides(db, DAN, id)).rejects.toThrow(/accepted/);
+    await approveAbstract(db, DAN, id); await submitTalk(db, CAMILLE, id, "2026-11-20"); await acceptTalk(db, DAN, id);
     await expect(approveSlides(db, DAN, id)).rejects.toThrow(/slides link/);
     await saveTalk(db, MAYA, id, { slides_url: "https://slides.example.com/a" });
     await expect(approveSlides(db, MAYA, id)).rejects.toThrow();
@@ -74,7 +76,14 @@ describe("the talk and its two people", () => {
     await approveSlides(db, DAN, id);
     await slidesSent(db, CAMILLE, id, "2026-11-20");
     await expect(saveTalk(db, MAYA, id, { slides_url: "https://slides.example.com/b" })).rejects.toThrow(/sent/);
+    await expect(slidesSent(db, CAMILLE, id, "2026-11-21")).rejects.toThrow(/already/);
     await expect(db.query("UPDATE talks SET slides_approved_by = slides_by WHERE id = $1", [id])).rejects.toThrow();
+  });
+  it("a second editor cannot let the first approve: everyone who changed the words is out", async () => {
+    const id = await talkOn(await fresh(), { speaker: MAYA });
+    await saveTalk(db, DAN, id, { abstract: "Dan fixed a typo." });
+    await expect(approveAbstract(db, CAMILLE, id)).rejects.toThrow(OWN_WORDS);
+    await expect(approveAbstract(db, DAN, id)).rejects.toThrow(OWN_WORDS);
   });
   it("states only move forward: submit needs approval, accept needs submitted, a decline needs a reason and is final", async () => {
     const id = await talkOn(await fresh());

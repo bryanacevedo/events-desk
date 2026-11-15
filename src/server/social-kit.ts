@@ -36,6 +36,22 @@ export function sniff(bytes: Uint8Array): "image/png" | "image/jpeg" | null {
   if (bytes.length > 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
   return null;
 }
+/** The picture's pixel size from its header, so a small file that unpacks to a huge picture is refused before anything draws it. */
+export function dimensions(b: Uint8Array): [number, number] | null {
+  if (sniff(b) === "image/png" && b.length >= 24) { const v = new DataView(b.buffer, b.byteOffset); return [v.getUint32(16), v.getUint32(20)]; }
+  if (sniff(b) === "image/jpeg") {
+    const v = new DataView(b.buffer, b.byteOffset);
+    for (let i = 2; i + 9 < b.length;) {
+      if (b[i] !== 0xff) { i++; continue; }
+      const m = b[i + 1];
+      if (m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc) return [v.getUint16(i + 7), v.getUint16(i + 5)];
+      i += 2 + v.getUint16(i + 2);
+    }
+  }
+  return null;
+}
+const MAX_SIDE = 4096;
+const checkSize = (b: Uint8Array) => { const d = dimensions(b); if (!d || d[0] < 1 || d[1] < 1 || d[0] > MAX_SIDE || d[1] > MAX_SIDE) throw new KitInvalid("Use a picture no larger than 4096 pixels on a side."); };
 const dataUri = (mime: string, b: Uint8Array) => `data:${mime};base64,${Buffer.from(b).toString("base64")}`;
 
 /* ------------------------------------------------------------------ the person's photo */
@@ -44,6 +60,7 @@ export async function putPhoto(db: Db, actor: string, bytes: Uint8Array, source:
   if (bytes.length > PHOTO_MAX) throw new KitInvalid("Use a photo of 2 MB or less.");
   const mime = sniff(bytes);
   if (!mime) throw new KitInvalid("Use a PNG or a JPEG.");
+  checkSize(bytes);
   await db.query("INSERT INTO kit_photos (person, bytes, mime, source) VALUES ($1, $2, $3, $4) ON CONFLICT (person) DO UPDATE SET bytes = $2, mime = $3, source = $4, created_at = now()", [actor, Buffer.from(bytes), mime, source]);
   return { source };
 }
@@ -57,16 +74,18 @@ const SLACK_IMAGE_HOSTS = /^(?:[a-z0-9-]+\.)*(?:slack-edge\.com|gravatar\.com|sl
 export type ImageFetcher = (url: string) => Promise<Uint8Array>;
 const fetchImage: ImageFetcher = async (url) => {
   const r = await fetch(url, { signal: AbortSignal.timeout(8000), redirect: "error" });
-  if (!r.ok) throw new KitInvalid("Slack would not give the photo.");
-  const b = new Uint8Array(await r.arrayBuffer());
-  return b;
+  if (!r.ok || !r.body) throw new KitInvalid("Slack would not give the photo.");
+  if (Number(r.headers.get("content-length") ?? 0) > PHOTO_MAX) throw new KitInvalid("Use a photo of 2 MB or less.");
+  const chunks: Uint8Array[] = []; let size = 0;
+  for await (const c of r.body as unknown as AsyncIterable<Uint8Array>) { size += c.length; if (size > PHOTO_MAX) throw new KitInvalid("Use a photo of 2 MB or less."); chunks.push(c); }
+  return new Uint8Array(Buffer.concat(chunks));
 };
 
 /** The person's own Slack picture, only when Slack is connected and knows them, only when they ask. The address must be https on Slack's image hosts. */
 export async function useSlackPhoto(db: Db, actor: string, cfg: SlackConfig | undefined, get: ImageFetcher = fetchImage) {
   const id = cfg?.userMap?.[actor];
   if (!cfg || !cfg.botToken || !id) throw new KitInvalid("Slack is not connected for you, so upload a photo instead.");
-  const j = (await slackCall(cfg, "users.profile.get", { user: id })) as { ok: boolean; profile?: { image_512?: string; image_original?: string; is_custom_image?: boolean } };
+  const j = (await slackCall(cfg, "users.profile.get", { user: id }, "form")) as { ok: boolean; profile?: { image_512?: string; image_original?: string; is_custom_image?: boolean } };
   const url = j.profile?.image_512 ?? j.profile?.image_original;
   if (!j.ok || !url) throw new KitInvalid("Slack gave no photo for you.");
   let u: URL;
@@ -87,6 +106,7 @@ export async function putOrganizerKit(db: Db, actor: string, eventId: string, b:
   if (b.logo) {
     if (b.logo.length > LOGO_MAX) throw new KitInvalid("Use a logo of 500 KB or less.");
     if (sniff(b.logo) !== "image/png") throw new KitInvalid("The logo must be a PNG.");
+    checkSize(b.logo);
   }
   await db.tx(async (q) => {
     const [e] = await q("SELECT 1 FROM events WHERE id = $1", [eventId]);
@@ -278,7 +298,7 @@ export async function patchOffer(db: Db, actor: string, offerId: string, b: { po
     if (!u || u.protocol !== "https:" || !(u.hostname === "linkedin.com" || u.hostname.endsWith(".linkedin.com")) || u.username || u.password) throw new KitInvalid("Paste the link to your post from linkedin.com.");
     await db.query("UPDATE kit_offers SET post_url = $2, posted_at = now() WHERE id = $1", [offerId, u.toString()]);
   }
-  if (b.caption !== undefined && Number.isInteger(b.caption) && (b.caption as number) >= 0 && (b.caption as number) < 3) await db.query("UPDATE kit_offers SET caption = $2 WHERE id = $1", [offerId, b.caption]);
+  if (b.caption !== undefined && Number.isInteger(b.caption) && (b.caption as number) >= 0 && (b.caption as number) < 2) await db.query("UPDATE kit_offers SET caption = $2 WHERE id = $1", [offerId, b.caption]);
   if (b.dismiss === true) await db.query("UPDATE kit_offers SET status = 'dismissed' WHERE id = $1", [offerId]);
   return { id: offerId };
 }

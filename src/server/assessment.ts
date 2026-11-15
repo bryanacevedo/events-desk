@@ -79,7 +79,7 @@ export function isPublicAddress(ip: string): boolean {
 
 /** HTML to plain text: script and style removed, tags become spaces, entities decoded, whitespace collapsed, cut to 40,000 characters. */
 export function stripTags(html: string, keepLinks = false): string {
-  if (keepLinks) html = html.replace(/<a\b[^>]*?\bhref\s*=\s*["']([^"']+)["'][^>]*>([\s\S]*?)<\/a\s*>/gi, (_m, href, inner) => `${inner} (${href}) `);
+  if (keepLinks) html = html.replace(/<a\b[^>]{0,2000}?\bhref\s*=\s*["']([^"'\s]{1,600})["'][^>]{0,2000}>/gi, (_m, href) => ` (${href}) `);
   const t = html.replace(/<!--[\s\S]*?-->/g, " ").replace(/<(script|style|noscript|template|svg)\b[\s\S]*?<\/\1\s*>/gi, " ").replace(/<\/?(p|div|br|li|ul|ol|h[1-6]|tr|td|th|section|article|header|footer|dt|dd)\b[^>]*>/gi, "\n").replace(/<[^>]*>/g, " ");
   return decodeEntities(t).replace(/[ \t\f\v ]+/g, " ").replace(/\s*\n\s*/g, "\n").trim().slice(0, PAGE_MAX);
 }

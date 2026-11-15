@@ -55,7 +55,7 @@ export async function addCall(db: Db, actor: string, eventId: string, b: CallInp
     await planEvent(q, eventId);
     const id = newId("cfp");
     await q("INSERT INTO calls_for_papers (id, event_id, title, url, closes_on, notes, route, source, source_url, added_by) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
-      [id, eventId, title, url, closes, text(b.notes).slice(0, 600), route, b.source === "model" ? "model" : "person", b.source_url ?? null, actor]);
+      [id, eventId, title, url, closes, text(b.notes).slice(0, 600), route, b.source === "model" ? "model" : "person", b.source === "model" && b.source_url ? web(b.source_url, "the page address") : null, actor]);
     await logActivity(q, eventId, actor, "speaking", `Added a call for papers closing ${closes}`);
     return { id };
   });
@@ -129,10 +129,10 @@ export async function proposeCalls(db: Db, llm: Llm, actor: string, eventId: str
 
 export interface TalkRow {
   id: string; event_id: string; involvement_id: string; cfp_id: string | null; title: string; abstract: string; speaker: string; status: string;
-  abstract_by: string | null; abstract_approved_by: string | null; abstract_approved_at: string | null; slides_url: string | null; slides_by: string | null;
+  abstract_by: string | null; abstract_editors: string[]; abstract_approved_by: string | null; abstract_approved_at: string | null; slides_url: string | null; slides_by: string | null; slides_editors: string[];
   slides_approved_by: string | null; slides_approved_at: string | null; slides_sent_on: string | null; submitted_on: string | null; slide_due_on: string | null; rehearsal_on: string | null; declined_reason: string | null;
 }
-const TALK_COLS = `id, event_id, involvement_id, cfp_id, title, abstract, speaker, status, abstract_by, abstract_approved_by, abstract_approved_at::text AS abstract_approved_at, slides_url, slides_by,
+const TALK_COLS = `id, event_id, involvement_id, cfp_id, title, abstract, speaker, status, abstract_by, abstract_editors, abstract_approved_by, abstract_approved_at::text AS abstract_approved_at, slides_url, slides_by, slides_editors,
   slides_approved_by, slides_approved_at::text AS slides_approved_at, slides_sent_on::text AS slides_sent_on, submitted_on::text AS submitted_on, slide_due_on::text AS slide_due_on, rehearsal_on::text AS rehearsal_on, declined_reason`;
 
 async function lockTalk(q: Db["query"], talkId: string) {
@@ -166,7 +166,9 @@ export async function createTalk(db: Db, actor: string, eventId: string, b: { cf
       cfp = b.cfp_id;
     }
     const id = b.id ?? newId("tlk");
-    await q("INSERT INTO talks (id, event_id, involvement_id, cfp_id, updated_by) VALUES ($1, $2, $3, $4, $5)", [id, eventId, inv, cfp, actor]);
+    const [iv] = await q<{ talk_title: string | null; speaker: string | null }>("SELECT talk_title, speaker FROM involvements WHERE id = $1", [inv]);
+    await q("INSERT INTO talks (id, event_id, involvement_id, cfp_id, title, speaker, abstract_by, abstract_editors, updated_by) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+      [id, eventId, inv, cfp, iv?.talk_title ?? "", iv?.speaker ?? "", iv?.talk_title ? actor : null, iv?.talk_title ? [actor] : [], actor]);
     if (cfp) await q("UPDATE calls_for_papers SET talk_id = $2 WHERE id = $1", [cfp, id]);
     await logActivity(q, eventId, actor, "speaking", "Started a talk");
     return { id, involvement_id: inv };
@@ -190,11 +192,11 @@ export async function saveTalk(db: Db, actor: string, talkId: string, p: TalkPat
       if (t.status === "submitted") throw new RuleError("A submitted abstract is a record and cannot change.");
       if (p.title !== undefined) put("title", text(p.title).slice(0, 200));
       if (p.abstract !== undefined) put("abstract", text(p.abstract).slice(0, 4000));
-      put("abstract_by", actor); raw("abstract_approved_by = NULL"); raw("abstract_approved_at = NULL");
+      put("abstract_by", actor); put("abstract_editors", [...new Set([...(t.abstract_editors ?? []), actor])]); raw("abstract_approved_by = NULL"); raw("abstract_approved_at = NULL");
       if (t.status === "approved_to_submit") raw("status = 'drafting'");
     }
     if (p.speaker !== undefined && text(p.speaker).slice(0, 80) !== t.speaker) {
-      if (t.status === "submitted" || t.status === "accepted" || t.status === "declined") throw new RuleError("The speaker cannot change after the talk is submitted.");
+      if (t.status === "submitted" || t.status === "accepted" || t.status === "declined" || t.slides_sent_on) throw new RuleError("The speaker cannot change after the talk is submitted.");
       put("speaker", text(p.speaker).slice(0, 80));
       raw("abstract_approved_by = NULL"); raw("abstract_approved_at = NULL"); raw("slides_approved_by = NULL"); raw("slides_approved_at = NULL");
       if (t.status === "approved_to_submit") raw("status = 'drafting'");
@@ -202,7 +204,7 @@ export async function saveTalk(db: Db, actor: string, talkId: string, p: TalkPat
     if (p.slides_url !== undefined && (text(p.slides_url) || null) !== t.slides_url) {
       if (t.slides_sent_on) throw new RuleError("The slides were sent to the organizer, so the link cannot change.");
       const u = text(p.slides_url);
-      put("slides_url", u ? web(u, "the slides link") : null); put("slides_by", actor); raw("slides_approved_by = NULL"); raw("slides_approved_at = NULL");
+      put("slides_url", u ? web(u, "the slides link") : null); put("slides_by", actor); put("slides_editors", [...new Set([...(t.slides_editors ?? []), actor])]); raw("slides_approved_by = NULL"); raw("slides_approved_at = NULL");
     }
     if (p.slide_due_on !== undefined) put("slide_due_on", ymd(p.slide_due_on, "the slide deadline"));
     if (p.rehearsal_on !== undefined) put("rehearsal_on", ymd(p.rehearsal_on, "the rehearsal day"));
@@ -222,7 +224,7 @@ export async function approveAbstract(db: Db, actor: string, talkId: string) {
     const t = await lockTalk(q, talkId);
     if (t.status !== "drafting") throw new RuleError("Only a draft can be approved.");
     if (!t.title || !t.abstract || !t.speaker) throw new RuleError("Give the talk a title, an abstract and a speaker before approving it.");
-    if (!t.abstract_by || t.abstract_by === actor) throw new Forbidden(OWN_WORDS);
+    if (!t.abstract_by || t.abstract_by === actor || t.abstract_editors.includes(actor)) throw new Forbidden(OWN_WORDS);
     await q("UPDATE talks SET abstract_approved_by = $2, abstract_approved_at = now(), status = 'approved_to_submit', updated_by = $2, updated_at = now() WHERE id = $1", [talkId, actor]);
     await logActivity(q, t.event_id, actor, "speaking", `Approved the abstract of "${t.title}"`);
     return { id: talkId };
@@ -230,9 +232,9 @@ export async function approveAbstract(db: Db, actor: string, talkId: string) {
 }
 
 export async function submitTalk(db: Db, actor: string, talkId: string, today: string) {
-  if (!canPlan(actor)) { const [t] = await db.query<{ speaker: string }>("SELECT speaker FROM talks WHERE id = $1", [talkId]); if (!t || !mayWrite(actor, t)) forbid(); }
   return db.tx(async (q) => {
     const t = await lockTalk(q, talkId);
+    if (!mayWrite(actor, t)) forbid();
     if (t.status !== "approved_to_submit") throw new RuleError("Approve the abstract before it is submitted.");
     await q("UPDATE talks SET status = 'submitted', submitted_on = $2, updated_by = $3, updated_at = now() WHERE id = $1", [talkId, today, actor]);
     if (t.cfp_id) await q("UPDATE calls_for_papers SET status = 'submitted' WHERE id = $1 AND status = 'open'", [t.cfp_id]);
@@ -245,6 +247,7 @@ export async function acceptTalk(db: Db, actor: string, talkId: string) {
   planners(actor);
   return db.tx(async (q) => {
     const t = await lockTalk(q, talkId);
+    await planEvent(q, t.event_id);
     if (t.status !== "submitted") throw new RuleError("Only a submitted talk can be accepted.");
     await q("UPDATE talks SET status = 'accepted', updated_by = $2, updated_at = now() WHERE id = $1", [talkId, actor]);
     await q("UPDATE involvements SET status = 'confirmed' WHERE id = $1 AND status = 'planned'", [t.involvement_id]);
@@ -259,6 +262,7 @@ export async function declineTalk(db: Db, actor: string, talkId: string, reason:
   if (!text(reason)) throw new RuleError("Say why before declining.");
   return db.tx(async (q) => {
     const t = await lockTalk(q, talkId);
+    await planEvent(q, t.event_id);
     if (!["drafting", "approved_to_submit", "submitted"].includes(t.status)) throw new RuleError("That talk is already settled.");
     await q("UPDATE talks SET status = 'declined', declined_reason = $2, updated_by = $3, updated_at = now() WHERE id = $1", [talkId, text(reason), actor]);
     await logActivity(q, t.event_id, actor, "speaking", `Declined "${t.title || "the talk"}": ${text(reason)}`);
@@ -270,9 +274,10 @@ export async function approveSlides(db: Db, actor: string, talkId: string) {
   planners(actor);
   return db.tx(async (q) => {
     const t = await lockTalk(q, talkId);
-    if (t.status === "declined") throw new RuleError("That talk was declined.");
+    await planEvent(q, t.event_id);
+    if (t.status !== "accepted") throw new RuleError("Slides are approved once the talk is accepted.");
     if (!t.slides_url) throw new RuleError("Add the slides link before approving the slides.");
-    if (!t.slides_by || t.slides_by === actor) throw new Forbidden(OWN_WORDS);
+    if (!t.slides_by || t.slides_by === actor || t.slides_editors.includes(actor)) throw new Forbidden(OWN_WORDS);
     await q("UPDATE talks SET slides_approved_by = $2, slides_approved_at = now(), updated_by = $2, updated_at = now() WHERE id = $1", [talkId, actor]);
     await logActivity(q, t.event_id, actor, "speaking", `Approved the slides of "${t.title}"`);
     return { id: talkId };
@@ -283,7 +288,10 @@ export async function slidesSent(db: Db, actor: string, talkId: string, today: s
   planners(actor);
   return db.tx(async (q) => {
     const t = await lockTalk(q, talkId);
+    await planEvent(q, t.event_id);
+    if (t.status !== "accepted") throw new RuleError("Slides go to the organizer once the talk is accepted.");
     if (!t.slides_approved_at) throw new RuleError("The slides need a second person's approval before they go to the organizer.");
+    if (t.slides_sent_on) throw new RuleError("The slides were already sent.");
     await q("UPDATE talks SET slides_sent_on = $2, updated_by = $3, updated_at = now() WHERE id = $1", [talkId, today, actor]);
     await logActivity(q, t.event_id, actor, "speaking", `Sent the slides of "${t.title}" to the organizer`);
     return { id: talkId };
@@ -310,9 +318,9 @@ export async function speakingView(db: Db, actor: string, today: string, opts: {
   const args = opts.eventId ? [opts.eventId] : [];
   const calls = await db.query<CallRow & { event_name: string }>(`SELECT ${CALL_COLS.split(", ").map((x) => "c." + x.replace(/^c\./, "")).join(", ")}, e.name AS event_name FROM calls_for_papers c JOIN events e ON e.id = c.event_id WHERE true ${ev} ORDER BY (c.status = 'open') DESC, c.closes_on, c.id`, args);
   const talks = await db.query<TalkRow & { event_name: string; scans: number; placed: number; hot: number; meetings_held: number }>(
-    `SELECT ${TALK_COLS.split(", ").map((x) => (x.includes("::") ? x.replace(/^(\w+)/, "t.$1") : "t." + x)).join(", ")}, e.name AS event_name, (SELECT count(*)::int FROM scans s WHERE s.talk_id = t.id) AS scans,
+    `SELECT ${TALK_COLS.split(/,\s+/).map((x) => (x.includes("::") ? x.replace(/^(\w+)/, "t.$1") : "t." + x)).join(", ")}, e.name AS event_name, (SELECT count(*)::int FROM scans s WHERE s.talk_id = t.id) AS scans,
             (SELECT count(*)::int FROM scans s WHERE s.talk_id = t.id AND s.state = 'placed') AS placed, (SELECT count(*)::int FROM scans s WHERE s.talk_id = t.id AND s.temperature = 'hot') AS hot,
-            (SELECT count(DISTINCT m.id)::int FROM meetings m WHERE m.status = 'held' AND m.contact_id IN (SELECT s.contact_id FROM scans s WHERE s.talk_id = t.id AND s.contact_id IS NOT NULL)) AS meetings_held
+            (SELECT count(DISTINCT m.id)::int FROM meetings m WHERE m.status = 'held' AND m.event_id = t.event_id AND m.contact_id IN (SELECT s.contact_id FROM scans s WHERE s.talk_id = t.id AND s.contact_id IS NOT NULL)) AS meetings_held
      FROM talks t JOIN events e ON e.id = t.event_id WHERE true ${ev.replace(/c\./g, "t.")} ORDER BY e.starts_on NULLS LAST, t.created_at`, args);
   const visibleTalks = lead ? talks : talks.filter((t) => t.speaker === actor);
   return {

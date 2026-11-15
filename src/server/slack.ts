@@ -59,12 +59,13 @@ function cardFacts(card: Parameters<typeof cardBreakdown>[0]) {
 }
 const dollars = (cents: number) => `$${(cents / 100).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
 
-export async function slackCall(cfg: SlackConfig, method: string, payload: unknown) {
+export async function slackCall(cfg: SlackConfig, method: string, payload: unknown, encoding: "json" | "form" = "json") {
+  const form = encoding === "form";
   const r = await (cfg.fetch ?? fetch)(`https://slack.com/api/${method}`, {
     method: "POST",
     signal: AbortSignal.timeout(15_000),
-    headers: { authorization: `Bearer ${cfg.botToken}`, "content-type": "application/json; charset=utf-8" },
-    body: JSON.stringify(payload),
+    headers: { authorization: `Bearer ${cfg.botToken}`, "content-type": form ? "application/x-www-form-urlencoded" : "application/json; charset=utf-8" },
+    body: form ? new URLSearchParams(payload as Record<string, string>).toString() : JSON.stringify(payload),
   });
   const j = await r.json() as { ok: boolean; error?: string };
   if (!j.ok && j.error !== "already_in_channel") console.error(`Slack ${method} failed: ${j.error}`);
