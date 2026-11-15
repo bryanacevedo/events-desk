@@ -328,3 +328,18 @@ This section overrides 13.1 to 13.7 where they differ. All accepted.
 18. The decision for removed seed rows is Events Desk decision 91; the sweep and world decisions follow in number (91 to 94). Migrations: Events Desk 0060, Account Desk 0040, no lumen-world migration.
 19. The booking-link fetch runs before ingest's transaction opens.
 Missing tests added: leads, held erasure on both paths, pre-event blocks follow-up, `ensure_event_play` on an old install, link refused in the open email, the sweep never moving a member below what the CRM holds when the feature list shrinks (rows not released stay `held`, nothing is sent lower).
+
+### 13.10 What was built, and where it differs from 13.1 to 13.9 (Events Desk, 2026-11-15)
+
+Built as 13.4 to 13.9 say: the adapter and the sweep (`crm-desk.ts`, `crm-sync.ts`, `crm-outbox.ts`), migration 0060, the vendored 1.3.0 slice, `worldData()`, `seed-world.ts`, the deferral panel and the two routes, tests `member-statuses`, `world-load`, `desk-read` and two cases in `integration-2b`. Decisions 91 to 94. Where it differs:
+
+1. Migration 0060 also adds `events.external_id` (the world's id for an event), which 13.3 named without saying where it lives.
+2. `held` rows are held in two places: before the call when the CRM's own list does not name the status, and after it when the CRM answers `unknown_status`. A list the desk could not read is no answer, so the CRM decides.
+3. A member whose highest status is not yet released is written at the highest status that is (13.4 said only that the row is counted); it is never written lower than what was sent.
+4. The 11 conferences were already the demo's events, so the loader keeps them and tags them; the world's attendance is loaded as contacts only for conferences with no list (none today) and as guests for the 7 hosted events. The demo's own Money20/20 USA customer dinner is not made under the world. See decision 91 for the list.
+5. Money20/20 USA 2025 has no list, price or cost in the world, so it is scored with nothing to count and no cost line (13.3 said "with its cost lines"; the world has none).
+6. The assessment answers are one source and one answer marked Sample: the world's facts do not address the seven directory questions.
+7. The play status is on its own route (`/api/events/:id/desk-plays`), not in the panel's read, so the panel's counts and link show at once.
+8. Roster and seller are read by `GET /api/world` (part 2) and used as owners and host names; no new tables hold them.
+9. Not run: the CRM Desk contract tests against a running CRM Desk (`tests/crm-desk-contract.test.ts` skips without its variables), and Account Desk's side of the plays read (a stand-in server in the tests).
+

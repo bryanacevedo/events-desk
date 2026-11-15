@@ -1,5 +1,17 @@
 # Events Desk: project status
 
+## Redesign step 6, part 3 of 4: the world additions, targeted members, the held statuses, the panel (2026-11-15)
+
+Worktree `.wt/ev6d-events-desk`, branch `ev6d/part3` (not pushed). Spec `docs/SHARED-WORLD.md` section 13 (goldfish-reviewed, 13.9) and 13.10 (what was built and where it differs). Decisions 91 to 94, migration 0060. Commits: adapter and sweep, world loading, the panel.
+
+**Built:** `Crm.features()` and the typed `unknown_status` error; the three statuses (targeted, waitlist, declined) in the sweep with the order, the 45 day lead window, the cap of 500, barred counts, no leads; outbox status `held` (released on a change in the CRM's list and daily, superseded, erased); stored-status check; `GET /api/integration` counts; lumen-world 1.3.0 vendored by `scripts/world-refresh.mjs`; `seed-world.ts` (the demo's default, `WORLD=lumen`, today 2026-11-24); the Outreach panel's booking link, counts and play status; `GET /api/desk/campaigns/<crm campaign id>` for Account Desk. Tests `member-statuses`, `world-load`, `desk-read`, `integration-2b`. No existing test changed except the pin in `shared-world-part2` and one assertion there (waitlist is now a meaning).
+
+**Not proven:** a real round trip with CRM Desk (the contract tests skip without a running CRM) or with Account Desk (a stand-in server answers the plays read); the lumen-world release was built in a scratch directory from the tagged worktree, not from a pushed tag; the panel was looked at in a browser with its two reads patched in the page (the demo's stand-in CRM writes no members, so counts are zero there); the full week's behaviour of the sweep on 2026-11-24 data against a live CRM.
+
+**Hand-off for part 4 (the four-desk rehearsal):** (1) Events Desk journal steps in lumen-world `stage/rehearse.py` (targeted, registered, declined, attended, with the dinner's guests from `events_desk_guests.csv`); (2) run all four desks together with `INTEGRATED_WITH=account_desk,market_desk,crm_desk`, `CRM=crmdesk`, `DESK_READ_KEY`, `ACCOUNT_DESK_URL`, `ACCOUNT_DESK_READ_KEY`, and check the booking link reaches Account Desk's drafts and a declined person's play stops; (3) `make demo-snapshot` on the world build (it now seeds the world, so rebuild the snapshot); (4) film notes. Needs from the other repos: Account Desk part 3 on main (the `/api/desk/campaigns/<ref>/plays` read and the `event_pre_event` play), lumen-world v1.3.0 pushed and pinned by the other desks. Open: the old seed's duplicate Money20/20 Europe 2027 event (decision 91); whether Market Desk's tier should replace the priority-or-tier rule (cross-repo item 11).
+
+**Environment note:** this worktree's `node_modules` points at `.wt/view-events-desk/node_modules` because the main checkout's lacks satori, `@resvg/resvg-js` and `zxing-wasm` (offline); `npm ci` fixes it. Without them `tsc` and the suites that import the social kit fail.
+
 ## Redesign step 6, part 2 of 4: member, activity and money writes, the world read (2026-11-15)
 
 Worktree `.wt/ev6c-events-desk`, branch `ev6c/shared-world-2`. Spec `docs/SHARED-WORLD.md` sections 12 (goldfish-reviewed by a fresh Opus agent before code: 1 Blocker, 10 Majors, 12 Nits, all in 12.8), decisions 88 to 90, migration 0059. Needs from other repos: `~/Developer/events-rethink/steps/step-6-cross-repo.md` (items 12 to 15 added).
