@@ -1,0 +1,12 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`the six images > the drawing for a fixed input does not change (a snapshot of each size's SVG) 1`] = `
+{
+  "banner": "5f8403ecfb91",
+  "post_landscape": "266a161f6b81",
+  "post_portrait": "f53d413dacb9",
+  "signature": "075bd70ea90f",
+  "square": "bc5b25a95df3",
+  "story": "4f92190778c1",
+}
+`;

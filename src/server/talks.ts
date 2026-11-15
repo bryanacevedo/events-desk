@@ -10,6 +10,7 @@ import { fill, promptHash } from "./prompts.ts";
 import { fetchPageText, type PageFetcher } from "./assessment.ts";
 import type { Llm } from "./providers.ts";
 import { offerKit } from "./kit-offers.ts";
+import { postingCounts } from "./social-kit.ts";
 
 export class SpeakingInvalid extends Error {}
 export const CFP_READS_PER_EVENT = 5;
@@ -308,11 +309,14 @@ export async function speakingView(db: Db, actor: string, today: string, opts: {
   const ev = opts.eventId ? "AND c.event_id = $1" : "";
   const args = opts.eventId ? [opts.eventId] : [];
   const calls = await db.query<CallRow & { event_name: string }>(`SELECT ${CALL_COLS.split(", ").map((x) => "c." + x.replace(/^c\./, "")).join(", ")}, e.name AS event_name FROM calls_for_papers c JOIN events e ON e.id = c.event_id WHERE true ${ev} ORDER BY (c.status = 'open') DESC, c.closes_on, c.id`, args);
-  const talks = await db.query<TalkRow & { event_name: string; scans: number }>(
-    `SELECT ${TALK_COLS.split(", ").map((x) => (x.includes("::") ? x.replace(/^(\w+)/, "t.$1") : "t." + x)).join(", ")}, e.name AS event_name, (SELECT count(*)::int FROM scans s WHERE s.talk_id = t.id) AS scans
+  const talks = await db.query<TalkRow & { event_name: string; scans: number; placed: number; hot: number; meetings_held: number }>(
+    `SELECT ${TALK_COLS.split(", ").map((x) => (x.includes("::") ? x.replace(/^(\w+)/, "t.$1") : "t." + x)).join(", ")}, e.name AS event_name, (SELECT count(*)::int FROM scans s WHERE s.talk_id = t.id) AS scans,
+            (SELECT count(*)::int FROM scans s WHERE s.talk_id = t.id AND s.state = 'placed') AS placed, (SELECT count(*)::int FROM scans s WHERE s.talk_id = t.id AND s.temperature = 'hot') AS hot,
+            (SELECT count(DISTINCT m.id)::int FROM meetings m WHERE m.status = 'held' AND m.contact_id IN (SELECT s.contact_id FROM scans s WHERE s.talk_id = t.id AND s.contact_id IS NOT NULL)) AS meetings_held
      FROM talks t JOIN events e ON e.id = t.event_id WHERE true ${ev.replace(/c\./g, "t.")} ORDER BY e.starts_on NULLS LAST, t.created_at`, args);
   const visibleTalks = lead ? talks : talks.filter((t) => t.speaker === actor);
   return {
+    posting: opts.eventId && lead ? await postingCounts(db, opts.eventId) : null,
     can_write: lead,
     calls: (lead ? calls : []).map((c) => ({ ...c, closing: c.status === "open" ? dueWords(c.closes_on, today) : c.status === "submitted" ? "Submitted" : "Passed", is_closed: c.status === "open" && c.closes_on < today })),
     talks: visibleTalks.map((t) => ({ ...t, status_words: TALK_STATUS_WORDS[t.status], next: nextStep(t), slides_late: t.status === "accepted" && !t.slides_sent_on && Boolean(t.slide_due_on) && (t.slide_due_on as string) < today,

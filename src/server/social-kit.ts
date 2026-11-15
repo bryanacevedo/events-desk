@@ -203,10 +203,16 @@ function tree(c: CardInput, w: number, h_: number): Node {
   ]);
 }
 
-export async function renderCard(c: CardInput, sizeId: KitSizeId): Promise<Buffer> {
+/** The drawing before it becomes pixels. Same on every machine (the fonts are bundled), so a test can pin it. */
+export async function cardSvg(c: CardInput, sizeId: KitSizeId): Promise<string> {
   const s = KIT_SIZES.find((x) => x.id === sizeId);
   if (!s) throw new KitInvalid("That size does not exist.");
-  const svg = await satori(tree(c, s.w, s.h) as never, { width: s.w, height: s.h, fonts: loadFonts() });
+  return satori(tree(c, s.w, s.h) as never, { width: s.w, height: s.h, fonts: loadFonts() });
+}
+
+export async function renderCard(c: CardInput, sizeId: KitSizeId): Promise<Buffer> {
+  const s = KIT_SIZES.find((x) => x.id === sizeId)!;
+  const svg = await cardSvg(c, sizeId);
   // No resource directory and no system fonts: the SVG holds everything it draws, as data.
   return Buffer.from(new Resvg(svg, { fitTo: { mode: "width", value: s.w }, font: { loadSystemFonts: false } }).render().asPng());
 }
