@@ -414,3 +414,10 @@ d('the unpacked extension in Chrome', () => {
     expect(results).toEqual(['layout_changed', 'not_a_directory']);
   });
 });
+
+import { execFileSync } from "node:child_process";
+import { readdirSync } from "node:fs";
+describe("every extension script parses", () => {
+  const files = ["extension", "extension/readers"].flatMap((d) => readdirSync(d).filter((f) => f.endsWith(".js")).map((f) => `${d}/${f}`));
+  for (const f of files) it(`${f} is valid JavaScript`, () => { execFileSync("node", ["--check", f]); });
+});

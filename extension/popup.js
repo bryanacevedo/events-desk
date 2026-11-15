@@ -28,7 +28,7 @@ async function save() {
   try { granted = await chrome.permissions.request({ origins: [origin + '/*'] }); } catch (e) { granted = false; }
   await chrome.storage.local.set({ deskUrl: origin, captureKey: key });
   settings.deskUrl = origin; settings.captureKey = key;
-  if (!granted) msg.textContent = 'Without access to that address the extension cannot reach the desk. Press Save again and choose Allow when the browser asks, or turn on access to the site in the extension's details page.';
+  if (!granted) msg.textContent = 'Without access to that address the extension cannot reach the desk. Press Save again and choose Allow when the browser asks, or turn on access to the site on the extension details page.';
   else msg.textContent = '';
   await openWork();
 }
