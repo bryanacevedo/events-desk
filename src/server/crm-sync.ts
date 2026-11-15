@@ -94,18 +94,27 @@ export async function syncCrm(db: Db, crm: Crm | null | undefined, env: Record<s
          EXISTS (SELECT 1 FROM meetings m WHERE m.contact_id = k.id) AS any_meeting
        FROM contacts k LEFT JOIN companies co ON co.id = k.company_id JOIN events e ON e.id = k.event_id WHERE k.dropped_at IS NULL AND k.email IS NOT NULL AND ${IN_WINDOW}
        ORDER BY k.event_id, (k.priority = 'A') DESC, (k.priority = 'B') DESC, co.tier NULLS LAST, k.id`);
-    const targetedPer = new Map<string, number>();
+    const cands: { key: string; row: (typeof contacts)[number] }[] = [];
+    const barredKeys = new Set<string>();
     for (const c of contacts) {
       if (erased.has(c.email)) continue;
-      let s = c.held ? "met" : c.replied ? "responded" : c.enrolled ? "sent" : null;
-      if (!s && c.target && c.lead && !c.any_meeting) {
-        if (barredEmails.has(c.email) || barredCountry(c.person_location, c.firmo_country)) { out.targeted_barred++; continue; }
-        const n = targetedPer.get(c.event_id) ?? 0;
-        if (n >= TARGET_CAP) { out.targeted_over_cap++; continue; }
-        targetedPer.set(c.event_id, n + 1); s = "targeted";
-      }
-      if (s) put({ event_id: c.event_id, email: c.email, full_name: c.full_name, company: c.company, domain: c.domain, person_id: c.person_id, status: s });
+      const s = c.held ? "met" : c.replied ? "responded" : c.enrolled ? "sent" : null;
+      if (s) { put({ event_id: c.event_id, email: c.email, full_name: c.full_name, company: c.company, domain: c.domain, person_id: c.person_id, status: s }); continue; }
+      if (!(c.target && c.lead && !c.any_meeting)) continue;
+      const key = `${c.event_id}:${c.email}`;
+      if (barredEmails.has(c.email) || barredCountry(c.person_location, c.firmo_country)) { barredKeys.add(key); continue; }
+      cands.push({ key, row: c });
     }
+    // The cap and the counts are per event and address, after every row of one address is seen (rows arrive in priority order).
+    const taken = new Map<string, Set<string>>(), over = new Set<string>();
+    for (const { key, row: c } of cands) {
+      const set = taken.get(c.event_id) ?? new Set<string>();
+      if (!set.has(key) && set.size >= TARGET_CAP) { over.add(key); continue; }
+      set.add(key); taken.set(c.event_id, set);
+      put({ event_id: c.event_id, email: c.email, full_name: c.full_name, company: c.company, domain: c.domain, person_id: c.person_id, status: "targeted" });
+    }
+    out.targeted_over_cap += [...over].filter((k) => !taken.get(k.split(":")[0])?.has(k)).length;
+    out.targeted_barred += [...barredKeys].filter((k) => !members.has(k) || ![...members.get(k)!.statuses].includes("targeted")).length;
 
     // What each member is, given what the CRM carries: the highest of what is known, or (when that is a meaning the CRM does not carry yet) the highest it does carry, never lower than what was sent.
     const wanted: { m: M; status: string; ref: string; was?: { last: string; n: number } }[] = [];

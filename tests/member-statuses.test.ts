@@ -167,6 +167,15 @@ describe("contacts as targets", () => {
     expect((await outbox()).filter((o) => o.payload.status === "targeted")).toHaveLength(0);
   });
 
+  it("duplicate rows for one address count once toward the cap and the counts", async () => {
+    const { r, h } = await setup();
+    await db.query(`INSERT INTO contacts (id, event_id, source_row_id, company_id, full_name, email, priority, source)
+      SELECT 'dup_' || g, event_id, source_row_id, company_id, 'Dup', 'ana@tallgrasssoftware.example', 'A', 'attendee' FROM generate_series(1, 5) g CROSS JOIN (SELECT * FROM contacts WHERE event_id = $1 LIMIT 1) c`, [h.id]);
+    const out = await syncCrm(db, r.crm);
+    expect((await emails()).filter((e) => e === "ana@tallgrasssoftware.example")).toHaveLength(1);
+    expect(out.targeted_over_cap).toBe(0);
+  });
+
   it("at most 500 per event are written, in priority order, and the rest are counted", async () => {
     const { r, h } = await setup();
     await db.query(`INSERT INTO contacts (id, event_id, source_row_id, company_id, full_name, email, priority, source)

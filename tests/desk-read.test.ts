@@ -50,7 +50,8 @@ describe("the booking link", () => {
   it("is an http or https address up to 500 characters, or empty", () => {
     expect(cleanBookingUrl("")).toBeNull();
     expect(cleanBookingUrl("https://a.example/x?y=1")).toBe("https://a.example/x?y=1");
-    expect(cleanBookingUrl("http://a.example")).toBe("http://a.example");
+    expect(cleanBookingUrl("HTTPS://A.example/a b")).toBe("https://a.example/a%20b");
+    expect(cleanBookingUrl("http://a.example")).toBe("http://a.example/");
     for (const bad of ["javascript:alert(1)", "ftp://a.example", "a.example", "https://", "https://a b", "x".repeat(501)]) expect(() => cleanBookingUrl(bad), bad).toThrow();
   });
   it("the database refuses anything else too", async () => {
@@ -111,6 +112,11 @@ describe("the play status from Account Desk", () => {
     clearPlayCache();
     expect((await playStatus(db, id, env, (async () => new Response("{}")) as never, () => 1)).state).toBe("unavailable");
     expect((await playStatus(db, id, {}, (async () => { throw new Error("must not call"); }) as never)).state).toBe("off");
+  });
+  it("a play-status body over 256 KB is unavailable", async () => {
+    const id = await withCampaign("cmp_1");
+    const big = JSON.stringify({ plays: [], pad: "x".repeat(300 * 1024) });
+    expect((await playStatus(db, id, env, (async () => new Response(big)) as never, () => 1)).state).toBe("unavailable");
   });
   it("the panel's route answers without waiting for it", async () => {
     const h = await http(); const id = await withCampaign();

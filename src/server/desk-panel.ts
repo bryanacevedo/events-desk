@@ -3,7 +3,7 @@
    Counts come from this desk's own sync table, so they never wait on a network call. The play status is read from Account Desk (`GET <ACCOUNT_DESK_URL>/api/desk/campaigns/<crm campaign>/plays`,
    Bearer ACCOUNT_DESK_READ_KEY), at most once a minute per event, on its own route so the panel never waits for it, and it carries counts only. A failed read keeps the last good one and says so. */
 
-import { timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import type { Db } from "./db.ts";
 import { RuleError } from "./events.ts";
 import { LAST_DAY_SQL } from "./motion.ts";
@@ -23,7 +23,7 @@ export function cleanBookingUrl(v: unknown): string | null {
   let u: URL;
   try { u = new URL(s); } catch { throw new RuleError("That is not a web address. Use one that starts with https:// or http://."); }
   if (u.protocol !== "https:" && u.protocol !== "http:") throw new RuleError("The booking link starts with https:// or http://.");
-  return s;
+  return u.href;
 }
 
 export async function setBookingUrl(db: Db, eventId: string, value: unknown) {
@@ -82,7 +82,9 @@ export async function playStatus(db: Db, eventId: string, env: Env = process.env
   try {
     const res = await doFetch(`${base.replace(/\/$/, "")}/api/desk/campaigns/${encodeURIComponent(e.crm_campaign_id)}/plays`, { headers: { authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(4000) });
     if (!res.ok) throw new Error(String(res.status));
-    const read = (await res.json()) as PlayRead;
+    const raw = await res.text();
+    if (raw.length > 256 * 1024) throw new Error("too large");
+    const read = JSON.parse(raw) as PlayRead;
     if (!Array.isArray(read?.plays)) throw new Error("shape");
     const at = new Date(t).toISOString();
     status = { state: "ok", lines: playLines(read), read_at: at, last_good_at: at };
@@ -97,7 +99,8 @@ export async function playStatus(db: Db, eventId: string, env: Env = process.env
 
 /* ------------------------------------------------------------------ the read Account Desk makes of this desk */
 
-const same = (a: string, b: string) => { const x = Buffer.from(a), y = Buffer.from(b); return x.length === y.length && timingSafeEqual(x, y); };
+const digest = (v: string) => createHash("sha256").update(v).digest();
+const same = (a: string, b: string) => timingSafeEqual(digest(a), digest(b));
 
 /** `GET /api/desk/campaigns/<crm campaign id>` with `Authorization: Bearer <DESK_READ_KEY>`: 404 when the key is unset, 401 when it is wrong. The body is about the event and carries no person. */
 export async function deskCampaignRead(db: Db, ref: string, header: string | undefined, env: Env = process.env): Promise<{ status: number; body: unknown }> {
