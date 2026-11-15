@@ -14,6 +14,8 @@ Worktree `.wt/ev6-events-desk`, branch `ev6/overview-views`. Decisions 81 and 82
 
 **Review:** an Opus review of the Overview diff found a squeezed timeline week when nothing is late, an optimistic pick that could be overwritten or lost on a failed save, hidden money labels on desktop and a bar that overflowed at year end; all four are fixed.
 
+**Landed:** `39623c0` on `main`, deploy live 2026-11-15. Live check at 1440 and 375: all three layouts open, no sideways scroll, no console errors (`~/Developer/events-desk-review/step6/live/`). The full suite passes with `--testTimeout=60000` (1,695 passed, 14 skipped); at the default 5 s the heavy workbook tests time out when the machine is busy.
+
 **Not done:** step 6 itself (into the shared world: SPEC, goldfish review, three directions, build) has not been started; it is 4 to 5 sessions by its own brief and the context of this session was spent. It needs a fresh session, which also owns the Account Desk and CRM Desk agreements it names.
 
 ## Redesign step 5, speaking and the social kit (2026-11-14)
