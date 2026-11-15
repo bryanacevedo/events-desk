@@ -486,3 +486,5 @@ Sending email or building sequences, a real CRM connection (write-back exists ag
 ## Event as a plan (redesign step 1)
 
 The step 2 spec (hosted events: guest lists, the RSVP link, reminders, check-in, follow-up) is `docs/HOSTED.md`, decisions 58 to 61. The step 1 spec is `docs/EVENT-PLAN.md`: involvements, goal, budget lines, who goes, sponsorship, assessment, list source and the plan stage. It was goldfish-reviewed before code (2026-11-13).
+
+The step 4 spec (the directory extension and the screen recording, reads, capture keys, Bring in) is `docs/DIRECTORY.md`, decisions 69 on. It was goldfish-reviewed by a fresh Opus subagent before code (2026-11-14); section 13 holds the fixes.
