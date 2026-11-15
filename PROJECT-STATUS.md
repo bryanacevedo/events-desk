@@ -264,3 +264,5 @@ From `node scripts/eval-report.ts` and the title report from the same code. Deta
 ## Prompt caching (2026-11-13, Backlog bl_117, branch `cache/prompt-caching`)
 
 Cache markers, tests and cache-aware cost accounting are in; measured with real calls on 2026-11-14: warm input cost about 87 to 91% lower on the tasks measured (see the newest decision). Not pushed until the repo writer lands.
+
+Gate results (2026-11-15, unattended writer): both Events Desk audits clean on a fresh demo server; full suite 1,820 passed 14 skipped; Account Desk full suite green and coverage 99 scenarios 92 shown 0 missing; lumen-world 57 tests, ruff clean, rehearse --verify identical (CRM 5, Market 1, Account 4), audit 9 of 9. Not deployed: Render deploys on hold (SESSIONS rule 20).

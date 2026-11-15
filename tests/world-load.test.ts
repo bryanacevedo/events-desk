@@ -12,9 +12,9 @@ let db: Db;
 beforeAll(async () => { db = await freshDb(); await seed(db, { real: true, today: "2026-11-24", world: true }); }, 600_000);
 
 describe("the vendored slice", () => {
-  it("is v1.3.0 at f9d183d, every public file checked against the manifest and the pin", () => {
+  it("is v1.3.0 at a008e18, every public file checked against the manifest and the pin", () => {
     const w = worldSlice();
-    expect(w.pin).toMatchObject({ tag: "v1.3.0", commit: "f9d183dd39fd7fbfd9ee0df6a452daca25a497ab", world_version: "1.3.0" });
+    expect(w.pin).toMatchObject({ tag: "v1.3.0", commit: "a008e188462e0ae06255493bd5c0da077747e99d", world_version: "1.3.0" });
     expect(worldData().today).toBe("2026-11-24");
   });
   it("holds public files only and the loader reads nothing outside samples/lumen-world", () => {
