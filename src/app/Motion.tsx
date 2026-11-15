@@ -224,7 +224,7 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
               );
             })() : (
             <div className="mt-cols">
-              {([["Coming up", (m: Meeting) => ["booked", "rescheduled"].includes(m.status)], ["Held", (m: Meeting) => m.status === "held"], ["Did not happen", (m: Meeting) => ["no_show", "cancelled"].includes(m.status)]] as const).map(([title, test]) => {
+              {([["Coming up", (m: Meeting) => ["booked", "rescheduled"].includes(m.status)], ["Meeting held", (m: Meeting) => m.status === "held"], ["Did not happen", (m: Meeting) => ["no_show", "cancelled"].includes(m.status)]] as const).map(([title, test]) => {
                 const rows = o.meetings.filter(test);
                 if (!rows.length) return null;
                 return (

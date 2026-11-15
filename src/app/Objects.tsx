@@ -15,7 +15,7 @@ import { OptOut, PriorityGrid, whyPriority } from "./Person";
 
 export const TOOL_NAME: Record<string, string> = { instantly: "Instantly", heyreach: "HeyReach", smartlead: "Smartlead", apollo: "Apollo" };
 export const CODE_WORDS: Record<string, string> = { interested: "Interested", meeting_request: "Wants a meeting", referral: "Pointed us to someone", not_interested: "Not interested", not_now: "Not now", question: "Asked a question", out_of_office: "Out of office", unsubscribe: "Opted out", wrong_person: "Wrong person", departed: "Left the company", bounced: "Bounced", other: "Needs a person" };
-const STATUS: Record<string, string> = { proposed: "Proposed", booked: "Booked", rescheduled: "Moved", held: "Held", no_show: "No-show", cancelled: "Cancelled" };
+const STATUS: Record<string, string> = { proposed: "Proposed", booked: "Booked", rescheduled: "Moved", held: "Meeting held", no_show: "No-show", cancelled: "Cancelled" };
 
 const dayKey = (d: Date) => d.toLocaleDateString("en-CA");
 export const stamp = (iso: string) => new Date(iso).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
@@ -411,7 +411,7 @@ export function MeetingSheet({ id, close, changed }: { id: string; close: () => 
       </div>
       {open && started && (
         <div className="ob-acts">
-          <button className="btn" type="button" disabled={busy} onClick={() => outcome("held")}>Held</button>
+          <button className="btn" type="button" disabled={busy} onClick={() => outcome("held")}>Meeting held</button>
           <button className="btn line" type="button" disabled={busy} onClick={() => outcome("no_show")}>No-show</button>
           <button className="btn line" type="button" disabled={busy} onClick={() => outcome("cancelled")}>Cancelled</button>
         </div>

@@ -121,7 +121,7 @@ export function App() {
         <nav className="side" aria-label="Events Desk">
           <div className="brand-block">
             <Link to="/" go={go} className="brand"><Mark /><span>Events Desk</span></Link>
-            <div className="tagline">From the seat to the result</div>
+            <div className="tagline">Event-led pipeline</div>
           </div>
           <div className="navlist" style={{ "--at": navAt } as React.CSSProperties} data-on={navAt >= 0 ? "" : undefined}>
             {item("/", "overview", "Overview", <Icon.overview />, "navitem")}

@@ -3114,3 +3114,4 @@ a:hover > .swap .due, a:focus-visible > .swap .due { opacity: 0; transform: tran
 .ovt .strip.nolate { grid-template-columns: minmax(0, 1fr); }
 .ovt .trk { overflow: hidden; }
 @media (min-width: 761px) { .ovb .lbl, .ovt .lbl { display: block; position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; } .ovb .m, .ovt .m { position: relative; } }
+.seat-top:not(:empty) { margin: 0 0 22px; }

@@ -399,9 +399,6 @@ export function Overview({ go, sheetId }: { go: (to: string) => void; sheetId: s
         </div>
       </header>
 
-      {ov && (view === "a" ? <WeekA rows={ov.deadlines} go={go} logos={logos} /> : view === "c" ? <WeekC rows={ov.deadlines} today={ov.year?.today ?? today} go={go} /> : <WeekB rows={ov.deadlines} go={go} logos={logos} />)}
-      {ov?.year && (view === "a" ? <YearA year={ov.year} go={go} logos={logos} /> : view === "c" ? <YearC year={ov.year} go={go} logos={logos} /> : <YearB year={ov.year} go={go} logos={logos} />)}
-
       <section className="railwrap" aria-label="Events in date order">
         <div className="rail" ref={rail} tabIndex={0} onKeyDown={onKey} onPointerMove={tilt} onPointerOut={untilt} aria-label="Events, left is earlier, right is later">
           {all.map((e, i) => {
@@ -437,6 +434,23 @@ export function Overview({ go, sheetId }: { go: (to: string) => void; sheetId: s
           {!all.length && <p className="mute">No events yet. <Link to="/events?request=1" go={go} className="to">Request a seat</Link> to start one.</p>}
         </div>
       </section>
+
+      <div className="seat-top">
+          {!needs.approvers.includes(actor) ? null : seatsWaiting.length > 0
+            ? (
+              <Link to="/seats" go={go} className="seatcall" aria-label={`${plural(seatsWaiting.length, "seat request")} waiting. Open Seats`}>
+                <b>{seatsWaiting.length}</b>
+                <span className="seatcall-w">seat {seatsWaiting.length === 1 ? "request" : "requests"}<br />waiting</span>
+                <span className="seatcall-logos" aria-hidden="true">{waitingLogos.map((r) => <EventLogo key={r.event_id} name={r.name} website={r.website} size={36} />)}</span>
+                <span className="seatcall-go" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M3 8h9.5M8.5 4l4 4-4 4" /></svg></span>
+              </Link>
+            )
+            : <p className="mute tray-empty">No seat requests waiting.</p>}
+      </div>
+
+
+      {ov && (view === "a" ? <WeekA rows={ov.deadlines} go={go} logos={logos} /> : view === "c" ? <WeekC rows={ov.deadlines} today={ov.year?.today ?? today} go={go} /> : <WeekB rows={ov.deadlines} go={go} logos={logos} />)}
+      {ov?.year && (view === "a" ? <YearA year={ov.year} go={go} logos={logos} /> : view === "c" ? <YearC year={ov.year} go={go} logos={logos} /> : <YearB year={ov.year} go={go} logos={logos} />)}
 
       <div className="ov-cols">
         <section className="ov" aria-label="Needs someone">
@@ -495,17 +509,6 @@ export function Overview({ go, sheetId }: { go: (to: string) => void; sheetId: s
         </section>
 
         <div className="ov-right">
-          {!needs.approvers.includes(actor) ? null : seatsWaiting.length > 0
-            ? (
-              <Link to="/seats" go={go} className="seatcall" aria-label={`${plural(seatsWaiting.length, "seat request")} waiting. Open Seats`}>
-                <b>{seatsWaiting.length}</b>
-                <span className="seatcall-w">seat {seatsWaiting.length === 1 ? "request" : "requests"}<br />waiting</span>
-                <span className="seatcall-logos" aria-hidden="true">{waitingLogos.map((r) => <EventLogo key={r.event_id} name={r.name} website={r.website} size={36} />)}</span>
-                <span className="seatcall-go" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M3 8h9.5M8.5 4l4 4-4 4" /></svg></span>
-              </Link>
-            )
-            : <p className="mute tray-empty">No seat requests waiting.</p>}
-
           <section className="ov" aria-label="Outreach">
             <div className="ov-h"><h2 className="display">Outreach</h2></div>
             {ov === null ? null : ov.live.length ? (
