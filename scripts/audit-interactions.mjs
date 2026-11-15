@@ -108,6 +108,21 @@ if (dinner) {
   }
 }
 
+// The Overview layout is each person's own pick (decision 81): the switcher changes the page at once, survives a reload, and leaves someone else on the default.
+{
+  const pressed = () => page.locator('.seg[aria-label="Overview layout"] [aria-pressed="true"]').innerText().catch(() => "none");
+  await as("Maya Ortiz", "/");
+  if ((await pressed()) !== "Trays") problems.push(`Overview layout: a person with no pick should see Trays, saw ${await pressed()}`);
+  await page.getByRole("button", { name: "Timeline", exact: true }).click(); await pause(500);
+  if (!(await page.locator(".ovt .strip, .ovt .ovt-run").count())) problems.push("Overview layout: picking Timeline did not draw it");
+  await page.reload({ waitUntil: "networkidle" }); await pause(600);
+  if ((await pressed()) !== "Timeline") problems.push("Overview layout: the pick did not survive a reload");
+  await as("Dan Whitlock", "/");
+  if ((await pressed()) !== "Trays") problems.push("Overview layout: one person's pick changed another person's page");
+  await as("Maya Ortiz", "/");
+  await page.getByRole("button", { name: "Trays", exact: true }).click(); await pause(400);
+}
+
 await browser.close();
 for (const e of [...new Set(errors)]) problems.push(`console error: ${e}`);
 if (problems.length) { console.error(`${problems.length} interaction problems:\n- ${problems.join("\n- ")}`); process.exit(1); }

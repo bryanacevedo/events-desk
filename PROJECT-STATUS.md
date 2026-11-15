@@ -1,5 +1,17 @@
 # Events Desk: project status
 
+## Redesign step 6, session 1: the Overview layout choice (2026-11-15)
+
+Worktree `.wt/ev6-events-desk`, branch `ev6/overview-views`. Decisions 81 and 82, migration 0057.
+
+**Step 5 live check (2026-11-15):** Render deploy `dep-dbspm3nf3r2c73elp0h0` is live on `79c46d7`; `/api/health` answers; Overview, Speaking and an event page load at 1440 and 375 with no sideways scroll and no console errors (screenshots in `~/Developer/events-desk-review/step5/live/`). The old `.wt/ev5-events-desk` worktree and branch `ev5/speaking` are removed.
+
+**Built:** the Overview in three layouts, A ledger, B trays (the default), C timeline, a per-person choice kept on the server, with a quiet switcher in the page header. Tests `tests/overview-views.test.ts`; the layout audit measures all three, the interaction audit checks the pick.
+
+**Bryan's picks, recorded (decision 82):** email gate stays, sponsorship kit offer stays, Get the attendee list C, Scanner tab B, phone scanner A (a B rebuild was started and dropped; nothing of it is in the code).
+
+**Not done:** step 6 itself (into the shared world: SPEC, goldfish review, three directions, build) has not been started; it is 4 to 5 sessions by its own brief and the context of this session was spent. It needs a fresh session, which also owns the Account Desk and CRM Desk agreements it names.
+
 ## Redesign step 5, speaking and the social kit (2026-11-14)
 
 Worktree `.wt/ev5-events-desk`, branch `ev5/speaking`. Spec `docs/SPEAKING.md`, decisions 74 to 80, migration 0056. Baseline before the work: the full suite was green (the Chrome tests need the sandbox off here).

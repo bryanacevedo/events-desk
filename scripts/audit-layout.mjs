@@ -81,6 +81,7 @@ async function icpCompiles() {
 }
 const compiles = await icpCompiles();
 pages.push(...compiles.paths.map((p) => [p, GTM]), ...hostedPages);
+pages.push(["/", MAYA, "a"], ["/", MAYA, "c"], ["/", GTM, "a"], ["/", GTM, "c"], ["/", MAYA, "b"], ["/", GTM, "b"]);
 
 const browser = await chromium.launch({ executablePath: process.env.CHROME ?? CHROME });
 let problems = 0;
@@ -127,8 +128,10 @@ for (const width of widths) {
   const phone = width < 500;
   const page = await browser.newPage({ viewport: { width, height: 900 }, isMobile: phone, hasTouch: phone, deviceScaleFactor: phone ? 2 : 1 });
   let acting = "";
-  for (const [path, actor] of pages) {
+  for (const [path, actor, view] of pages) {
     if (actor !== acting) { acting = actor; await page.goto(base + "/", { waitUntil: "networkidle" }); await page.evaluate((a) => localStorage.setItem("actor", a), actor); }
+    // The Overview has three layouts, a per-person choice (decision 81): each is measured, then the person is put back on the default.
+    if (view) await page.evaluate(([a, v]) => fetch("/api/overview/view", { method: "PUT", headers: { "x-actor": encodeURIComponent(a), "content-type": "application/json" }, body: JSON.stringify({ view: v }) }), [actor, view]);
     // On an event page, the time from the event's data arriving to the first useful content must stay under about a second.
     const eventPage = path.startsWith("/event/");
     const arrived = eventPage ? page.waitForResponse((r) => /\/api\/events\/[^/?]+$/.test(r.url())).then(() => Date.now()) : null;

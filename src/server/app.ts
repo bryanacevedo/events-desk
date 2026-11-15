@@ -19,6 +19,7 @@ import { mockSheets, type SheetPublisher } from "./sheets.ts";
 import { buildWorkbook, importReview, reviewContact } from "./workbook.ts";
 import { cancelEvent, decideApproval, defaultSettings, patchSettings, requestCard } from "./approvals.ts";
 import { overview } from "./overview.ts";
+import { isOverviewView, overviewView, setOverviewView } from "./view-prefs.ts";
 import { contentDisposition, ingestUpload, listSummary, listUploads, rebuiltRows, safeFilename, uploadFile } from "./uploads.ts";
 import { deleteEvent } from "./delete-event.ts";
 import { Forbidden } from "./seats.ts";
@@ -167,7 +168,15 @@ export function createApp(db: Db, cfg: AppConfig) {
     const o = await overview(db, cfg.lifecycle);
     const year = await yearPlan(db, cfg.lifecycle, c.get("actor"));
     const deadlines = await weekDeadlines(db, todayOf(cfg.lifecycle));
-    return c.json(isLead(c.get("actor")) ? { ...o, year, deadlines } : { ...o, results: [], needs: o.needs.filter((n) => n.kind !== "costs"), year, deadlines });
+    const view = await overviewView(db, c.get("actor"));
+    return c.json(isLead(c.get("actor")) ? { ...o, year, deadlines, view } : { ...o, results: [], needs: o.needs.filter((n) => n.kind !== "costs"), year, deadlines, view });
+  });
+  // Each person keeps their own Overview layout: a, b or c (decision 81). The acting name is the person; the database refuses any other value.
+  app.put("/api/overview/view", async (c) => {
+    const b = await c.req.json<{ view?: unknown }>().catch(() => ({}) as { view?: unknown });
+    if (!isOverviewView(b.view)) return bad("The Overview layout is a, b or c.");
+    await setOverviewView(db, c.get("actor"), b.view);
+    return c.json({ view: b.view });
   });
 
   /* The ICP: one seller per install, one line of versions. A document is uploaded, a person sees the cost and starts the compile,

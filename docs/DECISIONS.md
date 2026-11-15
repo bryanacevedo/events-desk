@@ -423,3 +423,15 @@ Satori and Resvg with IBM Plex Sans bundled from the installed `@fontsource` pac
 
 Scanned people are a rep's and never sequenced, so no sequence template changed. A scan picked "from the session" carries `talk_id` (only an accepted talk of that event; otherwise the scan is stored without it, because scans sync from an offline queue), and the talk shows on the scan list, the CSV and the rep's hand-off.
 
+
+## 81. The Overview comes in three layouts, and each person keeps their own (2026-11-15)
+
+Bryan: direction B is the default, but A (ledger), B (trays) and C (timeline) all stay, as a per-person choice. The choice is stored per person (`person_view_prefs`, migration 0057; the database allows only a, b or c for the Overview) and read with `GET /api/overview` as `view`; `PUT /api/overview/view` sets it under the acting name. No row means b. A quiet three-word switcher (Ledger, Trays, Timeline) sits in the page header, so it is never a settings hunt. All three read the same rows, so a rep's read still has no money in any of them. The layout audit measures all three at 1440 and 375, and the interaction audit checks that a pick shows at once, survives a reload and leaves someone else on the default.
+
+## 82. Bryan's picks of 2026-11-15, recorded as his
+
+- **Step 4's email gate stays as built.** `country_blocked` on email for every contact, whatever the source (the Outreach rule of 2026-11-14). Risk: legal; counsel confirms before live use.
+- **The sponsorship kit offer stays.** Decision 77's sponsorship path, which the brief did not list, is kept.
+- **Get the attendee list: C (Sheets),** as built.
+- **Scanner tab: B** (ledger first, setup and review in side sheets), as built.
+- **Phone scanner: A** (camera first, a sheet after the scan, Today in a sheet), as built. A rebuild to B was started and dropped the same day; nothing of it is in the code.
