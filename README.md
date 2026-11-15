@@ -84,6 +84,10 @@ The desk carries an event to the end of its life (built on `v2`, merged into `ma
 
 None of it has run against a real sequencer, CRM or calendar account. **Real sending is off** unless `LIVE_SEND=1`, and then it refuses to start unless `DESK_LOGIN=1` is set, a flag no real login backs yet, so turning it on is a deliberate choice; it also needs `LIVE_SPEND=1`, `WRITE_KEY`, `WEBHOOK_BASE` and `SEQUENCER_WEBHOOK_SECRET`. The full design, with what is proven and what is not, is in [docs/LIFECYCLE.md](docs/LIFECYCLE.md).
 
+## The directory extension and screen recording
+
+For events whose attendee directory can only be browsed. Load `extension/` unpacked in Chrome (steps in Settings, Browser extension), make a capture key there, open the event's directory in your own browser, pick the event in the extension and read the page or scroll and read. For a mobile-only app, record the phone screen while scrolling the list and read the recording from the event's "Get the attendee list" block; frames are taken in your browser and only they go up. Each person keeps where they were read from ("read from the Swapcard directory of X by Y on Z") and the event's terms note. People to check are held back until a person keeps or dismisses them; Bring in sends the rest through Layer 0 like any list. Outreach follows the country rules, not the source. Spec: `docs/DIRECTORY.md`.
+
 ## The scanner
 
 One phone web app for every rep at an event, at `/scan/<event id>` (the event's Scanner tab shows its link and a QR code). Aim at a badge code, photograph a badge or a business card, or type the person; then one screen: hot, warm or cold, the event's qualifiers, a note, what was promised and who sends it, the next step, consent.

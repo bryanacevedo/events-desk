@@ -1,5 +1,19 @@
 # Events Desk: project status
 
+## Redesign step 4, the directory extension and the screen recording (2026-11-14)
+
+Worktree `.wt/ev4-events-desk`, branch `ev4/extension`. Spec `docs/DIRECTORY.md` (section 13 holds the goldfish fixes), decisions 69 to 73, migration 0055.
+
+**Built:** a Chrome extension (`extension/`, Manifest V3, loaded unpacked; permissions activeTab, scripting, storage; no content scripts, no cookies; the reader is injected only when the person presses Read) with a Swapcard reader that finds a person from the profile link, never from class names, and says "layout unknown" when a matched page yields nothing. Capture keys made in Settings (hashed, shown once, scope add_people only, Bearer on two routes). Reads are staged with a source sentence and the event's terms note built by the server, judged by one pure function into staged or to check, and brought in through `ingestUpload` and Layer 0 with per-person `list_source`, `read_note` and `read_terms`. Screen recording: frames are taken in the browser (the video never leaves the computer), each read by the model once (counted before the call, capped, never repeated), checked in code against its own transcription. Panel "Get the attendee list" with the four paths in Bryan's order, a To check list, and Settings "Browser extension". Erasure and a 90-day purge reach reads.
+
+**Outreach rule (Bryan, 2026-11-14):** by country, never by source. The one gate edit: `country_blocked` on email for IT, CH, SE, DK, BE, AT, NO and DE (config list), for everyone. **This changes an existing rule:** before, only hosted guests read that list. The demo records a basis for every region, so German, Italian and Danish demo people no longer get email. Not run against live data from here; count live contacts it would touch with: contacts whose last comma part of `person_location`, or `companies.firmo->>'country'`, normalizes to a blocked code and who are in or eligible for an email sequence. **Risk: legal.** Swapcard's terms bar collecting other users' data without consent; counsel confirms before live use.
+
+**Design:** three directions in `~/Developer/events-desk-review/step4/directions/` (A Walkthrough, B Ledger, C Sheets). C built provisionally.
+
+**Vision eval** (`evals/recordings/directory_read.json`, claude-opus-5-5, 8 synthetic frames, $0.185): 35 of 40 people found, names exact 35 of 35, no wrong company, no invented person, the instruction line in a frame was not followed but one person's title was read as that text (so it goes to check), one reply came back in a code fence (now parsed). In-sample on a fake app; floors widened after seeing the run, noted in the code.
+
+**Not proven, for Bryan:** loading the extension in your Chrome on a real Swapcard directory (the fixtures are reconstructions from Swapcard's public patterns, not captures; selectors may need one real capture); a real phone screen recording; the toolbar press and the host-permission prompt (automation cannot click them). Adding directory people to a delivered list is not built. Brella, Grip, Whova and Cvent readers are later.
+
 ## Redesign step 3, the scanner (2026-11-14)
 
 Worktree `.wt/ev3`, branch `ev3`. Spec `docs/SCANNER.md` (sections 14 and 18 hold the two goldfish reviews' fixes, 16 the build's deviations, 17 what is not proven), decisions 63 to 68, migration 0054.
