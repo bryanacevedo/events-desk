@@ -303,3 +303,28 @@ Under `account_desk`, the Outreach section's panel gains: the counts of people b
 ### 13.8 Not in this part
 
 The four-desk rehearsal, Events Desk's journal steps in `stage/rehearse.py`, the demo snapshot and the film notes are part 4. A real Account Desk round trip over HTTP (both desks running) is part 4's rehearsal; part 3 tests the read with a stand-in server. No Render deploy.
+
+### 13.9 Goldfish review of section 13 (fresh Opus, 2026-11-15): 2 Blockers, 11 Majors, 6 Nits, and what changed
+
+This section overrides 13.1 to 13.7 where they differ. All accepted.
+
+1. Clock file. 1.2.0 files stay byte identical, `public/clock.json` included. The date goes in a new `public/events_desk_clock.json` (`{"events_desk_today": "2026-11-24"}`), copied only into the `events_desk` slice.
+2. The loader reads public files only. lumen-world publishes, for the `events_desk` slice only, `public/events_desk_attendance.csv` (event_id, name, title, email, company, domain, status, registered_at), `public/events_desk_guests.csv` (the dinner's guests, same columns plus invited_at, responded_at) and `public/events_desk_targets.csv` (event_id, name, title, email, company, domain, why, likelihood), all built from the world's people but carrying no person or company ids from `truth/`. `dinner_guests.csv` and `event_targets.csv` stay in `truth/` of the release for the world's own tests and are not copied to any slice. The `events_desk` slice's existing files do not change. The guard test covers Events Desk's vendored files and `seed-world.ts` reads nothing outside `samples/lumen-world/public`.
+3. Adapter. Three changes, listed: the status map in `crm-desk.ts` gains `targeted`, `waitlist`, `declined` (today `meaning()` throws for them); a refused member write raises a typed error carrying `unknown_status` and `allowed_meanings` (today an untyped "refused: 422"); `updateCampaignMemberStatus` returns the stored status so the equal check can run.
+4. Target rule. Not Market Desk's tier (12.1: unanswered). A contact is a target when `contacts.priority` is A or B or its company's `tier` is 1 or 2 (builder reads the columns and names the exact predicate in the decision); a hosted guest's list is the desk's global target-account list (`target_accounts`), as guests already are.
+5. No leads. A `targeted`, `waitlist` or `declined` member row never calls `createLead` whatever `write_leads` says (the person is written as a contact only when the CRM already holds them; otherwise as today's member write does, no lead). A test proves it.
+6. Erasure. Both cancel paths (`person-record.ts` by person, `operating.ts` by email) and the drain's erasure check cover `status IN ('queued','held')`; a test per path.
+7. Booking link. Only the day-7 `follow_up` email may carry it (the copy gate refuses a link in an `open` email); the day-0 email says a reply will find a time. LinkedIn carries none.
+8. One open play per account. Stopping a pre-event enrolment closes its account play (stopped, `close_reason` `declined_event` or `event_status_moved`) when no other enrolment of it is open, so `event_follow_up` can be proposed. Tests for both.
+9. `ensure_event_play` adds each missing play, not only when `event_follow_up` is absent; a test on an install that already has `event_follow_up`.
+10. Launch. Stated plainly: like `event_follow_up` (decision 69), `ensure_event_play` creates the pre-event play live and names its launcher; the setting is the decision. Every message still waits for a person's approval (autonomy `draft`). The 13.1 table is read that way.
+11. Timing. Events Desk writes `targeted` (and moves guests to it) only within 45 days before an event's start and not after its end (`TARGET_LEAD_DAYS`, a constant in the desk's config); earlier, the person is not announced. Account Desk's `within_days` then fits. In the demo at 2026-11-24 only AWS re:Invent 2026 qualifies. `waitlist` and `declined` have no window.
+12. `DEMO_TODAY` restamps plan and seed dates only; the sweep and views use the database clock. The loader seeds states explicitly (the dinner past, Money20/20 USA scored) so nothing depends on a clock; the spec no longer claims a global fixed clock for the demo.
+13. Determinism. The digest of the loader's output leaves out generated ids and timestamps and keys rows by the world's ids.
+14. The equal-status check stays as a guard; the stated reason is corrected: CRM Desk resolves by meaning first, so a person's label cannot win; the check catches an older CRM.
+15. A campaign is queued only for events with at least one releasable member (built after the feature gate).
+16. The dinner is past: guests are `registered`-then-`attended`, `no_show`, `waitlist`, `declined` (no `invited`), all four present. The 2026-12-01 hire in `team.csv` is dated after 2026-11-12: the statement reads "no history after now".
+17. Tier filtering is in the play trigger, not in `ingest_members`.
+18. The decision for removed seed rows is Events Desk decision 91; the sweep and world decisions follow in number (91 to 94). Migrations: Events Desk 0060, Account Desk 0040, no lumen-world migration.
+19. The booking-link fetch runs before ingest's transaction opens.
+Missing tests added: leads, held erasure on both paths, pre-event blocks follow-up, `ensure_event_play` on an old install, link refused in the open email, the sweep never moving a member below what the CRM holds when the feature list shrinks (rows not released stay `held`, nothing is sent lower).
