@@ -154,3 +154,64 @@ Goldfish review of this spec by a fresh Opus subagent, before code (2026-11-15):
 - Major 9 (route gating): fixed in 3.1, every route classified.
 - Major 10 (Market Desk's ICP): part 2 reads `icp.md` and the tier (parts table).
 - Nits 11 to 23: 11, 12, 14, 18 and 21 corrected in the text; 13 in 1.1; 15 (tag is v1.1.0, code and status say 1.2.0): the pin in part 2 is by commit, not tag; 16 and 17: noted in 1.1; 19 (owner column, Results link, "not in the CRM", every send): added to the 3.2 table text in the tests; 20: migration 0058 adds `definition_versions` in part 1, and the `activity`, `campaign_update` and `held` values with part 2; 22 and 23: closed means stage `scored`; `applies` lists are sorted and the endpoints are readable by anyone signed in.
+
+## 12. Part 2: member, activity and money writes, and reading the world (spec written before code, 2026-11-15)
+
+Replaces the design in sections 5 and the member and money lines of 4 and 6 for what part 2 builds. Facts are the code of `f849a9c` (1.1 holds the rest). Migration 0059.
+
+### 12.1 What part 2 builds, and what it does not
+
+Built: every member status the CRM carries is queued from where the desk knows it; the event's campaign is queued when the plan is approved; meetings, replies, sends and accepted debrief facts become activities; campaign money is built and kept off; the demo reads a pinned `lumen-world` slice; the per-row DESIGN 2b table test; the part 1 review leftovers.
+
+Not built, and said so: Targeted, Waitlist and Declined are not sent (CRM Desk carries no such meaning; part 3). A guest who moves from Registered to Declined stays Registered in the CRM until part 3; the sweep counts these as `awaiting_contract` and the integration read shows the count, so it is visible and not silent. Campaign money is not written to CRM Desk (12.5). Market Desk's ICP and its tier are not read (cross-repo item 11 has no answer yet); the page stays read-only under `market_desk` with its last profile.
+
+### 12.2 Member rows
+
+- One outbox row per status move: `desk_key = "cm:<event>:<member>:<status key>"`, where member is the contact id or the guest id and status key is one of `sent`, `registered`, `attended`, `no_show`, `met`, `responded`. The old keys `cm:<event>:<contact>` (the enrolment row and the reply row shared one key, so the second was swallowed) are no longer written; rows already in the table stay as they are.
+- Where they come from, as a sweep from state, run at the start of each outbox drain: `syncMembers(db, crm)`. A table `crm_member_sync (event_id, member_kind, member_id, last_status, queued_at)` holds the last status queued for each member. The sweep reads the current status of each hosted guest with an address (`event_guests`) and each enrolled contact, compares it with `last_status`, and queues a row when it differs. Why a sweep and not a call at each change: guest status changes in twelve places (invite, RSVP, waitlist promotion, check-in, undo, close attendance, walk-in, and more), contact status in more. A sweep from state cannot miss one, repeating it is harmless (the table and the key), and the latest status always wins. The cost is up to one sweep interval (5 minutes) of delay, and a state that came and went between two sweeps is never sent.
+- Mapping. Guest: `invited` sends `sent`; `registered`, `attended`, `no_show` send themselves; `listed`, `waitlist`, `declined` are `awaiting_contract` and nothing is queued or recorded for them. Contact in a launched sequence: `sent`; with an inbound reply that needed a rep: `responded`; with a held meeting: `met`. A contact the CRM tells us attended is not read back in part 2.
+- Order and staleness. Rows for one member drain oldest first. Before a member row is carried out, if a newer row for the same member is queued or done, this row is set to `cancelled` with `last_error` "superseded" and not sent, so a retry of an old status never moves the CRM backward. `met` is not overwritten by a later `responded` or `sent` (a person who met us and then replied is still met): the sweep never queues a lower status over `met`.
+- Waiting. A member row whose event has no CRM campaign id yet (its campaign row is queued, or waiting on its parent) is not an attempt and not a failure: `last_error` says "campaign not in the CRM yet" and it stays queued. A row that has waited more than 24 hours raises one alert per event per day (`raiseAlert`, key `crm_wait:<event>`), the same for a child campaign row waiting on its parent. The alert is raised by the lifecycle step, not by the drain, so a drain that cannot run still gets it.
+- Campaign at plan approval. `approveWithin` (and the approval route that does not auto-approve) queues the event's campaign in its own transaction through `queueCampaign`, so a hosted dinner or a conference with no list has one. Delivery still queues it too; the key makes the second a no-op.
+- Erasure and opt-out. An erased person's queued member and activity rows are cancelled, held or not (the code that cancels outbox rows by person already does this; the new kinds are added to its list and a test proves it). An opt-out does not cancel them (a person who unsubscribes still attended).
+
+### 12.3 Activities
+
+New outbox kinds `activity` and `activity_update`, and a Crm method `createActivity({ record, type, direction, subject, at, key, meeting })` that posts `/activities` with `external_id = "events_desk:" + key`, and `updateActivity({ id, meeting_status })` that PATCHes it. A CRM without the methods gets nothing queued.
+
+| Fact | Where it is queued | Row | Key |
+|---|---|---|---|
+| Meeting booked | `meetings.ts` where the row is inserted | `activity`: type `meeting`, `meeting_status: booked`, `meeting_at`, `meeting_timezone`, subject "Meeting at <event>" | `activity:meeting:<id>` |
+| Meeting held, no show, cancelled | `recordOutcome` | `activity_update` setting that status. CRM Desk refuses `proposed` and `rescheduled`, so those never queue an update; a reschedule is a new create only if the time changed (new key with the time) | `activity:meeting:<id>:<status>` |
+| Reply received | `replies.ts` where the reply is stored | `activity`: `email`, `in`, subject "Reply at <event>" (the desk stores the body; the body is not sent) | `activity:reply:<message id>` |
+| Send | `replies.ts ingestEvents` where a touch of kind `send` is added | `activity`: `email` or `linkedin` by the touch's channel, `out`, subject "<event> outreach, step <n>". Not queued under `account_desk` only if the sequence is Account Desk's; this desk's own sequences are always written | `activity:send:<touch id>` |
+| Accepted debrief fact | `reviewDebrief` on `accepted` | `activity`: `note`, subject "Conversation at <event>", body the template "<theme>: <quote>" (the quote is checked word for word; the fact text is model-written and is not sent) | `activity:debrief:<fact id>` |
+
+- A meeting that came from the CRM (`source = 'calendar'` read back through `ingestCrmMeetings`) is not written again. Source `crm` is not a source in this table; the sync marks meetings it ingested with `external_key` starting with the CRM's id, and the test reads that, not a guess.
+- A debrief fact has an account and no person. It is queued only when exactly one contact of the event at that account has a held meeting; otherwise it is not queued and the review screen's count of "facts not placed" is unchanged by it (nothing is shown in part 2; the count is in the integration read as `debrief_unplaced`).
+- `member -> record` uses the same `askPeople` lookup as members; a person with no record gets no activity (no lead is created for an activity).
+- Mapping a meeting status the CRM does not take: `no_show` is sent as `no_show`.
+
+### 12.4 Money, built and off
+
+`campaign_money` outbox kind, one row per event with a CRM campaign: `desk_key = "money:<event>"` replaced by a fresh row each time a change is seen (key `money:<event>:<n>`, `n` from `events.crm_money_n`). The row carries only the event id; the numbers are read when it drains, so a change back to an earlier value is not swallowed. `budget_cents` is the sum of the plan's `budget_lines.planned_cents`; `actual_cost_cents` is tickets bought plus recorded cost lines (`ticket_purchases`, `event_costs`), whole cents; AI cost and travel estimates are not in it. USD only: an install writes money only when `CRM_CAMPAIGN_MONEY=usd` is set, and that is set by a person after checking that CRM Desk hides the two fields from members (cross-repo item 7). Unset (the default), the sweep queues nothing, and a test proves both. `GET /api/integration` carries `campaign_money: "off" | "on"`.
+
+### 12.5 Reading the world
+
+- `samples/lumen-world/` holds a copy of `events.csv`, `team.csv` and `manifest.json` from `lumen-world` `release/world-v1.1.0/public` at commit `400566a`, and `PIN.json` (repository, commit, release, files and their SHA-256). It is a copy, not a link: Events Desk must run without that repository. `src/server/world-slice.ts` reads and checks it (hash per file, format version, the 18 events: 11 conferences, 5 webinars, 2 dinners), exposes `worldSlice()`, and `scripts/world-refresh.mjs` re-copies it from a checked-out `lumen-world` tag and rewrites the pin. The code and status of `lumen-world` say 1.2.0 but only v1.1.0 is a tag, so the pin is the commit.
+- The demo seed adds nothing from it in part 2 beyond the roster and the seller: `GET /api/world` answers the pin, the seller (Lumen Ledger), the 18 events and the roster's Events Desk roles. The demo's own events keep their ids. Loading the world's events as the demo's events is part 3, with the world additions.
+- Fixed demo clock: `DEMO_NOW` (a date) fixes "today" in the demo and the seed; unset keeps today's behaviour. The world's clock is 2026-11-12 14:00 UTC. A test seeds on the fixed clock twice and compares.
+- Coverage gate: `tests/integration-2b.test.ts` reads the DESIGN 2b table of this spec (3.2) and fails when a row has no case or a case names a row that is not there, the way Account Desk's `coverage.py` does for its scenarios.
+- Not read in part 2: Market Desk's ICP and tiers; the world's attendance and its additions (part 3).
+
+### 12.6 Part 1 review leftovers
+
+- A member row waits while its campaign row is queued (12.2); the 24 hour alert (12.2).
+- `publishAll` runs at boot, after migrations.
+- A fixture hash from CRM Desk's own test is added to `tests/definitions.test.ts` (CRM Desk's `tests/test_definitions.py` body and its published hash; the test fails on a different algorithm).
+- A TRUNCATE guard on `definition_versions` in migration 0059.
+- `/motion/checklist`, `/campaign` and `/release` stay closed under `account_desk` for sequences drafted before the setting: they start sending, and sending new work is what the setting turns off. Sequences launched earlier keep running (decision 88).
+
+### 12.7 Tests
+
+`tests/member-sync.test.ts` (every mapping, the sweep twice queues once, superseded rows, `met` sticks, awaiting_contract counted, waiting and the alert, campaign at approval, erasure cancels, opt-out does not), `tests/outbox-activities.test.ts` (each fact once, meetings create then update, refused statuses never queued, debrief placed or not, sends under both states), `tests/campaign-money.test.ts` (off by default, on writes once and reads latest at drain, USD only, definition of the two numbers), `tests/world-slice.test.ts` (hashes, counts, the clock), `tests/integration-2b.test.ts` (the table and its coverage gate), the definitions fixture. Existing suites stay green. Not tested: a real CRM Desk round trip of the new calls (the live half of the contract suite is skipped without its variables).
