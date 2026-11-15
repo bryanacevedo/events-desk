@@ -76,3 +76,19 @@ describe("DESIGN 2b coverage", () => {
 describe.each(["alone", "integrated"] as State[])("DESIGN 2b, %s", (state) => {
   for (const row of Object.keys(CASES)) it(row, async () => { await CASES[row](state); });
 });
+
+/* Step 6 part 3: the three held statuses are written whatever the install runs beside (members belong to this desk), and a CRM that lacks them holds them. */
+describe.each(["alone", "integrated"] as State[])("held statuses, %s", (state) => {
+  it("targeted is queued when the CRM names it and counted when it does not", async () => {
+    Object.assign(process.env, ENV[state]);
+    const db = await freshDb();
+    const id = await hostedDinner(db);
+    await db.query("UPDATE events SET starts_on = current_date + 10 WHERE id = $1", [id]);
+    const { guest } = await import("./hosted-helpers.ts");
+    await guest(db, id, "Ana Ruiz");
+    const crm = (meanings: string[]) => ({ name: "crm_desk", connected: true, write: async () => {}, personFlags: async () => ({}), findCampaignByKey: async () => null, createCampaign: async () => ({ id: "c" }), createCampaignMember: async (a: any) => ({ id: "m", status: a.status }), features: async () => ({ campaign_member_meanings: meanings }) }) as never;
+    expect((await syncCrm(db, crm(["sent"]))).awaiting_contract).toBe(1);
+    expect((await db.query("SELECT 1 FROM crm_outbox WHERE kind = 'campaign_member'"))).toHaveLength(0);
+    expect((await syncCrm(db, crm(["sent", "targeted"]))).members).toBe(1);
+  });
+});

@@ -5,17 +5,18 @@
    A 409 `erased` from CRM Desk is a finished write with nothing written: the create answers a null id, as it does for
    nobody to write to. */
 
-import { CrmAlreadyExists, heatOf, type AccountType, type Crm, type CrmAccount, type CrmAccountQuery, type CrmOpportunity, type CrmPatch, type CrmPersonQuery, type CrmRecord } from "./providers.ts";
+import { CrmAlreadyExists, CrmUnknownStatus, heatOf, type AccountType, type Crm, type CrmAccount, type CrmAccountQuery, type CrmOpportunity, type CrmPatch, type CrmPersonQuery, type CrmRecord } from "./providers.ts";
 
 type Fetch = typeof fetch;
 const TYPES: Record<string, AccountType> = { customer: "customer", prospect: "prospect", partner: "partner", competitor: "competitor" };
-const MEMBER: Record<string, string> = { sent: "sent", invited: "sent", registered: "registered", attended: "attended", met: "met", "no show": "no_show", no_show: "no_show", responded: "responded" };
+const MEMBER: Record<string, string> = { sent: "sent", invited: "sent", registered: "registered", attended: "attended", met: "met", "no show": "no_show", no_show: "no_show", responded: "responded", targeted: "targeted", waitlist: "waitlist", declined: "declined" };
 /** A status this desk has no CRM Desk meaning for is never sent as another one (docs/SHARED-WORLD.md 12.8). */
 const meaning = (status: string | undefined) => {
   const m = MEMBER[(status ?? "Sent").toLowerCase()];
   if (!m) throw new Error(`No CRM Desk meaning for the status ${status}.`);
   return m;
 };
+const FEATURES_TTL_MS = 3600_000;
 const MEETING: Record<string, "booked" | "held" | "cancelled"> = { booked: "booked", held: "held", cancelled: "cancelled", no_show: "cancelled" };
 // An erased person: the outbox reads `.id`, and a null id is its "nobody to write to", a finished write.
 const NOBODY = { id: null as unknown as string };
@@ -24,6 +25,7 @@ const NOTHING: CrmAccount = { owner: null, deal_name: null, deal_stage: null, la
 export function crmDeskCrm(url: string, key: string, doFetch: Fetch = fetch, timeoutMs = 15000): Crm {
   const base = url.replace(/\/$/, "") + "/api/v1";
   let users: Record<string, string> | null = null;
+  let features: { at: number; meanings: string[] } | null = null;
 
   async function call(method: string, path: string, body?: unknown, query?: Record<string, string>): Promise<{ status: number; json: any }> {
     const q = query ? "?" + new URLSearchParams(query).toString() : "";
@@ -46,6 +48,10 @@ export function crmDeskCrm(url: string, key: string, doFetch: Fetch = fetch, tim
   }
   const erased = (r: { status: number; json: any }) => r.status === 409 && r.json?.code === "erased";
   const stub = (id: string) => id.startsWith("suppressed:");
+  /** A 422 `unknown_status` is a typed answer (a contract gap), never an untyped failure. */
+  function unknownStatus(r: { status: number; json: any }, sent: string) {
+    if (r.status === 422 && r.json?.code === "unknown_status") throw new CrmUnknownStatus(sent, (r.json?.detail?.allowed_meanings as string[] | undefined) ?? []);
+  }
 
   async function ownerName(email: string | null): Promise<string | null> {
     if (!email) return null;
@@ -133,13 +139,27 @@ export function crmDeskCrm(url: string, key: string, doFetch: Fetch = fetch, tim
       const r = await call("POST", `/campaigns/${a.campaign}/members`, { contact: a.record.id, status });
       if (erased(r)) return NOBODY;
       if (r.status === 409 && r.json?.code === "already_member") throw new CrmAlreadyExists();
+      unknownStatus(r, status);
       if (r.status >= 400) throw new Error(`CRM Desk refused the member: ${r.status}`);
-      return { id: r.json.id };
+      return { id: r.json.id, status: typeof r.json.status === "string" ? r.json.status : undefined };
     },
     async updateCampaignMemberStatus(a) {
       if (stub(a.record.id)) return;
-      const r = await call("POST", `/campaigns/${a.campaign}/members`, { contact: a.record.id, status: meaning(a.status), update: true });
+      const status = meaning(a.status);
+      const r = await call("POST", `/campaigns/${a.campaign}/members`, { contact: a.record.id, status, update: true });
+      unknownStatus(r, status);
       if (r.status >= 400 && !(r.status === 409 && r.json?.code === "already_member") && !erased(r)) throw new Error(`CRM Desk refused the status: ${r.status}`);
+      return { status: typeof r.json?.status === "string" ? r.json.status : undefined };
+    },
+    /** What this CRM takes as a member's meaning. Read at most once an hour; a failed read keeps the last good answer, and with none yet it says null (nothing is released). */
+    async features() {
+      const now = Date.now();
+      if (features && now - features.at < FEATURES_TTL_MS) return { campaign_member_meanings: features.meanings };
+      try {
+        const m = (await ok("GET", "/definitions")).features?.campaign_member_meanings;
+        if (Array.isArray(m)) features = { at: now, meanings: m.map(String) };
+      } catch { /* keep the last good answer */ }
+      return features ? { campaign_member_meanings: features.meanings } : null;
     },
     async createActivity(a) {
       if (stub(a.record.id)) return { id: a.record.id };

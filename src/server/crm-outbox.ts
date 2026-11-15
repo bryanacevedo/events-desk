@@ -7,9 +7,9 @@
 import type { Db } from "./db.ts";
 import { newId } from "./events.ts";
 import { askPeople, crmConnected } from "./crm-checks.ts";
-import { CrmAlreadyExists, type CampaignType, type Crm, type CrmPatch, type CrmRecord } from "./providers.ts";
+import { CrmAlreadyExists, CrmUnknownStatus, type CampaignType, type Crm, type CrmPatch, type CrmRecord } from "./providers.ts";
 import { LAST_DAY_SQL } from "./motion.ts";
-import { moneyOf, moneyOn, syncCrm } from "./crm-sync.ts";
+import { moneyOf, moneyOn, NEW_MEANINGS, releasedMeanings, syncCrm } from "./crm-sync.ts";
 
 export const MAX_ATTEMPTS = 5;
 /** A child campaign whose conference is not in the CRM yet. The row waits; it is not a failure (docs/SHARED-WORLD.md 4). */
@@ -66,10 +66,16 @@ export async function queueCampaignMembers(q: Db["query"], eventId: string, crm:
 export const queueCreate = (q: Db["query"], kind: "campaign" | "campaign_member" | "task" | "lead" | "activity" | "activity_update" | "campaign_money", key: string, personId: string | null, payload: object) =>
   q("INSERT INTO crm_outbox (id, person_id, kind, payload, desk_key) VALUES ($1, $2, $3, $4::jsonb, $5) ON CONFLICT (desk_key) DO NOTHING", [newId("obx"), personId, kind, JSON.stringify(payload), key]);
 
+/** The CRM does not carry this status meaning yet: the row is held, with its payload, no attempt counted and no failure raised (docs/SHARED-WORLD.md 13.4). */
+export class HeldRow extends Error { constructor(reason = "held: the CRM does not carry this status yet") { super(reason); } }
+/** The CRM stored another meaning than the one sent: the row fails at once and says so. */
+export class StoredAs extends Error {}
+const checkStored = (sent: string | undefined, stored: string | undefined) => { if (sent && NEW_MEANINGS.includes(sent) && stored && stored !== sent) throw new StoredAs(`stored as ${stored}`); };
+
 const SUPERSEDED = "superseded";
 /** A later row for the same member (same event and address), queued or done. */
 async function newerExists(db: Pick<Db, "query">, key: string, ref: string) {
-  const [r] = await db.query("SELECT 1 FROM crm_outbox WHERE kind = 'campaign_member' AND payload->>'member_ref' = $1 AND desk_key <> $2 AND status IN ('queued', 'done') AND created_at > (SELECT created_at FROM crm_outbox WHERE desk_key = $2)", [ref, key]);
+  const [r] = await db.query("SELECT 1 FROM crm_outbox WHERE kind = 'campaign_member' AND payload->>'member_ref' = $1 AND desk_key <> $2 AND status IN ('queued', 'held', 'done') AND created_at > (SELECT created_at FROM crm_outbox WHERE desk_key = $2)", [ref, key]);
   return Boolean(r);
 }
 
@@ -96,7 +102,8 @@ async function carryOutCreate(db: Db, crm: Crm, kind: "campaign" | "campaign_mem
     return crm.createLead ? (await crm.createLead({ email: p.email, full_name: p.full_name, company: p.company ?? "", domain: p.domain, key })).id : null;
   }
   if (!records.length) {
-    if (kind === "campaign_member" && p.write_leads && p.email && crm.createLead) await crm.createLead({ email: p.email, full_name: p.full_name, company: p.company ?? "", domain: p.domain, key: `lead:${key}` });
+    // Someone announced as a target, waitlisted or declined is never made a lead by that (docs/SHARED-WORLD.md 13.9 item 5), whatever write_leads says.
+    if (kind === "campaign_member" && p.write_leads && p.email && crm.createLead && !(p.status && NEW_MEANINGS.includes(p.status))) await crm.createLead({ email: p.email, full_name: p.full_name, company: p.company ?? "", domain: p.domain, key: `lead:${key}` });
     return null;
   }
   if (kind === "campaign_member") {
@@ -107,11 +114,20 @@ async function carryOutCreate(db: Db, crm: Crm, kind: "campaign" | "campaign_mem
     // A newer status for the same member in this sweep's order supersedes this one, so a retry of an old status never moves the CRM backward.
     if ((p as unknown as { member_ref?: string }).member_ref && await newerExists(db, key, (p as unknown as { member_ref: string }).member_ref)) return SUPERSEDED;
     const campaign = ev?.crm_campaign_id ?? p.campaign!;
-    try { return (await crm.createCampaignMember({ campaign, record: records[0], key, status: p.status })).id; }
-    catch (e) {
+    // A meaning the CRM's own list does not name is held without asking it (a list it could not read is no answer: the CRM decides).
+    if (p.status && NEW_MEANINGS.includes(p.status)) { const f = await releasedMeanings(crm); if (f && !f.has(p.status)) throw new HeldRow(); }
+    try {
+      const made = await crm.createCampaignMember({ campaign, record: records[0], key, status: p.status });
+      checkStored(p.status, made.status);
+      return made.id;
+    } catch (e) {
+      if (e instanceof CrmUnknownStatus && p.status && NEW_MEANINGS.includes(p.status)) throw new HeldRow();
       if (!(e instanceof CrmAlreadyExists)) throw e;
       // Already a member: only the status moves.
-      if (p.status) await crm.updateCampaignMemberStatus?.({ campaign, record: records[0], status: p.status });
+      if (p.status) {
+        try { const moved = await crm.updateCampaignMemberStatus?.({ campaign, record: records[0], status: p.status }); checkStored(p.status, moved?.status); }
+        catch (e2) { if (e2 instanceof CrmUnknownStatus && NEW_MEANINGS.includes(p.status)) throw new HeldRow(); throw e2; }
+      }
       return records[0].id;
     }
   }
@@ -174,6 +190,8 @@ async function drainOnce(db: Db, crm: Crm | null | undefined, limit: number) {
       out.sent++;
     } catch (e) {
       if (e instanceof ParentNotInCrm) { await db.query("UPDATE crm_outbox SET last_error = $2 WHERE id = $1", [r.id, e.message]); continue; }
+      if (e instanceof HeldRow) { await db.query("UPDATE crm_outbox SET status = 'held', last_error = $2 WHERE id = $1 AND status = 'queued'", [r.id, e.message]); continue; }
+      if (e instanceof StoredAs) { await db.query("UPDATE crm_outbox SET attempts = attempts + 1, status = 'failed', last_error = $2 WHERE id = $1", [r.id, e.message]); out.failed++; continue; }
       const tries = r.attempts + 1;
       await db.query("UPDATE crm_outbox SET attempts = $2, status = $3, last_error = $4 WHERE id = $1", [r.id, tries, tries >= MAX_ATTEMPTS ? "failed" : "queued", String((e as Error)?.message ?? e).slice(0, 300)]);
       out.failed++;

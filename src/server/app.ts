@@ -2,7 +2,7 @@
 
 import { worldSlice } from "./world-slice.ts";
 import { definitionVersions, listDefinitions, readDefinition } from "./definitions.ts";
-import { START, refusalFor, integrationView } from "./integration.ts";
+import { START, refusalFor, integrationView, integrationCounts } from "./integration.ts";
 import { readFileSync } from "node:fs";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
@@ -156,7 +156,7 @@ export function createApp(db: Db, cfg: AppConfig) {
   app.get("/api/definitions", async (c) => c.json(await listDefinitions(db)));
   app.get("/api/definitions/:name", async (c) => { const q = c.req.query("version"); const v = q === undefined ? undefined : Number(q); if (v !== undefined && !(Number.isInteger(v) && v > 0)) return bad("That version does not exist.", 404); const d = await readDefinition(db, c.req.param("name"), v); return d ? c.json(d) : bad("That definition does not exist.", 404); });
   app.get("/api/definitions/:name/versions", async (c) => { const d = await definitionVersions(db, c.req.param("name")); return d ? c.json(d) : bad("That definition does not exist.", 404); });
-  app.get("/api/integration", (c) => c.json(integrationView(cfg.lifecycle?.crm?.name)));
+  app.get("/api/integration", async (c) => c.json({ ...integrationView(cfg.lifecycle?.crm?.name), ...(await integrationCounts(db)) }));
   app.get("/api/world", (c) => c.json(worldSlice()));
   app.get("/api/health", async (c) => {
     const stale = tickStale();

@@ -104,7 +104,7 @@ export async function linkEventQuietly(db: Db, eventId: string) {
 /** After contacts have gone: a person nobody points at is removed, and what was still waiting to be written about them goes too. Opt-outs have no person_id and stay. */
 export async function pruneOrphans(q: Db["query"]) {
   const gone = "(SELECT p.id FROM people p WHERE NOT EXISTS (SELECT 1 FROM contacts k WHERE k.person_id = p.id))";
-  await q(`UPDATE crm_outbox SET status = 'cancelled', person_id = NULL, done_at = now() WHERE status = 'queued' AND person_id IN ${gone}`);
+  await q(`UPDATE crm_outbox SET status = 'cancelled', person_id = NULL, done_at = now() WHERE status IN ('queued', 'held') AND person_id IN ${gone}`);
   await q(`DELETE FROM people WHERE id IN ${gone}`);
 }
 export const pruneQuietly = (db: Db) => db.tx(pruneOrphans).catch((e) => console.error("people prune", e));

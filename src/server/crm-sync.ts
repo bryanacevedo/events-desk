@@ -6,17 +6,26 @@ import type { Db } from "./db.ts";
 import { canWrite, queueCampaign, queueCreate } from "./crm-outbox.ts";
 import type { Crm } from "./providers.ts";
 import { plannedTotal } from "./budget-lines.ts";
+import { LAST_DAY_SQL } from "./motion.ts";
+import { defaultSettings } from "./approvals.ts";
+import { normalizeCountry } from "../shared/country-rules.ts";
 
-/** Funnel order for one member: the highest of everything known about them wins. */
-const RANK: Record<string, number> = { sent: 1, responded: 2, registered: 3, no_show: 4, attended: 5, met: 6 };
-const GUEST_STATUS: Record<string, string | null> = { invited: "sent", registered: "registered", attended: "attended", no_show: "no_show", listed: null, waitlist: null, declined: null };
+/** Funnel order for one member: the highest of everything known about them wins. A decline is a person's answer, so it beats a send or a reply but never an attendance (docs/SHARED-WORLD.md 13.4). */
+export const RANK: Record<string, number> = { targeted: 0, sent: 10, responded: 20, waitlist: 30, declined: 35, registered: 40, no_show: 50, attended: 60, met: 70 };
+/** The three meanings CRM Desk carries since 6ab3e22. Written only once the CRM's own feature list names them. */
+export const NEW_MEANINGS: readonly string[] = ["targeted", "waitlist", "declined"];
+/** A person is announced as a target only this many days before the event starts, and not after it ends (13.9 item 11). */
+export const TARGET_LEAD_DAYS = 45;
+/** At most this many targeted members per event are written to the CRM; the rest are counted. */
+export const TARGET_CAP = 500;
+const GUEST_STATUS: Record<string, string | null> = { invited: "sent", registered: "registered", attended: "attended", no_show: "no_show", listed: "targeted", waitlist: "waitlist", declined: "declined" };
 const WINDOW_DAYS = 180;
 const MEETING_STATUS: Record<string, string> = { booked: "booked", rescheduled: "booked", held: "held", no_show: "no_show", cancelled: "cancelled" };
 
 export const moneyOn = (env: Record<string, string | undefined> = process.env) => (env.CRM_CAMPAIGN_MONEY ?? "").toLowerCase() === "usd";
 
-export interface SyncResult { campaigns: number; members: number; awaiting_contract: number; meetings: number; meeting_updates: number; sends: number; replies: number; debriefs: number; debrief_unplaced: number; money: number }
-const zero = (): SyncResult => ({ campaigns: 0, members: 0, awaiting_contract: 0, meetings: 0, meeting_updates: 0, sends: 0, replies: 0, debriefs: 0, debrief_unplaced: 0, money: 0 });
+export interface SyncResult { campaigns: number; members: number; awaiting_contract: number; targeted_barred: number; targeted_over_cap: number; released: number; meetings: number; meeting_updates: number; sends: number; replies: number; debriefs: number; debrief_unplaced: number; money: number }
+const zero = (): SyncResult => ({ campaigns: 0, members: 0, awaiting_contract: 0, targeted_barred: 0, targeted_over_cap: 0, released: 0, meetings: 0, meeting_updates: 0, sends: 0, replies: 0, debriefs: 0, debrief_unplaced: 0, money: 0 });
 
 async function synced(q: Db["query"], kind: string, ref: string) { return (await q<{ last: string; n: number }>("SELECT last, n FROM crm_sync WHERE kind = $1 AND ref = $2", [kind, ref]))[0]; }
 const remember = (q: Db["query"], kind: string, ref: string, last: string) =>
@@ -26,39 +35,94 @@ const IN_WINDOW = `e.starts_on >= current_date - ${WINDOW_DAYS}`;
 /** An address on the suppression list because of an erasure request is never written about again. */
 const erasedEmails = async (q: Db["query"]) => new Set((await q<{ email: string }>("SELECT lower(email) AS email FROM suppressions WHERE kind = 'opt_out' AND reason = 'Erasure request' AND email IS NOT NULL")).map((r) => r.email));
 
+/** The meanings the CRM says it carries (its own feature list, cached by the adapter). A CRM that cannot say, or does not publish one, releases none of the three. */
+export async function releasedMeanings(crm: Crm): Promise<Set<string> | null> {
+  if (!crm.features) return new Set();
+  try { const f = await crm.features(); return f ? new Set(f.campaign_member_meanings) : null; } catch { return null; }
+}
+
 export async function syncCrm(db: Db, crm: Crm | null | undefined, env: Record<string, string | undefined> = process.env): Promise<SyncResult> {
   const out = zero();
   if (!canWrite(crm)) return out;
+  const features = await releasedMeanings(crm);                       // null: unreadable, nothing is released and nothing is set back to queued by a change
+  const released = features ?? new Set<string>();
   await db.tx(async (q) => {
     const erased = await erasedEmails(q);
+    const barredEmails = new Set((await q<{ email: string }>("SELECT lower(email) AS email FROM suppressions WHERE kind = 'opt_out' AND email IS NOT NULL")).map((r) => r.email));
+    const blockedCountries = new Set((defaultSettings().email_country_rules?.blocked ?? []).map((c) => c.toUpperCase()));
+    const barredCountry = (...places: (string | null | undefined)[]) => places.some((p) => { const c = normalizeCountry(p?.split(",").at(-1)?.trim() ?? ""); return Boolean(c && blockedCountries.has(c)); });
+
+    // 0. Held rows: cancelled when erased or superseded; set back to queued when the CRM's list of meanings changed, and once a day.
+    await q("UPDATE crm_outbox SET status = 'cancelled', last_error = 'erased' WHERE status IN ('queued', 'held') AND lower(payload->>'email') IN (SELECT lower(email) FROM suppressions WHERE kind = 'opt_out' AND reason = 'Erasure request' AND email IS NOT NULL)");
+    await q(`UPDATE crm_outbox o SET status = 'cancelled', last_error = 'superseded' WHERE o.status = 'held' AND o.kind = 'campaign_member'
+             AND EXISTS (SELECT 1 FROM crm_outbox n WHERE n.kind = 'campaign_member' AND n.payload->>'member_ref' = o.payload->>'member_ref' AND n.id <> o.id AND n.status IN ('queued', 'held', 'done') AND (n.created_at, n.id) > (o.created_at, o.id))`);
+    const list = features ? [...features].sort().join(",") : null, was = await synced(q, "features", "meanings");
+    const [{ today }] = await q<{ today: string }>("SELECT current_date::text AS today");
+    const day = await synced(q, "features", "released_on");
+    if ((list !== null && list !== was?.last) || day?.last !== today) {
+      const r = await q<{ id: string }>("UPDATE crm_outbox SET status = 'queued', last_error = NULL WHERE status = 'held' RETURNING id");
+      out.released = r.length;
+      if (list !== null && list !== was?.last) await remember(q, "features", "meanings", list);
+      await remember(q, "features", "released_on", today);
+    }
 
     // 1. Members: one per event and address, the highest status known.
-    type M = { event_id: string; email: string; full_name: string | null; company: string | null; domain: string | null; person_id: string | null; status: string };
+    type M = { event_id: string; email: string; full_name: string | null; company: string | null; domain: string | null; person_id: string | null; statuses: Set<string> };
     const members = new Map<string, M>();
-    const put = (m: M) => { const k = `${m.event_id}:${m.email}`; const cur = members.get(k); if (!cur || RANK[m.status] > RANK[cur.status]) members.set(k, { ...m, person_id: cur?.person_id ?? m.person_id }); };
-    const guests = await q<{ event_id: string; email: string; name: string; company: string | null; status: string }>(
-      `SELECT g.event_id, lower(g.email) AS email, g.name, g.company, g.status FROM event_guests g JOIN events e ON e.id = g.event_id WHERE g.removed_at IS NULL AND g.email IS NOT NULL AND ${IN_WINDOW}`);
-    const previous = new Set<string>();
+    const put = (m: Omit<M, "statuses"> & { status: string }) => {
+      const k = `${m.event_id}:${m.email}`, cur = members.get(k);
+      if (cur) { cur.statuses.add(m.status); cur.person_id ??= m.person_id; } else members.set(k, { ...m, statuses: new Set([m.status]) });
+    };
+    const LEAD = `(current_date >= e.starts_on - ${TARGET_LEAD_DAYS} AND current_date <= ${LAST_DAY_SQL})`;
+    const guests = await q<{ event_id: string; email: string; name: string; company: string | null; status: string; country: string | null; lead: boolean }>(
+      `SELECT g.event_id, lower(g.email) AS email, g.name, g.company, g.status, g.country, ${LEAD} AS lead FROM event_guests g JOIN events e ON e.id = g.event_id WHERE g.removed_at IS NULL AND g.email IS NOT NULL AND ${IN_WINDOW}`);
     for (const g of guests) {
       if (erased.has(g.email)) continue;
       const s = GUEST_STATUS[g.status] ?? null;
+      if (s === "targeted") {
+        if (!g.lead) continue;                                          // announced only inside the lead window
+        if (barredEmails.has(g.email) || barredCountry(g.country)) { out.targeted_barred++; continue; }
+      }
       if (s) put({ event_id: g.event_id, email: g.email, full_name: g.name, company: g.company, domain: null, person_id: null, status: s });
-      else previous.add(`${g.event_id}:${g.email}`);
     }
-    const contacts = await q<{ event_id: string; email: string; full_name: string | null; company: string; domain: string | null; person_id: string | null; enrolled: boolean; replied: boolean; held: boolean }>(
-      `SELECT k.event_id, lower(k.email) AS email, k.full_name, co.name AS company, co.primary_domain AS domain, k.person_id,
+    const contacts = await q<{ event_id: string; email: string; full_name: string | null; company: string; domain: string | null; person_id: string | null; enrolled: boolean; replied: boolean; held: boolean; any_meeting: boolean; target: boolean; priority: string | null; tier: number | null; lead: boolean; person_location: string | null; firmo_country: string | null }>(
+      `SELECT k.event_id, lower(k.email) AS email, k.full_name, co.name AS company, co.primary_domain AS domain, k.person_id, k.priority, co.tier, k.person_location, co.firmo->>'country' AS firmo_country,
+         (k.priority IN ('A', 'B') OR co.tier IN (1, 2)) AS target, ${LEAD} AS lead,
          EXISTS (SELECT 1 FROM enrollments n WHERE n.contact_id = k.id AND n.state <> 'adding') AS enrolled,
          EXISTS (SELECT 1 FROM inbound_messages m WHERE m.contact_id = k.id AND m.signal = 'reply') AS replied,
-         EXISTS (SELECT 1 FROM meetings m WHERE m.contact_id = k.id AND m.status = 'held') AS held
-       FROM contacts k LEFT JOIN companies co ON co.id = k.company_id JOIN events e ON e.id = k.event_id WHERE k.dropped_at IS NULL AND k.email IS NOT NULL AND ${IN_WINDOW}`);
+         EXISTS (SELECT 1 FROM meetings m WHERE m.contact_id = k.id AND m.status = 'held') AS held,
+         EXISTS (SELECT 1 FROM meetings m WHERE m.contact_id = k.id) AS any_meeting
+       FROM contacts k LEFT JOIN companies co ON co.id = k.company_id JOIN events e ON e.id = k.event_id WHERE k.dropped_at IS NULL AND k.email IS NOT NULL AND ${IN_WINDOW}
+       ORDER BY k.event_id, (k.priority = 'A') DESC, (k.priority = 'B') DESC, co.tier NULLS LAST, k.id`);
+    const targetedPer = new Map<string, number>();
     for (const c of contacts) {
       if (erased.has(c.email)) continue;
-      const s = c.held ? "met" : c.replied ? "responded" : c.enrolled ? "sent" : null;
+      let s = c.held ? "met" : c.replied ? "responded" : c.enrolled ? "sent" : null;
+      if (!s && c.target && c.lead && !c.any_meeting) {
+        if (barredEmails.has(c.email) || barredCountry(c.person_location, c.firmo_country)) { out.targeted_barred++; continue; }
+        const n = targetedPer.get(c.event_id) ?? 0;
+        if (n >= TARGET_CAP) { out.targeted_over_cap++; continue; }
+        targetedPer.set(c.event_id, n + 1); s = "targeted";
+      }
       if (s) put({ event_id: c.event_id, email: c.email, full_name: c.full_name, company: c.company, domain: c.domain, person_id: c.person_id, status: s });
     }
 
-    // 2. Every event that has someone to write, or a plan asked for, has its campaign queued (the key makes a repeat a no-op).
-    const eventIds = new Set<string>([...members.values()].map((m) => m.event_id));
+    // What each member is, given what the CRM carries: the highest of what is known, or (when that is a meaning the CRM does not carry yet) the highest it does carry, never lower than what was sent.
+    const wanted: { m: M; status: string; ref: string; was?: { last: string; n: number } }[] = [];
+    for (const m of members.values()) {
+      const ref = `${m.event_id}:${m.email}`, was = await synced(q, "member", ref);
+      const ranked = [...m.statuses].sort((a, b) => RANK[b] - RANK[a]);
+      let status = ranked[0];
+      if (NEW_MEANINGS.includes(status) && !released.has(status)) {
+        out.awaiting_contract++;
+        status = ranked.find((x) => !NEW_MEANINGS.includes(x) || released.has(x)) ?? "";
+        if (!status || (was && RANK[status] < RANK[was.last])) continue;
+      }
+      wanted.push({ m, status, ref, was });
+    }
+
+    // 2. Every event that has a member to write (one the CRM carries), or a plan asked for, has its campaign queued (the key makes a repeat a no-op).
+    const eventIds = new Set<string>(wanted.map((w) => w.m.event_id));
     for (const r of await q<{ id: string }>("SELECT e.id FROM events e WHERE e.plan_submitted_at IS NOT NULL AND " + IN_WINDOW)) eventIds.add(r.id);
     for (const id of eventIds) {
       const [has] = await q("SELECT 1 FROM crm_outbox WHERE desk_key = $1", [`campaign:${id}`]);
@@ -66,16 +130,15 @@ export async function syncCrm(db: Db, crm: Crm | null | undefined, env: Record<s
     }
 
     const names = new Map((await q<{ id: string; name: string; write_leads: boolean }>("SELECT id, name, write_leads FROM events")).map((e) => [e.id, e]));
-    for (const m of members.values()) {
-      const ref = `${m.event_id}:${m.email}`, was = await synced(q, "member", ref), ev = names.get(m.event_id)!;
-      if (was?.last === m.status) continue;
+    for (const { m, status, ref, was } of wanted) {
+      const ev = names.get(m.event_id)!;
+      if (was?.last === status) continue;
       const n = (was?.n ?? 0) + 1;
-      await queueCreate(q, "campaign_member", `cm:${m.event_id}:${m.email}:${m.status}:${n}`, m.person_id, { email: m.email, full_name: m.full_name, company: m.company, domain: m.domain, event_id: m.event_id, campaign: ev.name, write_leads: ev.write_leads, status: m.status, member_ref: ref });
-      await remember(q, "member", ref, m.status);
+      await queueCreate(q, "campaign_member", `cm:${m.event_id}:${m.email}:${status}:${n}`, m.person_id, { email: m.email, full_name: m.full_name, company: m.company, domain: m.domain, event_id: m.event_id, campaign: ev.name, write_leads: ev.write_leads, status, member_ref: ref });
+      await remember(q, "member", ref, status);
       out.members++;
     }
-    // A guest who was sent as registered and is now waitlisted or declined stays as the CRM has them until CRM Desk carries those meanings (part 3): counted, not silent.
-    for (const ref of previous) if ((await synced(q, "member", ref))) out.awaiting_contract++;
+    for (const k of ["awaiting_contract", "targeted_barred", "targeted_over_cap"] as const) await remember(q, "count", k, String(out[k]));
 
     // 3. Meetings the desk made (a meeting read back from the CRM is not written again).
     const meetings = await q<{ id: string; event_id: string; status: string; at: string; tz: string; email: string; full_name: string | null; company: string; domain: string; person_id: string | null; name: string }>(

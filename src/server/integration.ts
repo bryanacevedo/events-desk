@@ -63,3 +63,14 @@ export function deskLinks(env: Env = process.env): Record<string, string> {
   }
   return out;
 }
+
+const MEMBER_STATUSES = ["targeted", "sent", "responded", "waitlist", "declined", "registered", "no_show", "attended", "met"];
+/** The counts `GET /api/integration` adds: where each member stands in what was queued, what is held, and what the last sweep set aside. Read from the desk's own tables. */
+export async function integrationCounts(db: { query: <T = any>(sql: string, p?: unknown[]) => Promise<T[]> }) {
+  const members: Record<string, number> = Object.fromEntries(MEMBER_STATUSES.map((s) => [s, 0]));
+  for (const r of await db.query<{ last: string; n: number }>("SELECT last, count(*)::int AS n FROM crm_sync WHERE kind = 'member' GROUP BY last")) if (r.last in members) members[r.last] = r.n;
+  const count = async (k: string) => Number((await db.query<{ last: string }>("SELECT last FROM crm_sync WHERE kind = 'count' AND ref = $1", [k]))[0]?.last ?? 0);
+  const [{ n: held }] = await db.query<{ n: number }>("SELECT count(*)::int AS n FROM crm_outbox WHERE status = 'held'");
+  const features = (await db.query<{ last: string }>("SELECT last FROM crm_sync WHERE kind = 'features' AND ref = 'meanings'"))[0]?.last;
+  return { members, awaiting_contract: await count("awaiting_contract"), held, targeted_barred: await count("targeted_barred"), targeted_over_cap: await count("targeted_over_cap"), features_read: features ? features.split(",") : null };
+}

@@ -30,7 +30,7 @@ describe("the adapter", () => {
     const crm = crmDeskCrm("https://crm.example", "k", fake(calls));
     await crm.createCampaignMember!({ campaign: "cm1", record: rec, key: "k", status: "no_show" });
     expect(calls[0].body.status).toBe("no_show");
-    await expect(crm.createCampaignMember!({ campaign: "cm1", record: rec, key: "k", status: "waitlist" })).rejects.toThrow(/No CRM Desk meaning/);
+    await expect(crm.createCampaignMember!({ campaign: "cm1", record: rec, key: "k", status: "nonsense" })).rejects.toThrow(/No CRM Desk meaning/);
   });
   it("posts an activity with the desk's external id and a meeting's fields, patches its status, writes money only through its own call", async () => {
     const calls: any[] = [];

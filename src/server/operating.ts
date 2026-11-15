@@ -282,7 +282,7 @@ export async function forgetPerson(db: Db, deps: LifecycleDeps, email: string, a
     await q("DELETE FROM linkedin_cache WHERE lower(verified_email) = $1 OR linkedin = ANY($2::text[])", [e, linkedins]);
     // Copies elsewhere: notes on their history and CRM writes not yet sent.
     await q("UPDATE touches SET reason = '' WHERE contact_id = ANY($1::text[])", [ids]);
-    await q("UPDATE crm_outbox SET status = 'cancelled' WHERE status = 'queued' AND lower(payload->>'email') = $1", [e]);
+    await q("UPDATE crm_outbox SET status = 'cancelled' WHERE status IN ('queued', 'held') AND lower(payload->>'email') = $1", [e]);
     await q("DELETE FROM crm_sync WHERE kind = 'member' AND ref LIKE $1 ESCAPE '\\'", ["%:" + e.replace(/[\\%_]/g, (m) => "\\" + m)]);
     // A hosted guest with that address: the address goes and the guest is removed, so the CRM sweep has nobody to write about.
     await q("UPDATE event_guests SET email = NULL, removed_at = coalesce(removed_at, now()), removed_reason = coalesce(removed_reason, 'Erasure request') WHERE lower(email) = $1", [e]);

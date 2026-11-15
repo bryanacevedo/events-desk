@@ -314,9 +314,11 @@ export interface Crm {
   findCampaignByKey?(key: string): Promise<{ id: string } | null>;
   /** `type` is the CRM campaign type; `parent` is the CRM id of the campaign this one hangs off (a hosted side event under its conference). */
   createCampaign?(a: { name: string; start: string; end: string; type: CampaignType; key: string; parent?: string }): Promise<{ id: string }>;
-  updateCampaignMemberStatus?(a: { campaign: string; record: CrmRecord; status: string }): Promise<void>;
+  updateCampaignMemberStatus?(a: { campaign: string; record: CrmRecord; status: string }): Promise<{ status?: string } | void>;
   /** Salesforce refuses a duplicate member, so `CrmAlreadyExists` from here counts as done. */
-  createCampaignMember?(a: { campaign: string; record: CrmRecord; key: string; status?: string }): Promise<{ id: string }>;
+  createCampaignMember?(a: { campaign: string; record: CrmRecord; key: string; status?: string }): Promise<{ id: string; status?: string }>;
+  /** The member meanings this CRM carries (CRM Desk: GET /definitions features.campaign_member_meanings, cached an hour, the last good answer kept). Null when it cannot say: nothing held back is released. Absent on a CRM that does not publish them. */
+  features?(): Promise<{ campaign_member_meanings: string[] } | null>;
   /** Tasks can double on a retry, so the desk's key goes in a custom field and is looked for first. */
   findTaskByKey?(key: string): Promise<{ id: string } | null>;
   createTask?(a: { record: CrmRecord; subject: string; body: string; due: string; key: string }): Promise<{ id: string }>;
@@ -334,6 +336,8 @@ export interface Crm {
 export interface CrmOpportunity { id: string; name?: string | null; url?: string | null; owner?: string | null; next_step?: string | null; stage: string; amount_cents: number | null; created_date: string; stage_history: { stage: string; at: string }[]; close_date?: string | null; is_won?: boolean; is_closed?: boolean }
 export type CampaignType = "event" | "webinar";
 export class CrmAlreadyExists extends Error {}
+/** The CRM refused a member status as not one of its meanings (422 `unknown_status`): a contract gap, not a failure. `allowed` is what it said it takes. */
+export class CrmUnknownStatus extends Error { status: string; allowed: string[]; constructor(status: string, allowed: string[]) { super(`CRM refused the status ${status} as unknown`); this.status = status; this.allowed = allowed; } }
 
 const OWNERS = ["Priya Natarajan", "Tomas Lindqvist", "Adaeze Okonkwo", "Mateo Ruiz", "Hanna Berg"];
 const DEAL_KINDS = ["platform pilot", "expansion", "renewal", "new logo"];
