@@ -343,3 +343,64 @@ Built as 13.4 to 13.9 say: the adapter and the sweep (`crm-desk.ts`, `crm-sync.t
 8. Roster and seller are read by `GET /api/world` (part 2) and used as owners and host names; no new tables hold them.
 9. Not run: the CRM Desk contract tests against a running CRM Desk (`tests/crm-desk-contract.test.ts` skips without its variables), and Account Desk's side of the plays read (a stand-in server in the tests).
 
+
+## 14. Part 4: the four-desk rehearsal, the real calls between the desks, the snapshot and the film notes (spec written before code, 2026-11-15)
+
+Four repositories change, in this order of landing: `crm-build` (one small replay change), `lumen-world` (rehearsal steps, a check, a wiring proof), `outbound-desk` (Account Desk: one change from part 3's leftovers) and `events-desk` (this one). Nothing in this part changes what a person sees on a screen, so the design instrument and the design lint are run but nothing new is designed; the one exception is the demo snapshot, which is rebuilt (14.7).
+
+### 14.1 Who does what (the centaur)
+
+| Step | Agent | Person |
+|---|---|---|
+| Write campaigns, members (targeted, waitlist, declined, registered, attended, no show) and activities to CRM Desk | Events Desk's sweep and outbox, the same code a live install runs | Sets the plan, the targets, the booking link; nothing here sends an email |
+| Read the booking link, start the pre-event note, stop it on a decline | Account Desk (reads Events Desk, drafts) | Approves every message; the rehearsal sends none |
+| Read the play status | Events Desk (reads Account Desk, counts only) | Decides what to do with a stalled play |
+| Say whether the four desks agree | `stage/audit.py` (reads, changes nothing) | Reads the result |
+
+### 14.2 Events Desk's half of the journal (lumen-world `stage/rehearse.py`, Events Desk `scripts/rehearse.ts`)
+
+The rehearsal does not write Events Desk's calls by hand: it runs Events Desk. `scripts/rehearse.ts` (new, Events Desk) migrates its own database, runs `seed()` on the world (`world: true`, the demo's default), sets `deps.crm = crmDeskCrm(CRM_DESK_URL, CRM_DESK_KEY, journalFetch)`, then runs `syncCrm` and `drainOutbox` until the outbox is empty or stuck, and prints one JSON line (counts: campaigns, members by status, activities, held, failed, refused). It never calls a vendor or a model (the demo's stand-ins). `journalFetch` (new, `src/server/journal-fetch.ts`) wraps `fetch`: it appends a line to the file `EVENTS_JOURNAL` for every call that writes (any method but GET, except the two reads made with POST, `/contacts/contactability` and `/accounts/lookup`), in the shape the other desks use: `{actor: "events_desk", method, path (without /api/v1), body, status, answer}` and an `idempotency_key` when it sent one. `at` is not written by the script: the runner fills it from CRM Desk's clock (`app_now()`), as it does for the website forms. The runner appends these lines to the journal after the website forms and Market Desk's MQA and before Market Desk's pull, and the 9 of the old checks are unchanged.
+
+What the journal must contain (the runner stops if any is absent): a campaign create for each event with someone to write; a campaign create with `parent_id` for the Las Vegas dinner (parent: Money20/20 USA 2026's campaign) and `type: event` or `webinar` as the event's kind says; members at `targeted`, `waitlist`, `declined`, `registered`, `attended` and `no_show`; activities with an `external_id` beginning `events_desk:`. A call CRM Desk refuses is journaled with its status; the run stops on any refusal other than a named one: `already_member`, `erased`, and `unknown_status` for a status CRM Desk does not name (none today). The count of refusals is reported.
+
+CRM Desk's replay (`src/crm/sim/lumen.py`) learns one actor: when the journal holds `events_desk` steps it makes a fifth key (`--desk events_desk`, after the four it makes today, in the same order the rehearsal makes it), sends those steps with it, and does not move the clock for them (as Account Desk's and the website's). Without `events_desk` steps nothing changes: every existing journal replays as before.
+
+### 14.3 What the rehearsal's clock does to Events Desk
+
+Events Desk keeps `public/events_desk_clock.json` at 2026-11-24 and its SQL uses the database's `current_date` for the 45 day target window (13.4). The rehearsal runs on the wall clock, so *which* of the 142 targets are written depends on the day it is run; the journal is the record, and `--verify` replays the journal, not Events Desk, so the verification does not depend on the day. CRM Desk refuses activities dated after its own now (the rehearsal's CRM sits at 2026-11-12 14:00 UTC); a send or debrief stamped later is a refusal, and the runner reports it as a finding, not as a failure to hide. The world clock is not moved here (the question is with Bryan).
+
+### 14.4 Verification and the audit
+
+`--verify` rebuilds each desk from its half: CRM Desk's half now includes the `events_desk` steps. `SAME["crm"]` gains the ids of campaigns and campaign members and the count of external references made by the desk, so a replay that differs on Events Desk's writes fails. Events Desk is not replayed (its demo seeds from the world, not from a journal); `--verify` says so in its output. `stage/audit.py` gains check 10, which runs when Events Desk's journal is present: every campaign written under `events_desk:` has a type of `event` or `webinar`; the dinner's campaign has its parent; the members at `waitlist`, `declined` and `targeted` are present for the dinner and the four coming conferences and none is counted as a response (the CRM's `responded` flag); no activity written by Events Desk is dated after now; no member's contact is marked do-not-contact or unsubscribed; every member's contact exists. The 9 earlier checks are untouched and must still pass: `audit.py` reports "10 of 10", or "9 of 9" with a line saying the tenth was skipped, never a rounded number.
+
+### 14.5 The real calls between the desks (`stage/wire.py`, new)
+
+After the rehearsal, with its databases still there, the runner (`python stage/wire.py`) starts: CRM Desk on its own port; Events Desk (`node src/server/node.ts` on its rehearsal database, not `--demo`, `CRM=crmdesk`, its key, `INTEGRATED_WITH=account_desk,market_desk,crm_desk`, `DESK_READ_KEY`, `ACCOUNT_DESK_URL`, `ACCOUNT_DESK_READ_KEY`); Account Desk (its server on a copy of the rehearsal's database, `INTEGRATED_WITH=events_desk,market_desk,crm_desk`, `CRM=crmdesk`, `EVENTS_DESK_URL`, `EVENTS_DESK_READ_KEY`, `DESK_READ_KEY`). Keys are made by the runner for this run and never printed. It proves, with real HTTP and no stand-ins:
+
+1. Events Desk answers `GET /api/desk/campaigns/<crm campaign id>` with the right key (the event, dates, city, `booking_url`), 401 with a wrong key and 404 where no event has that campaign.
+2. Account Desk's `event_link.event_for` reads that answer over the network and a draft sentence carries the booking link (the day-7 email only, as decision 94 says).
+3. Account Desk reads the targeted members from CRM Desk and makes `event_targeted` signals; a member the CRM holds at `declined` makes none.
+4. A person who was targeted and is then written `declined` by Events Desk has their stored signal set aside by Account Desk's next read.
+5. Events Desk's `GET /api/events/<id>/desk-plays` (play status) reads Account Desk's `GET /api/desk/campaigns/<ref>/plays` and returns lines; with a wrong key it says `unavailable`, with none `off`.
+
+Not proven by this runner, and said so in the status: a send (nothing here sends), a play running for days on Account Desk's own clock, and Render.
+
+The CRM Desk contract tests run against the live CRM Desk of the same run: Events Desk's `tests/crm-desk-contract.test.ts` (with `CRM_DESK_URL`, `CRM_DESK_KEY` made `--desk events_desk`, `CRM_DESK_ADMIN_KEY`) and Account Desk's `tests/test_crm_contract.py`. Their pass counts and skips are recorded.
+
+### 14.6 Part 3's leftovers
+
+- Account Desk (`pipeline.py`): the Events Desk HTTP call (`_events_for` to `event_link.event_for`) ran inside `crm_sync`'s transaction, which holds the deal, owner and account rows it has written. It moves to its own job, `crm_members`, enqueued by `crm_sync` only when `INTEGRATED_WITH` names Events Desk (a dedupe key keeps it to one), so an Account Desk without Events Desk runs the same jobs as before and the deterministic demo is unchanged. The new job holds no row but its own job row while it waits on the network; the day's answer is still written on its own connection. `tests/test_event_pre_event.py` and any test that expected members ingested inside `crm_sync` call the new handler.
+- Events Desk: a test for `deskCampaignRead`'s key compare (equal, different length, same length and one character different, empty, a different scheme word, extra spaces) and that a key with trailing spaces in the environment is trimmed; `same` is exported for it.
+- `npm ci` in the main checkout `~/Developer/events-desk` (offline-safe: if the registry is unreachable the result is reported, not hidden), and the four `ev6d_` databases on port 54329 dropped (done before this spec was written: `ev6d_test_050be480`, `ev6d_test_c75086d1`, `ev6d_demo_6d502801`, `ev6d_demo_d704887a`).
+
+### 14.7 The demo snapshot and the film notes
+
+`make demo-snapshot` is rebuilt on the world build: the snapshot's world is the vendored 1.3.0 slice with the clock at 2026-11-24. The new snapshot is checked by opening the demo from it (the world's events are there, the dinner has its 40 guests, health answers) and the design lint and screen copy pass. It is committed with the status. Film notes (`docs/FILM-NOTES.md`, new): the shot list for the four-desk story with what each shot proves and where its data comes from, in Bryan's words rules (no em dashes, facts only, placeholders where unknown); no film is made here.
+
+### 14.8 Tests and gates
+
+New: Events Desk `tests/journal-fetch.test.ts` (what is journaled and what is not, the shape, no key or header written), `tests/desk-read.test.ts` (the key compare), a test of `scripts/rehearse.ts` against a stand-in CRM server (the line shape and the required statuses); lumen-world `tests/test_rehearsal_events.py` for the pure parts (merge of journal lines, the required-contents check, check 10 on small fixtures); Account Desk a test that the Events Desk call is outside `crm_sync` and the new job runs it; CRM Desk a replay test with a small `events_desk` journal. Before each push: the full suites (Events Desk with `--testTimeout=60000`), tsc, ruff, both Events Desk audits on a fresh server, the Account Desk coverage gate (0 missing), the rehearsal `--verify` and the audit. An Opus code review of the diffs.
+
+### 14.9 Not in this part
+
+Moving the world clock; a sending Events Desk under `INTEGRATED_WITH=account_desk` (it is off by design, 13.1); Market Desk's tier replacing the priority-or-tier rule (cross-repo item 11, still open); a rehearsal in which Account Desk reacts to Events Desk's members over days (the wiring proof shows one read and one stop, not the weeks); Render deploys (rule 20: not deployed, Render deploys on hold); new screens.
