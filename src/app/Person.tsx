@@ -12,6 +12,7 @@ import { dropWords } from "./words";
 import { gateWords } from "../shared/gate-words";
 import { companyHref, To } from "./To";
 
+const sentence = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s);
 const GRID: Record<1 | 2 | 3, Record<1 | 2 | 3, "A" | "B" | "C">> = { 1: { 1: "A", 2: "B", 3: "C" }, 2: { 1: "B", 2: "C", 3: "C" }, 3: { 1: "C", 2: "C", 3: "C" } };
 
 export function PriorityGrid({ company, title }: { company: 1 | 2 | 3 | null; title: 1 | 2 | 3 | null }) {
@@ -95,6 +96,7 @@ export function Person({ c, eventId, past = false, onClose, onChange }: { c: Per
         <h2>{c.full_name ?? "No name on the row"}</h2>
         <p style={{ fontSize: 16 }}>{c.title ? co(c.title) : "No title"}{c.company ? <>, <To to={eventId ? companyHref(eventId, c.company) : null}>{co(c.company)}</To></> : ""}</p>
         {c.employer && c.employer !== c.company && <p className="mute">Vendor lists {co(c.employer)}</p>}
+        {c.read_note && <p className="mute person-read">{sentence(c.read_note)}{c.read_terms ? `. ${c.read_terms}` : ""}</p>}
         {c.linkedin && <a className="mute to wrap-any" href={c.linkedin} target="_blank" rel="noopener noreferrer">{c.linkedin.replace(/^https?:\/\/(www\.)?/, "")}</a>}
         <div className="actions panel-acts">
           {canOptOut && <OptOut c={c} onDone={() => { setOptedOut(true); onChange?.(); }} />}

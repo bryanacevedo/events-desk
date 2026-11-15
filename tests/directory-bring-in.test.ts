@@ -5,6 +5,7 @@ import { createApp } from "../src/server/app.ts";
 import type { Db } from "../src/server/db.ts";
 import { bringIn, dismissRead, keepRead, purgeDirectoryData, authCapture, captureAdd, createRecording, readFrame } from "../src/server/directory.ts";
 import { forgetPerson } from "../src/server/operating.ts";
+import { recordOptOut } from "../src/server/suppression.ts";
 import { mockLlm } from "../src/server/providers.ts";
 import { requestResearchCard } from "../src/server/research.ts";
 import { ingestUpload } from "../src/server/uploads.ts";
@@ -199,6 +200,64 @@ describe("replacing what bring in made", () => {
     expect(String(lost.reason.message)).toMatch(/Nothing is ready|changed while/);
     expect(await count(db, "uploads", `event_id = '${ev}'`)).toBe(1);
     expect((await contacts(ev))).toHaveLength(2);
+  });
+});
+
+describe("races and suppressions", () => {
+  it("a dismiss racing bring in never leaves a dismissed read in the list", async () => {
+    for (let i = 0; i < 5; i++) {
+      const ev = await approvedEvent(db, `Race ${i}`);
+      await add(ev, [person("Ana Lima"), person("Ben Ode", { company: "Pinefold" })]);
+      const [ben] = await db.query<any>("SELECT id FROM directory_reads WHERE event_id = $1 AND full_name = 'Ben Ode'", [ev]);
+      const out = await Promise.allSettled([bringIn(db, ev, MAYA, NOW), dismissRead(db, ev, ben.id)]);
+      expect(out.filter((o) => o.status === "fulfilled").length).toBeGreaterThanOrEqual(1);
+      const rs = await reads(ev), cs = await contacts(ev);
+      expect(rs.filter((r) => r.state === "dismissed").every((r) => r.contact_id === null)).toBe(true);
+      expect(rs.filter((r) => r.state === "brought_in")).toHaveLength(cs.length);
+      expect(cs.map((c) => c.full_name)).not.toContain(rs.some((r) => r.full_name === "Ben Ode" && r.state === "dismissed") ? "Ben Ode" : "");
+    }
+  });
+  it("bring in marks only reads still staged: one dismissed meanwhile stays dismissed", async () => {
+    const ev = await approvedEvent(db);
+    await add(ev, [person("Ana Lima"), person("Ben Ode", { company: "Pinefold" })]);
+    const [ben] = await db.query<any>("SELECT id FROM directory_reads WHERE event_id = $1 AND full_name = 'Ben Ode'", [ev]);
+    await dismissRead(db, ev, ben.id);
+    expect((await bringIn(db, ev, MAYA, NOW)).brought_in).toBe(1);
+    expect((await reads(ev)).map((r) => [r.full_name, r.state]).sort()).toEqual([["Ana Lima", "brought_in"], ["Ben Ode", "dismissed"]]);
+  });
+  it("a name and company that opted out, or an erased profile link, is skipped and counted as skipped", async () => {
+    const ev = await approvedEvent(db);
+    await recordOptOut(db, MAYA, { name: "Ana Lima", company: "Orrery" });
+    const out = await add(ev, [person("Lima Ana", { company: "ORRERY, Inc." }), person("Ben Ode", { company: "Pinefold" })]);
+    expect(out).toMatchObject({ added: 1, skipped: 1 });
+    expect((await reads(ev)).map((r) => r.full_name)).toEqual(["Ben Ode"]);
+    // Erasure leaves the link behind as a block, with and without www.
+    const listed = await approvedEvent(db, "Listed");
+    await ingestUpload(db, listed, MAYA, "a.csv", "Company,Name,Title,Email,LinkedIn\nOrrery,Cy Ruiz,CFO,cy@orrery.example,https://www.linkedin.com/in/cy-ruiz\n");
+    const deps = { connectors: {}, llm: mockLlm, now: () => NOW, crm: { ...fakeCrm({ owner: "Dana Owner" }), write: async () => ({ id: "x" }) } as never, userMap: {} } as never;
+    await forgetPerson(db, deps, "cy@orrery.example", "GTM Team");
+    const again = await add(ev, [person("C Ruiz", { company: "Elsewhere", profile_url: "https://linkedin.com/in/cy-ruiz" }), person("C R", { company: "Else", profile_url: "https://www.linkedin.com/in/cy-ruiz/" })]);
+    expect(again).toMatchObject({ added: 0, skipped: 2 });
+    expect((await reads(ev)).map((r) => r.full_name)).toEqual(["Ben Ode"]);
+  });
+  it("a recording frame skips an opted-out person and does not count them as found", async () => {
+    const ev = await approvedEvent(db);
+    await recordOptOut(db, MAYA, { name: "Ana Lima", company: "Orrery" });
+    const llm = seeing([frame([{ name: "Ana Lima", title: "CFO", company: "Orrery" }, { name: "Ben Ode", title: "CEO", company: "Pinefold" }])]);
+    const rec = await createRecording(db, llm, ev, MAYA, "Brella");
+    const out = await readFrame(db, llm, MAYA, rec.id, 0, JPEG, NOW);
+    expect(out).toMatchObject({ state: "read", found: 1, frames_read: 1, frames_failed: 0, people: 1, to_check: 0 });
+    expect((await reads(ev)).map((r) => r.full_name)).toEqual(["Ben Ode"]);
+  });
+  it("a frame whose event moves out of reach while the model reads is refused when it comes back", async () => {
+    const ev = await approvedEvent(db);
+    const llm = seeing([frame([{ name: "Ana Lima", title: "CFO", company: "Orrery" }])]);
+    // The event is delivered while the model is reading.
+    const real = llm.read!.bind(llm);
+    llm.read = async (...a: Parameters<NonNullable<typeof llm.read>>) => { await db.query("UPDATE events SET stage = 'delivered' WHERE id = $1", [ev]); return real(...a); };
+    const rec = await createRecording(db, llm, ev, MAYA, "Brella");
+    await expect(readFrame(db, llm, MAYA, rec.id, 0, JPEG, NOW)).rejects.toThrow(/cannot take a list/);
+    expect(await count(db, "directory_reads", `event_id = '${ev}'`)).toBe(0);
   });
 });
 

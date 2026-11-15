@@ -47,6 +47,18 @@ describe("country_blocked", () => {
     expect((await gate("Ben Ode")).reason).toBe("country_blocked");
     expect((await gate("Cleo Park")).passed).toBe(true);
   });
+  it("blocks on either place: a city with no country at a blocked-country company, and a person elsewhere at one", async () => {
+    await db.query("UPDATE companies SET firmo = '{\"country\": \"Germany\"}'::jsonb WHERE event_id = $1 AND name = 'Tallgrass Software'", [h.id]);
+    for (const where of ["Berlin", "Munich, Bavaria", "Paris, France", null]) {
+      await place("Ana Ruiz", where);
+      expect((await gate("Ana Ruiz")).reason, String(where)).toBe("country_blocked");
+      expect((await gate("Ana Ruiz", "linkedin")).reason, String(where)).not.toBe("country_blocked");
+    }
+    // A blocked place at a company in an unlisted country is still blocked.
+    await db.query("UPDATE companies SET firmo = '{\"country\": \"France\"}'::jsonb WHERE event_id = $1 AND name = 'Tallgrass Software'", [h.id]);
+    await place("Ana Ruiz", "Milan, Italy");
+    expect((await gate("Ana Ruiz")).reason).toBe("country_blocked");
+  });
   it("leaves an unlisted country to the contact-basis check as before, and an unknown place too", async () => {
     await place("Ana Ruiz", "Paris, France");
     expect((await gate("Ana Ruiz")).reason).toBe("no_legal_basis");

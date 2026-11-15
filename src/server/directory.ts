@@ -9,7 +9,8 @@ import { fill, promptHash } from "./prompts.ts";
 import type { Llm } from "./providers.ts";
 import { ingestUpload, listUploads } from "./uploads.ts";
 import { addDays } from "../shared/motion.ts";
-import { cleanLinkedin } from "../shared/ingest.ts";
+import { cleanLinkedin, companyKey } from "../shared/ingest.ts";
+import { nameKey } from "../shared/email.ts";
 import { imageMime } from "../shared/scan.ts";
 import { isGtm } from "../shared/roles.ts";
 import { LIST_SOURCE_WORDS, type ListSource } from "../shared/plan.ts";
@@ -97,6 +98,8 @@ function spendRate(keyId: string, people: number, at: number) {
   if (minute.size > 2000) for (const [k, v] of minute) if (at - v.at >= 60_000) minute.delete(k);
 }
 
+function refundRate(keyId: string, people: number) { const w = minute.get(keyId); if (w) w.n = Math.max(0, w.n - people); }
+
 async function eventFor(q: Q, eventId: unknown): Promise<{ id: string; name: string; stage: string }> {
   const [ev] = typeof eventId === "string" ? await q<{ id: string; name: string; stage: string; parent_event_id: string | null; hosted: boolean }>(
     "SELECT id, name, stage, parent_event_id, EXISTS (SELECT 1 FROM hosted_events h WHERE h.event_id = events.id) AS hosted FROM events WHERE id = $1", [eventId]) : [];
@@ -105,7 +108,7 @@ async function eventFor(q: Q, eventId: unknown): Promise<{ id: string; name: str
   return ev;
 }
 
-async function termsOf(q: Q, eventId: string) {
+export async function termsOf(q: Q, eventId: string) {
   const [a] = await q<{ answer: string }>(
     "SELECT a.answer FROM event_assessments e JOIN assessment_answers a ON a.assessment_id = e.id WHERE e.event_id = $1 AND a.question = 'terms' AND a.state = 'confirmed'", [eventId]);
   return termsNote(a?.answer);
@@ -114,7 +117,9 @@ async function termsOf(q: Q, eventId: string) {
 interface ReadIn { name: string; title: string; company: string; location: string; profile_url: string | null; via: "extension" | "recording"; platform: string; recording_id: string | null; low?: { name?: boolean; company?: boolean } }
 
 /** One read in. A second send of the same person fills only the empty fields from the new one and changes no state, so a person's decision stands. */
-async function putRead(q: Q, eventId: string, r: ReadIn, ctx: { by: string; on: string; source: string; terms: string }): Promise<{ added: boolean; to_check: boolean }> {
+async function putRead(q: Q, eventId: string, r: ReadIn, ctx: { by: string; on: string; source: string; terms: string }): Promise<{ added: boolean; to_check: boolean; skipped: boolean }> {
+  // Someone who opted out or was erased is never read again: by name at a company, or by profile link (what forgetPerson writes).
+  if (await isSuppressedRead(q, r)) return { added: false, to_check: false, skipped: true };
   const j = judgeRead({ name: r.name, title: r.title, company: r.company }, r.low);
   const [row] = await q<{ inserted: boolean }>(
     `INSERT INTO directory_reads (id, event_id, dedupe_key, full_name, title, company, location, profile_url, via, platform, read_by, read_on, source_text, terms_note, state, check_reason, recording_id)
@@ -123,7 +128,17 @@ async function putRead(q: Q, eventId: string, r: ReadIn, ctx: { by: string; on: 
        location = coalesce(directory_reads.location, EXCLUDED.location), profile_url = coalesce(directory_reads.profile_url, EXCLUDED.profile_url)
      RETURNING (xmax = 0) AS inserted`,
     [newId("dr"), eventId, dedupeKey({ name: r.name, company: r.company, profile_url: r.profile_url }), r.name, r.title, r.company, r.location, r.profile_url, r.via, r.platform, ctx.by, ctx.on, ctx.source, ctx.terms, j.state, j.reason, r.recording_id]);
-  return { added: row.inserted, to_check: row.inserted && j.state === "to_check" };
+  return { added: row.inserted, to_check: row.inserted && j.state === "to_check", skipped: false };
+}
+
+/** The profile link as an erasure records it: the same with and without www. */
+export const erasedLinkKey = (url: unknown) => { const k = profileKey(url); return k ? `u:${k.replace("://www.", "://")}` : null; };
+
+/** Does an opt-out stand against this read: the name at the company, or an erased LinkedIn profile. */
+async function isSuppressedRead(q: Q, r: { name: string; company: string; profile_url: string | null }): Promise<boolean> {
+  const ck = r.company ? companyKey(r.company) : "", nk = nameKey(r.name), lk = erasedLinkKey(r.profile_url);
+  const rows = await q("SELECT 1 FROM suppressions WHERE kind = 'opt_out' AND ((name_key = $1 AND company_key = $2 AND $2 <> '') OR ($3::text IS NOT NULL AND name_key = $3 AND company_key = 'linkedin')) LIMIT 1", [nk, ck, lk]);
+  return rows.length > 0;
 }
 
 /** POST /api/capture/people. Everything the person's browser says is a claim: the source sentence and the terms note are built here, the strings are cleaned, a profile link on another host is dropped. */
@@ -138,8 +153,13 @@ export async function captureAdd(db: Db, key: CaptureKey, body: Record<string, u
     const name = cleanText(o.name);
     return name ? [{ name, title: cleanText(o.title), company: cleanText(o.company), location: cleanText(o.location), profile_url: cleanProfileUrl(o.profile_url) }] : [];
   });
-  spendRate(key.id, body.people.length, now.getTime());
-  return db.tx(async (q) => {
+  const sent = body.people.length;
+  let spent = false;
+  try {
+    return await db.tx(async (q) => {
+    // A key revoked while this send was on its way does not add anything.
+    const [k] = await q<{ revoked_at: string | null }>("SELECT revoked_at FROM capture_keys WHERE id = $1 FOR SHARE", [key.id]);
+    if (!k || k.revoked_at) throw new DirectoryError("That capture key has been revoked.", 401);
     const ev = await eventFor(q, body.event_id);
     // Every capture send and every frame read takes this lock before counting, so two at once cannot both pass a cap.
     await q("SELECT 1 FROM events WHERE id = $1 FOR UPDATE", [ev.id]);
@@ -148,14 +168,18 @@ export async function captureAdd(db: Db, key: CaptureKey, body: Record<string, u
     const keys = [...new Set(people.map((p) => dedupeKey({ name: p.name, company: p.company, profile_url: p.profile_url })))];
     const have = keys.length ? await q<{ dedupe_key: string }>("SELECT dedupe_key FROM directory_reads WHERE event_id = $1 AND dedupe_key = ANY($2::text[])", [ev.id, keys]) : [];
     if (n + (keys.length - have.length) > MAX_READS_PER_EVENT) throw new DirectoryError(`This event already holds ${n.toLocaleString("en-US")} reads, and ${MAX_READS_PER_EVENT.toLocaleString("en-US")} is the most it takes.`, 429);
+    // Spent only once the event has taken the send; given back if the rest throws.
+    spendRate(key.id, sent, now.getTime()); spent = true;
     const ctx = { by: key.owner, on, source: extensionSource({ platform, eventName: stillOk.name, by: key.owner, on }), terms: await termsOf(q, ev.id) };
-    let added = 0, already = 0, check = 0;
+    let added = 0, already = 0, check = 0, suppressed = 0;
     for (const p of people) {
       const r = await putRead(q, ev.id, { ...p, via: "extension", platform, recording_id: null }, ctx);
-      if (r.added) { added++; if (r.to_check) check++; } else already++;
+      if (r.skipped) suppressed++;
+      else if (r.added) { added++; if (r.to_check) check++; } else already++;
     }
-    return { added, already_in: already, to_check: check, skipped: (body.people as unknown[]).length - people.length };
-  });
+    return { added, already_in: already, to_check: check, skipped: sent - people.length + suppressed };
+    });
+  } catch (e) { if (spent) refundRate(key.id, sent); throw e; }
 }
 
 /* ------------------------------------------------------------------ the panel */
@@ -221,24 +245,31 @@ export async function directoryPanel(db: Db, eventId: string, blocked: readonly 
 /* ------------------------------------------------------------------ to check: keep, dismiss */
 
 export async function keepRead(db: Db, eventId: string, readId: string, edit: Record<string, unknown>) {
-  const [r] = await db.query<ReadRow>(`SELECT ${READ_COLS} FROM directory_reads WHERE id = $1 AND event_id = $2`, [readId, eventId]);
+  // The event's row is taken first, as bring in and the frame reads do, so a keep cannot cross a bring in.
+  return db.tx(async (q) => {
+  await q("SELECT 1 FROM events WHERE id = $1 FOR UPDATE", [eventId]);
+  const [r] = await q<ReadRow>(`SELECT ${READ_COLS} FROM directory_reads WHERE id = $1 AND event_id = $2`, [readId, eventId]);
   if (!r) throw new DirectoryError("That read is not on this event.", 404);
   if (r.state !== "to_check") throw new DirectoryError(r.state === "staged" ? "That read is already staged." : `That read is ${r.state.replace("_", " ")}.`, 409);
   const name = "name" in edit ? cleanText(edit.name) : r.full_name;
   if (!/\p{L}/u.test(name)) throw new DirectoryError("A name needs letters.", 400);
   const title = "title" in edit ? cleanText(edit.title) : r.title ?? "", company = "company" in edit ? cleanText(edit.company) : r.company ?? "";
   // A person looked at it and kept it: it becomes staged, whatever the rule thought. The key it was first seen under stays, so a later send of the same person still lands on it.
-  const [out] = await db.query<ReadRow>(`UPDATE directory_reads SET full_name = $3, title = nullif($4, ''), company = nullif($5, ''), state = 'staged', check_reason = NULL WHERE id = $1 AND event_id = $2 AND state = 'to_check' RETURNING ${READ_COLS}`, [readId, eventId, name, title, company]);
+  const [out] = await q<ReadRow>(`UPDATE directory_reads SET full_name = $3, title = nullif($4, ''), company = nullif($5, ''), state = 'staged', check_reason = NULL WHERE id = $1 AND event_id = $2 AND state = 'to_check' RETURNING ${READ_COLS}`, [readId, eventId, name, title, company]);
   if (!out) throw new DirectoryError("That read changed while you were looking at it. Reload.", 409);
   return out;
+  });
 }
 
 export async function dismissRead(db: Db, eventId: string, readId: string) {
-  const [r] = await db.query<{ state: string }>("SELECT state FROM directory_reads WHERE id = $1 AND event_id = $2", [readId, eventId]);
-  if (!r) throw new DirectoryError("That read is not on this event.", 404);
-  if (r.state === "brought_in") throw new DirectoryError("That person is already in the list. Drop them from the list instead.", 409);
-  await db.query("UPDATE directory_reads SET state = 'dismissed' WHERE id = $1 AND event_id = $2 AND state IN ('staged', 'to_check')", [readId, eventId]);
-  return { id: readId, state: "dismissed" };
+  return db.tx(async (q) => {
+    await q("SELECT 1 FROM events WHERE id = $1 FOR UPDATE", [eventId]);
+    const [r] = await q<{ state: string }>("SELECT state FROM directory_reads WHERE id = $1 AND event_id = $2", [readId, eventId]);
+    if (!r) throw new DirectoryError("That read is not on this event.", 404);
+    if (r.state === "brought_in") throw new DirectoryError("That person is already in the list. Drop them from the list instead.", 409);
+    await q("UPDATE directory_reads SET state = 'dismissed' WHERE id = $1 AND event_id = $2 AND state IN ('staged', 'to_check')", [readId, eventId]);
+    return { id: readId, state: "dismissed" };
+  });
 }
 
 /* ------------------------------------------------------------------ bring in */
@@ -272,13 +303,14 @@ export async function bringIn(db: Db, eventId: string, actor: string, now: Date)
     precondition: async (q) => {
       const again = await listBlock(q, eventId);
       if (again) throw new DirectoryError(again, 409);
-      const [{ n }] = await q<{ n: number }>("SELECT count(*)::int AS n FROM directory_reads WHERE id = ANY($1::text[]) AND state = 'staged'", [stagedIds]);
+      const n = (await q("SELECT id FROM directory_reads WHERE id = ANY($1::text[]) AND state = 'staged' FOR UPDATE", [stagedIds])).length;
       if (n === 0) throw new DirectoryError("Nothing is ready to bring in.", 409);
       const [{ m }] = await q<{ m: number }>("SELECT count(*)::int AS m FROM directory_reads WHERE event_id = $1 AND state IN ('staged', 'brought_in') AND NOT (id = ANY($2::text[]))", [eventId, ids]);
       if (m || n !== stagedIds.length) throw new DirectoryError("The reads changed while this was bringing them in. Look at the list and try again.", 409);
     },
     afterInsert: async (q, uploadId) => {
-      await q("UPDATE directory_reads SET state = 'brought_in', contact_id = NULL WHERE id = ANY($1::text[])", [ids]);
+      // Only reads still staged (or already brought in) move: one set aside meanwhile stays as it was.
+      await q("UPDATE directory_reads SET state = 'brought_in', contact_id = NULL WHERE id = ANY($1::text[]) AND state IN ('staged', 'brought_in')", [ids]);
       const via = "CASE r.via WHEN 'recording' THEN 'screen_recording' ELSE 'directory_extension' END";
       await q(`UPDATE source_rows s SET list_source = ${via} FROM directory_reads r WHERE s.upload_id = $1 AND r.event_id = $2 AND s.raw->>'Directory read' = r.id`, [uploadId, eventId]);
       await q(
@@ -311,7 +343,12 @@ export async function createRecording(db: Db, llm: Llm, eventId: string, actor: 
   });
 }
 
-const frameOut = (n: number, state: string, found: number, repeat = false) => ({ n, state, found, repeat });
+/** What a frame answered, with the recording's running counts and the event's reads waiting on a check, so the page need not reload its panel after every frame. */
+async function frameOut(q: Q, recordingId: string, n: number, state: string, found: number, repeat = false) {
+  const [r] = await q<{ frames_read: number; frames_failed: number; people: number; to_check: number }>(
+    "SELECT frames_read, frames_failed, people, (SELECT count(*)::int FROM directory_reads d WHERE d.event_id = recordings.event_id AND d.state = 'to_check') AS to_check FROM recordings WHERE id = $1", [recordingId]);
+  return { n, state, found, repeat, to_check: r?.to_check ?? 0, frames_read: r?.frames_read ?? 0, frames_failed: r?.frames_failed ?? 0, people: r?.people ?? 0 };
+}
 
 /** Reads one frame. The row is taken and the call counted first, in one transaction under the event's lock; the model is then called with nothing held; a thrown call marks the frame failed and is never retried. */
 export async function readFrame(db: Db, llm: Llm, actor: string, recordingId: string, frameNo: number, bytes: Uint8Array, now: Date) {
@@ -325,7 +362,7 @@ export async function readFrame(db: Db, llm: Llm, actor: string, recordingId: st
     if (rec.uploaded_by !== actor) throw new DirectoryError(`Only ${rec.uploaded_by}, who made this recording, can send its frames.`, 403);
     await q("SELECT 1 FROM events WHERE id = $1 FOR UPDATE", [rec.event_id]);
     const [have] = await q<{ state: string; found: number }>("SELECT state, found FROM recording_frames WHERE recording_id = $1 AND n = $2", [recordingId, frameNo]);
-    if (have) return { repeat: frameOut(frameNo, have.state, have.found, true) };
+    if (have) return { repeat: await frameOut(q, recordingId, frameNo, have.state, have.found, true) };
     if (rec.state === "done") throw new DirectoryError("This recording is finished. Make another to send more frames.", 409);
     const ev = await eventFor(q, rec.event_id);
     const [{ f }] = await q<{ f: number }>("SELECT count(*)::int AS f FROM recording_frames WHERE recording_id = $1", [recordingId]);
@@ -342,7 +379,7 @@ export async function readFrame(db: Db, llm: Llm, actor: string, recordingId: st
   const fail = async () => {
     await db.query("UPDATE recording_frames SET state = 'failed' WHERE recording_id = $1 AND n = $2", [recordingId, frameNo]);
     await db.query("UPDATE recordings SET frames_failed = frames_failed + 1 WHERE id = $1", [recordingId]);
-    return frameOut(frameNo, "failed", 0);
+    return frameOut(db.query, recordingId, frameNo, "failed", 0);
   };
   if (!llm.read) return fail();
   let reply;
@@ -355,6 +392,8 @@ export async function readFrame(db: Db, llm: Llm, actor: string, recordingId: st
   const on = today(now);
   return db.tx(async (q) => {
     await q("SELECT 1 FROM events WHERE id = $1 FOR UPDATE", [started.eventId]);
+    // The event may have moved on while the picture was being read.
+    await eventFor(q, started.eventId);
     const [{ n }] = await q<{ n: number }>("SELECT count(*)::int AS n FROM directory_reads WHERE event_id = $1", [started.eventId]);
     const ctx = { by: actor, on, source: recordingSource({ app: started.app, eventName: started.eventName, by: actor, on }), terms: await termsOf(q, started.eventId) };
     let room = MAX_READS_PER_EVENT - n, found = 0;
@@ -363,12 +402,13 @@ export async function readFrame(db: Db, llm: Llm, actor: string, recordingId: st
       const [there] = await q("SELECT 1 FROM directory_reads WHERE event_id = $1 AND dedupe_key = $2", [started.eventId, key]);
       if (!there && room <= 0) continue;
       const r = await putRead(q, started.eventId, { name: p.name, title: p.title, company: p.company, location: p.location, profile_url: null, via: "recording", platform: started.app, recording_id: recordingId, low: p.low }, ctx);
+      if (r.skipped) continue;
       if (r.added) room--;
       found++;
     }
     await q("UPDATE recording_frames SET state = 'read', found = $3 WHERE recording_id = $1 AND n = $2", [recordingId, frameNo, found]);
     await q("UPDATE recordings SET frames_read = frames_read + 1, people = (SELECT count(*)::int FROM directory_reads WHERE recording_id = $1) WHERE id = $1", [recordingId]);
-    return frameOut(frameNo, "read", found);
+    return frameOut(q, recordingId, frameNo, "read", found);
   });
 }
 

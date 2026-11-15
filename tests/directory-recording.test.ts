@@ -27,9 +27,9 @@ describe("a frame is read once", () => {
     const spy = { ...llm, async read(...a: Parameters<NonNullable<typeof llm.read>>) { during = (await db.query<any>("SELECT step, input_tokens, output FROM llm_calls WHERE event_id = $1", [ev]))[0]; return llm.read!(...a); } };
     const first = await readFrame(db, spy, MAYA, r.id, 0, JPEG, NOW);
     expect(during).toEqual({ step: "directory_read", input_tokens: 0, output: "" });
-    expect(first).toEqual({ n: 0, state: "read", found: 2, repeat: false });
+    expect(first).toMatchObject({ n: 0, state: "read", found: 2, repeat: false, frames_read: 1, frames_failed: 0, people: 2 });
     const again = await readFrame(db, spy, MAYA, r.id, 0, JPEG, NOW);
-    expect(again).toEqual({ n: 0, state: "read", found: 2, repeat: true });
+    expect(again).toMatchObject({ n: 0, state: "read", found: 2, repeat: true, frames_read: 1, people: 2 });
     expect(llm.calls).toBe(1);
     expect(await count(db, "llm_calls", `event_id = '${ev}' AND step = 'directory_read'`)).toBe(1);
     const rs = await reads();
@@ -54,7 +54,7 @@ describe("a frame is read once", () => {
   it("a failed frame is marked, counted in the totals, and is not retried by the desk", async () => {
     const llm = seeing([frame([ANA])], { throws: [0] });
     const r = await rec(llm);
-    expect(await readFrame(db, llm, MAYA, r.id, 0, JPEG, NOW)).toEqual({ n: 0, state: "failed", found: 0, repeat: false });
+    expect(await readFrame(db, llm, MAYA, r.id, 0, JPEG, NOW)).toMatchObject({ n: 0, state: "failed", found: 0, repeat: false, frames_read: 0, frames_failed: 1, people: 0 });
     expect(await readFrame(db, llm, MAYA, r.id, 0, JPEG, NOW)).toMatchObject({ state: "failed", repeat: true });
     expect(llm.calls).toBe(1);
     expect(await readFrame(db, llm, MAYA, r.id, 1, JPEG, NOW)).toMatchObject({ state: "read", found: 1 });
@@ -207,7 +207,7 @@ describe("over HTTP", () => {
     const frames = (n: number, bytes: Uint8Array, who = "Maya%20Ortiz") => app.request(`/api/recordings/${id}/frames`, { method: "POST", headers: { "x-actor": who, "x-frame": String(n), "content-type": "image/jpeg" }, body: bytes as unknown as BodyInit });
     const ok = await frames(0, JPEG);
     expect(ok.status).toBe(200);
-    expect(await ok.json()).toEqual({ n: 0, state: "read", found: 1, repeat: false });
+    expect(await ok.json()).toMatchObject({ n: 0, state: "read", found: 1, repeat: false, frames_read: 1, frames_failed: 0, people: 1, to_check: 0 });
     expect((await frames(1, JPEG, "Leo%20Marsh")).status).toBe(403);
     const four = new Uint8Array(3_900_000); four.set(JPEG);
     expect((await frames(2, four)).status).toBe(200);

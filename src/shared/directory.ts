@@ -91,7 +91,7 @@ const squash = (t: string) => ascii(t).toLowerCase().replace(/[^\p{L}\p{N}]/gu, 
     at most 40 people; every field cut to 200. Pure. The result goes through `judgeRead`. */
 export function checkFrame(text: string): { people: FramePerson[]; dropped: string[]; transcript: string; valid: boolean } {
   let j: any = null;
-  try { j = JSON.parse(text); } catch { /* an answer that is not JSON reads as nothing */ }
+  try { j = JSON.parse(text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "")); } catch { /* an answer that is not JSON reads as nothing */ }
   const valid = Boolean(j && typeof j === "object" && Array.isArray(j.people));
   const transcript = typeof j?.text === "string" ? j.text : "";
   const hay = squash(transcript);

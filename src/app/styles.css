@@ -2894,3 +2894,49 @@ a:hover > .swap .due, a:focus-visible > .swap .due { opacity: 0; transform: tran
   .sn-table .co, .sn-table .meth, .sn-table .src, .sn-table .rep { display: none; }
   .sn-kv div { grid-template-columns: 140px minmax(0, 1fr); }
 }
+
+/* ------------------------------------------------------------------ get the attendee list (docs/DIRECTORY.md 10) */
+
+.gs { display: grid; gap: 20px; max-width: 1100px; margin-top: 20px; }
+.gh { display: flex; align-items: center; justify-content: space-between; gap: 12px 24px; flex-wrap: wrap; }
+.gh h2 { font: 500 22px/28px var(--display); margin: 0; }
+.gs-list { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.gs-row { width: 100%; border: 0; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.gs-row .pn { width: 34px; text-align: center; font: 600 15px/20px var(--display); color: var(--mute); }
+.gs-row.gs-two { grid-template-columns: minmax(0, 1fr) auto; padding-left: 14px; }
+.conn-who span.strong { color: var(--ink); font-weight: 600; }
+.gs-row > .chev { justify-self: end; }
+.gs-will { margin: 0; max-width: 720px; }
+.rule { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 16px; margin: 0; padding: 12px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); font-size: 13px; line-height: 18px; }
+.rule dt { color: var(--mute); }
+.rule dd { margin: 0; color: var(--ink); }
+.gs-readas { display: grid; gap: 2px; padding: 18px 22px; border-radius: 18px; background: var(--well); }
+.gs-readas b { font-size: 22px; line-height: 28px; }
+.gs-form { display: grid; gap: 14px; }
+.gs-file { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; padding: 0 6px 0 12px; border-radius: 12px; background: var(--well); box-shadow: inset 0 0 0 1px var(--line); font-weight: 400; color: var(--ink); }
+.gs-file-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; }
+.gs-file-btn { cursor: pointer; flex: none; }
+.gs-frames { display: flex; gap: 3px; height: 28px; }
+.gs-frames i { flex: 1 1 0; min-width: 2px; border-radius: 2px; box-shadow: inset 0 0 0 1px var(--line-2); }
+.gs-frames i.on { background: var(--green); box-shadow: none; }
+.gs-frames i.bad { background: transparent; box-shadow: inset 0 0 0 1.5px var(--ink); }
+.figs dd { white-space: nowrap; }
+.gs-key { grid-template-columns: minmax(0, 1fr) auto; padding-left: 14px; }
+.gs-keyend { display: inline-flex; align-items: center; gap: 12px; justify-content: flex-end; font-size: 13px; color: var(--mute); }
+.gs-used { color: var(--ink); }
+.gs-step { grid-template-columns: 34px minmax(0, 1fr); }
+.gs-step .pn { text-align: center; font: 600 15px/20px var(--display); color: var(--mute); }
+.gs-step .conn-who span { font-size: 14px; line-height: 20px; color: var(--ink); }
+.gs-count { padding: 4px 10px 6px; font: 600 13px/18px var(--display); text-align: right; }
+.gs-keytext { display: block; font: 15px/22px ui-monospace, "SF Mono", Menlo, monospace; overflow-wrap: anywhere; }
+.person-read { overflow-wrap: anywhere; }
+@media (max-width: 720px) {
+  .gh .btn { width: 100%; }
+  .gs-key { grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 12px 14px; }
+  .gs-keyend { justify-content: space-between; }
+  .rule { grid-template-columns: minmax(0, 1fr); }
+  .gs-frames { gap: 2px; }
+}
+.scols.gs-trays .tray > * { flex: none; }
+.gs-trays .tray > .gs-count { flex: none; }
+.sheet-facts dd > span { display: inline-flex; gap: 10px; align-items: baseline; }

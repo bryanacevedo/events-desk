@@ -21,6 +21,7 @@ import { Scanner } from "./Scanner";
 import { CheckIn } from "./CheckIn";
 import { HostedResult } from "./HostedResult";
 import { Upload } from "./Upload";
+import { GetList } from "./Directory";
 import { To } from "./To";
 import { Chevron, FileButton, ShowMore, SheetButton } from "./Patterns";
 import { isGtm } from "../shared/roles";
@@ -607,7 +608,10 @@ export function StageBlock({ ev, go, compact }: { ev: EventState; go: (to: strin
         </section>
       )}
 
-      {stage === "approved" && <Upload primary label="Add the attendee list" path={`/api/events/${e.id}/upload`} accept={`.csv,.xlsx,text/csv,${XLSX}`} onDone={reload} />}
+      {stage === "approved" && (compact || topUp
+        ? <Upload primary label="Add the attendee list" path={`/api/events/${e.id}/upload`} accept={`.csv,.xlsx,text/csv,${XLSX}`} onDone={reload} />
+        : <GetList eventId={e.id} onChange={reload} />)}
+      {(stage === "mapped" || stage === "quoted") && !compact && !topUp && <GetList eventId={e.id} quiet onChange={reload} />}
 
       {stage === "mapped" && d.settings && <MappedStep d={d} onError={setError} onChange={reload} compact={compact} />}
 

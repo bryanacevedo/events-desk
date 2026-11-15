@@ -4,6 +4,7 @@ import { GATES, scoreCompanies, scoreConcierge, scoreReview, scoreTitles } from 
 import { isFresh, recordingOf, staleManifest, strictMode } from "../src/evals/recordings.ts";
 import { promptHash, type Step } from "../src/server/prompts.ts";
 import { assessmentRecording } from "../src/evals/assessment.ts";
+import { directoryRecording } from "../src/evals/directory.ts";
 import { titleRule, type Settings } from "../src/shared/cost.ts";
 
 const list = JSON.parse(readFileSync("evals/list.json", "utf8"));
@@ -60,10 +61,10 @@ describe("recorded model runs", () => {
    evals/recordings/stale.json with what to re-run, and CI (EVALS_STRICT=1) fails until it is re-recorded. */
 describe("stale recordings are declared, never passed quietly", () => {
   const manifest = staleManifest();
-  const steps = ["company_tier", "second_look", "website_read", "title_parse", "perspective", "title_tier", "review", "concierge", "assessment_propose"] as const;
+  const steps = ["company_tier", "second_look", "website_read", "title_parse", "perspective", "title_tier", "review", "concierge", "assessment_propose", "directory_read"] as const;
   // The assessment recording also carries a hash of every filled prompt (the questions are filled into the template, so a change to a question's wording
   // leaves the template hash alone), which assessmentRecording() checks. Company tier and second look are checked in their own tests.
-  const inputsOk = (step: Step): boolean | null => (step === "company_tier" || step === "second_look" ? true : step === "assessment_propose" ? assessmentRecording().out !== null : null);
+  const inputsOk = (step: Step): boolean | null => (step === "company_tier" || step === "second_look" ? true : step === "assessment_propose" ? assessmentRecording().out !== null : step === "directory_read" ? directoryRecording().out !== null : null);
   for (const step of steps) {
     const r = recordingOf(step);
     const declared = manifest[step];

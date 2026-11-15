@@ -31,6 +31,7 @@
     var total = 0;
     var ctl = root.EDScroll.create(opts.scroll || {});
     var finished = false;
+    var runId = opts.runId || null;
 
     function stopNow() { ctl.stop(); }
     function onHide() { if (doc.visibilityState === 'hidden') stopNow(); }
@@ -42,7 +43,7 @@
       finished = true;
       doc.removeEventListener('visibilitychange', onHide);
       root.removeEventListener('pagehide', stopNow);
-      return send({ type: 'ed:done', reason: reason, read: total, layout: extra && extra.layout, readerId: reader && reader.id });
+      return send({ type: 'ed:done', runId: runId, reason: reason, read: total, layout: extra && extra.layout, readerId: reader && reader.id });
     }
 
     async function pass() {
@@ -61,6 +62,7 @@
       for (var j = 0; j < fresh.length; j += BATCH) {
         var reply = await send({
           type: 'ed:batch',
+          runId: runId,
           platform: reader.id,
           pageUrl: root.location.href,
           people: fresh.slice(j, j + BATCH),

@@ -66,7 +66,11 @@ async function localChecks(db: Db, p: GatePerson, channel: Channel, now: Date, b
   if (!p.full_name || p.name_hidden) return no_("name_unknown");
   if (!p.domain) return no_("no_domain");
   // The countries the desk does not email, for everyone on every event whatever the source of the list (docs/DIRECTORY.md 3). A person whose country is unknown or not listed goes on to the basis check as before.
-  if (channel === "email") { const c = normalizeCountry(regionOf(p)); if (c && blocked.has(c)) return no_("country_blocked"); }
+  // Either place blocks: a person located "Berlin" or "Munich, Bavaria" at a company headquartered in a blocked country is blocked, though their own place names no country.
+  if (channel === "email") {
+    const own = normalizeCountry(p.person_location?.split(",").at(-1)?.trim() ?? ""), hq = normalizeCountry(p.firmo?.country?.trim() ?? "");
+    if ((own && blocked.has(own)) || (hq && blocked.has(hq))) return no_("country_blocked");
+  }
   // 7. A person recorded a basis for this region.
   if (!bases.has(regionOf(p))) return no_("no_legal_basis");
   // 5. Not in another cadence, at any event. The other channel of the same event is the same cadence.

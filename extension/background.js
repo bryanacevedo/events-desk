@@ -6,8 +6,9 @@ const NOT_DIR = 'This page is not a directory the extension can read yet. Use a 
 const CHANGED = "The page looks like Swapcard's directory but its layout has changed: nothing was read. Tell the desk's admin.";
 const INJECT_FILES = ['readers/swapcard.js', 'readers/index.js', 'scroll.js', 'inject.js'];
 
-const blank = () => ({ running: false, tabId: null, eventId: null, read: 0, added: 0, alreadyIn: 0, toCheck: 0, message: '', done: false });
+const blank = () => ({ running: false, tabId: null, eventId: null, runId: null, read: 0, added: 0, alreadyIn: 0, toCheck: 0, message: '', done: false });
 let state = blank();
+let runCounter = 0;
 
 async function loadSettings() {
   const s = await chrome.storage.local.get(['deskUrl', 'captureKey', 'eventId']);
@@ -69,14 +70,17 @@ async function listEvents() {
 
 async function startRun({ tabId, mode, eventId }) {
   if (!eventId) return { ok: false, error: 'Pick an event first.' };
-  state = { ...blank(), running: true, tabId, eventId };
+  // An old run is stopped first, and this one is tagged so a late message from the old page cannot end it.
+  await stopRun();
+  const runId = Date.now().toString(36) + '-' + (++runCounter);
+  state = { ...blank(), running: true, tabId, eventId, runId };
   await saveState();
   try {
     await chrome.scripting.executeScript({ target: { tabId }, files: INJECT_FILES });
     await chrome.scripting.executeScript({
       target: { tabId },
-      func: (m) => globalThis.EDRun.start({ mode: m }),
-      args: [mode === 'scroll' ? 'scroll' : 'once'],
+      func: (m, id) => globalThis.EDRun.start({ mode: m, runId: id }),
+      args: [mode === 'scroll' ? 'scroll' : 'once', runId],
     });
   } catch (e) {
     state = { ...blank(), done: true, message: NOT_DIR };
@@ -145,8 +149,8 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
     case 'start': job = startRun(msg); break;
     case 'stop': job = stopRun(); break;
     case 'status': job = currentState().then((s) => ({ ok: true, state: s })); break;
-    case 'ed:batch': job = isPage && sender.tab.id === state.tabId ? onBatch(msg) : Promise.resolve({ ok: false }); break;
-    case 'ed:done': job = isPage && sender.tab.id === state.tabId ? onDone(msg) : Promise.resolve({ ok: false }); break;
+    case 'ed:batch': job = isPage && sender.tab.id === state.tabId && msg.runId === state.runId ? onBatch(msg) : Promise.resolve({ ok: false }); break;
+    case 'ed:done': job = isPage && sender.tab.id === state.tabId && msg.runId === state.runId ? onDone(msg) : Promise.resolve({ ok: false }); break;
     default: return false;
   }
   job.then(reply, (e) => reply({ ok: false, error: String((e && e.message) || e) }));

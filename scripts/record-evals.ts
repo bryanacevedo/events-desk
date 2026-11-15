@@ -15,6 +15,8 @@ import { loadTitleDev, loadTitleHoldout, titlePrompt } from "../src/evals/title-
 import { assessmentPrompt } from "../src/server/assessment.ts";
 import { assessmentDev, assessmentPage } from "../src/server/assessment-sim.ts";
 import { pageSent } from "../src/shared/assessment.ts";
+import { directoryInputs, directoryLabels, frameBytes } from "../src/evals/directory.ts";
+import { imageMime } from "../src/shared/scan.ts";
 import { decidedByRule, demoIcp, inputsHash, loadDev, loadHoldout, promptFor, secondLookItems } from "../src/evals/company-tier.ts";
 
 if (process.env.LIVE_SPEND !== "1" || !process.env.ANTHROPIC_API_KEY) {
@@ -31,7 +33,7 @@ const tools = (await client.listTools()).tools.filter((t) => t.name !== "list_ev
 await client.close();
 await db.close();
 
-type Item = { id: string; prompt: string };
+type Item = { id: string; prompt: string; /** The recording's stored form of the input when the prompt alone is not all of it (a picture goes with the prompt). */ stored?: string; image?: { mime: "image/jpeg" | "image/png" | "image/webp"; base64: string } };
 // Company tier is scored on the development set and the frozen holdout (src/evals/company-tier.ts). The hard rules decide some items in code, so the
 // model is asked only about the rest. The second look runs on the items production would look at twice: the model's tier 1s and its tiers more than
 // one level from the baseline, so it needs the first pass.
@@ -51,6 +53,8 @@ const steps: [Step, Item[] | (() => Item[])][] = [
   ["reply_classify", ["dev", "holdout", "injection"].flatMap((k) => JSON.parse(readFileSync(`evals/reply-classify.${k}.json`, "utf8")).items).map((it: { id: string; reply: string }) => ({ id: it.id, prompt: fill("reply_classify", { codes: REPLY_CODES.join(", "), reply: cleanReply(it.reply) || it.reply }) }))],
   // The assessment step reads each labelled page the way production sends it: markers neutralised, cut to length. About 7 calls.
   ["assessment_propose", assessmentDev().map((it) => ({ id: it.id, prompt: assessmentPrompt(pageSent(assessmentPage(it))) }))],
+  // The directory read sends one frame of the fake event app with the prompt production uses. 8 calls, each with a picture; the stored input carries the picture's hash.
+  ["directory_read", directoryLabels().frames.map((f) => ({ id: f.id, prompt: fill("directory_read", {}), stored: directoryInputs()[f.id], image: { mime: imageMime(frameBytes(f))!, base64: frameBytes(f).toString("base64") } }))],
   ["concierge", list.questions.map((q: { id: string; question: string }) => ({ id: q.id, prompt: fill("concierge", { tools, input: `Event: evt_eval\nQuestion: ${q.question}` }) }))],
 ];
 
@@ -60,9 +64,9 @@ const plan = planEvalRun(Object.fromEntries(steps.filter(([step]) => !only || st
 console.log(`${plan.total} items in this list; limit ${plan.limit}${plan.explicit ? "" : " (default, set EVALS_MAX_ITEMS to change)"}; making ${plan.run} real calls.`);
 if (!plan.full) console.log("Partial run: results go to evals/recordings/partial/ and the CI recordings are left alone. A full re-record needs EVALS_MAX_ITEMS=" + plan.total + ".");
 const llm = anthropicLlm();
-async function withBackoff(step: Step, prompt: string) {
+async function withBackoff(step: Step, prompt: string, image?: Item["image"]) {
   for (let i = 1; ; i++) {
-    try { const r = await llm.complete(step, prompt); if (r.model) served.add(r.model); spent.calls++; spent.input += r.input_tokens; spent.output += r.output_tokens; return r.text; }
+    try { const r = image ? await llm.read!(step, prompt, image) : await llm.complete(step, prompt); if (r.model) served.add(r.model); spent.calls++; spent.input += r.input_tokens; spent.output += r.output_tokens; return r.text; }
     catch (e) { if (!(e instanceof VendorError) || i >= 6) throw e; await new Promise((r) => setTimeout(r, 5000 * i)); }
   }
 }
@@ -88,11 +92,11 @@ for (const [step, source] of steps) {
   const outputs: Record<string, string> = {};
   const queue = [...items];
   await Promise.all(Array.from({ length: 5 }, async () => {
-    for (let item = queue.shift(); item; item = queue.shift()) outputs[item.id] = await withBackoff(step, item.prompt);
+    for (let item = queue.shift(); item; item = queue.shift()) outputs[item.id] = await withBackoff(step, item.prompt, item.image);
   }));
   results[step] = outputs;
   // inputs_hash covers the filled prompts, so a changed ICP, fact format or eval set makes the recording stale even when the template is the same.
-  writeFileSync(`${dir}/${step}.json`, `${JSON.stringify({ step, prompt_hash: promptHash(step, llm.model), inputs_hash: inputsHash(Object.fromEntries(items.map((i) => [i.id, i.prompt]))), model: llm.model, served_models: [...served].sort(), recorded_at: new Date().toISOString(), outputs }, null, 1)}\n`);
+  writeFileSync(`${dir}/${step}.json`, `${JSON.stringify({ step, prompt_hash: promptHash(step, llm.model), inputs_hash: inputsHash(Object.fromEntries(items.map((i) => [i.id, i.stored ?? i.prompt]))), model: llm.model, served_models: [...served].sort(), recorded_at: new Date().toISOString(), outputs }, null, 1)}\n`);
   console.log(step, items.length, "recorded");
   logCost(step);
 }

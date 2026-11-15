@@ -11,11 +11,10 @@ import { Fold } from "./Motion";
 import { DeclineBox, Editable, GoalEditor, InvolvementEditor, LinesEditor, PersonEditor, ReasonEditor } from "./PlanEdit";
 import { SponsorBlock } from "./PlanSponsor";
 import { AssessmentBlock, OrganizerBlock } from "./PlanAssessment";
-import { Upload } from "./Upload";
+import { GetList } from "./Directory";
 import { LIST_SOURCE_WORDS } from "../shared/plan";
 import { money, num, shortDate } from "./words";
 
-const XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
 type PV = "a" | "b" | "c";
 const VIEW_WORDS: [PV, string][] = [["a", "One ledger"], ["b", "By involvement"], ["c", "What needs me"]];
@@ -166,7 +165,7 @@ export function PlanTab({ id, listRows, onChange }: { id: string; listRows: numb
       <ul className="pl-rows">
         <li className="pl-row"><span className="pl-what"><b>Attendee list</b>{src && <span>{src}</span>}</span><span className="pl-end">{listRows > 0 ? `${num(listRows)} rows` : "Not uploaded"}</span></li>
       </ul>
-      {canUpload && <Upload primary label="Add the attendee list" path={`/api/events/${id}/upload`} accept={`.csv,.xlsx,text/csv,${XLSX}`} onDone={() => { void saved(); }} />}
+      {canUpload && <GetList eventId={id} onChange={() => { void saved(); }} />}
       {!p.event.hosted && (
         <>
           <h3 className="pl-h3">Assessment</h3>

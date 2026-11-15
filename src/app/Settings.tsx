@@ -12,6 +12,7 @@ import { EventLogo } from "./EventLogo";
 import { CompileFlow } from "./Icp";
 import { Icon } from "./icons";
 import { Chevron, ConfirmDialog } from "./Patterns";
+import { HSheet, Facts } from "./Guests";
 import { PersonAvatar } from "./PersonAvatar";
 import { plural } from "./words";
 
@@ -23,12 +24,20 @@ type View = ReturnType<typeof settingsView>;
 const SECTIONS = [
   ["icp", "ICP", <Icon.target />], ["scoring", "Scoring", <Icon.grid />], ["titles", "Titles and people", <Icon.people />], ["lists", "Lists", <Icon.lists />],
   ["data", "Data rules", <Icon.check />], ["spend", "Spend limits", <Icon.cost />], ["connections", "Connections", <Icon.plug />], ["team", "Team and access", <Icon.seats />],
+  ["extension", "Browser extension", <Icon.plug />],
 ] as const;
 type Section = (typeof SECTIONS)[number][0];
 
 export function Settings({ go, compileId, section }: { go: Go; compileId: string | null; section: string | null }) {
   const { actor } = useActor();
-  if (!isGtm(actor)) return <><header className="hero" data-ready="1"><div><h1>Settings</h1></div></header><p className="mute" role="status">{SETTINGS_REFUSAL}</p></>;
+  // Everyone makes their own browser extension keys; the rest of Settings is GTM Engineering's.
+  if (!isGtm(actor)) return (
+    <>
+      <header className="hero" data-ready="1"><div><h1>Settings</h1></div></header>
+      <ExtensionSection />
+      <p className="mute" role="status">{SETTINGS_REFUSAL}</p>
+    </>
+  );
   if (compileId) return <CompileFlow id={compileId} go={go} />;
   const cur: Section = SECTIONS.some(([k]) => k === section) ? (section as Section) : "icp";
   return (
@@ -38,7 +47,7 @@ export function Settings({ go, compileId, section }: { go: Go; compileId: string
         <nav className="snav" aria-label="Settings sections" style={{ "--at": SECTIONS.findIndex(([k]) => k === cur) } as CSSProperties}>
           {SECTIONS.map(([k, label, icon]) => <Link key={k} to={k === "icp" ? "/settings" : `/settings?section=${k}`} go={go} aria-current={cur === k ? "page" : undefined}><span className="ico">{icon}</span>{label}</Link>)}
         </nav>
-        <div className="sbody" key={cur}>{cur === "icp" ? <IcpSection go={go} /> : <ViewSection which={cur} />}</div>
+        <div className="sbody" key={cur}>{cur === "icp" ? <IcpSection go={go} /> : cur === "extension" ? <ExtensionSection /> : <ViewSection which={cur} />}</div>
       </div>
     </>
   );
@@ -356,4 +365,111 @@ function ViewSection({ which }: { which: Exclude<Section, "icp"> }) {
     );
   }
   return <section aria-label={title} className="sstack" data-ready="1">{body}</section>;
+}
+
+
+/* ------------------------------------------------------------------ the browser extension: every person makes and revokes their own keys */
+
+interface CaptureKey { id: string; label: string; tail: string; created_at: string; last_used_at: string | null; revoked_at: string | null; state: string }
+const stamp = (iso: string) => {
+  const d = new Date(iso), now = new Date();
+  const time = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  return d.toDateString() === now.toDateString() ? `Today at ${time}` : `${when(iso)}, ${time}`;
+};
+const MAX_KEYS = 5;
+
+function ExtensionSection() {
+  const { actor } = useActor();
+  const [keys, setKeys] = useState<CaptureKey[] | null>(null);
+  const [making, setMaking] = useState(false);
+  const [made, setMade] = useState<{ label: string; key: string; created_at: string } | null>(null);
+  const [error, setError] = useState("");
+  const [sure, setSure] = useState<string | null>(null);
+  const load = async () => { const r = await get<{ keys: CaptureKey[] }>("/api/capture-keys"); setKeys(r?.keys ?? []); };
+  useEffect(() => { load(); }, [actor]);
+  if (!keys) return null;
+  const live = keys.filter((k) => !k.revoked_at);
+  const revoke = async (id: string) => {
+    setError("");
+    const r = await send("DELETE", `/api/capture-keys/${id}`, actor);
+    setSure(null);
+    if (!r.ok) setError(r.error); else await load();
+  };
+  const address = location.origin;
+  return (
+    <section aria-label="Browser extension" className="sstack" data-ready="1">
+      <div className="gh">
+        <h2>Browser extension</h2>
+        <button className="btn" type="button" disabled={live.length >= MAX_KEYS} onClick={() => { setMaking(true); setMade(null); }}>Make a key</button>
+      </div>
+      {error && <p role="alert" className="error">{error}</p>}
+      <div className="scols gs-trays">
+        <Tray title="Your keys">
+          {keys.length === 0 && <p className="sempty">No keys yet</p>}
+          {keys.map((k) => (
+            <div className="conn gs-key" key={k.id}>
+              <span className="conn-who"><b>{k.label}</b><span>Ends in {k.tail}, made {when(k.created_at)}</span></span>
+              {k.revoked_at
+                ? <span className="gs-keyend">Revoked {when(k.revoked_at)}</span>
+                : sure === k.id
+                  ? <span className="gs-keyend"><button className="btn small" type="button" onClick={() => revoke(k.id)}>Revoke the key</button><button className="btn line small" type="button" onClick={() => setSure(null)}>Keep it</button></span>
+                  : <span className="gs-keyend"><span className={k.last_used_at ? "gs-used" : undefined}>{k.last_used_at ? stamp(k.last_used_at) : "Not used yet"}</span><button className="btn line small" type="button" onClick={() => setSure(k.id)} aria-label={`Revoke ${k.label}`}>Revoke</button></span>}
+            </div>
+          ))}
+          <span className="gs-count">{live.length} of {MAX_KEYS}</span>
+        </Tray>
+        <div className="sstack tight">
+          <Tray title="To paste into the extension">
+            <Row label="Desk address" value={<span className="wrap-any">{address}</span>} />
+            <Row label="Extension folder" value="events-desk/extension" />
+          </Tray>
+          <Tray title="Load it in Chrome">
+            {["Open chrome://extensions and turn on Developer mode", "Press Load unpacked and choose the folder events-desk/extension", "Open Events Desk in the toolbar and paste the address and the key"].map((t, i) => (
+              <div className="conn gs-step" key={t}><span className="pn">{i + 1}</span><span className="conn-who"><span>{t}</span></span></div>
+            ))}
+          </Tray>
+        </div>
+      </div>
+      {making && <KeySheet made={made} address={address} actor={actor} close={() => { setMaking(false); setMade(null); load(); }} onMade={(m) => { setMade(m); load(); }} />}
+    </section>
+  );
+}
+
+function KeySheet({ made, address, actor, close, onMade }: { made: { label: string; key: string; created_at: string } | null; address: string; actor: string; close: () => void; onMade: (m: { label: string; key: string; created_at: string }) => void }) {
+  const [label, setLabel] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [copied, setCopied] = useState("");
+  const copy = async (what: string, text: string) => {
+    try { await navigator.clipboard.writeText(text); setCopied(what); } catch { setCopied(""); setError("This browser would not copy. Select the text and copy it by hand."); }
+  };
+  const make = async () => {
+    setBusy(true); setError("");
+    const r = await send<{ label: string; key: string; created_at: string }>("POST", "/api/capture-keys", actor, { label });
+    setBusy(false);
+    if (r.ok) onMade(r.data); else setError(r.error);
+  };
+  if (!made) {
+    return (
+      <HSheet label="Make a key" close={close}>
+        <form className="gs-form" onSubmit={(e) => { e.preventDefault(); if (label.trim()) void make(); }}>
+          <label className="field"><span>Name</span><input className="input" value={label} maxLength={60} onChange={(e) => setLabel(e.target.value)} autoComplete="off" placeholder="Conference laptop" /></label>
+          {error && <p role="alert" className="error">{error}</p>}
+          <div className="actions"><button className="btn" type="submit" disabled={busy || !label.trim()}>Make the key</button><button className="btn line" type="button" onClick={close}>Cancel</button></div>
+        </form>
+      </HSheet>
+    );
+  }
+  return (
+    <HSheet label="New key" close={close}>
+      <div className="gs-readas"><span className="mute">{made.label}</span><code className="gs-keytext">{made.key}</code></div>
+      <p className="strong">Shown once. It cannot be read again after this closes.</p>
+      {error && <p role="alert" className="error">{error}</p>}
+      <div className="actions">
+        <button className="btn" type="button" onClick={() => copy("key", made.key)}>{copied === "key" ? "Copied" : "Copy the key"}</button>
+        <button className="btn line" type="button" onClick={() => copy("address", address)}>{copied === "address" ? "Copied" : "Copy the desk address"}</button>
+      </div>
+      <Facts rows={[["Can", "Add people to an event"], ["Cannot", "Read or change anything else"], ["Made", `${when(made.created_at)} by ${actor}`]]} />
+    </HSheet>
+  );
 }

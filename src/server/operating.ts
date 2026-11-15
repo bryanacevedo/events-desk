@@ -6,7 +6,7 @@ import type { Db } from "./db.ts";
 import { welcomeRoom } from "./event-room.ts";
 import { stopContacts } from "./enroll-ops.ts";
 import { purgeScanData } from "./scans.ts";
-import { eraseReads, purgeDirectoryData } from "./directory.ts";
+import { eraseReads, erasedLinkKey, purgeDirectoryData } from "./directory.ts";
 import { logActivity, newId, RuleError } from "./events.ts";
 import { DESK, nowOf, type LifecycleDeps } from "./lifecycle-deps.ts";
 import { pauseSequenceById, drainOps } from "./sequences.ts";
@@ -251,6 +251,8 @@ export async function forgetPerson(db: Db, deps: LifecycleDeps, email: string, a
     await eraseReads(q, { contactIds: ids, people: rows.filter((r) => r.full_name && r.key).map((r) => ({ name: r.full_name!, companyKey: r.key! })), profileUrls: [...linkedins, ...profileRows.map((r) => r.p).filter((x): x is string => Boolean(x))] });
     // The name at the company is blocked too, so a later list with no address still finds them.
     for (const [n, k] of pairs) await q("INSERT INTO suppressions (id, kind, name_key, company_key, reason, created_by) VALUES ($1, 'opt_out', $2, $3, 'Erasure request', $4)", [newId("sup"), n, k, actor]);
+    // An erased LinkedIn profile is not read again: recorded as a name key that no real name can have, under the company key "linkedin".
+    for (const u of new Set([...linkedins, ...profileRows.map((r) => r.p).filter((x): x is string => Boolean(x))].map(erasedLinkKey).filter((x): x is string => Boolean(x)))) await q("INSERT INTO suppressions (id, kind, name_key, company_key, reason, created_by) VALUES ($1, 'opt_out', $2, 'linkedin', 'Erasure request', $3)", [newId("sup"), u, actor]);
     await stopContacts(q, ids, "remove", "erasure");
     await q("UPDATE inbound_messages SET body = NULL WHERE contact_id = ANY($1::text[])", [ids]);
     // Slack cards and the event's history are scrubbed while the name is still known.

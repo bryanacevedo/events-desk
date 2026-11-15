@@ -9,6 +9,7 @@
 # of # met accounts have pipeline
 # of # others
 # of # used
+# read from #
 # still registered will be marked as no-shows.
 #, #, not requested. Request a seat
 #, added by #
@@ -17,10 +18,12 @@ A line for the version history
 Accounts you know will be there (optional)
 Add a way of taking part
 Budget is for leadership and GTM Engineering.
+Choose one video, or screenshots of the list.
 Confirmed by #, #
 Declined by ##
 Domain not set up to send
 Each side keeps the guests it invited
+Ends in #, made #
 Every way of taking part is on the plan.
 From the attendee file (unverified):
 From the seat to the result
@@ -36,6 +39,7 @@ My event is not listed
 No email, no CRM task.
 No event has finished sending yet.
 Not read: the card ran out
+Nothing in that video looked like a list.
 Nothing is due this week.
 Nothing needs anyone right now.
 One company per line: name, employees, industry, business model, expected tier, kind (won, lost or bad fit)
@@ -47,6 +51,7 @@ People to look for per company
 Publish although it got under # right
 Reading replies, waiting on the uploader
 Real event names, simulated attendees.
+Request email to the organizer
 Results are for leadership and GTM Engineering.
 Review the cost to verify and find contacts
 Save the document as .txt or .md, or paste its text.
@@ -54,12 +59,15 @@ Saved. Their outreach is stopped, and a task for today is in the CRM.
 Saved. Their outreach is stopped.
 Say when you sent it
 Says unsubscribe, read as something else
+Screen recording, for an app with no website
 Seats are for leadership and GTM Engineering.
+Shown once. It cannot be read again after this closes.
 Sponsor session or side event
 That company is not on this event.
 That deal is no longer credited here.
 That did not go through. Try again.
 That event does not exist.
+That file could not be read.
 That meeting is no longer here.
 That person is not on the list.
 That reply is no longer here.
@@ -70,6 +78,7 @@ The plan was made, but # Add the rest on the plan.
 The rules changed since this test. Test again before publishing.
 The sentence, word for word
 The side that owns the account keeps all its guests
+This browser cannot read that video. Take screenshots of the list and choose them instead.
 This browser will not keep scans after the page closes. Sync before you leave.
 This draft was thrown away.
 Those notes are not here.
@@ -78,5 +87,8 @@ Travel per person, dollars (optional)
 Up to ##
 Usage is for leadership and GTM Engineering.
 Waiting on # to run this.
+Ways to get it, in order
+Web portal, with the browser extension
 Where the file came from
 Where the pipeline came from
+Will not share the list

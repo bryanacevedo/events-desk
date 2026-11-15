@@ -27,6 +27,7 @@ import { exampleDns, systemDns } from "./identity.ts";
 import { seed } from "./seed.ts";
 import { restampDemoPlan, seedPastResults } from "./seed-plan.ts";
 import { seedScans } from "./seed-scans.ts";
+import { seedDirectory } from "./seed-directory.ts";
 import { swapcardAdapter } from "./organizer-api.ts";
 import { senderFromEnv } from "./transactional.ts";
 import { simDeps } from "./sim-vendors.ts";
@@ -129,6 +130,8 @@ if (!demoMotionReady) void (async () => {
         await seedPastResults(db, lifecycle!);
         // A day's scans on the same past event, and Tokyo set up for the one coming.
         await seedScans(db, lifecycle!);
+        // The extension's reads on the same past event, and a finished screen recording on Tokyo.
+        await seedDirectory(db);
         // Free meeting slots belong to an event still to come: the one in market before it starts.
         const tokyo = "evt_salesforce-world-tour-tokyo-2026";
         const [rep] = await db.query<{ rep: string }>("SELECT requester AS rep FROM seat_requests WHERE event_id = $1 AND status = 'approved' ORDER BY (requester = 'Maya Ortiz') DESC, requester LIMIT 1", [tokyo]);

@@ -20,6 +20,8 @@ export interface PersonRow {
   seen_at: number; last_verified_at: string | null;
   /** Where this person is in outreach: their latest enrollment, latest reply and latest meeting. Null where there is none. */
   outreach: { state: string; cause: string | null; channel: string } | null; reply_code: string | null; meeting: string | null;
+  /** Where this person's list came from, and for a person read from a directory or a recording the sentence and terms note the server wrote. */
+  list_source: string | null; read_note: string | null; read_terms: string | null;
 }
 export interface CompanyRow {
   id: string; name: string; tier: 1 | 2 | 3 | null; tier_fact: string | null; industry: string | null; employees: string | null; country: string | null;
@@ -34,7 +36,7 @@ export function mountEventViews(app: Hono<{ Variables: { actor: string } }>, db:
     const source = ["attendee", "prospect"].includes(c.req.query("source") ?? "") ? c.req.query("source")! : "";
     const limit = Math.min(MAX, int(c.req.query("limit"), PAGE) || PAGE), offset = int(c.req.query("offset"), 0);
     const rows = await db.query<PersonRow & { total: number }>(
-      `SELECT c.id, c.full_name, c.title, c.email, c.priority, c.title_tier, c.drop_reason, c.source, c.linkedin, c.employer,
+      `SELECT c.id, c.full_name, c.title, c.email, c.priority, c.title_tier, c.drop_reason, c.source, c.linkedin, c.employer, c.list_source, c.read_note, c.read_terms,
               co.name AS company, co.id AS company_id, co.tier AS company_tier,
               coalesce((SELECT array_agg(f.flag ORDER BY f.flag) FROM review_flags f WHERE f.contact_id = c.id), '{}') AS flags,
               (SELECT count(DISTINCT coalesce(ev.parent_event_id, ev.id))::int FROM contacts x JOIN events ev ON ev.id = x.event_id WHERE x.person_id = c.person_id) AS seen_at,

@@ -57,6 +57,26 @@ describe("the key", () => {
   });
 });
 
+describe("a send in flight", () => {
+  it("is refused when its key was revoked after it was checked, and adds nothing", async () => {
+    const e = await approvedEvent(db, "Revoke Mid Send");
+    const k = await keyFor(db, MAYA, "mid");
+    const checked = await authCapture(db, `Bearer ${k.key}`);
+    await revokeCaptureKey(db, MAYA, k.id);
+    await expect(captureAdd(db, checked, { event_id: e, platform: "swapcard", people: [person("Ana Lima")] }, new Date("2026-11-14T12:00:00Z"))).rejects.toThrow(/revoked/);
+    expect(await count(db, "directory_reads", `event_id = '${e}'`)).toBe(0);
+  });
+  it("spends nothing of the minute's allowance when the event refuses the send", async () => {
+    const e = await approvedEvent(db, "Minute Event");
+    const k = await keyFor(db, MAYA, "minute");
+    const key = await authCapture(db, `Bearer ${k.key}`);
+    const now = new Date("2026-11-14T12:00:00Z");
+    const many = (tag: string) => Array.from({ length: 200 }, (_, i) => person(`${tag} Person${i}`, { company: `Co ${tag} ${i}` }));
+    for (let i = 0; i < 4; i++) await expect(captureAdd(db, key, { event_id: "ev_nope", platform: "swapcard", people: many(`x${i}`) }, now)).rejects.toThrow(/not on this desk/);
+    expect((await captureAdd(db, key, { event_id: e, platform: "swapcard", people: many("good") }, now)).added).toBe(200);
+  });
+});
+
 describe("who gets in", () => {
   it("refuses a missing, malformed, unknown, revoked and wrong-scope key, each in its own sentence", async () => {
     const good = await keyFor(db, MAYA, "good");
