@@ -312,7 +312,8 @@ export interface Crm {
   write?(record: CrmRecord, patch: CrmPatch): Promise<void>;
   /** The event's Campaign. Looked up by the desk's key first, so a retry finds the one already made. */
   findCampaignByKey?(key: string): Promise<{ id: string } | null>;
-  createCampaign?(a: { name: string; start: string; end: string; type: string; key: string }): Promise<{ id: string }>;
+  /** `type` is the CRM campaign type; `parent` is the CRM id of the campaign this one hangs off (a hosted side event under its conference). */
+  createCampaign?(a: { name: string; start: string; end: string; type: CampaignType; key: string; parent?: string }): Promise<{ id: string }>;
   updateCampaignMemberStatus?(a: { campaign: string; record: CrmRecord; status: string }): Promise<void>;
   /** Salesforce refuses a duplicate member, so `CrmAlreadyExists` from here counts as done. */
   createCampaignMember?(a: { campaign: string; record: CrmRecord; key: string; status?: string }): Promise<{ id: string }>;
@@ -326,6 +327,7 @@ export interface Crm {
   opportunities?(accounts: CrmAccountQuery[]): Promise<Record<string, CrmOpportunity[]>>;
 }
 export interface CrmOpportunity { id: string; name?: string | null; url?: string | null; owner?: string | null; next_step?: string | null; stage: string; amount_cents: number | null; created_date: string; stage_history: { stage: string; at: string }[]; close_date?: string | null; is_won?: boolean; is_closed?: boolean }
+export type CampaignType = "event" | "webinar";
 export class CrmAlreadyExists extends Error {}
 
 const OWNERS = ["Priya Natarajan", "Tomas Lindqvist", "Adaeze Okonkwo", "Mateo Ruiz", "Hanna Berg"];

@@ -22,6 +22,7 @@ import { processEvent, type Deps } from "./pipeline.ts";
 import { retryMerges } from "./top-up.ts";
 import { mockLlm, mockVendors, noCrm } from "./providers.ts";
 import { chooseCrm } from "./crm-desk.ts";
+import { checkIntegration } from "./integration.ts";
 import { sheetsFor } from "./sheets.ts";
 import { exampleDns, systemDns } from "./identity.ts";
 import { seed } from "./seed.ts";
@@ -82,6 +83,7 @@ const deps: Deps = mode.liveSpend
   ? { live: true, crm: noCrm, llm: anthropicLlm(), vendorsFor: (s) => liveVendors(s, { apollo: env.APOLLO_API_KEY, zerobounce: env.ZEROBOUNCE_API_KEY }) }
   : mode.demo ? simDeps() : { llm: mockLlm, vendorsFor: mockVendors };
 // CRM picks the CRM: unset keeps today's (simCrm in the demo, noCrm live); crmdesk is CRM Desk (src/server/crm-desk.ts).
+try { checkIntegration(env); } catch (e) { console.error((e as Error).message); process.exit(1); }
 try { deps.crm = chooseCrm(deps.crm, env, mode.liveSpend); } catch (e) { console.error((e as Error).message); process.exit(1); }
 // Google only in live mode. Bad Google settings stop the start here, not at the first delivery.
 try { deps.sheets = sheetsFor(mode.liveSpend, env); } catch (e) { console.error((e as Error).message); process.exit(1); }

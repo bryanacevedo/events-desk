@@ -1,5 +1,20 @@
 # Events Desk: project status
 
+## Redesign step 6, part 1 of 4: into the shared world (2026-11-15)
+
+Worktree `.wt/ev6b-events-desk`, branch `ev6b/shared-world`. Spec `docs/SHARED-WORLD.md` (goldfish-reviewed by a fresh Opus agent before code: 2 Blockers, 8 Majors, 13 Nits, all handled in section 11). Decisions 84 to 87, migration 0058. Needs from other repos: `~/Developer/events-rethink/steps/step-6-cross-repo.md`.
+
+**Built in part 1:** Bryan's Overview move (date cards then the seat bar at the top of all three layouts), "Meeting held", the tagline "Event-led pipeline" (decision 84); `INTEGRATED_WITH` real (`src/server/integration.ts`, `GET /api/integration`, 409 on the closed routes, `launchAllowed` and card confirmation gated); the deferral panel on the Outreach tab (direction A of three, provisional); campaign type and a parent for hosted side events; `GET /api/definitions` publishing `campaign_member_statuses`. Tests `tests/integration.test.ts`.
+
+**Hand-off for part 2 (a fresh session, same worktree or a new one from origin/main):**
+1. Write `docs/SHARED-WORLD.md` part 2 spec first, goldfish it, then build: queue every member status where it happens (guest status changes, registrations, check-in, no-show) keyed `cm:<event>:<contact>:<status>`; call `queueCampaign` at plan confirmation; meeting activities as create then PATCH; send activities from `ingestEvents`; debrief activities (quote, not model text); campaign money (needs CRM Desk item 7 first, a currency decision, one row per event).
+2. Read the shared world from a pinned `lumen-world` commit (18 events, roster, Lumen Ledger as seller), Market Desk's ICP and the tier from the record, the fixed demo clock, the coverage gate.
+3. The tests that were left out of part 1: member, activity and money tests, and the per-row DESIGN 2b table (`tests/integration-2b.test.ts`; part 1 has the route-level proof only).
+4. Counts, booking link and play status on the deferral panel.
+5. From the Opus code review, not done: a member row must wait (no attempt counted) while its event's own campaign row is still queued, and an alert when a child waits over 24 hours; call `publishAll` at boot; add a fixture hash from CRM Desk's own test to `tests/integration.test.ts`; a TRUNCATE guard on `definition_versions`; `/motion/checklist`, `/campaign` and `/release` are closed for sequences drafted before the setting (decide whether those should stay open for events already started).
+
+**Open for Bryan:** direction A of the deferral panel is provisional.
+
 ## Redesign step 6, session 1: the Overview layout choice (2026-11-15)
 
 Worktree `.wt/ev6-events-desk`, branch `ev6/overview-views`. Decisions 81 and 82, migration 0057.

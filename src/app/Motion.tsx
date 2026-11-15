@@ -90,6 +90,9 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
   // What the event cost and returned is leadership's and GTM Engineering's view, as on Budget.
   const lead = isGtm(actor) || Boolean(needs?.approvers.includes(actor));
   const [o, setO] = useState<Overview | null>(null);
+  // Where Account Desk runs the outreach, this section hands over instead of building sequences (docs/SHARED-WORLD.md 7).
+  const [deferTo, setDeferTo] = useState<{ sequencer: string; links: Record<string, string> } | null>(null);
+  useEffect(() => { get<{ sequencer: string; links: Record<string, string> }>("/api/integration").then(setDeferTo).catch(() => setDeferTo(null)); }, []);
   const [slots, setSlots] = useState<{ roster: { rep: string }[]; timezone?: string; slots: { id: string; rep: string; starts_at: string; location: string; meeting_id: string | null }[] }>({ roster: [], slots: [] });
   const [busy, setBusy] = useState(false), [error, setError] = useState(""), [note, setNote] = useState("");
   const [cap, setCap] = useState({ name: "", email: "", company: "", note: "", hot: false });
@@ -138,7 +141,18 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
   return (
     <section className="motion" aria-label="Outreach" data-ready="1">
       <h2 className="sr-only">Outreach</h2>
-      {((demo && !canFollowUp && !["closing", "scored"].includes(o.motion)) || (!demo && !started && (!o.card || o.card.status === "declined")) || canFollowUp) && <div className="m-head">
+      {deferTo?.sequencer === "account_desk" && !started && (
+        <div className="m-defer">
+          <p className="m-defer-t">Account Desk runs the outreach for this event.</p>
+          {deferTo.links.account_desk && <a className="btn line small" href={deferTo.links.account_desk} target="_blank" rel="noreferrer">Open in Account Desk</a>}
+          <ul className="m-rows m-wide">
+            {([["Badge scans and notes", "Met at the booth"], ["Replies", "Replies"], ["Meetings", "Meetings"]] as const).map(([label, fold]) => (
+              <li key={label} className="brow opens" role="button" tabIndex={0} onClick={() => openFold(fold)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openFold(fold); } }}><span>{label}</span><Chevron right /></li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {(deferTo?.sequencer !== "account_desk" || started) && ((demo && !canFollowUp && !["closing", "scored"].includes(o.motion)) || (!demo && !started && (!o.card || o.card.status === "declined")) || canFollowUp) && <div className="m-head">
         {demo && !canFollowUp && !["closing", "scored"].includes(o.motion) && <button className="btn line small" disabled={busy} onClick={() => act("POST", `/api/demo/motion/${id}/advance`)}>{o.motion === "in_market" ? "Simulate replies" : "Next step"}</button>}
         {!demo && !started && (!o.card || o.card.status === "declined") && <button className="btn small" disabled={busy} onClick={() => act("POST", `/api/events/${id}/motion/start`)}>Start outreach</button>}
         {canFollowUp && <button className="btn small" disabled={busy} onClick={() => act("POST", `/api/events/${id}/motion/sequences`, undefined, "The follow-up is set up. Each sequence waits for its launch checklist.")}>Start the follow-up</button>}

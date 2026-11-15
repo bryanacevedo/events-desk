@@ -3115,3 +3115,6 @@ a:hover > .swap .due, a:focus-visible > .swap .due { opacity: 0; transform: tran
 .ovt .trk { overflow: hidden; }
 @media (min-width: 761px) { .ovb .lbl, .ovt .lbl { display: block; position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; } .ovb .m, .ovt .m { position: relative; } }
 .seat-top:not(:empty) { margin: 0 0 22px; }
+.m-defer { display: grid; gap: 14px; margin: 0 0 18px; padding: 18px 20px; border-radius: 20px; background: color-mix(in srgb, var(--sand) 48%, white); justify-items: start; }
+.m-defer-t { margin: 0; font: 500 18px/24px var(--display); }
+.m-defer .m-rows { width: 100%; }

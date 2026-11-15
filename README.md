@@ -94,6 +94,10 @@ None of it has run against a real sequencer, CRM or calendar account. **Real sen
 
 For events whose attendee directory can only be browsed. Load `extension/` unpacked in Chrome (steps in Settings, Browser extension), make a capture key there, open the event's directory in your own browser, pick the event in the extension and read the page or scroll and read. For a mobile-only app, record the phone screen while scrolling the list and read the recording from the event's "Get the attendee list" block; frames are taken in your browser and only they go up. Each person keeps where they were read from ("read from the Swapcard directory of X by Y on Z") and the event's terms note. People to check are held back until a person keeps or dismisses them; Bring in sends the rest through Layer 0 like any list. Outreach follows the country rules, not the source. Spec: `docs/DIRECTORY.md`.
 
+## Running beside the other desks
+
+`INTEGRATED_WITH` names the desks present (`account_desk`, `market_desk`, `crm_desk`); unset means alone. With `account_desk`, Account Desk runs the outreach: new sequence work is closed here and the Outreach tab says so. With `market_desk`, the ICP page is read-only. `GET /api/integration` says what is on, and `GET /api/definitions` publishes the campaign member statuses with a version and hash. Spec: `docs/SHARED-WORLD.md`.
+
 ## The scanner
 
 One phone web app for every rep at an event, at `/scan/<event id>` (the event's Scanner tab shows its link and a QR code). Aim at a badge code, photograph a badge or a business card, or type the person; then one screen: hot, warm or cold, the event's qualifiers, a note, what was promised and who sends it, the next step, consent.

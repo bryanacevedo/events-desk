@@ -443,3 +443,15 @@ Every live Claude request now carries a prompt-cache breakpoint on its stable bl
 ## 84. The date cards and the seat bar lead the Overview, in all three layouts; two copy fixes (Bryan, 2026-11-15)
 
 The row of upcoming-event date cards moves to the top of the Overview, with the green seat-requests bar directly under it, then the rest of each layout unchanged. It is one move for A Ledger, B Trays and C Timeline, because the cards and the bar are the page's own parts, not a layout's. Only their position changed (one spacing rule under the bar). A meeting's status shows as "Meeting held", not the bare word "Held" (the status map, the Held group on the Motion section, the outcome button). The sidebar tagline is "Event-led pipeline". Workbook and CSV values are unchanged. Screenshots before and after at 1440 and 375: `~/Developer/events-desk-review/overview-top/`.
+
+## 85. Step 6 is four parts, and part 1 does not claim option A fires (2026-11-15)
+
+Part 1: `INTEGRATED_WITH` as a real setting, the closed routes, the deferral panel, campaign type and parent, the published definition. Part 2: member, activity and money writes, the shared world read, the clock and coverage gate. Part 3: the world additions, Targeted members, the held statuses released. Part 4: the four-desk rehearsal. Why: the goldfish review found that Events Desk queues almost no member statuses today (only Met and Responded), so Account Desk's follow-up trigger would see nearly nothing; that is built in part 2 on its own spec. What others must do is in `~/Developer/events-rethink/steps/step-6-cross-repo.md`.
+
+## 86. `INTEGRATED_WITH=account_desk` closes new sequencer work, never stopping or already-running work (2026-11-15)
+
+Closed with 409 `owned_by_account_desk`: tools, legal basis, drafts, launch steps, templates, placement, consent, domains, resume, and a Motion card for outreach (at the route and at confirmation, and `launchAllowed`). Open: stop and restart, capture, replies, meetings, costs, debriefs, and every transactional send. A sequence already running keeps being watched. `market_desk` closes the ICP's upload, compile, bench, confirm, publish and reopen (409 `owned_by_market_desk`); the profile in force stays. `crm_desk` changes nothing alone. An unknown name stops boot. The setting is read on each call.
+
+## 87. A hosted side event is a child campaign; a child waits for its parent and says so (2026-11-15)
+
+Campaign type is `webinar` for a hosted webinar and `event` otherwise (the adapter used to ignore the event kind). A hosted event under a conference is created with `parent_id` set to the conference's CRM campaign; if that campaign is not in the CRM yet the row stays queued with "parent not in the CRM yet" and uses no attempt. `queueCampaign` queues the conference first; its callers (plan confirmation) come in part 2. Events Desk publishes `campaign_member_statuses` at `/api/definitions`, versioned and hashed as CRM Desk's are (migration 0058, append-only). Declined, Waitlist and Targeted are in the definition but are not sent until CRM Desk carries them.

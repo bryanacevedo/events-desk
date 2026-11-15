@@ -119,7 +119,7 @@ export function crmDeskCrm(url: string, key: string, doFetch: Fetch = fetch, tim
       return { id: r.json.id };
     },
     async createCampaign(a) {
-      return { id: (await ok("POST", "/campaigns", { name: a.name, type: "event", status: "planned", start_date: a.start, end_date: a.end, external_id: a.key })).id };
+      return { id: (await ok("POST", "/campaigns", { name: a.name, type: a.type, status: "planned", start_date: a.start, end_date: a.end, external_id: a.key, ...(a.parent ? { parent_id: a.parent } : {}) })).id };
     },
     async createCampaignMember(a) {
       if (stub(a.record.id)) return { id: a.record.id };

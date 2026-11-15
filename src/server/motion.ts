@@ -3,6 +3,7 @@
 import type { Db } from "./db.ts";
 import { crmConnected } from "./crm-checks.ts";
 import { currentUploader, getSettings } from "./approvals.ts";
+import { OWNED_BY_ACCOUNT_DESK, sequencerOn } from "./integration.ts";
 import { logActivity, newId, RuleError } from "./events.ts";
 import { DESK, nowOf, type LifecycleDeps } from "./lifecycle-deps.ts";
 import { moveMotion } from "./motion-state.ts";
@@ -48,6 +49,7 @@ export async function applyMotionCard(q: Db["query"], cardId: string, eventId: s
   await q("UPDATE cost_cards SET status = $2 WHERE id = $1", [cardId, status]);
   if (status === "declined") { await logActivity(q, eventId, actor, "motion", `Declined the Motion card: ${reason?.trim()}`); return; }
   const [c] = await q<{ inputs: { purpose: string; crm_connected: boolean; verify_once: boolean; write_leads: boolean; holdout_percent: number } }>("SELECT inputs FROM cost_cards WHERE id = $1", [cardId]);
+  if (c.inputs.purpose === "outreach" && !sequencerOn()) throw new RuleError(OWNED_BY_ACCOUNT_DESK);
   if (c.inputs.purpose !== "outreach") { await logActivity(q, eventId, actor, "motion", "Confirmed the Motion card for debriefs only"); return; }
   await q("UPDATE events SET outreach_started_by = $2, outreach_started_at = now(), verify_once = $3, write_leads = $4, holdout_percent = $5 WHERE id = $1", [eventId, actor, c.inputs.verify_once, c.inputs.write_leads, c.inputs.holdout_percent]);
   await moveMotion(q, eventId, c.inputs.crm_connected ? "owners" : "sequencing", actor, c.inputs.crm_connected ? "Started outreach: account owners get their say first" : "Started outreach. No CRM is connected, so there are no owners to ask");

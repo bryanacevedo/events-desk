@@ -15,6 +15,7 @@
 #, added by #
 #Syncs only while this page stays open#.
 A line for the version history
+Account Desk runs the outreach for this event.
 Accounts you know will be there (optional)
 Add a way of taking part
 Budget is for leadership and GTM Engineering.

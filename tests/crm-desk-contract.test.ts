@@ -73,7 +73,7 @@ describe.skipIf(!LIVE)("against a running CRM Desk", () => {
   it("test 1: every create lands once on a retry; an erased person is a finished write", async () => {
     const c = crm();
     expect(await c.findCampaignByKey!(`ev:${tag}`)).toBeNull();
-    const cmp = await c.createCampaign!({ name: `Summit ${tag}`, start: "2026-12-01", end: "2026-12-02", type: "Conference", key: `ev:${tag}` });
+    const cmp = await c.createCampaign!({ name: `Summit ${tag}`, start: "2026-12-01", end: "2026-12-02", type: "event", key: `ev:${tag}` });
     expect(await c.findCampaignByKey!(`ev:${tag}`)).toEqual(cmp);
     const rec = (await c.personFlags!([{ ref: "r", email: `rui.${tag}@${domain}`, full_name: null, company: null, domain: null }])).r[0];
     expect((await c.createCampaignMember!({ campaign: cmp.id, record: rec, key: `cm:${tag}` })).id).toBeTruthy();

@@ -1,5 +1,7 @@
 /* Events Desk API. Writes need a display name and, when WRITE_KEY is set, the key. */
 
+import { definitionVersions, listDefinitions, readDefinition } from "./definitions.ts";
+import { START, refusalFor, integrationView } from "./integration.ts";
 import { readFileSync } from "node:fs";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
@@ -113,6 +115,9 @@ export function createApp(db: Db, cfg: AppConfig) {
       if (cfg.publicDemo && /^\/api\/(events\/[^/]+\/(upload|new-registrations|review|guests\/import)|target-accounts\/import|kit\/photo|events\/[^/]+\/organizer-kit)$/.test(c.req.path)) return bad("This public demo does not take files. To try your own list, run it yourself: the README shows how.", 403);
       // Settings and the ICP are GTM Engineering's. Acting as is not security; this keeps the desk honest until a real login.
       if (/^\/api\/(icp|settings)(\/|$)/.test(c.req.path) && !isGtm(c.get("actor"))) return bad(SETTINGS_REFUSAL, 403);
+      // Where another desk owns the job, the write is refused and says whose it is (docs/SHARED-WORLD.md 3.1).
+      const owned = refusalFor(c.req.method, c.req.path, START.test(c.req.path) ? (await c.req.json().catch(() => ({})))?.purpose : undefined);
+      if (owned) return c.json({ error: owned.message, code: owned.code }, 409);
     }
     await next();
   });
@@ -147,6 +152,10 @@ export function createApp(db: Db, cfg: AppConfig) {
   });
 
   // An outside uptime check reads this. It fails when the background pass has stopped finishing, and it carries today's alerts, including the ones Slack could not deliver.
+  app.get("/api/definitions", async (c) => c.json(await listDefinitions(db)));
+  app.get("/api/definitions/:name", async (c) => { const q = c.req.query("version"); const v = q === undefined ? undefined : Number(q); if (v !== undefined && !(Number.isInteger(v) && v > 0)) return bad("That version does not exist.", 404); const d = await readDefinition(db, c.req.param("name"), v); return d ? c.json(d) : bad("That definition does not exist.", 404); });
+  app.get("/api/definitions/:name/versions", async (c) => { const d = await definitionVersions(db, c.req.param("name")); return d ? c.json(d) : bad("That definition does not exist.", 404); });
+  app.get("/api/integration", (c) => c.json(integrationView(cfg.lifecycle?.crm?.name)));
   app.get("/api/health", async (c) => {
     const stale = tickStale();
     const [a] = await db.query<{ n: number }>("SELECT count(*)::int AS n FROM alerts WHERE day = $1", [new Date().toISOString().slice(0, 10)]).catch(() => [{ n: -1 }]);

@@ -7,10 +7,29 @@
 import type { Db } from "./db.ts";
 import { newId } from "./events.ts";
 import { askPeople, crmConnected } from "./crm-checks.ts";
-import { CrmAlreadyExists, type Crm, type CrmPatch, type CrmRecord } from "./providers.ts";
+import { CrmAlreadyExists, type CampaignType, type Crm, type CrmPatch, type CrmRecord } from "./providers.ts";
 import { LAST_DAY_SQL } from "./motion.ts";
 
 export const MAX_ATTEMPTS = 5;
+/** A child campaign whose conference is not in the CRM yet. The row waits; it is not a failure (docs/SHARED-WORLD.md 4). */
+export class ParentNotInCrm extends Error { constructor() { super("parent not in the CRM yet"); } }
+
+/** The campaign type by event kind, and the conference a hosted event hangs off. A webinar is a `webinar` campaign; everything else an `event`. */
+export async function campaignShape(db: Pick<Db, "query">, eventId: string): Promise<{ type: CampaignType; conference: string | null }> {
+  const [h] = await db.query<{ hosted_format: string; conference_event_id: string | null }>("SELECT hosted_format, conference_event_id FROM involvements WHERE event_id = $1 AND kind = 'hosted' AND status <> 'dropped'", [eventId]);
+  return { type: h?.hosted_format === "webinar" ? "webinar" : "event", conference: h?.conference_event_id ?? null };
+}
+
+/** Queues an event's campaign, once. A hosted event under a conference also queues the conference's campaign first, so the child's row never waits for a row nobody queued. */
+export async function queueCampaign(q: Db["query"], eventId: string, crm: Crm | null | undefined) {
+  if (!canWrite(crm) || !crm.createCampaign) return;
+  const [h] = await q<{ conference_event_id: string | null }>("SELECT conference_event_id FROM involvements WHERE event_id = $1 AND kind = 'hosted' AND status <> 'dropped'", [eventId]);
+  for (const id of [h?.conference_event_id, eventId]) {
+    if (!id) continue;
+    const [ev] = await q<{ name: string; start: string; end: string }>(`SELECT e.name, e.starts_on::text AS start, ${LAST_DAY_SQL}::text AS end FROM events e WHERE e.id = $1`, [id]);
+    if (ev) await queueCreate(q, "campaign", `campaign:${id}`, null, { event_id: id, name: ev.name, start: ev.start, end: ev.end, email: null, full_name: null, company: null, domain: null });
+  }
+}
 export const canWrite = (crm: Crm | null | undefined): crm is Crm => crmConnected(crm) && typeof crm.write === "function";
 
 export type OutboxKind = "email" | "opt_out" | "campaign" | "campaign_member" | "task" | "lead";
@@ -20,8 +39,7 @@ export interface OutboxPayload { email: string | null; full_name: string | null;
 export async function queueDeliveredEmails(q: Db["query"], eventId: string, crm: Crm | null | undefined, payloadEventId: string = eventId) {
   if (!canWrite(crm)) return;
   // The event's Campaign comes first, once, so everything later has somewhere to attach.
-  const [ev] = await q<{ name: string; start: string; end: string }>(`SELECT e.name, e.starts_on::text AS start, ${LAST_DAY_SQL}::text AS end FROM events e WHERE e.id = $1`, [payloadEventId]);
-  if (crm.createCampaign) await queueCreate(q, "campaign", `campaign:${payloadEventId}`, null, { event_id: payloadEventId, name: ev.name, start: ev.start, end: ev.end, email: null, full_name: null, company: null, domain: null });
+  if (crm.createCampaign) await queueCampaign(q, payloadEventId, crm);
   const rows = await q<{ person_id: string | null; email: string; full_name: string | null; company: string; domain: string | null }>(
     `SELECT k.person_id, lower(k.email) AS email, k.full_name, co.name AS company, co.primary_domain AS domain FROM contacts k JOIN companies co ON co.id = k.company_id
      WHERE k.event_id = $1 AND k.dropped_at IS NULL AND k.priority IS NOT NULL AND k.email IS NOT NULL AND k.verify_1 = 'deliverable' AND k.verify_2 = 'deliverable' ORDER BY k.id`, [eventId]);
@@ -51,7 +69,16 @@ export const queueCreate = (q: Db["query"], kind: "campaign" | "campaign_member"
 async function carryOutCreate(db: Db, crm: Crm, kind: "campaign" | "campaign_member" | "task" | "lead", key: string, p: OutboxPayload & { status?: string; campaign?: string; subject?: string; body?: string; due?: string; write_leads?: boolean; name?: string; start?: string; end?: string }): Promise<string | null> {
   if (kind === "campaign") {
     if (!crm.createCampaign) return null;
-    const id = (await crm.findCampaignByKey?.(key))?.id ?? (await crm.createCampaign({ name: p.name!, start: p.start!, end: p.end!, type: "Conference", key })).id;
+    const found = await crm.findCampaignByKey?.(key);
+    if (found) { await db.query("UPDATE events SET crm_campaign_id = $2 WHERE id = $1", [p.event_id, found.id]); return found.id; }
+    const shape = await campaignShape(db, p.event_id!);
+    let parent: string | undefined;
+    if (shape.conference) {
+      // A hosted side event hangs off its conference's campaign. If that is not in the CRM yet this row waits, and says so, without using an attempt.
+      parent = (await db.query<{ crm_campaign_id: string | null }>("SELECT crm_campaign_id FROM events WHERE id = $1", [shape.conference]))[0]?.crm_campaign_id ?? undefined;
+      if (!parent) throw new ParentNotInCrm();
+    }
+    const id = (await crm.createCampaign({ name: p.name!, start: p.start!, end: p.end!, type: shape.type, key, parent })).id;
     await db.query("UPDATE events SET crm_campaign_id = $2 WHERE id = $1", [p.event_id, id]);
     return id;
   }
@@ -113,6 +140,7 @@ export async function drainOutbox(db: Db, crm: Crm | null | undefined, limit = 5
       await db.query("UPDATE crm_outbox SET status = 'done', attempts = attempts + 1, last_error = NULL, done_at = now() WHERE id = $1", [r.id]);
       out.sent++;
     } catch (e) {
+      if (e instanceof ParentNotInCrm) { await db.query("UPDATE crm_outbox SET last_error = $2 WHERE id = $1", [r.id, e.message]); continue; }
       const tries = r.attempts + 1;
       await db.query("UPDATE crm_outbox SET attempts = $2, status = $3, last_error = $4 WHERE id = $1", [r.id, tries, tries >= MAX_ATTEMPTS ? "failed" : "queued", String((e as Error)?.message ?? e).slice(0, 300)]);
       out.failed++;

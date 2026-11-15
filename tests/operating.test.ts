@@ -147,7 +147,7 @@ describe("the event's CRM campaign", () => {
     const c = crmWith();
     const id = await deliverEvent(db, LIST, { crm: c.crm }, "Payments Summit");
     await drainOutbox(db, c.crm);
-    expect(c.made).toEqual([expect.objectContaining({ name: "Payments Summit", type: "Conference", start: "2027-01-01", key: `campaign:${id}` })]);
+    expect(c.made).toEqual([expect.objectContaining({ name: "Payments Summit", type: "event", start: "2027-01-01", key: `campaign:${id}` })]);
     await db.query("UPDATE crm_outbox SET status = 'queued' WHERE kind = 'campaign'");
     await drainOutbox(db, c.crm);
     expect(c.made).toHaveLength(1);
