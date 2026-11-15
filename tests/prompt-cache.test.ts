@@ -31,8 +31,11 @@ describe("prompt caching (bl_117)", () => {
   it("every real template has an INPUT line, so every step gets a marker", async () => {
     const { TEMPLATES } = await import("../src/server/prompts.ts");
     const { cacheableContent } = await import("../src/server/anthropic.ts");
+    // scan_read and directory_read carry their data as an image beside the prompt, so the prompt has no per-request text and is sent whole (it is also under the 512-token minimum).
+    const imageOnly = ["scan_read", "directory_read"];
     for (const [step, t] of Object.entries(TEMPLATES)) {
       const c = cacheableContent(t as string);
+      if (imageOnly.includes(step)) { expect(c, step).toBe(t); continue; }
       expect(Array.isArray(c), step).toBe(true);
     }
   });
