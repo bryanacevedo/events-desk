@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Events Desk</title>
+<link rel="stylesheet" href="popup.css">
+</head>
+<body>
+<div class="pop">
+  <header class="pop-top">
+    <span class="mark" aria-hidden="true"></span>
+    <span class="title">Events Desk</span>
+    <button type="button" class="textlink" id="settings-btn" hidden>Settings</button>
+  </header>
+
+  <main class="pop-body" id="setup" hidden>
+    <h2>Connect to your desk</h2>
+    <label class="field"><span>Desk address</span>
+      <input class="input" id="desk-url" type="url" placeholder="https://your-desk.example.com" autocomplete="off" spellcheck="false"></label>
+    <label class="field"><span>Capture key</span>
+      <input class="input" id="capture-key" type="password" placeholder="Paste the key from the desk settings" autocomplete="off" spellcheck="false"></label>
+    <p class="mute small">The browser will ask once to let this extension talk to that address.</p>
+    <p class="pmsg" id="setup-msg" role="status"></p>
+  </main>
+  <footer class="pop-foot" id="setup-foot" hidden>
+    <button type="button" class="btn" id="save-btn">Save and connect</button>
+  </footer>
+
+  <main class="pop-body" id="work" hidden>
+    <h2>Event</h2>
+    <div class="evs" id="events" role="radiogroup" aria-label="Event"></div>
+    <p class="big" id="counts" hidden></p>
+    <p class="pmsg" id="work-msg" role="status"></p>
+  </main>
+  <footer class="pop-foot" id="work-foot" hidden>
+    <button type="button" class="btn" id="read-btn">Read this page</button>
+    <button type="button" class="btn line" id="scroll-btn">Scroll and read</button>
+    <button type="button" class="btn warm" id="stop-btn" hidden>Stop</button>
+  </footer>
+</div>
+<script type="module" src="popup.js"></script>
+</body>
+</html>

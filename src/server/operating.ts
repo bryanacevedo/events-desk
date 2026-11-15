@@ -6,6 +6,7 @@ import type { Db } from "./db.ts";
 import { welcomeRoom } from "./event-room.ts";
 import { stopContacts } from "./enroll-ops.ts";
 import { purgeScanData } from "./scans.ts";
+import { eraseReads, purgeDirectoryData } from "./directory.ts";
 import { logActivity, newId, RuleError } from "./events.ts";
 import { DESK, nowOf, type LifecycleDeps } from "./lifecycle-deps.ts";
 import { pauseSequenceById, drainOps } from "./sequences.ts";
@@ -245,6 +246,9 @@ export async function forgetPerson(db: Db, deps: LifecycleDeps, email: string, a
     const linkedins = [...new Set(rows.map((r) => r.linkedin).filter((x): x is string => Boolean(x)))];
     const persons = [...new Set(rows.map((r) => r.person_id).filter((x): x is string => Boolean(x)))];
     const pairs = rows.filter((r) => r.full_name && r.key).map((r) => [nameKey(r.full_name!), r.key!] as const);
+    // What a directory or a recording read about them, however it was found: by the contact, by name and company on any event, or by a profile link. Dismissed reads go too.
+    const profileRows = ids.length ? await q<{ p: string | null }>("SELECT raw->>'Profile' AS p FROM source_rows WHERE id = ANY($1::text[])", [rows.map((r) => r.source_row_id)]) : [];
+    await eraseReads(q, { contactIds: ids, people: rows.filter((r) => r.full_name && r.key).map((r) => ({ name: r.full_name!, companyKey: r.key! })), profileUrls: [...linkedins, ...profileRows.map((r) => r.p).filter((x): x is string => Boolean(x))] });
     // The name at the company is blocked too, so a later list with no address still finds them.
     for (const [n, k] of pairs) await q("INSERT INTO suppressions (id, kind, name_key, company_key, reason, created_by) VALUES ($1, 'opt_out', $2, $3, 'Erasure request', $4)", [newId("sup"), n, k, actor]);
     await stopContacts(q, ids, "remove", "erasure");
@@ -290,4 +294,5 @@ export async function purgeOldBodies(db: Db, deps: LifecycleDeps, days = 180) {
   await db.query("UPDATE inbound_messages SET body = NULL WHERE body IS NOT NULL AND received_at < $1::timestamptz - ($2::text || ' days')::interval", [now, String(days)]);
   await db.query("UPDATE notifications SET card = '{}'::jsonb WHERE status <> 'queued' AND card <> '{}'::jsonb AND created_at < $1::timestamptz - interval '7 days'", [now]);
   await purgeScanData(db, deps);
+  await purgeDirectoryData(db, nowOf(deps));
 }

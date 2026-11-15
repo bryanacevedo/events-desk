@@ -30,10 +30,11 @@ import { canPlan, forRep, isLead, MONEY_REFUSAL } from "./money.ts";
 import { mountPlanRoutes } from "./plan-routes.ts";
 import { mountHosted } from "./hosted-routes.ts";
 import { mountScans } from "./scan-routes.ts";
+import { mountDirectory } from "./directory-routes.ts";
 import type { OrganizerAdapter } from "./organizer-api.ts";
 import type { TransactionalSender } from "./transactional.ts";
 import { involvementsByEvent, involvementWords, stageNow, todayOf, weekDeadlines, yearPlan } from "./plan.ts";
-import { isListSource, type ListSourceInput } from "../shared/plan.ts";
+import { isUploadSource, type ListSourceInput } from "../shared/plan.ts";
 import { mountSettingsView } from "./settings-view.ts";
 import { mountSeatRoutes } from "./seat-routes.ts";
 import { mountBudgetRoutes } from "./budget-routes.ts";
@@ -48,6 +49,10 @@ export interface AppConfig { writeKey?: string; demo: boolean; /** Everything af
 type Ctx = { Variables: { actor: string } };
 /** The public RSVP answer, by exact pattern. */
 const RSVP_ANSWER = /^\/api\/rsvp\/[^/]+$/;
+/** The extension's two routes, by exact method and path. */
+const CAPTURE_ROUTE = /^(GET \/api\/capture\/events|POST \/api\/capture\/people)$/;
+/** What the public demo refuses outright: the capture routes, capture keys, recordings and their frames. */
+const DIRECTORY_ONLY = /^\/api\/(capture\/|capture-keys(\/|$)|events\/[^/]+\/recordings$|recordings\/)/;
 
 const bad = (msg: string, status: 400 | 401 | 403 | 404 | 409 = 400) => Response.json({ error: msg }, { status });
 /** The organizer's website, from the catalog entry the event came from. Screens read the logo domain from it. */
@@ -61,9 +66,11 @@ export function createApp(db: Db, cfg: AppConfig) {
     contentSecurityPolicy: { defaultSrc: ["'self'"], imgSrc: ["'self'", "data:", "blob:", "https://www.google.com", "https://*.gstatic.com", "https://images.unsplash.com"], styleSrc: ["'self'", "'unsafe-inline'"], scriptSrc: ["'self'", "'wasm-unsafe-eval'"], workerSrc: ["'self'"], mediaSrc: ["'self'", "blob:"], manifestSrc: ["'self'"], connectSrc: ["'self'"], fontSrc: ["'self'", "data:"], frameAncestors: ["'none'"], objectSrc: ["'none'"], baseUri: ["'self'"] } }));
   // No body is read whole before its size is known: files may be about 20 MB (21,000,000 bytes), everything else 1 MB.
   const FILE_ROUTE = /^\/api\/(events\/[^/]+\/(upload|new-registrations|review|top-ups|guests\/import)|icp\/documents|target-accounts\/import)(\/|$)/;
+  // A screen recording's frame is one picture: 4 MB, and not a file route (docs/DIRECTORY.md 13.3).
+  const FRAME_ROUTE = /^\/api\/recordings\/[^/]+\/frames$/;
   app.use("*", async (c, next) => {
     if (c.req.method === "GET" || c.req.method === "HEAD") return next();
-    return bodyLimit({ maxSize: FILE_ROUTE.test(c.req.path) ? 21_000_000 : 1_000_000, onError: (cc) => cc.text("Too large", 413) })(c, next);
+    return bodyLimit({ maxSize: FILE_ROUTE.test(c.req.path) ? 21_000_000 : FRAME_ROUTE.test(c.req.path) ? 4_000_000 : 1_000_000, onError: (cc) => cc.text("Too large", 413) })(c, next);
   });
   // The hosted demo has no login: its webhooks are refused (the simulated tools call the desk in process), and each address gets a fair share of writes.
   if (cfg.publicDemo) {
@@ -84,6 +91,10 @@ export function createApp(db: Db, cfg: AppConfig) {
   }
 
   app.use("/api/*", async (c, next) => {
+    // The directory and the recordings read other people's pages and spend on vision: not in the public demo, for anyone.
+    if (cfg.publicDemo && DIRECTORY_ONLY.test(c.req.path)) return bad("This public demo does not read directories or recordings. To try it, run the desk yourself.", 403);
+    // The extension's two routes take their own Bearer key, checked in the route, and no write key or acting name. Exactly these two and nothing else.
+    if (CAPTURE_ROUTE.test(`${c.req.method} ${c.req.path}`)) return next();
     if (c.req.method === "GET") {
       // Reads say who is acting too. Usage is company money: leadership's and GTM Engineering's. Budget and Results also admit a planner (decision 54), who writes the plans they show.
       c.set("actor", decodeURIComponent(c.req.header("x-actor") ?? "").trim().slice(0, 60));
@@ -449,9 +460,11 @@ export function createApp(db: Db, cfg: AppConfig) {
   /** Where a list came from, from x-list-source and x-source-note. Absent means other, so old callers keep working; a value outside the five is refused. */
   const sourceOf = (c: { req: { header(n: string): string | undefined } }): ListSourceInput | string => {
     const kind = c.req.header("x-list-source")?.trim() || "other";
-    if (!isListSource(kind)) return "Choose where the list came from: web_app_download, app_download, emailed_by_organizer, sponsor_export or other.";
+    if (!isUploadSource(kind)) return "Choose where the list came from: web_app_download, app_download, emailed_by_organizer, sponsor_export or other.";
     return { kind, note: decodeURIComponent(c.req.header("x-source-note") ?? "").slice(0, 200) };
   };
+
+  mountDirectory(app, db, { publicDemo: cfg.publicDemo, llm: cfg.llm, lifecycle: cfg.lifecycle }, { autoQuote });
 
   app.post("/api/events/:id/upload", async (c) => {
     const source = sourceOf(c);

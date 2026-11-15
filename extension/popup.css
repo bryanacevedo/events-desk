@@ -1,0 +1,41 @@
+/* A small copy of the desk's tokens (src/app/styles.css). System fonts only: no CDN, no web fonts. */
+:root {
+  --ground: #FFFFFF; --well: #F4F6F4; --ink: #15231B; --mute: #5E6A62; --line: #E3E8E4; --line-2: #C9D2CC;
+  --green: #1F5D3F; --green-2: #174A32; --orange: #D1501C; --orange-2: #B5431A;
+  --sans: "Geist Variable", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --display: "IBM Plex Sans Variable", var(--sans);
+  --r: 10px; --r-pill: 22px;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; background: var(--ground); color: var(--ink); font: 400 15px/22px var(--sans); font-variant-numeric: tabular-nums; }
+button, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 4px; }
+.mute { color: var(--mute); } .small { font-size: 13px; line-height: 18px; margin: 0; }
+.pop { width: 360px; height: 480px; display: flex; flex-direction: column; overflow: hidden; }
+.pop-top { display: flex; align-items: center; gap: 8px; height: 52px; padding: 0 8px 0 14px; border-bottom: 1px solid var(--line); flex: none; font: 500 15px/1 var(--display); }
+.pop-top .title { flex: 1; }
+.mark { width: 14px; height: 14px; border-radius: 4px; background: var(--green); }
+.pop-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; padding: 16px; }
+.pop-foot { display: grid; gap: 8px; padding: 12px 16px 16px; flex: none; border-top: 1px solid var(--line); }
+h2 { margin: 0; font: 500 17px/24px var(--display); }
+.big { margin: 0; font: 600 22px/30px var(--display); }
+.pmsg { margin: 0; min-height: 22px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; width: 100%; min-height: 44px; padding: 0 20px; border: 0; border-radius: var(--r-pill); background: var(--green); color: #FFFFFF; font: 500 15px/1 var(--sans); cursor: pointer; }
+.btn:hover:not(:disabled) { background: var(--green-2); }
+.btn:disabled { opacity: 0.45; cursor: default; }
+.btn.line { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--line-2); }
+.btn.line:hover:not(:disabled) { background: var(--well); }
+.btn.warm { background: var(--orange); } .btn.warm:hover:not(:disabled) { background: var(--orange-2); }
+.textlink { min-height: 36px; padding: 0 14px; border: 0; border-radius: var(--r-pill); background: var(--well); font: 500 14px/1 var(--sans); cursor: pointer; }
+.textlink:hover { background: var(--line); }
+.field { display: grid; gap: 6px; } .field > span { font-weight: 500; font-size: 13px; color: var(--mute); }
+.input { width: 100%; height: 44px; padding: 0 12px; border: 0; border-radius: var(--r); background: var(--well); box-shadow: inset 0 0 0 1px var(--line); }
+.input:focus-visible { outline: none; box-shadow: inset 0 0 0 1.5px var(--ink); }
+.evs { display: grid; }
+.evs label { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 10px; align-items: center; min-height: 56px; border-top: 1px solid var(--line); cursor: pointer; }
+.evs label:last-child { border-bottom: 1px solid var(--line); }
+.evs input { width: 20px; height: 20px; margin: 0; accent-color: var(--green); }
+.evs b { display: block; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.evs span span { display: block; font-size: 13px; line-height: 18px; color: var(--mute); }
+.evs em { font-style: normal; font-size: 13px; color: var(--mute); }

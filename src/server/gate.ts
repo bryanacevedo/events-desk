@@ -11,6 +11,8 @@ import { activeHolds } from "./touches.ts";
 import { linkContact } from "./person-record.ts";
 import { nameKey } from "../shared/email.ts";
 import type { Channel } from "../shared/motion.ts";
+import { normalizeCountry } from "../shared/country-rules.ts";
+import { defaultSettings } from "./approvals.ts";
 
 export type Moment = "add" | "launch" | "resume";
 export interface GateResult { contact_id: string; passed: boolean; reason: string | null; retry_after: Date | null }
@@ -41,7 +43,7 @@ export async function loadPeople(db: Db, eventId: string, ids: string[]) {
 }
 
 /** Checks in code that need nothing from the CRM, in the spec's order, and returns the first reason to refuse. */
-async function localChecks(db: Db, p: GatePerson, channel: Channel, now: Date, bases: Set<string>): Promise<Omit<GateResult, "contact_id" | "passed"> | null> {
+async function localChecks(db: Db, p: GatePerson, channel: Channel, now: Date, bases: Set<string>, blocked: Set<string>): Promise<Omit<GateResult, "contact_id" | "passed"> | null> {
   const no_ = (reason: string, retry_after: Date | null = null) => ({ reason, retry_after });
   // 1. Not dropped, not suppressed.
   if (p.drop_reason) return no_(`dropped:${p.drop_reason}`);
@@ -63,6 +65,8 @@ async function localChecks(db: Db, p: GatePerson, channel: Channel, now: Date, b
   // 8, asked here because it is free. Templates need a name.
   if (!p.full_name || p.name_hidden) return no_("name_unknown");
   if (!p.domain) return no_("no_domain");
+  // The countries the desk does not email, for everyone on every event whatever the source of the list (docs/DIRECTORY.md 3). A person whose country is unknown or not listed goes on to the basis check as before.
+  if (channel === "email") { const c = normalizeCountry(regionOf(p)); if (c && blocked.has(c)) return no_("country_blocked"); }
   // 7. A person recorded a basis for this region.
   if (!bases.has(regionOf(p))) return no_("no_legal_basis");
   // 5. Not in another cadence, at any event. The other channel of the same event is the same cadence.
@@ -115,10 +119,11 @@ export async function runGate(db: Db, deps: LifecycleDeps, eventId: string, cont
   if (await sendingStopped(db.query)) return contactIds.map((id) => ({ contact_id: id, passed: false, reason: "desk_stopped", retry_after: new Date(now.getTime() + HOUR) }));
   const people = await loadPeople(db, eventId, contactIds);
   const bases = new Set((await db.query<{ region: string }>("SELECT region FROM legal_bases WHERE event_id = $1", [eventId])).map((r) => r.region));
+  const blocked = new Set((defaultSettings().email_country_rules?.blocked ?? []).map((c) => c.toUpperCase()));
   const out = new Map<string, GateResult>();
   const open: GatePerson[] = [];
   for (const p of people) {
-    const r = await localChecks(db, p, channel, now, bases);
+    const r = await localChecks(db, p, channel, now, bases, blocked);
     if (r) out.set(p.id, { contact_id: p.id, passed: false, ...r });
     else open.push(p);
   }

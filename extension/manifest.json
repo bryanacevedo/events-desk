@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "Events Desk directory reader",
+  "version": "0.1.0",
+  "description": "Reads the people shown in an event directory you have open and hands them to your Events Desk.",
+  "minimum_chrome_version": "110",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "optional_host_permissions": ["https://*/*", "http://localhost/*", "http://127.0.0.1/*"],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "action": { "default_title": "Events Desk", "default_popup": "popup.html" }
+}

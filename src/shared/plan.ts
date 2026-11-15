@@ -64,12 +64,16 @@ export function planWaitingOn(e: Pick<EventRow, "stage"> & { approval_mode?: App
 
 /* ------------------------------------------------------------------ where a list came from (4.3) */
 
-export const LIST_SOURCES = ["web_app_download", "app_download", "emailed_by_organizer", "sponsor_export", "other"] as const;
+/** The five a person can name on an upload (x-list-source). The other two come only from Bring in (docs/DIRECTORY.md 4). */
+export const UPLOAD_SOURCES = ["web_app_download", "app_download", "emailed_by_organizer", "sponsor_export", "other"] as const;
+export const LIST_SOURCES = [...UPLOAD_SOURCES, "directory_extension", "screen_recording"] as const;
 export type ListSource = (typeof LIST_SOURCES)[number];
 export const LIST_SOURCE_WORDS: Record<ListSource, string> = {
   web_app_download: "Downloaded from the web app", app_download: "Downloaded from the app", emailed_by_organizer: "Emailed by the organizer", sponsor_export: "Sponsor export", other: "Other",
+  directory_extension: "Read from the directory with the extension", screen_recording: "Read from a screen recording",
 };
 export interface ListSourceInput { kind: ListSource; note: string }
+export const isUploadSource = (v: unknown): v is (typeof UPLOAD_SOURCES)[number] => typeof v === "string" && (UPLOAD_SOURCES as readonly string[]).includes(v);
 export const isListSource = (v: unknown): v is ListSource => typeof v === "string" && (LIST_SOURCES as readonly string[]).includes(v);
 
 /* ------------------------------------------------------------------ sponsorship, deliverables and the week (4.2) */

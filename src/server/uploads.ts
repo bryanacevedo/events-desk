@@ -18,7 +18,11 @@ export const TYPES = { xlsx: "application/vnd.openxmlformats-officedocument.spre
 
 export const toBytes = (file: string | Uint8Array | ArrayBuffer) => (typeof file === "string" ? new TextEncoder().encode(file) : file instanceof Uint8Array ? file : new Uint8Array(file));
 
-export async function ingestUpload(db: Db, eventId: string, actor: string, filename: string, file: string | Uint8Array | ArrayBuffer, source: ListSourceInput = OTHER_SOURCE) {
+/** Two optional steps for a caller that builds the list itself (Bring in, docs/DIRECTORY.md 8 and 13): `precondition` runs after the event row is locked and may throw RuleError;
+    `afterInsert` runs inside the same transaction once the upload, rows and contacts are stored. */
+export interface IngestHooks { precondition?: (q: Db["query"]) => Promise<void>; afterInsert?: (q: Db["query"], uploadId: string) => Promise<void> }
+
+export async function ingestUpload(db: Db, eventId: string, actor: string, filename: string, file: string | Uint8Array | ArrayBuffer, source: ListSourceInput = OTHER_SOURCE, hooks: IngestHooks = {}) {
   // POST /upload is the first list and replacing it. New registrations have their own way in.
   const [at] = await db.query<{ stage: string; parent_event_id: string | null }>("SELECT stage, parent_event_id FROM events WHERE id = $1", [eventId]);
   if (at?.parent_event_id) throw new RuleError("New registrations cannot take another attendee list.");
@@ -38,6 +42,7 @@ export async function ingestUpload(db: Db, eventId: string, actor: string, filen
     // A new list replaces the old one while nothing has been paid for. The uploader of the current list is the one who confirms its cost cards, so a
     // new upload moves that to the new uploader, and a card quoted for the old list is void: it is declined here and can never be confirmed.
     const [cur] = await q<{ stage: string }>("SELECT stage FROM events WHERE id = $1 FOR UPDATE", [eventId]);
+    if (hooks.precondition) await hooks.precondition(q);
     if (cur && ["mapped", "quoted"].includes(cur.stage) && (await q("SELECT 1 FROM uploads WHERE event_id = $1 LIMIT 1", [eventId])).length) {
       await q("UPDATE approvals SET status = 'declined', decided_by = $2, decided_at = now(), reason = $3 WHERE event_id = $1 AND status = 'pending' AND kind <> 'seats'", [eventId, actor, `Replaced: ${actor} uploaded a new list`]);
       await q("UPDATE cost_cards SET status = 'declined' WHERE event_id = $1 AND status = 'pending'", [eventId]);
@@ -83,6 +88,7 @@ export async function ingestUpload(db: Db, eventId: string, actor: string, filen
         full_name: c.full_name, title: c.title, email: c.email, linkedin: c.linkedin, drop_reason: c.drop_reason,
       }))), eventId, source.kind],
     );
+    if (hooks.afterInsert) await hooks.afterInsert(q, uploadId);
     // A list the organizer emailed closes the open request to the organizer, in this same transaction.
     if (source.kind === "emailed_by_organizer") await closeOrganizerRequest(q, eventId, actor);
     await logActivity(q, eventId, actor, "mapped", `Mapped ${Object.keys(map).length} columns, ignored ${ignored.length}. Attendee list quality: ${data.quality.verdict}`);

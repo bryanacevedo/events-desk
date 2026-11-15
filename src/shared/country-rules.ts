@@ -10,6 +10,9 @@ const NAMES: Record<string, string> = {
   "united states": "US", "united states of america": "US", usa: "US", america: "US", canada: "CA", "united kingdom": "GB", uk: "GB", "great britain": "GB", england: "GB", scotland: "GB", wales: "GB",
   germany: "DE", france: "FR", netherlands: "NL", "the netherlands": "NL", holland: "NL", spain: "ES", ireland: "IE", brazil: "BR", australia: "AU", singapore: "SG", italy: "IT", belgium: "BE",
   sweden: "SE", denmark: "DK", poland: "PL", austria: "AT", portugal: "PT", finland: "FI", switzerland: "CH", norway: "NO", india: "IN", japan: "JP", mexico: "MX", "new zealand": "NZ",
+  // The native names and common spellings of the eight countries the desk does not email, so a directory that prints "Deutschland" is read as Germany.
+  deutschland: "DE", "bundesrepublik deutschland": "DE", italia: "IT", schweiz: "CH", suisse: "CH", svizzera: "CH", sverige: "SE", danmark: "DK", belgique: "BE", belgie: "BE", "belgië": "BE", belgien: "BE",
+  osterreich: "AT", "österreich": "AT", oesterreich: "AT", norge: "NO", noreg: "NO",
 };
 
 /** An ISO code in upper case, or null when the text is empty or not a country this knows. A two-letter code counts only when it is one of the known ones ("UK" is GB). */
