@@ -1,5 +1,17 @@
 # Events Desk: project status
 
+## Redesign step 7: before the list, and choosing events (2026-11-15)
+
+Worktree `.wt/ev7-events-desk`, branch `ev7/before-the-list`. Spec `docs/CHOOSING.md` (goldfish-reviewed by a fresh Opus agent before code: 2 Blockers, 12 Majors, all fixed in the spec), decisions 96 to 101, migration 0061. Not deployed: Render deploys on hold (SESSIONS rule 20).
+
+**Built:** target accounts read and matched against pasted or uploaded speaker and sponsor pages (code, with the line quoted; a wrong match is rejected with a reason, held per conference), earlier editions' lists and people already captured; the meeting goal tracker in the Plan tab's Goal (by rep, who has nothing booked, one held figure with the Result); the Choosing page (leadership, GTM, planners) ranking candidates by a printed rule from overlap, cost and last edition's return; which events to repeat with Fisher exact, Bonferroni over the pairs looked at, "too few to say" under 5 a side, a Repeat or Drop decision with a reason; a model step `repeat_word` that words passing patterns, checked in code, template in the demo. Accounts met now counts the team's target list when it has one (caption says the basis).
+
+**Demo (day 2026-11-24):** 156 target accounts, two sample pages, SaaStr link, two sample catalog rows (Money20/20 USA 2027, Dreamforce 2027) so past return and "below the median" show, GITEX Global 2026 with a goal of 20 and 7 booked meetings, Money20/20 USA 2026 read after the event (held 10 of 16, by rep). Which events to repeat reads "too few to say" (2 scored events): honest, not seeded otherwise.
+
+**Not proven:** `repeat_word` against a real model (the demo and tests use the simulated one, marked template); a real speaker or sponsor page; PDFs are not read. Money20/20 USA 2026's accounts met reads 0 of 10 from the target list, because the demo's met companies are not on the world's list (shown honestly with its basis).
+
+**Hand-off:** unblocks step 8 (ready for a real team). Open: whether the Choosing page should also sit in the Plan tab's Audience.
+
 ## Redesign step 6, part 4 of 4: the four-desk rehearsal, the real calls, the snapshot, the film notes (2026-11-15)
 
 Worktree `.wt/ev6p4-events-desk`, branch `ev6p4/part4`. Spec `docs/SHARED-WORLD.md` section 14 (goldfish-reviewed by a fresh Opus agent before code: 1 Blocker, 8 Majors, 6 Nits, all in 14.10), 14.11 (what was built), decision 95, `docs/FILM-NOTES.md`. Not deployed: Render deploys on hold (SESSIONS rule 20).
