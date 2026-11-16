@@ -12,6 +12,7 @@ import { computeScorecard } from "./closeout.ts";
 import { DESK, type LifecycleDeps } from "./lifecycle-deps.ts";
 import { LAST_DAY_SQL } from "./motion.ts";
 import { dollars, eventBudget, plannedTotal } from "./budget-lines.ts";
+import { targetAccountsMet } from "./overlap.ts";
 import { canPlan, forRep } from "./money.ts";
 import { sponsorshipView } from "./sponsorship.ts";
 import { assessmentView } from "./assessment.ts";
@@ -490,8 +491,9 @@ export async function closeResult(db: Db, actor: string, eventId: string, today:
 /* ------------------------------------------------------------------ result against the goal */
 
 export interface GoalLine { goal: number; actual: number; short_by: number }
+/** `accounts_basis` says what accounts met was counted from: the team's target account list, or tier 1 companies when it has none. Absent with no accounts goal. */
 /** `read` is false when the scorecard could not read pipeline (no CRM was connected when it was made). Then actual and short_by are null: an unread pipeline is not a pipeline of $0. */
-export interface GoalResult { meetings: GoalLine | null; accounts: GoalLine | null; pipeline: { goal_cents: number; actual_cents: number | null; short_by_cents: number | null; read?: boolean } | null }
+export interface GoalResult { meetings: GoalLine | null; accounts: GoalLine | null; accounts_basis?: "target_list" | "tier1"; pipeline: { goal_cents: number; actual_cents: number | null; short_by_cents: number | null; read?: boolean } | null }
 
 /** The result against the goal. Held meetings come from the latest written scorecard, else one read without writing. Target accounts met are tier 1 companies with a held meeting
     (a stand-in until step 7 brings a target account list). Pipeline is sourced plus influenced. Money keys end in `cents`, so forRep strips the pipeline for a rep. */
@@ -507,7 +509,9 @@ export async function goalResult(db: Db, deps: LifecycleDeps | undefined, eventI
   if (g.a !== null) {
     const [r] = await db.query<{ n: number }>(
       "SELECT count(DISTINCT co.id)::int AS n FROM meetings mt JOIN contacts k ON k.id = mt.contact_id JOIN companies co ON co.id = k.company_id WHERE mt.event_id = $1 AND mt.status = 'held' AND co.tier = 1", [eventId]);
-    out.accounts = line(g.a, r.n);
+    const onList = await targetAccountsMet(db, eventId);
+    out.accounts = line(g.a, onList ?? r.n);
+    out.accounts_basis = onList === null ? "tier1" : "target_list";
   }
   if (g.p !== null) {
     // A scorecard made with no CRM connected has no pipeline to read. That is "not read", never $0 of the goal.

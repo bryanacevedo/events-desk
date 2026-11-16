@@ -44,6 +44,7 @@ import { isUploadSource, type ListSourceInput } from "../shared/plan.ts";
 import { mountSettingsView } from "./settings-view.ts";
 import { mountSeatRoutes } from "./seat-routes.ts";
 import { mountBudgetRoutes } from "./budget-routes.ts";
+import { mountChoosing } from "./choosing-routes.ts";
 import { mountEventViews } from "./event-views.ts";
 import { mountLifecycle } from "./lifecycle-routes.ts";
 import { tickStale, tickState } from "./lifecycle-tick.ts";
@@ -107,7 +108,7 @@ export function createApp(db: Db, cfg: AppConfig) {
       // Reads say who is acting too. Usage is company money: leadership's and GTM Engineering's. Budget and Results also admit a planner (decision 54), who writes the plans they show.
       c.set("actor", decodeURIComponent(c.req.header("x-actor") ?? "").trim().slice(0, 60));
       if (/^\/api\/usage(\/|$)/.test(c.req.path) && !isLead(c.get("actor"))) return bad(MONEY_REFUSAL, 403);
-      if (/^\/api\/(budget|results)(\/|$)/.test(c.req.path) && !canPlan(c.get("actor"))) return bad(MONEY_REFUSAL, 403);
+      if (/^\/api\/(budget|results|choosing|target-accounts)(\/|$)/.test(c.req.path) && !canPlan(c.get("actor"))) return bad(MONEY_REFUSAL, 403);
     }
     if (c.req.method !== "GET") {
       // The guest's own RSVP answer is the one write with no actor and no write key: the link is the credential, and the route answers only about the guest it names.
@@ -179,6 +180,7 @@ export function createApp(db: Db, cfg: AppConfig) {
   mountBudgetRoutes(app, db, cfg);
   mountEventViews(app, db);
   mountPlanRoutes(app, db, cfg);
+  mountChoosing(app, db, cfg);
   mountHosted(app, db, cfg);
   mountSpeaking(app, db, cfg);
   // "Did it pay?" is company money: anyone else gets the overview without it.

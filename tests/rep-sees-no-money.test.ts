@@ -161,3 +161,21 @@ describe("a hosted event's reads carry no company money to a rep", () => {
     expect(found).toEqual([]);
   });
 });
+
+describe("choosing and the goal tracker", () => {
+  it("the tracker is counts for a rep, and every choosing and target account read is refused", async () => {
+    const h = await deliveredInMotion(db, { crm: fakeCrm(), time: clock("2027-01-01T12:00:00Z") });
+    await db.query("UPDATE events SET starts_on = '2027-01-10', ends_on = '2027-01-12' WHERE id = $1", [h.id]);
+    await updatePlan(db, CAMILLE, h.id, { goal_meetings_held: 12, goal_pipeline_cents: 20_000_000 });
+    await recordEventCost(db, h.id, "Dan Whitlock", "sponsorship", 1_000_000, "Gold");
+    const app = createApp(db, { demo: true, lifecycle: h.deps });
+    const r = await app.request(`/api/events/${h.id}/goal-tracker`, { headers: as(MAYA) });
+    expect(r.status).toBe(200);
+    const body = await r.json() as { goal: number; words: string };
+    expect(body.goal).toBe(12);
+    expect(money(body)).toEqual([]);
+    for (const path of ["/api/target-accounts", "/api/choosing", "/api/choosing/repeat", "/api/choosing/c1/likely"]) expect((await app.request(path, { headers: as(MAYA) })).status, path).toBe(403);
+    for (const path of ["/api/choosing/c1/pages", "/api/choosing/series-links"]) expect((await app.request(path, { method: "POST", headers: { ...as(MAYA), "content-type": "application/json" }, body: "{}" })).status, path).toBe(403);
+    expect((await app.request("/api/target-accounts", { headers: as(CAMILLE) })).status).toBe(200);
+  });
+});
