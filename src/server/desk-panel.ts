@@ -100,7 +100,7 @@ export async function playStatus(db: Db, eventId: string, env: Env = process.env
 /* ------------------------------------------------------------------ the read Account Desk makes of this desk */
 
 const digest = (v: string) => createHash("sha256").update(v).digest();
-const same = (a: string, b: string) => timingSafeEqual(digest(a), digest(b));
+export const same = (a: string, b: string) => timingSafeEqual(digest(a), digest(b));
 
 /** `GET /api/desk/campaigns/<crm campaign id>` with `Authorization: Bearer <DESK_READ_KEY>`: 404 when the key is unset, 401 when it is wrong. The body is about the event and carries no person. */
 export async function deskCampaignRead(db: Db, ref: string, header: string | undefined, env: Env = process.env): Promise<{ status: number; body: unknown }> {

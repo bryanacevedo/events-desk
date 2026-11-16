@@ -415,3 +415,15 @@ Moving the world clock; a sending Events Desk under `INTEGRATED_WITH=account_des
 - Order: `--verify` and `audit.py` run before `wire.py`; `wire.py` works on copies (`ev6p4_wire_*`) of the CRM and Account Desk databases, so the audit never reads what the wiring changed.
 - 14.6 corrected: the new job holds no deal, owner or account row (it writes its own settings and signals only); the tests to update are `tests/test_event_pre_event.py` (its `sync` helper) and the Events Desk cases in `tests/test_crm_world.py`; `sim/runner.py` calls `crm_sync` directly and stays unchanged because the job is enqueued only when `INTEGRATED_WITH` names Events Desk.
 - Nits taken: no idempotency key is sent by Events Desk (clause removed); the key-compare and journal tests extend `tests/desk-read.test.ts`; the journal summary line lists `events_desk`.
+
+### 14.11 What was built, and where it differs from 14.1 to 14.10 (2026-11-15)
+
+Built as 14.2 to 14.7 say: `scripts/rehearse.ts` and `src/server/journal-fetch.ts` (Events Desk); the `events_desk` actor and fifth key in CRM Desk's replay (`crm-build` `src/crm/sim/lumen.py`); `events_half`, `check_events_lines` and the `--no-events` flag in lumen-world `stage/rehearse.py`; `events_repo` and `run_events` in `stage/desks.py`; audit check 10 and a summary line in `stage/audit.py`; `stage/wire.py` and `stage/contract.py`; Account Desk's `crm_members` job (decision 95 there); the key-compare tests; the rebuilt snapshot; `docs/FILM-NOTES.md`. Decision 95 here. Where it differs:
+
+1. The activities in the journal are few (2 in the final run: one meeting and one send): the demo's sends, replies and debriefs come from the demo pipeline. The script writes 30 sends and three held meetings as the desk's own rows (decision 95); most of those people are not in the CRM, so only one meeting and one send reach it. This is the weakest part of the rehearsal's coverage of 14.2 and is said in the status.
+2. Guests who waited or declined are written as leads first (decision 95), which 14.2 did not say; without it the CRM held none of the dinner's declined guests and the required statuses could not be written.
+3. CRM Desk's replay test (14.8) is not a unit test: the replay is proved by `--verify` (CRM Desk identical on 7 checks, including the campaign and member ids).
+4. `wire.py` clears Account Desk's member cursor before the decline is read, because CRM Desk's clock stands still in a rehearsal and the decline carries the same time as the target before it; with a running clock the cursor reads it.
+5. The wiring proofs read one event's play status: after the decline the play is stopped, and Events Desk says so in words.
+6. `--verify` replays CRM Desk, Market Desk and Account Desk; Events Desk is not replayed (said in 14.4).
+7. The journals the rehearsal regenerates are not delivered to the desks' `world/` folders: Account Desk's coverage gate shows 1 scenario missing on a build from them (a chance scenario), 0 missing on the committed journal. Copies are in `~/Developer/.wt/ev6p4-journals/`; it is a decision for Bryan.

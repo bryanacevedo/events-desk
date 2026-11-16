@@ -2,7 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "../src/server/app.ts";
-import { clearPlayCache, cleanBookingUrl, panelView, playLines, playStatus, type PlayRead } from "../src/server/desk-panel.ts";
+import { clearPlayCache, cleanBookingUrl, deskCampaignRead, panelView, playLines, playStatus, same, type PlayRead } from "../src/server/desk-panel.ts";
 import { demoConnectors } from "../src/server/connectors/setup.ts";
 import { mockLlm } from "../src/server/providers.ts";
 import type { Db } from "../src/server/db.ts";
@@ -43,6 +43,20 @@ describe("GET /api/desk/campaigns/<crm campaign id>", () => {
   it("is not served to a stranger as a write", async () => {
     const h = await http(); await withCampaign("cmp_3"); process.env.DESK_READ_KEY = "k";
     expect((await h.request("/api/desk/campaigns/cmp_3", { method: "POST", headers: { authorization: "Bearer k" } })).status).not.toBe(200);
+  });
+});
+
+describe("the key compare", () => {
+  it("accepts only the same key: not a shorter, a longer, a one-character-off, an empty or a differently cased one", () => {
+    expect(same("secret-key", "secret-key")).toBe(true);
+    for (const wrong of ["secret-ke", "secret-keyy", "secret-kex", "", "SECRET-KEY", " secret-key"]) expect(same(wrong, "secret-key")).toBe(false);
+  });
+  it("trims the key in the environment, and takes only a Bearer header", async () => {
+    await withCampaign("cmp_k");
+    const env = { DESK_READ_KEY: "  k-1  " };
+    expect((await deskCampaignRead(db, "cmp_k", "Bearer k-1", env)).status).toBe(200);
+    for (const header of ["Bearer k-", "Bearer k-11", "Bearer k-1 ", "bearer k-1", "Basic k-1", "k-1", "Bearer ", undefined]) expect((await deskCampaignRead(db, "cmp_k", header, env)).status).toBe(401);
+    expect((await deskCampaignRead(db, "cmp_k", "Bearer k-1", { DESK_READ_KEY: "   " })).status).toBe(404);
   });
 });
 

@@ -1,5 +1,17 @@
 # Events Desk: project status
 
+## Redesign step 6, part 4 of 4: the four-desk rehearsal, the real calls, the snapshot, the film notes (2026-11-15)
+
+Worktree `.wt/ev6p4-events-desk`, branch `ev6p4/part4`. Spec `docs/SHARED-WORLD.md` section 14 (goldfish-reviewed by a fresh Opus agent before code: 1 Blocker, 8 Majors, 6 Nits, all in 14.10), 14.11 (what was built), decision 95, `docs/FILM-NOTES.md`. Not deployed: Render deploys on hold (SESSIONS rule 20).
+
+**Built:** `scripts/rehearse.ts` and `src/server/journal-fetch.ts` (Events Desk's own sweep and outbox run against a live CRM Desk, every write journaled without the key); lumen-world `stage/rehearse.py` step 7b, audit check 10, `stage/wire.py` (real HTTP between the three servers) and `stage/contract.py`; CRM Desk's replay learns the `events_desk` actor and a fifth key; Account Desk reads Events Desk in its own job (`crm_members`); a test of the key compare (`tests/desk-read.test.ts`); `tests/journal-fetch.test.ts`; the demo snapshot rebuilt on world 1.3.0.
+
+**Checked by running (2026-11-15):** full suite `npx vitest run --testTimeout=60000` 1,825 passed, 14 skipped; `tsc --noEmit` clean; design-lint and the suite's design-lint test pass; layout audit and interaction audit pass on a fresh server (the interaction audit needs the demo motion to finish, about two minutes after start; run at once it reports "Event reply: nothing to open"); the rebuilt snapshot opens (49 events, the side dinner, `/api/health` ok). Four-desk rehearsal `stage/rehearse.py --verify`: 22,989 steps (481 from Events Desk: 14 campaigns, 388 member writes, 1 meeting and 1 send), CRM Desk identical on 7 checks, Market Desk on 1, Account Desk on 4. `stage/audit.py`: 10 of 10. `stage/wire.py`: 11 of 11 (booking link read over HTTP, targeted members become signals, a decline stops the play, the play status read back in words, wrong key refused). CRM Desk contract tests against a live CRM Desk: Events Desk's 7 passed, Account Desk's `test_crm_contract.py` passed (none skipped).
+
+**Not proven or not done:** (1) The rehearsal's regenerated journals are NOT delivered to the desks' `world/` folders or committed: Account Desk's coverage gate on a build from them shows 1 scenario missing ("set aside and still set aside", a chance scenario; the committed journal gives 0 missing). They are kept in `~/Developer/.wt/ev6p4-journals/` with the run's log. Decision for Bryan below. (2) Almost no activities reach the CRM from the rehearsal (the demo's sends and replies come from the demo pipeline; see 14.11 item 1). (3) Nothing is sent; no play ran for days. (4) The world clock is not moved (Events Desk's date stays 2026-11-24, `current_date` in SQL is still the wall clock). (5) `npm ci` in the main checkout ran, but that checkout is on an old commit whose lockfile lacks satori, resvg and zxing; it needs a fast-forward to origin/main first (not done: shared checkout).
+
+**Hand-off:** step 7. Open: whether to deliver the four-desk journals (and tune or accept Account Desk's chance scenario), Market Desk's tier replacing the priority-or-tier rule (cross-repo item 11).
+
 ## Redesign step 6, part 3 of 4: the world additions, targeted members, the held statuses, the panel (2026-11-15)
 
 Worktree `.wt/ev6d-events-desk`, branch `ev6d/part3` (not pushed). Spec `docs/SHARED-WORLD.md` section 13 (goldfish-reviewed, 13.9) and 13.10 (what was built and where it differs). Decisions 91 to 94, migration 0060. Commits: adapter and sweep, world loading, the panel.
