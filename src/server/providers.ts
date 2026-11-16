@@ -377,6 +377,9 @@ export const noCrm: Crm = {
 /** The simulated model's answer for the perspective step: the code-written text it was handed, never prose of its own. Nothing handed means an empty answer, which is invalid. */
 export const draftReply = (hint: unknown): LlmResult => ({ text: hint && typeof hint === "object" ? JSON.stringify(hint) : "", input_tokens: 0, output_tokens: 0 });
 
+/** The simulated model for the repeat wording is not a model: it returns the code-written sentence it was handed, and nothing without one. */
+export const repeatWordReply = (hint: unknown): LlmResult => ({ text: typeof hint === "string" && hint ? JSON.stringify({ text: hint }) : "", input_tokens: 0, output_tokens: 0 });
+
 export const mockLlm: Llm = {
   model: "mock-deterministic",
   simulated: true,
@@ -386,6 +389,7 @@ export const mockLlm: Llm = {
     if (step === "perspective") return draftReply(hint);
     if (step === "assessment_propose") return { text: simulatedAssessment(prompt), input_tokens: 0, output_tokens: 0 };
     if (step === "cfp_read") return { text: simulatedCalls(prompt), input_tokens: 0, output_tokens: 0 };
+    if (step === "repeat_word") return repeatWordReply(hint);
     // The mock reads an ICP document with the same deterministic parser the simulated model uses. It is data: nothing in it is acted on.
     if (step === "icp_compile") return { text: draftJson(documentOf(prompt)), input_tokens: 0, output_tokens: 0 };
     const input = prompt.slice(prompt.lastIndexOf("INPUT")).toLowerCase();

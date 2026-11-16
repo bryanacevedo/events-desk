@@ -21,7 +21,7 @@ import type { Settings } from "../shared/cost.ts";
 import type { World, WorldCompany, WorldPerson } from "../shared/world.ts";
 import type { Verdict } from "../shared/tiers.ts";
 import type { Deps } from "./pipeline.ts";
-import { draftReply, mockCrm, mockLlm, mockVendors, VendorError, type AccountType, type CompanyCandidate, type Crm, type CrmRecord, type FirmographicsLookup, type FoundPerson, type Identity, type Llm, type PeopleSearch, type PersonMatchResult, type Reveal, type Vendors, type Waterfall, type WaterfallResult, type WebsiteReader } from "./providers.ts";
+import { draftReply, repeatWordReply, mockCrm, mockLlm, mockVendors, VendorError, type AccountType, type CompanyCandidate, type Crm, type CrmRecord, type FirmographicsLookup, type FoundPerson, type Identity, type Llm, type PeopleSearch, type PersonMatchResult, type Reveal, type Vendors, type Waterfall, type WaterfallResult, type WebsiteReader } from "./providers.ts";
 import { FUNCTIONS, parseTitle } from "../shared/titles.ts";
 import { SENIORITIES } from "../shared/icp.ts";
 import { cleanFirmo, type FirmoRecord } from "../shared/tiering.ts";
@@ -683,6 +683,7 @@ export function simLlm(world: World, opts: { salt?: string } = {}): Llm {
       if (step === "perspective") return draftReply(hint);
       if (step === "assessment_propose") return { text: simulatedAssessment(prompt), input_tokens: 0, output_tokens: 0 };
       if (step === "cfp_read") return { text: simulatedCalls(prompt), input_tokens: 0, output_tokens: 0 };
+      if (step === "repeat_word") return repeatWordReply(hint);
       const input = prompt.slice(prompt.lastIndexOf("INPUT") + 5).trim();
       const out = (o: unknown) => ({ text: JSON.stringify(o), input_tokens: 0, output_tokens: 0 });
       if (step === "title_parse") {

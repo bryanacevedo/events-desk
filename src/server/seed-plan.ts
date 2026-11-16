@@ -228,6 +228,9 @@ export async function seedPastResults(db: Db, deps: LifecycleDeps) {
     if (!e) continue;
     const after = { ...deps, now: () => new Date(`${addDays(e.last_day, 1)}T12:00:00Z`) };
     const heldNow = async () => (await db.query<{ n: number }>("SELECT held_all AS n FROM event_funnel WHERE event_id = $1", [id]))[0].n;
+    // The reps who went, in name order: the held meetings are spread across them, so the tracker's by-rep list is real. Maya Ortiz when nobody is recorded as going.
+    const reps = (await db.query<{ requester: string }>("SELECT DISTINCT requester FROM seat_requests WHERE event_id = $1 AND status = 'approved' ORDER BY requester", [id])).map((r) => r.requester);
+    if (!reps.length) reps.push(MAYA);
     if ((await heldNow()) < held) {
       // Companies with a held meeting already are not met twice.
       const people = await db.query<{ id: string }>(
@@ -240,7 +243,7 @@ export async function seedPastResults(db: Db, deps: LifecycleDeps) {
       for (const [i, p] of ordered.entries()) {
         if ((await heldNow()) >= held) break;
         const when = `${addDays(e.starts_on, i % 3)}T${String(14 + (i % 4)).padStart(2, "0")}:00:00Z`;
-        const m = await bookMeeting(db, after, { contact_id: p.id, scheduled_at: when, source: "manual", rep: MAYA }, DESK);
+        const m = await bookMeeting(db, after, { contact_id: p.id, scheduled_at: when, source: "manual", rep: reps[i % reps.length] }, DESK);
         await recordOutcome(db, after, m.id, "held", DESK);
       }
     }

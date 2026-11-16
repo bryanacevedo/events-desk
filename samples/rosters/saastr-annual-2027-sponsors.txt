@@ -1,0 +1,29 @@
+Sample page written for the demo. It is not the organizer's page.
+
+SaaStr Annual 2027: sponsors and exhibitors
+
+Platinum
+Torerquist
+Linilquist
+Taliix
+Fenirline Ledger
+Velmora Systems
+
+Gold
+Elanquist
+Davoln Stream
+Norenn Group (visit norenn.example)
+Kororwick Pay
+Yaroyard Market
+Quillfern Analytics
+Brightharbor Software
+
+Silver
+Booth 214: https://www.rosovel.example
+Calirline
+Orlirin
+Tandemrow Cloud
+Oakpine Robotics
+Marlowe & Finch
+
+Sponsor list as of the sample date. Sponsors confirmed by the organizer are the only ones listed.

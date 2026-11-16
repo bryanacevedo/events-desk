@@ -160,7 +160,7 @@ function capitalizedRuns(text: string): { run: string[]; opens: boolean }[] {
   return out;
 }
 
-function unknownName(text: string, a: Allowed): string | null {
+export function unknownName(text: string, a: Allowed): string | null {
   for (const { run, opens } of capitalizedRuns(text)) {
     let toks = run.slice();
     if (opens) while (toks.length && isGeneric(toks[0])) toks.shift();

@@ -6,12 +6,16 @@ import type { Db } from "./db.ts";
 import { RuleError } from "./events.ts";
 import { goalTracker } from "./goal-tracker.ts";
 import type { LifecycleDeps } from "./lifecycle-deps.ts";
-import { canPlan, forRep } from "./money.ts";
-import { addPage, addSeriesLink, Invalid, NotFound, rejectMatch, removePage, restoreMatch } from "./overlap.ts";
+import { canPlan, forRep, isLead, MONEY_REFUSAL } from "./money.ts";
+import { addPage, addSeriesLink, Invalid, likelyThere, NotFound, rejectMatch, removePage, restoreMatch } from "./overlap.ts";
+import { todayOf } from "./plan.ts";
+import { mockLlm, type Llm } from "./providers.ts";
+import { candidates } from "./ranking.ts";
+import { decide, repeatView, wordPatterns } from "./repeat.ts";
 import { Forbidden } from "./seats.ts";
 
 export const CHOOSING_WRITER_REFUSAL = "Pages, matches and series links are written by planners, leadership and GTM Engineering.";
-type Cfg = { demo: boolean; lifecycle?: LifecycleDeps };
+type Cfg = { demo: boolean; lifecycle?: LifecycleDeps; llm?: Llm };
 
 export function mountChoosing(app: Hono<any>, db: Db, cfg: Cfg) {
   const body = async (c: Context): Promise<Record<string, any>> => ((await c.req.json().catch(() => ({}))) ?? {}) as Record<string, any>;
@@ -60,6 +64,30 @@ export function mountChoosing(app: Hono<any>, db: Db, cfg: Cfg) {
     if (!writer(c)) return refuse(CHOOSING_WRITER_REFUSAL, 403);
     const b = await body(c);
     return run(() => addSeriesLink(db, actorOf(c), b), 201);
+  });
+
+  // Next year's candidates, ordered by the printed rule. Dollars are in it, so it is planners' and leadership's only.
+  app.get("/api/choosing", async (c) => {
+    if (!writer(c)) return refuse(MONEY_REFUSAL, 403);
+    return c.json(await candidates(db, cfg.lifecycle));
+  });
+  app.get("/api/choosing/repeat", async (c) => {
+    if (!writer(c)) return refuse(MONEY_REFUSAL, 403);
+    return c.json(await repeatView(db, cfg.lifecycle));
+  });
+  app.get("/api/choosing/:catalogId/likely", async (c) => {
+    if (!writer(c)) return refuse(MONEY_REFUSAL, 403);
+    return run(() => likelyThere(db, todayOf(cfg.lifecycle), c.req.param("catalogId")));
+  });
+  // Repeat or Drop: leadership and GTM Engineering only.
+  app.post("/api/choosing/repeat/decisions", async (c) => {
+    if (!isLead(actorOf(c))) return refuse("Repeat or Drop is recorded by leadership or GTM Engineering.", 403);
+    return run(async () => decide(db, actorOf(c), await body(c), cfg.lifecycle), 201);
+  });
+  // The wording of the patterns that pass, once per reading. The one paid call in this step; the demo's model is simulated and hands back the code-written sentence.
+  app.post("/api/choosing/repeat/word", async (c) => {
+    if (!writer(c)) return refuse(CHOOSING_WRITER_REFUSAL, 403);
+    return run(() => wordPatterns(db, cfg.llm ?? cfg.lifecycle?.llm ?? mockLlm, cfg.lifecycle));
   });
 
   // Counts only, for anyone who can read the event.
