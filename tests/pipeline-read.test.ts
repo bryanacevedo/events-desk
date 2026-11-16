@@ -42,7 +42,7 @@ describe("the pipeline line of a goal", () => {
     await db.query("UPDATE scorecards SET metrics = $2::jsonb WHERE event_id = $1 AND window_days = 30", [M2020, JSON.stringify(m)]);
     const r = await goalResult(db, noCrm, M2020);
     expect(r.pipeline).toEqual({ goal_cents: 80_000_000, actual_cents: null, short_by_cents: null, read: false });
-    expect(goalWords(r, true)).toEqual(["Held 10 of 16 meetings", "Met 0 of 10 target accounts", "Pipeline not read, no CRM connected (goal $800,000)"]);
+    expect(goalWords(r, true)).toEqual(["Held 10 of 16 meetings", "Met 0 of 10 target accounts (from your target account list)", "Pipeline not read, no CRM connected (goal $800,000)"]);
     // A planner's plan read carries the same words; a rep's carries neither the figure nor the goal.
     const lead = await planView(db, noCrm, M2020, CAMILLE) as any;
     expect(lead.result.words.at(-1)).toBe("Pipeline not read, no CRM connected (goal $800,000)");

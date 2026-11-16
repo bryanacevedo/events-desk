@@ -1,6 +1,6 @@
 /* The demo's "before the list" (docs/CHOOSING.md, section 10). Runs after seed-world when the world seed runs, from the world's public files and two sample pages this repository holds.
    Nothing here is a model's words and no repeat decision or wording is made: with two scored past events the desk says "too few to say", and that is what the demo shows.
-   Everything is keyed by fixed ids, so a second seed writes the same rows. */
+   Rows are keyed by fixed ids, but this holds only on a fresh database: a second run stops at the sample pages (already added) and would book the meetings again. */
 
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -44,12 +44,6 @@ export async function seedChoosing(db: Db, opts: { today?: string } = {}) {
     seen.add(t.company.toLowerCase());
     await db.query("INSERT INTO target_accounts (id, name, domain, source, created_by) VALUES ($1, $2, $3, 'upload', $4) ON CONFLICT DO NOTHING", [`tac_w${hash("world", domain || t.company).slice(0, 14)}`, t.company, domain || null, SAMPLE_LIST_NOTE]);
   }
-
-  // 1b. Four of the companies the team met at Money20/20 USA 2026 were added to the list after the show (sample): so the result's "target accounts met" reads a real count, not zero.
-  const met = await db.query<{ name: string; domain: string }>(
-    `SELECT min(co.name) AS name, mt.domain FROM meetings mt JOIN contacts k ON k.id = mt.contact_id JOIN companies co ON co.id = k.company_id
-      WHERE mt.event_id = 'evt_money20-20-usa-2026' AND mt.status = 'held' GROUP BY mt.domain ORDER BY mt.domain LIMIT 4`);
-  for (const m of met) await db.query("INSERT INTO target_accounts (id, name, domain, source, created_by) VALUES ($1, $2, $3, 'manual', $4) ON CONFLICT DO NOTHING", [`tac_m${hash("met", m.domain).slice(0, 14)}`, m.name, m.domain, "Sample: added after the show"]);
 
   // 2. Two sample catalog rows, marked as samples, so a candidate has a scored earlier edition.
   for (const c of SAMPLE_CATALOG) {

@@ -101,10 +101,10 @@ function Pages({ id, likely, reload }: { id: string; likely: Likely; reload: () 
   );
 }
 
-function CandidateBody({ c, reload }: { c: Cand; reload: () => Promise<void> }) {
+function CandidateBody({ c, reload, version }: { c: Cand; reload: () => Promise<void>; version: number }) {
   const [likely, setLikely] = useState<Likely | null>(null), [all, setAll] = useState(false);
   const load = async () => { setLikely(await get<Likely>(`/api/choosing/${c.catalog_id}/likely`)); };
-  useEffect(() => { void load(); }, [c.catalog_id]);
+  useEffect(() => { void load(); }, [c.catalog_id, version]);
   const again = async () => { await load(); await reload(); };
   const accounts = likely?.accounts ?? [];
   const shown = all ? accounts : accounts.slice(0, 8);
@@ -131,7 +131,7 @@ function CandidateBody({ c, reload }: { c: Cand; reload: () => Promise<void> }) 
   );
 }
 
-function CandidateRow({ c, rank, reload }: { c: Cand; rank: number; reload: () => Promise<void> }) {
+function CandidateRow({ c, rank, reload, version }: { c: Cand; rank: number; reload: () => Promise<void>; version: number }) {
   const [seen, setSeen] = useState(false);
   const status = statusOf(c), note = status === "Declined" && c.event?.decline_reason ? c.event.decline_reason : c.ours_last ? callWords(c.ours_last) : "";
   return (
@@ -147,12 +147,12 @@ function CandidateRow({ c, rank, reload }: { c: Cand; rank: number; reload: () =
         <span className="ch-status"><b>{status}</b>{note && <span>{note}</span>}</span>
       </>
     }>
-      {seen && <CandidateBody c={c} reload={reload} />}
+      {seen && <CandidateBody c={c} reload={reload} version={version} />}
     </ExpandRow>
   );
 }
 
-function Candidates({ data, reload }: { data: Cands; reload: () => Promise<void> }) {
+function Candidates({ data, reload, version }: { data: Cands; reload: () => Promise<void>; version: number }) {
   const [how, setHow] = useState(false);
   return (
     <div className="rs-sec">
@@ -165,7 +165,7 @@ function Candidates({ data, reload }: { data: Cands; reload: () => Promise<void>
             {data.candidates.map((c, i) => (
               <div key={c.catalog_id}>
                 {c.group !== (data.candidates[i - 1]?.group ?? 0) && GROUP_WORDS[c.group] && <h4 className="ch-group">{GROUP_WORDS[c.group]}</h4>}
-                <CandidateRow c={c} rank={i + 1} reload={reload} />
+                <CandidateRow c={c} rank={i + 1} reload={reload} version={version} />
               </div>
             ))}
           </div>
@@ -256,7 +256,7 @@ function Repeats({ data, lead, reload }: { data: Repeat; lead: boolean; reload: 
             <div><dd>{num(data.total)}</dd><dt>past events with a goal</dt></div>
             {data.no_goal > 0 && <div><dd>{num(data.no_goal)}</dd><dt>had no goal</dt></div>}
             <div><dd>{num(data.pairs)}</dd><dt>groups compared</dt></div>
-            <div><dd>{chance(data.alpha_each ?? rule.alpha)}</dd><dt>chance of luck allowed each, {rule.alpha} split by the groups compared</dt></div>
+            {data.pairs > 0 && <div><dd>{chance(data.alpha_each ?? rule.alpha)}</dd><dt>chance of luck allowed each, {rule.alpha} split by the groups compared</dt></div>}
             <div><dd>{rule.min_events}</dd><dt>events needed each side</dt></div>
             <div><dd>{rule.min_goal_met}</dd><dt>met their goal to pass</dt></div>
           </dl>
@@ -329,7 +329,7 @@ function TargetAccounts({ data, reload }: { data: Targets; reload: () => Promise
 export function Choosing({ go: _go }: { go: (to: string) => void }) {
   const { actor, needs } = useActor();
   const [cands, setCands] = useState<Cands | null>(null), [rep, setRep] = useState<Repeat | null>(null), [targets, setTargets] = useState<Targets | null>(null);
-  const [ready, setReady] = useState(false);
+  const [ready, setReady] = useState(false), [listVersion, setListVersion] = useState(0);
   const lead = Boolean(needs?.approvers.includes(actor)) || isGtm(actor);
   const loadCands = async () => { setCands(await get<Cands>("/api/choosing")); };
   const loadRep = async () => { setRep(await get<Repeat>("/api/choosing/repeat")); };
@@ -340,9 +340,9 @@ export function Choosing({ go: _go }: { go: (to: string) => void }) {
   return (
     <section className="choosing" data-ready="1">
       <header className="hero"><div><h1>Choosing</h1></div></header>
-      {cands && <Candidates data={cands} reload={async () => { await Promise.all([loadCands(), loadRep()]); }} />}
+      {cands && <Candidates data={cands} version={listVersion} reload={async () => { await Promise.all([loadCands(), loadRep()]); }} />}
       {rep && <Repeats data={rep} lead={lead} reload={async () => { await Promise.all([loadRep(), loadCands()]); }} />}
-      {targets && <TargetAccounts data={targets} reload={async () => { await Promise.all([loadTargets(), loadCands()]); }} />}
+      {targets && <TargetAccounts data={targets} reload={async () => { await Promise.all([loadTargets(), loadCands()]); setListVersion((v) => v + 1); }} />}
       {!cands && !rep && !targets && <p className="md-clear">Choosing is for planners, leadership and GTM Engineering.</p>}
     </section>
   );

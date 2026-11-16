@@ -36,6 +36,15 @@ describe("pricing", () => {
 });
 
 describe("Usage and the event page", () => {
+  it("counts the repeat wording call, which has no event, in Usage", async () => {
+    const before = await usage();
+    await db.query("INSERT INTO repeat_wordings (id, reading_hash, pattern_key, status, text, by, model, input_tokens, output_tokens) VALUES ('rwd_t', 'h', 'size:flagship', 'done', 'x', 'model', 'claude-opus-5-5', 5000, 700)");
+    const after = await usage();
+    expect(after.ai.real_calls - before.ai.real_calls).toBe(1);
+    expect(after.ai.month_cents - before.ai.month_cents).toBeCloseTo(modelCostUsd("claude-opus-5-5", 5000, 700)! * 100, 4);
+    expect(after.ai.year_cents - before.ai.year_cents).toBeCloseTo(modelCostUsd("claude-opus-5-5", 5000, 700)! * 100, 4);
+  });
+
   const llmRows = (id: string) => db.query<{ id: string }>("SELECT id FROM llm_calls WHERE event_id = $1", [id]);
 
   it("keeps the flat rate for a simulated run and says so", async () => {

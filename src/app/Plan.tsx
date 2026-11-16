@@ -109,11 +109,11 @@ const Sec = ({ title, children }: { title: string; children: ReactNode }) => <se
 
 export function PlanTab({ id, listRows, onChange }: { id: string; listRows: number; onChange: () => void }) {
   const { actor, needs } = useActor();
-  const [p, setP] = useState<PlanData | null>(null);
+  const [p, setP] = useState<PlanData | null>(null), [planLoads, setPlanLoads] = useState(0);
   const [view, setView] = useState<PV>(() => readView(actor));
   const [busy, setBusy] = useState(false), [error, setError] = useState("");
   const [kits, setKits] = useState<KitOffer[]>([]), [kit, setKit] = useState<string | null>(null);
-  const load = async () => { setP(await get<PlanData>(`/api/events/${id}/plan`)); setKits((await get<{ offers: KitOffer[] }>(`/api/kit/offers?event=${id}`))?.offers ?? []); };
+  const load = async () => { setP(await get<PlanData>(`/api/events/${id}/plan`)); setPlanLoads((n) => n + 1); setKits((await get<{ offers: KitOffer[] }>(`/api/kit/offers?event=${id}`))?.offers ?? []); };
   const saved = async () => { await load(); onChange(); };
   useEffect(() => { load(); }, [id, actor]);
   useEffect(() => { setView(readView(actor)); }, [actor]);
@@ -159,7 +159,7 @@ export function PlanTab({ id, listRows, onChange }: { id: string; listRows: numb
       view={p.reason ? <p className="pl-said">{p.reason}</p> : <p className="mute">{p.reason_words ?? "No reason was written"}</p>}
       editor={(close) => <ReasonEditor id={id} value={p.reason} done={close} saved={saved} />} />
   );
-  const goal = <><Editable can={canEdit} label="Edit the goal" view={<Goal p={p} />} editor={(close) => <GoalEditor id={id} goal={p.goal} withPipeline={money_} done={close} saved={saved} />} /><Tracker id={id} stamp={p.goal.meetings_held} /></>;
+  const goal = <><Editable can={canEdit} label="Edit the goal" view={<Goal p={p} />} editor={(close) => <GoalEditor id={id} goal={p.goal} withPipeline={money_} done={close} saved={saved} />} /><Tracker id={id} stamp={planLoads} /></>;
   const takingView = (
     <>
       {live.length ? <ul className="pl-rows">{live.map((i) => <InvolvementRow key={i.id} i={i} />)}</ul> : <p className="mute">Nothing planned yet.</p>}

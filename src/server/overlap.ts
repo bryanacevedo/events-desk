@@ -91,6 +91,11 @@ export async function addPage(db: Db, actor: string, catalogId: string, p: PageI
   if (!body) throw new Invalid("There is no text on that page.");
   if (body.length > MAX_PAGE_CHARS) throw new Invalid(`That page is longer than ${MAX_PAGE_CHARS.toLocaleString("en-US")} characters. Paste the part with the names.`);
   const hash = createHash("sha256").update(body).digest("hex");
+  try { return await addPageTx(db, actor, catalogId, p, body, hash); }
+  catch (e) { if ((e as { code?: string })?.code === "23505") throw new RuleError("That page is already added."); throw e; }
+}
+
+async function addPageTx(db: Db, actor: string, catalogId: string, p: PageInput, body: string, hash: string) {
   return db.tx(async (q) => {
     const [cat] = await q("SELECT 1 FROM catalog_events WHERE id = $1", [catalogId]);
     if (!cat) throw new NotFound("That event is not in the list.");
@@ -118,18 +123,25 @@ export async function removePage(db: Db, _actor: string, pageId: string) {
   return { ok: true };
 }
 
+/** A rejection holds for the whole conference: every match of this account on every page of the same event goes together, in one transaction. */
 export async function rejectMatch(db: Db, actor: string, matchId: string, reason: unknown) {
   const why = typeof reason === "string" ? reason.trim() : "";
   if (!why) throw new Invalid("Say why this match is wrong.");
-  const r = await db.query("UPDATE roster_matches SET status = 'rejected', rejected_by = $2, rejected_reason = $3, rejected_at = now() WHERE id = $1 RETURNING id", [matchId, actor, why.slice(0, 500)]);
-  if (!r.length) throw new NotFound("That match does not exist.");
-  return { ok: true };
+  return db.tx(async (q) => {
+    const [m] = await q<{ account_id: string; catalog_id: string }>("SELECT m.account_id, g.catalog_id FROM roster_matches m JOIN roster_pages g ON g.id = m.page_id WHERE m.id = $1", [matchId]);
+    if (!m) throw new NotFound("That match does not exist.");
+    await q("UPDATE roster_matches SET status = 'rejected', rejected_by = $3, rejected_reason = $4, rejected_at = now() WHERE account_id = $1 AND page_id IN (SELECT id FROM roster_pages WHERE catalog_id = $2)", [m.account_id, m.catalog_id, actor, why.slice(0, 500)]);
+    return { ok: true };
+  });
 }
 
 export async function restoreMatch(db: Db, _actor: string, matchId: string) {
-  const r = await db.query("UPDATE roster_matches SET status = 'counted', rejected_by = NULL, rejected_reason = NULL, rejected_at = NULL WHERE id = $1 RETURNING id", [matchId]);
-  if (!r.length) throw new NotFound("That match does not exist.");
-  return { ok: true };
+  return db.tx(async (q) => {
+    const [m] = await q<{ account_id: string; catalog_id: string }>("SELECT m.account_id, g.catalog_id FROM roster_matches m JOIN roster_pages g ON g.id = m.page_id WHERE m.id = $1", [matchId]);
+    if (!m) throw new NotFound("That match does not exist.");
+    await q("UPDATE roster_matches SET status = 'counted', rejected_by = NULL, rejected_reason = NULL, rejected_at = NULL WHERE account_id = $1 AND page_id IN (SELECT id FROM roster_pages WHERE catalog_id = $2)", [m.account_id, m.catalog_id]);
+    return { ok: true };
+  });
 }
 
 /* ------------------------------------------------------------------ series */
@@ -151,6 +163,7 @@ export async function addSeriesLink(db: Db, actor: string, input: { name?: unkno
   if (!alias || !target) throw new Invalid("Give both names.");
   if (alias === target) throw new Invalid("Those two names are already the same conference.");
   return db.tx(async (q) => {
+    await q("LOCK TABLE series_links IN SHARE ROW EXCLUSIVE MODE");
     const [t] = await q("SELECT 1 FROM series_links WHERE alias_key = $1", [target]);
     if (t) throw new RuleError("That name is itself linked to another. Link to the earliest name instead.");
     const [a] = await q("SELECT 1 FROM series_links WHERE series_key = $1", [alias]);

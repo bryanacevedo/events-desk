@@ -11,7 +11,7 @@ const SHOWN = 5;
 
 export function Tracker({ id, stamp }: { id: string; stamp?: unknown }) {
   const [t, setT] = useState<GoalTracker | null>(null), [all, setAll] = useState(false);
-  useEffect(() => { let on = true; get<GoalTracker>(`/api/events/${id}/goal-tracker`).then((d) => { if (on) setT(d); }); return () => { on = false; }; }, [id, stamp]);
+  useEffect(() => { let on = true; get<GoalTracker>(`/api/events/${id}/goal-tracker`).then((d) => { if (on) setT(d); }).catch(() => { if (on) setT(null); }); return () => { on = false; }; }, [id, stamp]);
   if (!t || t.goal === null || t.goal === undefined || !t.words) return null;
   const counted = t.counted ?? 0, reps = t.by_rep ?? [];
   const shown = all ? reps : reps.slice(0, SHOWN);

@@ -118,7 +118,7 @@ describe("seedReal and seedPlan on 2026-11-13", () => {
   // The hosted year seeds target accounts, so accounts met counts them (docs/CHOOSING.md section 5), not the tier 1 stand-in: none of them met a past conference company.
   it("both past events read exact goal lines from a written scorecard: one short, one met", async () => {
     for (const id of [M2020, DREAMFORCE]) expect((await q<{ n: number }>("SELECT count(*)::int AS n FROM scorecards WHERE event_id = $1 AND window_days = 30", [id]))[0].n).toBe(1);
-    expect(goalWords(await goalResult(db, lifecycle, M2020), true)).toEqual(["Held 10 of 16 meetings", "Met 0 of 10 target accounts", "Pipeline not read, no CRM connected (goal $800,000)"]);
+    expect(goalWords(await goalResult(db, lifecycle, M2020), true)).toEqual(["Held 10 of 16 meetings", "Met 0 of 10 target accounts (from your target account list)", "Pipeline not read, no CRM connected (goal $800,000)"]);
     expect(goalWords(await goalResult(db, lifecycle, DREAMFORCE), true)).toEqual(["Held 8 of 8 meetings"]);
     const m = await goalResult(db, lifecycle, M2020), d = await goalResult(db, lifecycle, DREAMFORCE);
     expect(m.meetings!.short_by).toBe(6);

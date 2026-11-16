@@ -112,6 +112,22 @@ describe("pages and matches", () => {
   });
 });
 
+describe("a rejection on two pages", () => {
+  it("rejects and restores the account on every page of the conference in one step", async () => {
+    const a = await addPage(db, MAYA, "c27", { kind: "sponsor", input: "pasted", text: "Stripe\nNowhere Ltd" });
+    const b = await addPage(db, MAYA, "c27", { kind: "speaker", input: "pasted", text: "Nowhere Ltd speaks" });
+    const o = await addPage(db, MAYA, "cx", { kind: "speaker", input: "pasted", text: "Nowhere Ltd" });
+    const rows = (ids: string[]) => db.query<{ status: string }>("SELECT status FROM roster_matches WHERE account_id = 't4' AND page_id = ANY($1) ORDER BY page_id", [ids]);
+    const [m] = await db.query<{ id: string }>("SELECT id FROM roster_matches WHERE page_id = $1 AND account_id = 't4'", [b.id]);
+    await rejectMatch(db, MAYA, m.id, "A different Nowhere");
+    expect((await rows([a.id, b.id])).map((r) => r.status)).toEqual(["rejected", "rejected"]);
+    expect((await rows([o.id])).map((r) => r.status)).toEqual(["counted"]);
+    expect((await likelyThere(db, "2026-11-24", "c27")).accounts.map((x) => x.name)).toEqual(["Stripe"]);
+    await restoreMatch(db, MAYA, m.id);
+    expect((await rows([a.id, b.id])).map((r) => r.status)).toEqual(["counted", "counted"]);
+  });
+});
+
 describe("series", () => {
   it("joins a renamed conference once, with a reason, and refuses chains", async () => {
     expect(await seriesKey(db, "SaaStr AI Annual 2026")).toBe("saastr-ai-annual");

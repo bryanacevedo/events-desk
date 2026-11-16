@@ -13,9 +13,12 @@ export interface AiPart { step: string; calls: number; real_calls: number; flat_
 export function realCalls(db: Db, from: string, to: string, eventId?: string): Promise<RealRow[]> {
   const where = eventId ? "AND event_id = $3" : "";
   return db.query<RealRow>(
-    `SELECT event_id, step, model, count(*)::int AS n, sum(input_tokens)::float8 AS inp, sum(output_tokens)::float8 AS out FROM
+    `SELECT event_id, step, model, count(*)::int AS n, sum(coalesce(input_tokens, 0))::float8 AS inp, sum(coalesce(output_tokens, 0))::float8 AS out FROM
        (SELECT event_id, step, model, input_tokens, output_tokens, created_at FROM llm_calls
-        UNION ALL SELECT event_id, step, model, input_tokens, output_tokens, created_at FROM llm_calls_kept) c
+        UNION ALL SELECT event_id, step, model, input_tokens, output_tokens, created_at FROM llm_calls_kept
+        -- The wording of a repeat reading belongs to no event: its tokens count in the month and year totals, never on an event's row.
+        UNION ALL SELECT ''::text, 'repeat_word', model, input_tokens, output_tokens, created_at FROM repeat_wordings
+          WHERE model IS NOT NULL AND (coalesce(input_tokens, 0) > 0 OR coalesce(output_tokens, 0) > 0)) c
      WHERE created_at >= $1 AND created_at < $2 AND (input_tokens > 0 OR output_tokens > 0) ${where} GROUP BY 1, 2, 3`, eventId ? [from, to, eventId] : [from, to]);
 }
 

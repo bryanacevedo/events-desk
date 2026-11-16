@@ -77,7 +77,7 @@ describe("the tracker", () => {
     const held = t.by_rep!.filter((r) => r.held > 0);
     expect(held).toHaveLength(10);
     expect(held.every((r) => r.held === 1)).toBe(true);
-    expect(t.accounts).toMatchObject({ goal: 10, basis: "target_list", caption: "from your target account list" });
+    expect(t.accounts).toMatchObject({ goal: 10, actual: 0, basis: "target_list", caption: "from your target account list" });
   });
 });
 

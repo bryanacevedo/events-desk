@@ -102,6 +102,18 @@ describe("goal tracker", () => {
     expect((await goalTracker(db, h.deps, h.id)).nothing_booked).toEqual([LEO]);
   });
 
+  it("held counts each person once and skips a held meeting with no contact, so the figure is the same before, during and after", async () => {
+    const h = await event("2027-01-01");
+    await meet(h, "Ana Ruiz", "held"); await meet(h, "Ana Ruiz", "held", MAYA, "2027-01-12T15:00:00Z"); const orphan = await meet(h, "Ben Ode", "held");
+    await db.query("UPDATE meetings SET contact_id = NULL WHERE id = $1", [orphan]);
+    const phases: number[] = [];
+    for (const day of ["2027-01-01", "2027-01-11", "2027-02-20"]) {
+      const t = await goalTracker(db, { ...h.deps, now: () => new Date(`${day}T12:00:00Z`) } as never, h.id);
+      phases.push(t.held!);
+    }
+    expect(phases).toEqual([1, 1, 1]);
+  });
+
   it("accounts met: target accounts when the team has them, tier 1 companies when it has none, and the caption says which", async () => {
     const h = await event("2027-02-15");
     await db.query("UPDATE companies SET tier = 1 WHERE event_id = $1", [h.id]);

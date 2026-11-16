@@ -24,8 +24,8 @@ import {
 import { stageLabel } from "../shared/domain.ts";
 
 /** What the plan reads as "today": the deps clock when the desk has one (a test clock and the demo clock move it), else the wall clock. */
-/** The day the choosing and tracker screens read as today: the deps clock, else the demo's own day (DEMO_TODAY, set by the demo server), else the wall clock. */
-export const choosingToday = (deps?: Pick<LifecycleDeps, "now">) => deps?.now ? todayOf(deps) : (process.env.DEMO_TODAY && /^\d{4}-\d{2}-\d{2}$/.test(process.env.DEMO_TODAY) ? process.env.DEMO_TODAY : todayOf(deps));
+/** The day the choosing and tracker screens read as today: the deps clock, else the demo's own day (DEMO_TODAY, only when the demo server set it: DEMO_TODAY_SET), else the wall clock. */
+export const choosingToday = (deps?: Pick<LifecycleDeps, "now">) => deps?.now ? todayOf(deps) : (process.env.DEMO_TODAY_SET === "1" && process.env.DEMO_TODAY && /^\d{4}-\d{2}-\d{2}$/.test(process.env.DEMO_TODAY) ? process.env.DEMO_TODAY : todayOf(deps));
 export const todayOf = (deps?: Pick<LifecycleDeps, "now">) => (deps?.now?.() ?? new Date()).toISOString().slice(0, 10);
 export const AUTO_APPROVER = "Under the approval amount";
 const same = (userMap?: Record<string, string>) => (n: string) => userMap?.[n] ?? n;
@@ -529,7 +529,7 @@ export function goalWords(r: GoalResult, withMoney: boolean): string[] {
   if (!r.meetings && !r.accounts && !r.pipeline) return ["No goal was set."];
   const out: string[] = [];
   if (r.meetings) out.push(`Held ${r.meetings.actual} of ${r.meetings.goal} meetings`);
-  if (r.accounts) out.push(`Met ${r.accounts.actual} of ${r.accounts.goal} target accounts`);
+  if (r.accounts) out.push(`Met ${r.accounts.actual} of ${r.accounts.goal} target accounts${r.accounts_basis ? ` (${r.accounts_basis === "target_list" ? "from your target account list" : "tier 1 companies"})` : ""}`);
   if (r.pipeline && withMoney) out.push(r.pipeline.read !== false && r.pipeline.actual_cents !== null ? `${dollars(r.pipeline.actual_cents)} of ${dollars(r.pipeline.goal_cents)} pipeline` : `Pipeline not read, no CRM connected (goal ${dollars(r.pipeline.goal_cents)})`);
   return out;
 }

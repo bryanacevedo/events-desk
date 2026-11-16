@@ -498,7 +498,7 @@ Candidates are catalog conferences starting 30 to 400 days out. Order: not decli
 
 ## 98. The goal tracker counts people, not meeting rows, and one held figure (2026-11-15, step 7)
 
-Booked and rescheduled both count as booked; after the event only held counts, read from the Result so the Plan tab shows one held number (distinct people, the funnel's definition). Who goes comes from the `who_goes` view, so per-seat events are covered. "Target accounts met" now counts the team's target list when it has one (field `accounts_basis` says which); uploading a list therefore changes how past events' accounts met read, and the caption says the basis. Without a list the tier 1 stand-in stays.
+Booked and rescheduled both count as booked; after the event only held counts, read from the Result so the Plan tab shows one held number (distinct people, the funnel's definition). Who goes comes from the `who_goes` view, so per-seat events are covered. "Target accounts met" now counts the team's target list when it has one (field `accounts_basis` says which); uploading a list therefore changes how existing results read, and the Result now says the basis in its words (`goalWords`) and the tracker in its caption. Without a list the tier 1 stand-in stays.
 
 ## 99. Which events to repeat: Account Desk's method, with these deviations (2026-11-15, step 7)
 
@@ -510,5 +510,5 @@ New step `repeat_word`: one call per passing pattern per reading, the row insert
 
 ## 101. The demo's today for these screens is the demo's day (2026-11-15, step 7)
 
-The tracker, ranking and repeat reads use the deps clock, else `DEMO_TODAY` (set by the demo server to the world's 2026-11-24), else the wall clock. Other desk views keep the database clock (decision 91). The world clock is not moved.
+The tracker, ranking and repeat reads use the deps clock, else `DEMO_TODAY` only when the demo server set it (`DEMO_TODAY_SET`, to the world's 2026-11-24), else the wall clock. Other desk views keep the database clock (decision 91). The world clock is not moved.
 

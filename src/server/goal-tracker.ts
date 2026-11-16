@@ -32,13 +32,15 @@ export async function goalTracker(db: Db, deps: LifecycleDeps | undefined, event
   const phase: TrackerPhase = today < start ? "before" : today <= end ? "during" : "after";
 
   // One row per person: a held meeting wins over a booked one with the same person, so nobody is counted twice.
-  const ms = await db.query<{ who: string; status: string; rep: string | null }>(
-    "SELECT coalesce(contact_id, id) AS who, status, nullif(trim(rep), '') AS rep FROM meetings WHERE event_id = $1 AND status IN ('booked', 'rescheduled', 'held')", [eventId]);
+  const ms = await db.query<{ who: string; status: string; rep: string | null; contact_id: string | null }>(
+    "SELECT coalesce(contact_id, id) AS who, contact_id, status, nullif(trim(rep), '') AS rep FROM meetings WHERE event_id = $1 AND status IN ('booked', 'rescheduled', 'held')", [eventId]);
   const heldBy = new Map<string, Set<string>>(), bookedBy = new Map<string, Set<string>>(), display = new Map<string, string>();
   const heldAll = new Set<string>(), bookedAll = new Set<string>();
   const noRep = new Set<string>();
   const add = (m: Map<string, Set<string>>, k: string, who: string) => { if (!m.has(k)) m.set(k, new Set()); m.get(k)!.add(who); };
   for (const m of ms) {
+    // Held counts distinct people, as the funnel's held_all does: a held meeting with no contact is not counted, so the figure does not move when the phase turns to after.
+    if (m.status === "held" && !m.contact_id) continue;
     const key = m.rep?.toLowerCase() ?? "";
     if (m.rep && !display.has(key)) display.set(key, m.rep);
     if (m.status === "held") { heldAll.add(m.who); if (key) add(heldBy, key, m.who); }

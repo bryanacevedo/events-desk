@@ -101,7 +101,7 @@ const decisionWords = (d: { decision: string; decided_by: string }) => `${d.deci
 export function reasonsFor(c: Pick<Candidate, "likely" | "cost" | "past" | "vs_median" | "ours_last" | "event">, med: { value: number | null; n: number }): string[] {
   const out: string[] = [];
   const k = c.likely.by_kind, parts: string[] = [];
-  if (k.past) parts.push(`${k.past} from ${c.likely.past_lists ? "earlier lists" : "an earlier list"}`);
+  if (k.past) parts.push(`${k.past} from ${c.likely.past_lists > 1 ? "earlier lists" : "an earlier list"}`);
   if (k.page) parts.push(`${k.page} named on a page`);
   if (k.captured) parts.push(`${k.captured} with people already captured`);
   out.push(c.likely.accounts ? `${plural(c.likely.accounts, "target account")} likely there: ${parts.join(", ")}` : `No target account is known to be there yet${c.likely.past_lists ? "" : " (no list from an earlier edition)"}`);

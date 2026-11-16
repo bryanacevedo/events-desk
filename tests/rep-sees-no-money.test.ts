@@ -176,6 +176,8 @@ describe("choosing and the goal tracker", () => {
     expect(money(body)).toEqual([]);
     for (const path of ["/api/target-accounts", "/api/choosing", "/api/choosing/repeat", "/api/choosing/c1/likely"]) expect((await app.request(path, { headers: as(MAYA) })).status, path).toBe(403);
     for (const path of ["/api/choosing/c1/pages", "/api/choosing/series-links"]) expect((await app.request(path, { method: "POST", headers: { ...as(MAYA), "content-type": "application/json" }, body: "{}" })).status, path).toBe(403);
+    const send = (method: string, path: string) => app.request(path, { method, headers: { ...as(MAYA), "content-type": "application/json" }, ...(method === "DELETE" ? {} : { body: "{}" }) });
+    for (const [method, path] of [["POST", "/api/choosing/repeat/decisions"], ["POST", "/api/choosing/repeat/word"], ["POST", "/api/choosing/matches/m1/reject"], ["POST", "/api/choosing/matches/m1/restore"], ["DELETE", "/api/choosing/pages/p1"]]) expect((await send(method, path)).status, `${method} ${path}`).toBe(403);
     expect((await app.request("/api/target-accounts", { headers: as(CAMILLE) })).status).toBe(200);
   });
 });
