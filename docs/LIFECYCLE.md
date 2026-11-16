@@ -237,7 +237,7 @@ All aggregation is `GROUP BY`.
 
 - Meetings by company tier, title tier and segment. People dropped who later appear in a deal.
 - Accepted debrief facts, by account and theme.
-- A proposal is a suggested edit to the ICP or title table, with its evidence. It takes a person to accept, and goes through the existing ICP confirm screen as a new version. Fewer than 20 outcomes in a group reads "too few to say".
+- A proposal is a suggested edit to the ICP or title table, with its evidence. It takes a person to accept, and goes through the existing ICP confirm screen as a new version. Fewer than 20 outcomes in a group reads "too few to say". Event-level patterns (which events to repeat) use a floor of 5 events on each side and a correction for many comparisons: `docs/CHOOSING.md`, decision 99.
 
 ## 12a. Slack, in the open
 

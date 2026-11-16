@@ -487,3 +487,28 @@ Outbox status `held` (migration 0060): a member row for one of the three that th
 ## 95. The rehearsal runs Events Desk itself, and what it will not write (2026-11-15, step 6 part 4)
 
 The four-desk rehearsal does not replay a hand-written list of Events Desk's calls: `scripts/rehearse.ts` seeds the world, runs this desk's own sweep and outbox against the live CRM Desk, and `journalFetch` writes down every call that changed something (any method but GET, except the two reads made with POST), without the key. CRM Desk's demo replays those lines with a fifth key made for `events_desk`. Four rehearsal-only choices, each said in the run's output: (1) every event has `write_leads` on, as a person could set it; (2) guests who waited or declined are first written as leads by address, because the world's CRM leaves most of them out and this desk never makes a lead from a waitlist or a decline (13.9 item 5); (3) a queued activity dated after the CRM's own clock is cancelled with a reason and counted, because CRM Desk does not refuse such a row and its audit says nothing is dated after now; (4) an address that is not `.example` is cancelled before it reaches the CRM. The demo's own sends and meetings come from the demo pipeline, which a rehearsal does not run, so the script writes 30 invitation sends and three held meetings for Money20/20 USA as the desk's own rows and lets the sweep write them as it would any. Risk: none outward-facing; nothing is sent.
+
+## 96. Target accounts are the existing list; this step reads it, adds no tier, and matches code-only (2026-11-15, step 7)
+
+`target_accounts` (migration 0053) stays the team's list; `GET /api/target-accounts` and the Choosing page read it, the existing import route fills it. A speaker or sponsor page is matched by code (domain as a whole host, or the account's name as a contiguous token run starting with a capital), never by a model, so a miss is visible and a wrong match is a person's reject with a reason. Rejections hold for the candidate, not the page. Evidence from `past` and `captured` counts only people whose source is `attendee` or `onsite`; a `prospect` the desk itself chose never counts as proof an account will be there. Spec `docs/CHOOSING.md`, goldfish-reviewed by a fresh Opus agent before code (2 Blockers, 12 Majors, nits, all fixed in the spec).
+
+## 97. Candidates are ranked by a printed rule, with no blended score (2026-11-15, step 7)
+
+Candidates are catalog conferences starting 30 to 400 days out. Order: not declined and not below the median, then last edition below the median, then declined; inside a group the cost kind (plan, one pass, one pass estimated, unknown; never divided into each other), then target accounts per $1,000 by integer cross multiplication, then accounts, date and catalog id. LIFECYCLE 11's "no blended number" holds. Money is shown, so the whole Choosing read is leadership, GTM and planners only.
+
+## 98. The goal tracker counts people, not meeting rows, and one held figure (2026-11-15, step 7)
+
+Booked and rescheduled both count as booked; after the event only held counts, read from the Result so the Plan tab shows one held number (distinct people, the funnel's definition). Who goes comes from the `who_goes` view, so per-seat events are covered. "Target accounts met" now counts the team's target list when it has one (field `accounts_basis` says which); uploading a list therefore changes how past events' accounts met read, and the caption says the basis. Without a list the tier 1 stand-in stays.
+
+## 99. Which events to repeat: Account Desk's method, with these deviations (2026-11-15, step 7)
+
+One-sided Fisher exact on "met its meetings goal", Bonferroni over the pairs looked at, "too few to say" under the floor. Deviations: a pair is looked at when both sides have at least 5 events (margins only, so outcomes cannot loosen the correction); a pass needs at least 3 goal-met events in the group (Account Desk's two-SDR rule has no event equivalent, since one planner requests most events); the floor for events is 5 a side, while LIFECYCLE 12's 20 stays for people groups. With two scored events in the demo, everything reads "too few to say", which is the honest state. A person records Repeat or Drop (a drop needs a reason, enforced by the database); leadership and GTM only.
+
+## 100. A model words a passing pattern, code checks it, the demo uses the template (2026-11-15, step 7)
+
+New step `repeat_word`: one call per passing pattern per reading, the row inserted before the call (unique, so never repeated, a failed call stays failed), accepted only if every number and name is in the pattern's facts, at most two sentences, no advice words. The simulated model is not a model and returns the code-written text; the row and the screen say "template". Not run against a real model in this step; nothing model-worded is invented in the demo.
+
+## 101. The demo's today for these screens is the demo's day (2026-11-15, step 7)
+
+The tracker, ranking and repeat reads use the deps clock, else `DEMO_TODAY` (set by the demo server to the world's 2026-11-24), else the wall clock. Other desk views keep the database clock (decision 91). The world clock is not moved.
+

@@ -243,3 +243,5 @@ All four films: https://bryanacevedo.github.io/project-videos/
 ## License
 
 [PolyForm Noncommercial 1.0.0](LICENSE.md). See [NOTICE](NOTICE) and [CREDITS.md](CREDITS.md).
+
+**Choosing events (step 7).** The Choosing page (leadership, GTM and planners) ranks next year's candidate conferences by target accounts likely there (from speaker and sponsor pages you paste or upload, earlier editions' lists and people already captured), cost and last edition's return, by a printed rule with no blended score; and shows which past events to repeat with counts, a correction for many comparisons and "too few to say" under the floor. The Plan tab's Goal shows the meeting goal tracker by rep. Spec `docs/CHOOSING.md`.

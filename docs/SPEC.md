@@ -492,3 +492,5 @@ The step 4 spec (the directory extension and the screen recording, reads, captur
 The step 5 spec (speaking: calls for papers, the talk, two-person approval, credit from scans; and the "I'm going" kit) is `docs/SPEAKING.md`, decisions 74 on.
 
 The step 6 spec (into the shared world: `INTEGRATED_WITH`, the campaign and its members and activities in CRM Desk, the published member statuses, the world; in four parts) is `docs/SHARED-WORLD.md`, decisions 85 on. Goldfish-reviewed by a fresh Opus subagent before code (2026-11-15); section 11 holds the findings.
+
+The step 7 spec (before the list, and choosing events: target accounts likely at a conference, the meeting goal tracker, ranked candidates, which events to repeat) is `docs/CHOOSING.md`, decisions 96 to 101, migration 0061. Goldfish-reviewed by a fresh Opus subagent before code (2026-11-15).
