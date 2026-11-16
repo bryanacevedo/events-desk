@@ -24,6 +24,8 @@ import {
 import { stageLabel } from "../shared/domain.ts";
 
 /** What the plan reads as "today": the deps clock when the desk has one (a test clock and the demo clock move it), else the wall clock. */
+/** The day the choosing and tracker screens read as today: the deps clock, else the demo's own day (DEMO_TODAY, set by the demo server), else the wall clock. */
+export const choosingToday = (deps?: Pick<LifecycleDeps, "now">) => deps?.now ? todayOf(deps) : (process.env.DEMO_TODAY && /^\d{4}-\d{2}-\d{2}$/.test(process.env.DEMO_TODAY) ? process.env.DEMO_TODAY : todayOf(deps));
 export const todayOf = (deps?: Pick<LifecycleDeps, "now">) => (deps?.now?.() ?? new Date()).toISOString().slice(0, 10);
 export const AUTO_APPROVER = "Under the approval amount";
 const same = (userMap?: Record<string, string>) => (n: string) => userMap?.[n] ?? n;

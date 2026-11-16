@@ -45,6 +45,12 @@ export async function seedChoosing(db: Db, opts: { today?: string } = {}) {
     await db.query("INSERT INTO target_accounts (id, name, domain, source, created_by) VALUES ($1, $2, $3, 'upload', $4) ON CONFLICT DO NOTHING", [`tac_w${hash("world", domain || t.company).slice(0, 14)}`, t.company, domain || null, SAMPLE_LIST_NOTE]);
   }
 
+  // 1b. Four of the companies the team met at Money20/20 USA 2026 were added to the list after the show (sample): so the result's "target accounts met" reads a real count, not zero.
+  const met = await db.query<{ name: string; domain: string }>(
+    `SELECT min(co.name) AS name, mt.domain FROM meetings mt JOIN contacts k ON k.id = mt.contact_id JOIN companies co ON co.id = k.company_id
+      WHERE mt.event_id = 'evt_money20-20-usa-2026' AND mt.status = 'held' GROUP BY mt.domain ORDER BY mt.domain LIMIT 4`);
+  for (const m of met) await db.query("INSERT INTO target_accounts (id, name, domain, source, created_by) VALUES ($1, $2, $3, 'manual', $4) ON CONFLICT DO NOTHING", [`tac_m${hash("met", m.domain).slice(0, 14)}`, m.name, m.domain, "Sample: added after the show"]);
+
   // 2. Two sample catalog rows, marked as samples, so a candidate has a scored earlier edition.
   for (const c of SAMPLE_CATALOG) {
     const [like] = await db.query<{ website: string | null; seat_price_cents: number; size: string | null; brand_color: string | null }>("SELECT website, seat_price_cents, size, brand_color FROM catalog_events WHERE id = $1", [c.like]);

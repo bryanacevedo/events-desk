@@ -7,7 +7,7 @@ import { dollars, plannedTotal } from "./budget-lines.ts";
 import type { Db } from "./db.ts";
 import type { LifecycleDeps } from "./lifecycle-deps.ts";
 import { likelyThere, seriesKeyWith, seriesLinks, type EvidenceKind } from "./overlap.ts";
-import { todayOf } from "./plan.ts";
+import { choosingToday as todayOf } from "./plan.ts";
 import { addDays } from "../shared/motion.ts";
 
 export const CANDIDATE_LEAD_DAYS = 30;

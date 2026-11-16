@@ -4,7 +4,7 @@
 import type { Db } from "./db.ts";
 import { RuleError } from "./events.ts";
 import type { LifecycleDeps } from "./lifecycle-deps.ts";
-import { goalResult, todayOf } from "./plan.ts";
+import { goalResult, choosingToday as todayOf } from "./plan.ts";
 
 export type TrackerPhase = "before" | "during" | "after";
 export interface RepRow { rep: string; going: boolean; held: number; booked: number; nothing_booked: boolean }

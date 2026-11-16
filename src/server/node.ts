@@ -74,6 +74,7 @@ await publishAll(db).catch((e) => console.error("definitions", e));
 // Under the shared world (WORLD=lumen, the demo's default; docs/SHARED-WORLD.md 13.3) it is the world's own Events Desk date, 2026-11-24.
 const worldOn = mode.demo && (process.env.WORLD ?? "lumen") === "lumen";
 const demoToday = process.env.DEMO_TODAY ?? (worldOn ? worldData().today : new Date().toISOString().slice(0, 10));
+if (mode.demo) process.env.DEMO_TODAY = demoToday;
 const empty = (await db.query<{ n: number }>("SELECT count(*)::int AS n FROM events"))[0]?.n === 0;
 const mayLoadSample = !url || process.env.SEED_SAMPLE === "1";
 if ((mode.demo && !fromSnapshot) || (empty && mayLoadSample && !fromSnapshot)) {

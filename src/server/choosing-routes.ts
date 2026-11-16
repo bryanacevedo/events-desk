@@ -8,7 +8,7 @@ import { goalTracker } from "./goal-tracker.ts";
 import type { LifecycleDeps } from "./lifecycle-deps.ts";
 import { canPlan, forRep, isLead, MONEY_REFUSAL } from "./money.ts";
 import { addPage, addSeriesLink, Invalid, likelyThere, NotFound, rejectMatch, removePage, restoreMatch } from "./overlap.ts";
-import { todayOf } from "./plan.ts";
+import { choosingToday as todayOf } from "./plan.ts";
 import { mockLlm, type Llm } from "./providers.ts";
 import { candidates } from "./ranking.ts";
 import { decide, repeatView, wordPatterns } from "./repeat.ts";

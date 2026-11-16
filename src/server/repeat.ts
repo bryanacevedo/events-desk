@@ -10,7 +10,7 @@ import { isLead } from "./money.ts";
 import { Forbidden } from "./seats.ts";
 import { Invalid, seriesKeyWith, seriesLinks } from "./overlap.ts";
 import { allowedFrom, numbersIn, sentencesOf, unknownName, collapse } from "./perspective-check.ts";
-import { todayOf } from "./plan.ts";
+import { choosingToday as todayOf } from "./plan.ts";
 import { fill } from "./prompts.ts";
 import type { Llm } from "./providers.ts";
 import { writtenCards } from "./ranking.ts";
