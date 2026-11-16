@@ -20,6 +20,7 @@ Accounts you know will be there (optional)
 Add a way of taking part
 Budget is for leadership and GTM Engineering.
 Choose one video, or screenshots of the list.
+Choosing is for planners, leadership and GTM Engineering.
 Confirmed by #, #
 Counted by this desk, not a finding
 Declined by ##
@@ -35,13 +36,17 @@ It will not share the list
 It will share the list
 Keep it as my rule
 Last day of the event
+Last time below the median
 Leave out the answer to #
 Logo, PNG up to 500 KB
 My event is not listed
 Needs a second person to approve the abstract
 Needs a second person to approve the slides
+No conference starts in the next year.
 No email, no CRM task.
 No event has finished sending yet.
+No past event has a goal and a written scorecard yet.
+No past event has a written scorecard yet.
 Not read: the card ran out
 Nothing in that video looked like a list.
 Nothing is due this week.
@@ -51,6 +56,7 @@ One ticket ###
 Open the link in your invitation email again, or ask the person who invited you for a new one.
 Open this page in Safari to scan codes, or take a photo with the phone's camera, or type the person.
 Page # of #
+Paste the text of the page
 People to look for per company
 Publish although it got under # right
 Reading replies, waiting on the uploader
@@ -93,12 +99,16 @@ Those notes are not here.
 To change anything, write to #.
 Travel per person, dollars (optional)
 Up to ##
+Upload a CSV of target accounts
 Usage is for leadership and GTM Engineering.
 Waiting on # to run this.
 Ways to get it, in order
 Web portal, with the browser extension
 Where the file came from
 Where the pipeline came from
+Why they are one conference
+Why this match is wrong
 Why you are passing on #
 Will not share the list
 You post this yourself. Events Desk never posts for you.
+chance of luck allowed each, # split by the groups compared

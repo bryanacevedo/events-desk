@@ -3122,3 +3122,68 @@ a:hover > .swap .due, a:focus-visible > .swap .due { opacity: 0; transform: tran
 .m-deskp .m-act { display: flex; gap: 8px; align-items: center; }
 .m-deskp .m-act input { flex: 1 1 200px; width: auto; min-width: 0; }
 .m-deskp .m-rows li b { font-variant-numeric: tabular-nums; }
+
+/* Choosing (docs/CHOOSING.md section 11) and the meeting goal tracker. Built from the desk's own parts: .xrow rows, .pl-rows, .pl-figs, .rs-ratio bars, .pl-bt tables. */
+.choosing { display: grid; gap: 28px; min-width: 0; align-content: start; }
+.ch-list, .ch-series { display: grid; border-top: 1px solid var(--line); }
+.ch-group { margin: 20px 0 4px; font: 600 14px/20px var(--sans); color: var(--ink); }
+.ch-how { justify-self: start; }
+.ch-order { display: grid; gap: 4px; max-width: 72ch; font-size: 14px; line-height: 20px; }
+.ch-row .xrow-head { display: grid; grid-template-columns: 28px minmax(0, 1.1fr) minmax(0, 2fr) minmax(110px, 0.8fr) 16px; gap: 0 16px; min-height: 64px; }
+.ch-srow .xrow-head { display: grid; grid-template-columns: minmax(0, 1fr) minmax(120px, 280px) 16px; gap: 0 16px; min-height: 56px; }
+.ch-rank { text-align: right; color: var(--mute); font-variant-numeric: tabular-nums; }
+.ch-what { display: grid; min-width: 0; }
+.ch-what b, .ch-status b { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ch-what span, .ch-status span { font-size: 13px; line-height: 18px; color: var(--mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ch-status { display: grid; min-width: 0; }
+.ch-status b { font-weight: 600; }
+.ch-figs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 16px; min-width: 0; }
+.ch-fig { display: grid; min-width: 0; }
+.ch-fig b { font: 500 16px/22px var(--display); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ch-fig span { font-size: 12px; line-height: 16px; color: var(--mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ch-fig.thin b { color: var(--mute); font-weight: 400; }
+.ch-body { display: grid; gap: 10px; padding: 4px 0 6px 44px; min-width: 0; }
+.ch-srow .ch-body { padding-left: 0; }
+.ch-reasons .pl-row { min-height: 40px; }
+.ch-pages, .ch-matches { display: grid; }
+.ch-pages > li { border-top: 1px solid var(--line); padding: 4px 0 8px; }
+.ch-pages > li:first-child { border-top: 0; }
+.ch-matches { padding-left: 16px; }
+.ch-match { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 16px; align-items: center; min-height: 48px; padding: 6px 0; border-top: 1px solid var(--line); }
+.ch-match .pl-what span { overflow-wrap: anywhere; }
+.ch-match .pl-end { white-space: nowrap; }
+.ch-reject { grid-column: 1 / -1; padding-bottom: 8px; }
+.ch-file { cursor: pointer; justify-self: start; }
+.ch-rule { margin: 8px 0 12px; }
+.ch-pt .pl-bt-row { --n: 3; }
+.ch-pt .pl-bt-row > span:not(:first-child) { text-align: left; white-space: normal; }
+@media (min-width: 761px) { .ch-pt .pl-bt-row { grid-template-columns: minmax(0, 1fr) 130px 110px 320px; } }
+.ch-words { display: grid; gap: 8px; }
+.ch-word { display: grid; gap: 2px; max-width: 72ch; }
+
+.tr { display: grid; gap: 10px; min-width: 0; margin-top: 4px; padding-top: 12px; border-top: 1px solid var(--line); }
+.tr-words { font-weight: 600; }
+.tr .rs-ratio { max-width: 420px; }
+.tr-reps { display: grid; max-width: 520px; }
+.tr-rep { display: grid; grid-template-columns: minmax(0, 1fr) 72px 116px; gap: 4px 12px; align-items: baseline; min-height: 36px; padding: 6px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.tr-rep:first-child { border-top: 0; }
+.tr-rep b { font-weight: 500; overflow-wrap: anywhere; }
+.tr-rep > span { text-align: right; white-space: nowrap; color: var(--mute); }
+.tr-rep > span:last-child { color: var(--ink); }
+.tr-acc { margin-top: 2px; }
+.tr-acc dt { order: 2; }
+
+@media (max-width: 760px) {
+  .ch-row .xrow-head { grid-template-columns: 24px minmax(0, 1fr) 16px; gap: 6px 10px; padding: 8px 0; }
+  .ch-row .xrow-head .ch-figs { grid-column: 2 / -1; grid-row: 2; gap: 0 10px; }
+  .ch-row .xrow-head .ch-status { grid-column: 2 / -1; grid-row: 3; }
+  .ch-row .xrow-head > .chev { grid-column: 3; grid-row: 1; }
+  .ch-srow .xrow-head { grid-template-columns: minmax(0, 1fr) 16px; }
+  .ch-srow .xrow-head .ch-status { grid-column: 1; grid-row: 2; }
+  .ch-srow .xrow-head > .chev { grid-column: 2; grid-row: 1; }
+  .ch-body { padding-left: 0; }
+  .ch-matches { padding-left: 0; }
+  .ch-what span { white-space: normal; }
+  .ch-fig span { white-space: normal; }
+  .tr-rep { grid-template-columns: minmax(0, 1fr) 64px 112px; }
+}

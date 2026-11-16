@@ -7,11 +7,13 @@ import { Icon } from "./icons";
 export function More({ go, showDay, showSpeaking }: { go: (to: string) => void; showDay: boolean; showSpeaking: boolean }) {
   const { actor, needs } = useActor();
   const lead = Boolean(needs?.approvers.includes(actor)) || isGtm(actor);
+  const plans = lead || Boolean(needs?.planners.includes(actor));
   return (
     <>
       <header className="hero" data-ready="1"><div><h1>More</h1></div></header>
       <nav className="morelist" aria-label="More">
         {showDay && <Link to="/my-day" go={go} className="navitem"><span className="ico"><Icon.calendar /></span><span className="lbl">My day</span></Link>}
+        {plans && <Link to="/choosing" go={go} className="navitem"><span className="ico"><Icon.choosing /></span><span className="lbl">Choosing</span></Link>}
         {lead && <Link to="/results" go={go} className="navitem"><span className="ico"><Icon.results /></span><span className="lbl">Results</span></Link>}
         {showSpeaking && <Link to="/speaking" go={go} className="navitem"><span className="ico"><Icon.speaking /></span><span className="lbl">Speaking</span></Link>}
         {lead && <Link to="/usage" go={go} className="navitem"><span className="ico"><Icon.usage /></span><span className="lbl">Usage</span></Link>}

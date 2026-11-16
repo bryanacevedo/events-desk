@@ -108,6 +108,26 @@ if (dinner) {
   }
 }
 
+// Choosing: a candidate opens and closes with the keyboard and a click, and the Plan tab's tracker draws for an event with a goal.
+{
+  await as("Camille Laurent", "/choosing");
+  const head = page.locator(".ch-row .xrow-head").first();
+  if (!(await head.count())) problems.push("Choosing: no candidate to open");
+  else {
+    await head.click(); await pause(300);
+    if ((await head.getAttribute("aria-expanded")) !== "true") problems.push("Choosing: a click did not open the candidate");
+    await head.focus(); await page.keyboard.press("Enter"); await pause(300);
+    if ((await head.getAttribute("aria-expanded")) !== "false") problems.push("Choosing: Enter did not close the candidate");
+  }
+  const evs = (await (await fetch(`${base}/api/events`)).json()).events;
+  for (const name of ["Money20/20 USA 2026", "GITEX Global 2026"]) {
+    const id = evs.find((e) => e.name.startsWith(name))?.id;
+    if (!id) { problems.push(`Tracker: ${name} is not in the demo`); continue; }
+    await as("Camille Laurent", `/event/${id}#plan`);
+    if (!(await page.locator(".tr .tr-words").count())) problems.push(`Tracker: ${name} shows no words line in its Plan tab`);
+  }
+}
+
 // The Overview layout is each person's own pick (decision 81): the switcher changes the page at once, survives a reload, and leaves someone else on the default.
 {
   const pressed = () => page.locator('.seg[aria-label="Overview layout"] [aria-pressed="true"]').innerText().catch(() => "none");

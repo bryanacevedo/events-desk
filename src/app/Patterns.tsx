@@ -20,8 +20,9 @@ export function Flag({ cents, words, over = false, className = "" }: { cents: nu
 }
 
 /** A row that opens itself. `head` is the row and the control; `side` holds buttons and inputs that must not toggle it; children are what opens. */
-export function ExpandRow({ head, side, children, className = "", label, defaultOpen = false }: { head: ReactNode; side?: ReactNode; children: ReactNode; className?: string; label?: string; defaultOpen?: boolean }) {
-  const [open, setOpen] = useState(defaultOpen);
+export function ExpandRow({ head, side, children, className = "", label, defaultOpen = false, onToggle }: { head: ReactNode; side?: ReactNode; children: ReactNode; className?: string; label?: string; defaultOpen?: boolean; onToggle?: (open: boolean) => void }) {
+  const [open, setOpen_] = useState(defaultOpen);
+  const setOpen = (o: boolean) => { setOpen_(o); onToggle?.(o); };
   const id = useId();
   const onKey = (ev: KeyboardEvent) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); setOpen(!open); } };
   return (

@@ -14,6 +14,7 @@ import { AssessmentBlock, OrganizerBlock } from "./PlanAssessment";
 import { GetList } from "./Directory";
 import { KitSheet } from "./Kit";
 import { TalkBlock } from "./PlanTalk";
+import { Tracker } from "./Tracker";
 import { LIST_SOURCE_WORDS } from "../shared/plan";
 import { money, num, shortDate } from "./words";
 
@@ -158,7 +159,7 @@ export function PlanTab({ id, listRows, onChange }: { id: string; listRows: numb
       view={p.reason ? <p className="pl-said">{p.reason}</p> : <p className="mute">{p.reason_words ?? "No reason was written"}</p>}
       editor={(close) => <ReasonEditor id={id} value={p.reason} done={close} saved={saved} />} />
   );
-  const goal = <Editable can={canEdit} label="Edit the goal" view={<Goal p={p} />} editor={(close) => <GoalEditor id={id} goal={p.goal} withPipeline={money_} done={close} saved={saved} />} />;
+  const goal = <><Editable can={canEdit} label="Edit the goal" view={<Goal p={p} />} editor={(close) => <GoalEditor id={id} goal={p.goal} withPipeline={money_} done={close} saved={saved} />} /><Tracker id={id} stamp={p.goal.meetings_held} /></>;
   const takingView = (
     <>
       {live.length ? <ul className="pl-rows">{live.map((i) => <InvolvementRow key={i.id} i={i} />)}</ul> : <p className="mute">Nothing planned yet.</p>}

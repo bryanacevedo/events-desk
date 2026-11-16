@@ -44,6 +44,9 @@ const hostedPages = [
   ["/speaking", "Camille Laurent"], ["/speaking", MAYA], ["/my-day", "Camille Laurent"],
   ...(byName("Money20/20 Europe 2027") ? [[`/event/${byName("Money20/20 Europe 2027")}`, "Camille Laurent"]] : []),
   ...(byName("Money20/20 USA") ? [[`/event/${byName("Money20/20 USA")}#result`, "Dan Whitlock"]] : []),
+  // The meeting goal tracker in the Plan tab (docs/CHOOSING.md section 5): after the event, and days out.
+  ...(byName("Money20/20 USA 2026") ? [[`/event/${byName("Money20/20 USA 2026")}#plan`, "Camille Laurent"]] : []),
+  ...(byName("GITEX Global 2026") ? [[`/event/${byName("GITEX Global 2026")}#plan`, "Camille Laurent"], [`/event/${byName("GITEX Global 2026")}#plan`, MAYA]] : []),
   // The Scanner tab (docs/SCANNER.md 10): scans from a day, and one set up with none yet.
   ...(byName("Money20/20 USA") ? [[`/event/${byName("Money20/20 USA")}#scanner`, "Camille Laurent"], [`/event/${byName("Money20/20 USA")}#scanner`, MAYA]] : []),
   ...(byName("Salesforce World Tour Tokyo") ? [[`/event/${byName("Salesforce World Tour Tokyo")}#scanner`, "Camille Laurent"]] : []),
@@ -51,7 +54,7 @@ const hostedPages = [
 const pages = [
   ["/", MAYA], ["/events", MAYA], [`/events?event=${ids[1] ?? flagship}`, MAYA], ["/events?time=all", MAYA], ["/events?time=past&region=na", MAYA], ["/events?add=1", GTM], [`/events?event=${flagship}`, MAYA], ["/events?request=1", MAYA], [`/events?request=1&catalog=${listed}`, MAYA],
   [`/?event=${ids[1] ?? flagship}`, MAYA], ["/budget", "Dan Whitlock"], ["/budget?year=2027", "Dan Whitlock"], ["/budget?year=2027&q=money", "Dan Whitlock"], ["/usage", "Dan Whitlock"], ["/more", MAYA],
-  ["/seats", "Dan Whitlock"], ["/seats?status=all", "Dan Whitlock"], ["/seats?request=1", "Dan Whitlock"], ["/seats?mine=1&status=all", "Dan Whitlock"],
+  ["/choosing", "Camille Laurent"], ["/choosing", "Dan Whitlock"], ["/seats", "Dan Whitlock"], ["/seats?status=all", "Dan Whitlock"], ["/seats?request=1", "Dan Whitlock"], ["/seats?mine=1&status=all", "Dan Whitlock"],
   ...sections.map((q) => [`/settings${q}`, GTM]), ["/settings", MAYA], ["/settings?section=spend", "Dan Whitlock"],
   ...[...new Set([...volumes, ...ids])].map((id) => [`/event/${id}`, MAYA]),
   [`/event/${flagship}`, "Dan Whitlock"], [`/event/${byName("Dreamforce 2026") ?? flagship}?s=dropped`, MAYA], [`/event/${flagship}?ct=unknown&cq=a`, MAYA],
@@ -144,6 +147,8 @@ for (const width of widths) {
     // Open the on-request sections and one person, so their layout is measured too.
     for (const label of ["See why", "Cost and the card", "Show more"]) { const b = page.getByRole("button", { name: label, exact: true }); if (await b.count()) await b.first().click(); }
     for (const text of ["Cost", "What happened so far"]) { const d = page.locator("details.fold > summary", { hasText: text }); if (await d.count()) await d.first().click(); }
+    // Choosing: open the first candidate and the first series so their opened layout is measured too.
+    if (path === "/choosing") { for (const sel of [".ch-row .xrow-head", ".ch-srow .xrow-head"]) { const h = page.locator(sel).first(); if (await h.count()) await h.click(); } await page.waitForTimeout(500); }
     const more = page.locator(".reasons .morebtn button"); if (await more.count()) await more.click();
     if (eventPage) { await page.waitForTimeout(300); const row = page.locator("button.prow").first(); if (await row.count()) await row.click(); }
     // The request form: open the list of events once, and on one page choose "My event isn't listed" so the suggestion fields are measured too.
