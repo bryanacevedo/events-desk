@@ -93,7 +93,7 @@ export async function syncCrm(db: Db, crm: Crm | null | undefined, env: Record<s
          EXISTS (SELECT 1 FROM meetings m WHERE m.contact_id = k.id AND m.status = 'held') AS held,
          EXISTS (SELECT 1 FROM meetings m WHERE m.contact_id = k.id) AS any_meeting
        FROM contacts k LEFT JOIN companies co ON co.id = k.company_id JOIN events e ON e.id = k.event_id WHERE k.dropped_at IS NULL AND k.email IS NOT NULL AND ${IN_WINDOW}
-       ORDER BY k.event_id, (k.priority = 'A') DESC, (k.priority = 'B') DESC, co.tier NULLS LAST, k.id`);
+       ORDER BY k.event_id, (k.priority = 'A') DESC, (k.priority = 'B') DESC, co.tier NULLS LAST, lower(k.email), k.id`);   // by the person before the id: an uploaded list's ids differ between runs, and this order is the order the CRM is written in
     const cands: { key: string; row: (typeof contacts)[number] }[] = [];
     const barredKeys = new Set<string>();
     for (const c of contacts) {

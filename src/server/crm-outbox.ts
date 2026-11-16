@@ -43,7 +43,7 @@ export async function queueDeliveredEmails(q: Db["query"], eventId: string, crm:
   if (crm.createCampaign) await queueCampaign(q, payloadEventId, crm);
   const rows = await q<{ person_id: string | null; email: string; full_name: string | null; company: string; domain: string | null }>(
     `SELECT k.person_id, lower(k.email) AS email, k.full_name, co.name AS company, co.primary_domain AS domain FROM contacts k JOIN companies co ON co.id = k.company_id
-     WHERE k.event_id = $1 AND k.dropped_at IS NULL AND k.priority IS NOT NULL AND k.email IS NOT NULL AND k.verify_1 = 'deliverable' AND k.verify_2 = 'deliverable' ORDER BY k.id`, [eventId]);
+     WHERE k.event_id = $1 AND k.dropped_at IS NULL AND k.priority IS NOT NULL AND k.email IS NOT NULL AND k.verify_1 = 'deliverable' AND k.verify_2 = 'deliverable' ORDER BY lower(k.email), k.id`, [eventId]);
   for (const r of rows) await q("INSERT INTO crm_outbox (id, person_id, kind, payload) VALUES ($1, $2, 'email', $3::jsonb)", [newId("obx"), r.person_id, JSON.stringify({ email: r.email, full_name: r.full_name, company: r.company, domain: r.domain, event_id: payloadEventId })]);
 }
 
@@ -155,7 +155,7 @@ async function drainOnce(db: Db, crm: Crm | null | undefined, limit: number) {
   const out = { sent: 0, failed: 0, none: 0 };
   if (!canWrite(crm)) return out;
   await syncCrm(db, crm).catch((e) => console.error("crm sync", e));
-  const rows = await db.query<{ id: string; kind: OutboxKind; payload: OutboxPayload; attempts: number; desk_key: string | null }>("SELECT id, kind, payload, attempts, desk_key FROM crm_outbox WHERE status = 'queued' ORDER BY (coalesce(last_error, '') LIKE '%not in the CRM yet' OR last_error = 'campaign money is off'), created_at, id LIMIT $1", [limit]);
+  const rows = await db.query<{ id: string; kind: OutboxKind; payload: OutboxPayload; attempts: number; desk_key: string | null }>("SELECT id, kind, payload, attempts, desk_key FROM crm_outbox WHERE status = 'queued' ORDER BY (coalesce(last_error, '') LIKE '%not in the CRM yet' OR last_error = 'campaign money is off'), created_at, coalesce(desk_key, payload::text), id LIMIT $1", [limit]);
   for (const r of rows) {
     try {
       const p = r.payload;

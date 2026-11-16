@@ -6,6 +6,7 @@
    A queued activity dated after the CRM's own clock is cancelled with a reason and counted, not written: CRM Desk's audit says nothing is dated after now. Prints one JSON line. */
 
 import { migrate, postgresJs } from "../src/server/db.ts";
+import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
@@ -22,11 +23,34 @@ const url = need("DATABASE_URL"), crmUrl = need("CRM_DESK_URL"), crmKey = need("
 const prefix = need("EVENTS_DB_PREFIX"), dbName = new URL(url).pathname.slice(1);
 if (!dbName.startsWith(prefix)) { console.error(`Refusing the database ${dbName}: it does not start with ${prefix}.`); process.exit(1); }
 
+// The desk's ids (events.ts newId, caches.ts) come from crypto.randomUUID, so every run made different ids, and the queries that order by id wrote the CRM
+// in a different order (and picked different people): three rehearsals, three different journals (2026-11-16). A rehearsal is a recording the other desks
+// replay, so its ids are numbered: the same sequence of calls gives the same ids. Only this script is changed; the desk itself keeps its random ids.
+let idCount = 0;
+Object.defineProperty(globalThis.crypto, "randomUUID", { configurable: true, writable: true, value: () => {
+  const h = createHash("sha256").update(`rehearsal-id:${idCount++}`).digest("hex");
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-8${h.slice(17, 20)}-${h.slice(20, 32)}` as `${string}-${string}-${string}-${string}-${string}`;
+} });
+
+// The desk reads the wall clock in places (new Date(), Date.now(): what is "upcoming", which day a sample falls on), so a rehearsal on another hour or day wrote other calls.
+// For this run the clock is the demo's own day (worldData().today, noon UTC), the day the world's Events Desk is built for; timers and the database driver keep real time.
+const fixedNow = new Date(`${worldData().today}T12:00:00Z`).getTime();
+class FixedDate extends Date {
+  constructor(...a: unknown[]) { if (a.length === 0) super(fixedNow); else super(...(a as [string])); }
+  static now() { return fixedNow; }
+}
+globalThis.Date = FixedDate as DateConstructor;
+
 const clockNow = new Date(now.replace(" ", "T").replace(/([+-]\d\d)$/, "$1:00")).toISOString();   // CRM Desk writes its clock as 2026-11-12T14:00:00+00
 const root = fileURLToPath(new URL("..", import.meta.url));
 const db = await postgresJs(url);
 await db.query("DROP SCHEMA public CASCADE; CREATE SCHEMA public");
 await migrate(db, readdirSync(join(root, "migrations")).filter((f) => f.endsWith(".sql")).map((name) => ({ name, sql: readFileSync(join(root, "migrations", name), "utf8") })));
+// Queries that do not fix their order return rows as Postgres happens to produce them, and background vacuum, parallel scans and synchronized scans change that between runs
+// (Account Desk's runner turns the same three off for its deterministic build). Off for this database before anything is written, so the rows come back in the order they were made.
+await db.query(`ALTER DATABASE "${dbName}" SET max_parallel_workers_per_gather = 0`);
+await db.query(`ALTER DATABASE "${dbName}" SET synchronize_seqscans = off`);
+for (const t of await db.query<{ tablename: string }>("SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename")) await db.query(`ALTER TABLE "${t.tablename}" SET (autovacuum_enabled = false)`);
 await seed(db, { real: true, today: worldData().today, world: true });
 
 // People the CRM does not hold (the dinner's guests who declined or waited, most of the targets) are written as leads only when the event's person turned that on.
@@ -36,7 +60,7 @@ await db.query("UPDATE events SET write_leads = true");
 // would any). The motion itself needs the whole demo pipeline, which a rehearsal does not run.
 const people = await db.query<{ id: string; event_id: string; email: string; domain: string | null }>(
   `SELECT k.id, k.event_id, k.email, co.primary_domain AS domain FROM contacts k LEFT JOIN companies co ON co.id = k.company_id
-   WHERE k.event_id = 'evt_money20-20-usa-2026' AND k.email LIKE '%.example' AND k.dropped_at IS NULL ORDER BY k.id LIMIT 30`);
+   WHERE k.event_id = 'evt_money20-20-usa-2026' AND k.email LIKE '%.example' AND k.dropped_at IS NULL ORDER BY lower(k.email), k.full_name LIMIT 30`);   // by the person, not the id: an uploaded list's contact ids are random per run
 for (const [i, p] of people.entries()) {
   await db.query(`INSERT INTO touches (id, domain, contact_id, event_id, kind, channel, at, source, dedup_key, step) VALUES ($1, $2, $3, $4, 'send', 'email', $5, 'rehearsal', $6, 1)`,
     [`tch_rh_${i}`, p.domain, p.id, p.event_id, new Date(Date.UTC(2026, 9, 6, 14 + (i % 3), i)).toISOString(), `rehearsal:send:${p.id}`]);
