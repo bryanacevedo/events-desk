@@ -18,7 +18,9 @@ import { journalFetch } from "../src/server/journal-fetch.ts";
 
 const need = (k: string) => { const v = process.env[k]; if (!v) { console.error(`${k} is not set.`); process.exit(1); } return v; };
 const url = need("DATABASE_URL"), crmUrl = need("CRM_DESK_URL"), crmKey = need("CRM_DESK_KEY"), journal = need("EVENTS_JOURNAL"), now = need("EVENTS_NOW");
-if (!/ev6p4_|rehears/i.test(url)) { console.error("Refusing a database whose name does not look like a rehearsal's."); process.exit(1); }
+// The runner names the prefix it may drop (REHEARSAL_DB_PREFIX); this script drops a schema, so it takes no other database.
+const prefix = need("EVENTS_DB_PREFIX"), dbName = new URL(url).pathname.slice(1);
+if (!dbName.startsWith(prefix)) { console.error(`Refusing the database ${dbName}: it does not start with ${prefix}.`); process.exit(1); }
 
 const clockNow = new Date(now.replace(" ", "T").replace(/([+-]\d\d)$/, "$1:00")).toISOString();   // CRM Desk writes its clock as 2026-11-12T14:00:00+00
 const root = fileURLToPath(new URL("..", import.meta.url));
@@ -51,7 +53,7 @@ const late = await db.query<{ kind: string; n: number }>(
   `UPDATE crm_outbox SET status = 'cancelled', last_error = 'after the CRM''s clock' WHERE status = 'queued' AND kind = 'activity' AND (payload->>'at')::timestamptz > $1::timestamptz
    RETURNING kind, 1 AS n`, [clockNow]);
 // Nothing but an example address goes to a rehearsal's CRM (the audit holds every desk to it): the demo's own sample people may carry others.
-await db.query("UPDATE crm_outbox SET status = 'cancelled', last_error = 'not an example address' WHERE status = 'queued' AND payload->>'email' IS NOT NULL AND lower(payload->>'email') NOT LIKE '%.example'");
+const notExample = await db.query("UPDATE crm_outbox SET status = 'cancelled', last_error = 'not an example address' WHERE status = 'queued' AND payload->>'email' IS NOT NULL AND lower(payload->>'email') NOT LIKE '%.example' RETURNING id");
 let passes = 0, last = { sent: 0, failed: 0, none: 0 };
 for (; passes < 6; passes++) {                    // a child campaign and the members wait for their parent: a few passes
   last = await drainOutbox(db, crm);
@@ -59,7 +61,7 @@ for (; passes < 6; passes++) {                    // a child campaign and the me
 }
 const by = async (sql: string) => Object.fromEntries((await db.query<{ k: string; n: number }>(sql)).map((r) => [r.k, r.n]));
 console.log(JSON.stringify({
-  swept, passes: passes + 1, drain: last, cancelled_after_clock: late.length,
+  swept, passes: passes + 1, drain: last, cancelled_after_clock: late.length, cancelled_not_example: notExample.length,
   outbox: await by("SELECT kind || ':' || status AS k, count(*)::int AS n FROM crm_outbox GROUP BY 1"),
   members: await by("SELECT last AS k, count(*)::int AS n FROM crm_sync WHERE kind = 'member' GROUP BY 1"),
   errors: await by("SELECT left(coalesce(last_error, ''), 80) AS k, count(*)::int AS n FROM crm_outbox WHERE status IN ('failed', 'held', 'queued') GROUP BY 1"),
