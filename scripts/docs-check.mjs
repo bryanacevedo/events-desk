@@ -36,10 +36,10 @@ function checkMigrations(root) {
   const first = nums[0], last = nums[nums.length - 1];
   const problems = [];
   const readme = read(root, "README.md");
-  if (!/migrations\s+\d{4}\s+to\s+\d{4}/i.test(readme)) problems.push(`README.md must state the migration range (migrations ${first} to ${last}).`);
+  if (!/migrations[^.\n]{0,60}?\b\d{4}\s+to\s+\d{4}/i.test(readme)) problems.push(`README.md must state the migration range (migrations ${first} to ${last}).`);
   for (const rel of ["README.md", "PROJECT-STATUS.md"]) {
     const text = read(root, rel);
-    for (const m of text.matchAll(/migrations\s+(\d{4})\s+to\s+(\d{4})/gi)) {
+    for (const m of text.matchAll(/migrations[^.\n]{0,60}?\b(\d{4})\s+to\s+(\d{4})/gi)) {
       if (m[1] !== first || m[2] !== last) problems.push(`${rel} says migrations ${m[1]} to ${m[2]}; the folder holds ${first} to ${last}.`);
     }
   }
@@ -51,7 +51,14 @@ function checkEnv(root) {
   const files = [...walk(join(root, "src")), ...walk(join(root, "scripts"))];
   const used = new Set();
   const re = /\b(?:process\.)?env(?:\.|\[\s*["'`])([A-Z][A-Z0-9_]{2,})\b/g;
-  for (const f of files) for (const m of readFileSync(f, "utf8").matchAll(re)) used.add(m[1]);
+  const lookups = /\bneed\(\s*["'`]([A-Z][A-Z0-9_]{2,})["'`]/g; // need("X") helpers
+  const quoted = /["'`]([A-Z][A-Z0-9_]{3,})["'`]/g; // quoted names in a line that reads env, such as a list of PG* names
+  for (const f of files) {
+    const text = readFileSync(f, "utf8");
+    for (const m of text.matchAll(re)) used.add(m[1]);
+    for (const m of text.matchAll(lookups)) used.add(m[1]);
+    for (const line of text.split("\n")) if (/\benv\b/.test(line) && !/^\s*(\/\/|\*|\/\*)/.test(line)) for (const m of line.matchAll(quoted)) if (m[1].includes("_") || /^PG[A-Z]+$/.test(m[1])) used.add(m[1]);
+  }
   const docs = read(root, "README.md") + "\n" + read(root, ".env.example");
   let allow = {};
   try { allow = JSON.parse(read(root, "scripts/docs-env-allowlist.json") || "{}"); } catch { return ["scripts/docs-env-allowlist.json is not valid JSON."]; }
@@ -69,14 +76,16 @@ function checkDecisions(root) {
   const nums = [...read(root, "docs/DECISIONS.md").matchAll(/^## (\d+)\./gm)].map((m) => Number(m[1]));
   if (!nums.length) return ["docs/DECISIONS.md has no numbered decisions."];
   const top = Math.max(...nums);
-  const stated = read(root, "PROJECT-STATUS.md").match(/\*\*Decisions:\*\*[^\n]*?\b1 to (\d+)/);
-  if (!stated) return ["PROJECT-STATUS.md must state the decisions on record: '**Decisions:** `docs/DECISIONS.md`, 1 to N'."];
-  return Number(stated[1]) === top ? [] : [`PROJECT-STATUS.md says decisions 1 to ${stated[1]}; docs/DECISIONS.md ends at ${top}.`];
+  const stated = [...read(root, "PROJECT-STATUS.md").matchAll(/\*\*Decisions:\*\*[^\n]*?\b1 to (\d+)/g)];
+  if (!stated.length) return ["PROJECT-STATUS.md must state the decisions on record: '**Decisions:** `docs/DECISIONS.md`, 1 to N'."];
+  return stated.filter((m) => Number(m[1]) !== top).map((m) => `PROJECT-STATUS.md says decisions 1 to ${m[1]}; docs/DECISIONS.md ends at ${top}.`);
 }
 
 /* 5. PROJECT-STATUS 'Updated' is not more than 1 day older than the last commit that touched code. */
 function lastCodeCommitDate(root) {
   try {
+    const shallow = execFileSync("git", ["rev-parse", "--is-shallow-repository"], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    if (shallow !== "false") return null; // a shallow clone (CI) has no real history
     const out = execFileSync("git", ["log", "-1", "--format=%cs", "--", "src", "scripts", "migrations", "tests", "package.json"], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
     return /^\d{4}-\d\d-\d\d$/.test(out) ? out : null;
   } catch { return null; }
@@ -93,9 +102,10 @@ function checkUpdated(root, codeDate) {
 
 /* 6. No line says a push deploys by itself: deploys here are manual. */
 function checkDeployClaims(root) {
-  const bad = /redeploys? (?:on every push|by itself)|rebuilt from the seed on every push|auto-?deploys? on (?:every )?push/i;
+  const bad = /(?:re)?deploy(?:s|ed)? (?:on every push|by itself)|rebuilt from the seed on every push|auto-?deploys? (?:is on|on (?:every )?push)|\bon hold\b|\brule 20\b/i;
   const problems = [];
-  for (const rel of ["README.md", "PROJECT-STATUS.md", "render.yaml"]) {
+  const docs = existsSync(join(root, "docs")) ? readdirSync(join(root, "docs")).filter((f) => f.endsWith(".md")).map((f) => `docs/${f}`) : [];
+  for (const rel of ["README.md", "PROJECT-STATUS.md", "render.yaml", ...docs]) {
     read(root, rel).split("\n").forEach((line, i) => { if (bad.test(line)) problems.push(`${rel}:${i + 1} claims a push deploys by itself. Deploys are manual.`); });
   }
   return problems;

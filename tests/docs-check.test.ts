@@ -86,4 +86,20 @@ describe("docs gate", () => {
     const r = check(fixture({ "PROJECT-STATUS.md": "**Updated:** 2026-11-17. **Decisions:** 1 to 2.\n\nRender redeploys on every push to main.\n" }), opts);
     expect(r.join("\n")).toMatch(/deploys by itself/);
   });
+
+  it("catches env names read through need() and quoted lookup lists", () => {
+    expect(check(fixture({ "scripts/r.ts": 'const v = need("REHEARSE_KEY");\n' }), opts).join("\n")).toMatch(/REHEARSE_KEY/);
+    expect(check(fixture({ "src/g.ts": 'if (["PGHOST", "PGSERVICE"].some((v) => env[v])) throw 1;\n' }), opts).join("\n")).toMatch(/PGHOST[\s\S]*PGSERVICE|PGSERVICE[\s\S]*PGHOST/);
+  });
+
+  it("catches wider deploy claims, in docs too", () => {
+    for (const line of ["It deploys on every push.", "Redeployed on every push.", "auto-deploy is on", "Render deploys on hold (rule 20)"]) {
+      expect(check(fixture({ "docs/X.md": `${line}\n` }), opts).join("\n")).toMatch(/deploys by itself/);
+    }
+  });
+
+  it("checks every decisions line in PROJECT-STATUS", () => {
+    const r = check(fixture({ "PROJECT-STATUS.md": "**Updated:** 2026-11-17. **Decisions:** 1 to 2.\n\n**Decisions:** `x`, 1 to 1.\n" }), opts);
+    expect(r.join("\n")).toMatch(/1 to 1/);
+  });
 });
