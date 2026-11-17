@@ -11,6 +11,7 @@ import { OLD_SHEET_ERROR, type EventRow, type Stage } from "../shared/domain";
 import { AFTER, afterStep } from "./stages";
 import { get, send, type HostedPage, type Card, type CompanyRow, type EventPayload, type Page, type Pending, type PersonRow, type ReviewCase, type SeatRequest, type Spread, type TopUpCounts, type TopUpItem, type UploadItem } from "./api";
 import { Link, useActor } from "./App";
+import { LOADING } from "./access";
 import { objectHref, ObjectSheets } from "./Objects";
 import { Cases, openCases } from "./Cases";
 import { Motion } from "./Motion";
@@ -958,7 +959,7 @@ export function Event({ id, go }: { id: string; go: (to: string) => void }) {
   const parent = ev.data?.event.parent_event_id;
   useEffect(() => { if (parent) go(`/event/${parent}`); }, [parent]);
   if (ev.missing) return <div className="empty" data-ready="1">That event does not exist. <Link to="/events" go={go} className="to">Back to Events</Link></div>;
-  if (!ev.data || parent || hosted === undefined) return null;
+  if (!ev.data || parent || hosted === undefined) return <p className="md-clear">{LOADING}</p>;
   if (hosted && hash === "#check-in") return hosted.can_check_in ? <CheckIn id={id} page={hosted} reload={loadHosted} go={go} /> : <div className="empty" data-ready="1">Check-in is for the people on this event&apos;s list. <Link to={`/event/${id}#guests`} go={go} className="to">Back to the guests</Link></div>;
   const d = ev.data, e = d.event, stage: Stage = e.stage;
   const going = (needs?.requests ?? []).filter((r) => r.event_id === e.id && r.status === "approved");

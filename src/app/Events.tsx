@@ -4,6 +4,7 @@
    the near weeks room and compresses the far months, so seven events in one month stay apart. An
    event opens in the side sheet; Add event opens its form in one too. */
 
+import { LOADING } from "./access";
 import { useEffect, useRef, useState } from "react";
 import type { EventRow } from "../shared/domain";
 import { isGtm } from "../shared/roles";
@@ -78,7 +79,7 @@ export function Events({ go, sheetId, requesting, preselect, search }: { go: (to
     setTrackW(el.clientWidth || 700);
     return () => ro.disconnect();
   }, [needs]);
-  if (!needs) return null;
+  if (!needs) return <p className="md-clear">{LOADING}</p>;
 
   const today = todayYmd();
   const time: TimeKey = (search.get("time") as TimeKey) in TIMES ? (search.get("time") as TimeKey) : "coming";

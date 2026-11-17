@@ -8,6 +8,7 @@ import { get, send, type KitOffer, type PlanBudgetCategory, type PlanData, type 
 import { useActor } from "./App";
 import { Icon } from "./icons";
 import { Fold } from "./Motion";
+import { DecisionLine, LOADING } from "./access";
 import { DeclineBox, Editable, GoalEditor, InvolvementEditor, LinesEditor, PersonEditor, ReasonEditor } from "./PlanEdit";
 import { SponsorBlock } from "./PlanSponsor";
 import { AssessmentBlock, OrganizerBlock } from "./PlanAssessment";
@@ -108,7 +109,7 @@ const StageFacts = ({ p }: { p: PlanData }) => (
 const Sec = ({ title, children }: { title: string; children: ReactNode }) => <section className="pl-sec" aria-label={title}><h2>{title}</h2><div className="pl-body">{children}</div></section>;
 
 export function PlanTab({ id, listRows, onChange }: { id: string; listRows: number; onChange: () => void }) {
-  const { actor, needs } = useActor();
+  const { actor, decisions, needs } = useActor();
   const [p, setP] = useState<PlanData | null>(null), [planLoads, setPlanLoads] = useState(0);
   const [view, setView] = useState<PV>(() => readView(actor));
   const [busy, setBusy] = useState(false), [error, setError] = useState("");
@@ -117,7 +118,7 @@ export function PlanTab({ id, listRows, onChange }: { id: string; listRows: numb
   const saved = async () => { await load(); onChange(); };
   useEffect(() => { load(); }, [id, actor]);
   useEffect(() => { setView(readView(actor)); }, [actor]);
-  if (!p) return null;
+  if (!p) return <p className="md-clear">{LOADING}</p>;
   const pick = (v: PV) => { setView(v); saveView(actor, v); };
   const money_ = Boolean(p.budget);
   const isApprover = Boolean(needs?.approvers.includes(actor)) && actor !== p.approval.requested_by;
@@ -125,11 +126,12 @@ export function PlanTab({ id, listRows, onChange }: { id: string; listRows: numb
   const planning = p.stage_line.plan_stage === "planning" && p.event.stage !== "declined";
   const act: { label: string; run: () => Promise<unknown> } | null =
     planning && !submitted && money_ ? { label: "Ask for approval", run: () => send("POST", `/api/events/${id}/plan/submit`, actor) }
-    : planning && submitted && isApprover ? { label: "Approve the plan", run: () => send("POST", `/api/events/${id}/plan/decision`, actor, { decision: "approve" }) }
-    : !planning && p.approval.over_budget && isApprover ? { label: "Approve again", run: () => send("POST", `/api/events/${id}/plan/decision`, actor, { decision: "approve" }) }
+    : planning && submitted && isApprover && decisions === "panel" ? { label: "Approve the plan", run: () => send("POST", `/api/events/${id}/plan/decision`, actor, { decision: "approve" }) }
+    : !planning && p.approval.over_budget && isApprover && decisions === "panel" ? { label: "Approve again", run: () => send("POST", `/api/events/${id}/plan/decision`, actor, { decision: "approve" }) }
     : null;
   const canEdit = p.can_plan && p.event.stage !== "declined";
-  const canDecline = isApprover && planning && submitted && !p.approval.approved_at;
+  const waitingOnDecision = isApprover && !p.approval.approved_at && ((planning && submitted) || (!planning && p.approval.over_budget));
+  const canDecline = decisions === "panel" && isApprover && planning && submitted && !p.approval.approved_at;
   const go = async () => {
     if (!act) return;
     setBusy(true); setError("");
@@ -293,6 +295,7 @@ export function PlanTab({ id, listRows, onChange }: { id: string; listRows: numb
         </div>
       </header>
       {error && <p role="alert" className="error small">{error}</p>}
+      {waitingOnDecision && decisions !== "panel" && <DecisionLine decisions={decisions} />}
       {canDecline && <div className="pl-decline"><DeclineBox id={id} saved={saved} /></div>}
       {view !== "c" && notes}
       {body}

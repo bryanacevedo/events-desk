@@ -1,6 +1,7 @@
 /* The home for someone running events all year. It answers three things across every event: where each one is (the rail, one card per event in date order,
    opened at today), what needs someone (replies and follow-ups first, then the list's own risks), and whether it is working (outreach, and what it paid). */
 
+import { LOADING } from "./access";
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import type { EventRow } from "../shared/domain";
 import { get, send, type DeadlineRow, type LiveRow, type OutreachNeed, type ResultRow, type YearPlanRead } from "./api";
@@ -369,7 +370,7 @@ export function Overview({ go, sheetId }: { go: (to: string) => void; sheetId: s
     void send("PUT", "/api/overview/view", actor, { view: v }).then((r) => { if (!r.ok && n === picked.current) setView(was); });
   };
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
-  if (!needs) return null;
+  if (!needs) return <p className="md-clear">{LOADING}</p>;
 
   const today = todayYmd();
   const all = [...needs.events].sort((a, b) => a.starts_on.localeCompare(b.starts_on) || a.name.localeCompare(b.name));

@@ -10,16 +10,17 @@ import { PersonAvatar } from "./PersonAvatar";
 import { RequestSeats } from "./RequestForm";
 import { useRef, useState } from "react";
 import { Icon } from "./icons";
+import { DecisionLine } from "./access";
 import { firstName, money, shortDate } from "./words";
 
 function Decide({ r, onDone }: { r: SeatRequest; onDone: () => void }) {
-  const { actor, demo, needs } = useActor();
+  const { actor, demo, decisions, needs } = useActor();
   const [declining, setDeclining] = useState(false);
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  if (!demo) return <p className="small mute">Decided in Slack.</p>;
+  if (!demo) return <DecisionLine decisions={decisions} />;
   if (!needs?.approvers.includes(actor) || r.requester === actor) return null;
   const decide = async (decision: "approve" | "decline") => {
     setBusy(true);

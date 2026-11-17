@@ -5,6 +5,7 @@
 import { useEffect, useState } from "react";
 import { get, type HostedMine, type KitOffer } from "./api";
 import { Link, useActor } from "./App";
+import { LOADING, NOT_AVAILABLE } from "./access";
 import { copyText } from "./Guests";
 import { isGtm } from "../shared/roles";
 import { Icon } from "./icons";
@@ -35,11 +36,12 @@ export function MyDay() {
   // Seat requests still open for this person. Buying the ticket is the approvers' job, so an approval leaves this page.
   const mySeats = (needs?.requests ?? []).filter((r) => r.requester === actor && (r.status === "pending" || r.status === "declined"));
   const [d, setD] = useState<Day | null>(null), [allReplies, setAllReplies] = useState(false);
+  const [done, setDone] = useState(false);
   const sheet = openObject();
   const [allKits, setAllKits] = useState(false), [mine, setMine] = useState<HostedMine | null>(null), [kits, setKits] = useState<KitOffer[]>([]), [kit, setKit] = useState<KitOffer | null>(null);
-  const load = async () => { setD(await get<Day>(`/api/motion/my-day?rep=${encodeURIComponent(actor)}`)); setMine(await get<HostedMine>("/api/hosted/mine")); setKits(((await get<{ offers: KitOffer[] }>("/api/kit/offers"))?.offers ?? []).filter((o) => o.person === actor)); };
+  const load = async () => { const day = await get<Day>(`/api/motion/my-day?rep=${encodeURIComponent(actor)}`); setD(day); setDone(true); setMine(await get<HostedMine>("/api/hosted/mine")); setKits(((await get<{ offers: KitOffer[] }>("/api/kit/offers"))?.offers ?? []).filter((o) => o.person === actor)); };
   useEffect(() => { load(); }, [actor]);
-  if (!d) return null;
+  if (!d) return <p className="md-clear">{done ? NOT_AVAILABLE("My day") : LOADING}</p>;
   const today = new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
   const figures: [number, string][] = [[d.replies.length, d.replies.length === 1 ? "reply to answer" : "replies to answer"], [d.meetings.length, d.meetings.length === 1 ? "meeting" : "meetings"], [d.captures.length, d.captures.length === 1 ? "person met" : "people met"]];
 

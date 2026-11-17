@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { get, send } from "./api";
 import { useActor } from "./App";
+import { NOT_AVAILABLE } from "./access";
 import { copyText, Facts, HSheet } from "./Guests";
 import { Form } from "./PlanEdit";
 import { METHOD_WORDS, STATE_WORDS, type ScanState } from "../shared/scan";
@@ -26,13 +27,13 @@ const source = (r: Row) => ((r.method === "badge_code" || r.method === "badge_id
 export function Scanner({ id, eventName }: { id: string; eventName: string }) {
   const { actor } = useActor();
   const [cfg, setCfg] = useState<Cfg | null>(null), [page, setPage] = useState<Page | null>(null), [filter, setFilter] = useState<Filter>("all"), [all, setAll] = useState(false);
-  const [sheet, setSheet] = useState<"setup" | "review" | null>(null), [copied, setCopied] = useState(false), [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false), [sheet, setSheet] = useState<"setup" | "review" | null>(null), [copied, setCopied] = useState(false), [busy, setBusy] = useState(false);
   const load = useCallback(async () => {
     const [c, p] = await Promise.all([get<Cfg>(`/api/events/${id}/scanner`), get<Page>(`/api/events/${id}/scans`)]);
-    setCfg(c); setPage(p);
+    setCfg(c); setPage(p); setDone(true);
   }, [id]);
   useEffect(() => { void load(); }, [load, actor]);
-  if (!cfg || !page) return <div className="empty" data-ready="1">Loading the scanner.</div>;
+  if (!cfg || !page) return <div className="empty" data-ready="1">{done ? NOT_AVAILABLE("The scanner") : "Loading the scanner."}</div>;
 
   const link = `${location.origin}/scan/${id}`;
   const hasTalk = page.scans.some((r) => r.talk_title);

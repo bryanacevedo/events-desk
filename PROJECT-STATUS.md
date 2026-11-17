@@ -4,6 +4,10 @@
 
 Docs are part of done: README, PROJECT-STATUS and docs change in the same commit as the behaviour, counts or setup they describe. `make docs-check` (also run by the suite) enforces it.
 
+## S4 standalone-day review fixes (2026-11-17)
+
+Worktree `.wt/s4-events-desk`, branch `s4/standalone`. From the fresh review of the standalone persona day (`workday-sim-plan/runs/s4/events/review.txt`), only the items it marked small and safe. Fixed: no Approve, Approve again or Decline button where the plan decision route does not exist (the screen says where decisions are taken, from `/api/health.decisions`: panel, slack or none); Choosing and Results wait with "Loading." while the planners load instead of showing a refusal, and Choosing says it could not load when its reads fail; planners see Results in the menu (decision 54); a loading line on the app shell, the event page, Plan, Overview, Events, My day and Choosing; Outreach, the Scanner and My day say "not available on this desk" once their read has finished with nothing, instead of staying blank or "Loading" forever; the plan read runs its independent queries together instead of one after another. Stale doc line about the Slack plan card corrected. New screen sentences are in `docs/SCREEN-COPY.txt` for Bryan to read. Not built, because they are product decisions: the simulation mode over a real database, and a seat and plan approval path without Slack.
+
 ## S2b: docs never stale (2026-11-17)
 
 README refreshed (no test counts, migration range, stray Choosing paragraph made a section, deploys are manual); `.env.example` lists the 15 variables it was missing and 9 developer or internal ones are on the gate's allowlist; stale lines about Render and the decision range corrected; one superseded decision annotated. Docs gate `scripts/docs-check.mjs` with `tests/docs-check.test.ts` and `make docs-check`; a pre-push hook is proposed in `docs/PRE-PUSH-HOOK.md`, not installed. Left as they are, by rule: decisions 50 to 57 sit out of numeric order in `docs/DECISIONS.md` and decision 83 is dated before 81.

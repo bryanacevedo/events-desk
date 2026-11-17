@@ -11,6 +11,7 @@ import { useActor } from "./App";
 import { isGtm } from "../shared/roles";
 import { ExpandRow, ShowMore } from "./Patterns";
 import { Form } from "./PlanEdit";
+import { CHOOSING_FAILED, LOADING } from "./access";
 import { money, num, shortDate } from "./words";
 
 type Cands = Awaited<ReturnType<typeof candidates>>;
@@ -336,14 +337,14 @@ export function Choosing({ go: _go }: { go: (to: string) => void }) {
   const loadTargets = async () => { setTargets(await get<Targets>("/api/target-accounts")); };
   const loadAll = async () => { await Promise.all([loadCands(), loadRep(), loadTargets()]); setReady(true); };
   useEffect(() => { void loadAll(); }, [actor]);
-  if (!ready) return null;
+  if (!ready) return <p className="md-clear">{LOADING}</p>;
   return (
     <section className="choosing" data-ready="1">
       <header className="hero"><div><h1>Choosing</h1></div></header>
       {cands && <Candidates data={cands} version={listVersion} reload={async () => { await Promise.all([loadCands(), loadRep()]); }} />}
       {rep && <Repeats data={rep} lead={lead} reload={async () => { await Promise.all([loadRep(), loadCands()]); }} />}
       {targets && <TargetAccounts data={targets} reload={async () => { await Promise.all([loadTargets(), loadCands()]); setListVersion((v) => v + 1); }} />}
-      {!cands && !rep && !targets && <p className="md-clear">Choosing is for planners, leadership and GTM Engineering.</p>}
+      {!cands && !rep && !targets && <p className="md-clear">{CHOOSING_FAILED}</p>}
     </section>
   );
 }

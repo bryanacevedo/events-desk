@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { get, send } from "./api";
 import { useActor } from "./App";
+import { LOADING, NOT_AVAILABLE } from "./access";
 import { Chevron, ExpandRow } from "./Patterns";
 import { Icon } from "./icons";
 import { PersonAvatar } from "./PersonAvatar";
@@ -142,11 +143,11 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
   // Which meetings a funnel row asked for: the Meetings fold shows only those until "All meetings".
   const [meetView, setMeetView] = useState<keyof typeof MEET_VIEWS | null>(null);
   const showMeetings = (v: keyof typeof MEET_VIEWS) => { setMeetView(v); requestAnimationFrame(() => openFold("Meetings")); };
-  const [seqs, setSeqs] = useState<SeqList | null>(null);
+  const [seqs, setSeqs] = useState<SeqList | null>(null), [done, setDone] = useState(false);
   const load = async () => {
     // The tab and its sequences arrive together, so the Sequences fold never shows empty while its rows load.
     const [ov, sq] = await Promise.all([get<Overview>(`/api/events/${id}/motion`), get<SeqList>(`/api/events/${id}/sequences`)]);
-    setSeqs(sq); setO(ov);
+    setSeqs(sq); setO(ov); setDone(true);
     const r = await get<typeof slots>(`/api/events/${id}/motion/roster`);
     if (r) { setSlots(r); setSlot((x) => (x.rep ? x : { ...x, rep: r.roster[0]?.rep ?? "" })); }
   };
@@ -159,7 +160,7 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
       setNote(r.data?.did ?? say); await load(); onChange();
     } finally { setBusy(false); }
   };
-  if (!o) return null;
+  if (!o) return <p className="md-clear">{done ? NOT_AVAILABLE("Outreach") : LOADING}</p>;
   const f = o.funnel, s = o.live_score, started = o.motion !== "none";
   const free = slots.slots.filter((x) => !x.meeting_id), roster = slots.roster.map((x) => x.rep);
   const booked = new Set(o.meetings.map((m) => m.contact_id).filter(Boolean) as string[]);

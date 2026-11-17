@@ -1,5 +1,6 @@
 # comes off every outreach list and is never looked up again, at every event.
 # for # needed
+# is not available on this desk.
 # knows not to expect you. Change your answer any time before the event.
 # new, # already in
 # no tier#
@@ -20,6 +21,7 @@ Accounts you know will be there (optional)
 Add a way of taking part
 Budget is for leadership and GTM Engineering.
 Choose one video, or screenshots of the list.
+Choosing could not load. Try again.
 Choosing is for planners, leadership and GTM Engineering.
 Confirmed by #, #
 Counted by this desk, not a finding
@@ -62,7 +64,7 @@ Publish although it got under # right
 Reading replies, waiting on the uploader
 Real event names, simulated attendees.
 Request email to the organizer
-Results are for leadership and GTM Engineering.
+Results are for planners, leadership and GTM Engineering.
 Review the cost to verify and find contacts
 Save the document as .txt or .md, or paste its text.
 Saved. Their outreach is stopped, and a task for today is in the CRM.
@@ -71,6 +73,7 @@ Say when you sent it
 Says unsubscribe, read as something else
 Scans marked from the session, and meetings held with those people.
 Screen recording, for an app with no website
+Seat and plan decisions need Slack connected. Nobody can decide this here yet.
 Seats are for leadership and GTM Engineering.
 Send the slides to the organizer
 Shown once. It cannot be read again after this closes.

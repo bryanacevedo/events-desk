@@ -543,17 +543,25 @@ export async function planView(db: Db, deps: LifecycleDeps | undefined, eventId:
     `SELECT ${EVENT_COLS}, reason, plan_submitted_at::text AS plan_submitted_at, plan_approved_by, approved_budget_cents::float8 AS approved_budget_cents, goal_meetings_held, goal_accounts_met, goal_pipeline_cents::float8 AS goal_pipeline_cents FROM events WHERE id = $1`, [eventId]);
   if (!e) throw new RuleError("That event does not exist.");
   const money = canPlan(actor);
-  const involvements = await db.query<{ id: string; kind: string; label: string; status: string; dropped_reason: string | null; conference_event_id: string | null; pass_count: number | null; hosted_format: string | null; headcount: number | null; talk_title: string | null; speaker: string | null }>(
-    "SELECT id, kind, label, status, dropped_reason, conference_event_id, pass_count, hosted_format, headcount, talk_title, speaker FROM involvements WHERE event_id = $1 ORDER BY created_at, id", [eventId]);
+  // Every read below is independent of the others, so they run together: one wait instead of about thirty one after another on a remote database.
+  const [involvements, side, people, settings, budget, result, sponsor, deadlines, assessment, listSource] = await Promise.all([
+    db.query<{ id: string; kind: string; label: string; status: string; dropped_reason: string | null; conference_event_id: string | null; pass_count: number | null; hosted_format: string | null; headcount: number | null; talk_title: string | null; speaker: string | null }>(
+    "SELECT id, kind, label, status, dropped_reason, conference_event_id, pass_count, hosted_format, headcount, talk_title, speaker FROM involvements WHERE event_id = $1 ORDER BY created_at, id", [eventId]),
+    db.query<{ id: string; name: string; starts_on: string; hosted_format: string; plan_stage: string }>(
+    "SELECT ev.id, ev.name, ev.starts_on::text AS starts_on, i.hosted_format, ev.plan_stage FROM involvements i JOIN events ev ON ev.id = i.event_id WHERE i.conference_event_id = $1 AND i.status <> 'dropped' ORDER BY ev.starts_on, ev.name", [eventId]),
+    db.query<{ id: string; person: string; roles: string[]; team: string; involvement_id: string | null; seat_request_id: string | null; seat_status: string | null }>(
+    "SELECT id, person, roles, team, involvement_id, seat_request_id, seat_status FROM who_goes WHERE event_id = $1 ORDER BY created_at, id", [eventId]),
+    getSettings(db.query, eventId),
+    eventBudget(db, eventId),
+    goalResult(db, deps, eventId),
+    sponsorshipView(db, eventId, today),
+    eventDeadlines(db, eventId, today),
+    assessmentView(db, eventId),
+    currentListSource(db, eventId),
+  ]);
   const hosted = involvements.some((i) => i.kind === "hosted" && i.status !== "dropped");
   // A hosted event reads its guest list: the host waits on nobody until a guest is listed and not yet invited.
   const [gc] = hosted ? await db.query<{ total: number; listed: number }>("SELECT count(*)::int AS total, count(*) FILTER (WHERE status = 'listed')::int AS listed FROM event_guests WHERE event_id = $1 AND removed_at IS NULL", [eventId]) : [undefined];
-  const side = await db.query<{ id: string; name: string; starts_on: string; hosted_format: string; plan_stage: string }>(
-    "SELECT ev.id, ev.name, ev.starts_on::text AS starts_on, i.hosted_format, ev.plan_stage FROM involvements i JOIN events ev ON ev.id = i.event_id WHERE i.conference_event_id = $1 AND i.status <> 'dropped' ORDER BY ev.starts_on, ev.name", [eventId]);
-  const people = await db.query<{ id: string; person: string; roles: string[]; team: string; involvement_id: string | null; seat_request_id: string | null; seat_status: string | null }>(
-    "SELECT id, person, roles, team, involvement_id, seat_request_id, seat_status FROM who_goes WHERE event_id = $1 ORDER BY created_at, id", [eventId]);
-  const settings = await getSettings(db.query, eventId);
-  const budget = await eventBudget(db, eventId);
   const plan_stage = planStageOf(e, today, prepareDays());
   const approvedAmount = e.approved_budget_cents;
   const over_budget = approvedAmount !== null && budget.total_planned_cents > approvedAmount;
@@ -565,10 +573,6 @@ export async function planView(db: Db, deps: LifecycleDeps | undefined, eventId:
   if (over_budget) notes.push(money ? `Over the approved budget by ${dollars(budget.total_planned_cents - (approvedAmount as number))}. Waiting on ${approvers.join(" or ")}.` : `Over the approved budget. Waiting on ${approvers.join(" or ")}.`);
   for (const n of ownWaiting) notes.push(`${n}'s own pass waits on another approver.`);
   if (over_plan) notes.push(money ? `Over plan by ${dollars(budget.total_actual_cents - budget.total_planned_cents)}.` : "Over plan.");
-  const result = await goalResult(db, deps, eventId);
-  const sponsor = await sponsorshipView(db, eventId, today);
-  const deadlines = (await eventDeadlines(db, eventId, today));
-  const assessment = await assessmentView(db, eventId);
   const view = {
     event: { id: e.id, name: e.name, venue: e.venue, starts_on: e.starts_on, last_day: e.last_day, country: e.country ?? null, stage: e.stage, decline_reason: e.decline_reason, approval_mode: e.approval_mode ?? "per_seat", hosted },
     stage_line: { plan_stage, plan_stage_label: planStageLabel(plan_stage), list_stage: e.stage, list_stage_label: stageLabel(e.stage), waiting_on: planWaitingOn(e, { hosted, submitted: Boolean(e.plan_submitted_at), guests: gc }), paused: e.stage === "paused" },
@@ -578,7 +582,7 @@ export async function planView(db: Db, deps: LifecycleDeps | undefined, eventId:
     approval: { submitted_at: e.plan_submitted_at, approved_by: e.plan_approved_by, approved_at: e.plan_approved_at ?? null, approved_budget_cents: approvedAmount, requested_by: e.requested_by, approvers, over_budget, over_plan, waiting_seats: waitingSeats.length },
     involvements, side_events: side, who_goes: people,
     sponsorship: sponsor.sponsorship, deliverables: sponsor.deliverables, promises: sponsor.promises, deadlines,
-    list_source: await currentListSource(db, eventId),
+    list_source: listSource,
     assessment, organizer_request: assessment.organizer_request,
     notes,
     judged_at: e.judged_at ?? null,

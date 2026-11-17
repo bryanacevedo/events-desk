@@ -172,7 +172,7 @@ export function createApp(db: Db, cfg: AppConfig) {
   app.get("/api/health", async (c) => {
     const stale = tickStale();
     const [a] = await db.query<{ n: number }>("SELECT count(*)::int AS n FROM alerts WHERE day = $1", [new Date().toISOString().slice(0, 10)]).catch(() => [{ n: -1 }]);
-    return c.json({ ok: !stale, demo: cfg.demo, tick: { started_at: tickState.startedAt, finished_at: tickState.finishedAt, stale }, alerts_today: a?.n ?? 0 }, stale ? 503 : 200);
+    return c.json({ ok: !stale, demo: cfg.demo, decisions: cfg.demo ? "panel" : cfg.slack ? "slack" : "none", tick: { started_at: tickState.startedAt, finished_at: tickState.finishedAt, stale }, alerts_today: a?.n ?? 0 }, stale ? 503 : 200);
   });
 
   // The rules every new event starts from, read-only. The ICP screen shows them until uploading a document exists.
