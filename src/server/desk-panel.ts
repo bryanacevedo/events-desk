@@ -5,6 +5,7 @@
 
 import { createHash, timingSafeEqual } from "node:crypto";
 import type { Db } from "./db.ts";
+import { tracedFetch } from "./telemetry.ts";
 import { RuleError } from "./events.ts";
 import { LAST_DAY_SQL } from "./motion.ts";
 
@@ -72,7 +73,7 @@ export function playLines(read: PlayRead): string[] {
 }
 
 /** The status, from the cache when it is under a minute old. A failure keeps the last good lines and the time of that read. Never throws. */
-export async function playStatus(db: Db, eventId: string, env: Env = process.env, doFetch: typeof fetch = fetch, now: () => number = Date.now): Promise<PlayStatus> {
+export async function playStatus(db: Db, eventId: string, env: Env = process.env, doFetch: typeof fetch = tracedFetch, now: () => number = Date.now): Promise<PlayStatus> {
   const base = env.ACCOUNT_DESK_URL?.trim(), key = env.ACCOUNT_DESK_READ_KEY?.trim();
   const [e] = await db.query<{ crm_campaign_id: string | null }>("SELECT crm_campaign_id FROM events WHERE id = $1", [eventId]);
   if (!base || !key || !e?.crm_campaign_id) return { state: "off", lines: [], read_at: null, last_good_at: null };
