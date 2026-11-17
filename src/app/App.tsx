@@ -9,6 +9,7 @@ import { Event } from "./Event";
 import { Icon, Mark } from "./icons";
 import { Overview } from "./Overview";
 import { Seats } from "./Seats";
+import { SeatDecisions } from "./SeatDecisions";
 import { Budget } from "./Budget";
 import { Usage } from "./Usage";
 import { MyDay } from "./MyDay";
@@ -58,11 +59,12 @@ export function Link({ to, go, className, children, ...rest }: { to: string; go:
   return <a href={to} className={className} {...rest} onClick={(ev) => { if (ev.metaKey || ev.ctrlKey || ev.button !== 0) return; ev.preventDefault(); go(to); }}>{children}</a>;
 }
 
-type Place = "overview" | "events" | "seats" | "budget" | "results" | "choosing" | "speaking" | "usage" | "more" | "settings" | "event" | "myday";
+type Place = "overview" | "events" | "seats" | "seatdecisions" | "budget" | "results" | "choosing" | "speaking" | "usage" | "more" | "settings" | "event" | "myday";
 function placeOf(pathname: string): Place {
   if (/^\/event\//.test(pathname)) return "event";
   if (pathname === "/events") return "events";
   if (pathname === "/seats") return "seats";
+  if (pathname === "/seat-decisions") return "seatdecisions";
   if (pathname === "/budget") return "budget";
   if (pathname === "/results") return "results";
   if (pathname === "/choosing") return "choosing";
@@ -159,6 +161,7 @@ export function App() {
           {place === "overview" && <Overview go={go} sheetId={search.get("event")} />}
           {place === "events" && <Events go={go} sheetId={search.get("event")} requesting={search.get("request") === "1"} preselect={search.get("catalog")} search={search} />}
           {place === "seats" && (lead ? <Seats go={go} search={search} requesting={search.get("request") === "1"} preselect={search.get("catalog")} /> : <p className="md-clear">Seats are for leadership and GTM Engineering.</p>)}
+          {place === "seatdecisions" && (lead ? <SeatDecisions /> : <p className="md-clear">Seats are for leadership and GTM Engineering.</p>)}
           {place === "budget" && (lead ? <Budget go={go} search={search} /> : <p className="md-clear">Budget is for leadership and GTM Engineering.</p>)}
           {place === "results" && (planner === "yes" ? <Results go={go} /> : planner === "loading" ? <p className="md-clear">{LOADING}</p> : <p className="md-clear">Results are for planners, leadership and GTM Engineering.</p>)}
           {place === "choosing" && (planner === "yes" ? <Choosing go={go} /> : planner === "loading" ? <p className="md-clear">{LOADING}</p> : <p className="md-clear">Choosing is for planners, leadership and GTM Engineering.</p>)}

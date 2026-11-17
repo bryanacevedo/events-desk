@@ -16,7 +16,7 @@ import { startTelemetry } from "./telemetry.ts";
 import { createApp } from "./app.ts";
 import { canWrite, drainQuietly } from "./crm-outbox.ts";
 import { migrate, pglite, postgresJs, type Db } from "./db.ts";
-import { parseUserMap, resolveMode } from "./modes.ts";
+import { mayRunPipeline, parseUserMap, resolveMode } from "./modes.ts";
 import { anthropicLlm, DEFAULT_MODEL } from "./anthropic.ts";
 import { liveVendors } from "./live-vendors.ts";
 import { processEvent, type Deps } from "./pipeline.ts";
@@ -38,11 +38,12 @@ import { senderFromEnv } from "./transactional.ts";
 import { simDeps } from "./sim-vendors.ts";
 import { demoConnectors, liveConnectors } from "./connectors/setup.ts";
 import { lifecycleTick } from "./lifecycle-tick.ts";
-import { demoAdvance, seedDemoStages, withDemoCrm } from "./demo-run.ts";
+import { demoAdvance, seedDemoStages } from "./demo-run.ts";
 import { addSlots } from "./rep-day.ts";
 import type { LifecycleDeps } from "./lifecycle-deps.ts";
 import { slackNotifier } from "./slack.ts";
 import { systemMailAuth } from "./sending.ts";
+import { buildSim, demoLifecycle, SIM_BANNER } from "./sim-mode.ts";
 
 const root = fileURLToPath(new URL("../..", import.meta.url));
 const port = Number(process.env.PORT ?? 8787);
@@ -89,7 +90,9 @@ if ((mode.demo && !fromSnapshot) || (empty && mayLoadSample && !fromSnapshot)) {
 if (mode.demo) await restampDemoPlan(db, demoToday);
 
 const env = process.env as Record<string, string>;
-const deps: Deps = mode.liveSpend
+if (mode.sim) console.error(SIM_BANNER);
+const sim = mode.sim ? await buildSim(db) : undefined;
+const deps: Deps = sim ? sim.deps : mode.liveSpend
   ? { live: true, crm: noCrm, llm: anthropicLlm(), vendorsFor: (s) => liveVendors(s, { apollo: env.APOLLO_API_KEY, zerobounce: env.ZEROBOUNCE_API_KEY }) }
   : mode.demo ? simDeps() : { llm: mockLlm, vendorsFor: mockVendors };
 // CRM picks the CRM: unset keeps today's (simCrm in the demo, noCrm live); crmdesk is CRM Desk (src/server/crm-desk.ts).
@@ -100,8 +103,8 @@ try { deps.sheets = sheetsFor(mode.liveSpend, env); } catch (e) { console.error(
 const slack = mode.liveSpend
   ? { signingSecret: env.SLACK_SIGNING_SECRET, botToken: env.SLACK_BOT_TOKEN, channel: env.SLACK_APPROVALS_CHANNEL, opsChannel: env.SLACK_OPS_CHANNEL || undefined, seatsChannel: env.SLACK_SEATS_CHANNEL || undefined, appUrl: env.APP_URL || undefined, approvers: env.APPROVER_SLACK_IDS.split(",").map((s) => s.trim()), userMap: parseUserMap(env.SLACK_USER_MAP), llm: deps.llm }
   : undefined;
-// A real database with spend off must never run mock vendors: that would write fake emails into real events.
-const mayRun = mode.liveSpend || !url;
+// A real database with spend off must never run mock vendors: that would write fake emails into real events. Sim mode is the one exception, and only over a guarded simulation database.
+const mayRun = mayRunPipeline(mode);
 const kick = mayRun ? (id: string) => { processEvent(db, id, deps).catch((e) => console.error("pipeline", id, e)); } : undefined;
 if (kick) {
   // One process runs the jobs, so anything still marked running died with the last process.
@@ -113,9 +116,9 @@ if (kick) {
 // Everything after delivery. The demo runs the real connector code over stand-in tools. Real tools need LIVE_SEND=1 and their keys.
 let live: Awaited<ReturnType<typeof liveConnectors>> = {};
 try { live = liveConnectors(env); } catch (e) { console.error((e as Error).message); process.exit(1); }
-const demoSetup = mode.demo ? await demoConnectors(db) : undefined;
+const demoSetup = sim ? sim.setup : mode.demo ? await demoConnectors(db) : undefined;
 const lifecycle: LifecycleDeps | undefined = demoSetup
-  ? { crm: withDemoCrm(deps.crm, db, () => new Date()), connectors: demoSetup.connectors, llm: deps.llm, demoCalendar: true }
+  ? demoLifecycle(db, deps, demoSetup)
   : Object.keys(live).length ? {
       crm: deps.crm, connectors: live, llm: deps.llm, notify: slack ? slackNotifier(slack) : undefined, userMap: slack?.userMap, appUrl: env.APP_URL || undefined,
       // Every protection the sending layer has is on for real sending, read from the environment.
@@ -179,7 +182,7 @@ if (existsSync(join(root, "dist"))) {
 
 // There is no login, so the app listens on this machine only unless HOST says otherwise.
 serve({ fetch: api.fetch, port, hostname: process.env.HOST?.trim() || "127.0.0.1" }, () => {
-  console.log(`Events Desk on http://localhost:${port}  (database: ${url ? "DATABASE_URL" : "PGlite in .data/"}, spend: ${mode.liveSpend ? "LIVE" : "mocked"})`);
+  console.log(`Events Desk on http://localhost:${port}  (database: ${url ? "DATABASE_URL" : "PGlite in .data/"}, spend: ${mode.liveSpend ? "LIVE" : "mocked"}${mode.sim ? ", SIM MODE ON" : ""})`);
 });
 
 const stop = async () => { await db.close(); process.exit(0); };

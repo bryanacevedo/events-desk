@@ -8,6 +8,7 @@ import { isLead } from "./money.ts";
 import { approvalHeadroom } from "./budget.ts";
 import { addCatalogEntry, decideSeat, Forbidden, Invalid, parseCatalogEntry, parseSeatRequest, requestSeat } from "./seats.ts";
 import { postSeatRequest, type SlackConfig } from "./slack.ts";
+import { defaultSettings, getSettings } from "./approvals.ts";
 
 export const CATALOG_SQL = `
   WITH live AS (SELECT DISTINCT ON (catalog_id) id, catalog_id, stage FROM events WHERE catalog_id IS NOT NULL AND stage <> 'declined' AND parent_event_id IS NULL ORDER BY catalog_id, created_at DESC)
@@ -28,7 +29,43 @@ export const REQUESTS_SQL = `
   WHERE e.parent_event_id IS NULL
   ORDER BY e.starts_on, e.name, r.created_at`;
 
-export function mountSeatRoutes(app: Hono<any>, db: Db, cfg: { demo: boolean; slack?: SlackConfig }) {
+/** The pending seat requests this person may decide: they are one of the event's approvers, and the request is not their own (decision 103). */
+export async function decidableSeats(db: Db, actor: string) {
+  const pending = (await db.query<{ id: string; event_id: string; requester: string }>(REQUESTS_SQL.replace("WHERE e.parent_event_id IS NULL", "WHERE e.parent_event_id IS NULL AND r.status = 'pending'"))) as Array<Record<string, any>>;
+  const approversOf = new Map<string, string[]>();
+  const out: Array<Record<string, any>> = [];
+  for (const r of pending) {
+    if (!approversOf.has(r.event_id)) approversOf.set(r.event_id, (await getSettings(db.query, r.event_id)).approvers ?? []);
+    if (approversOf.get(r.event_id)!.includes(actor) && r.requester !== actor) out.push(r);
+  }
+  return out;
+}
+
+export function mountSeatRoutes(app: Hono<any>, db: Db, cfg: { demo: boolean; slack?: SlackConfig; kick?: (eventId: string) => void }) {
+  // The in-app seat decision screen (decision 103): the same decideSeat Slack calls, so the rules, the activity line and the side effects are the same.
+  // Slack stays the main path when it is connected; here a decision already made is refused with 409, never made twice.
+  app.get("/api/seat-decisions", async (c) => {
+    const actor: string = c.get("actor");
+    const rows = await decidableSeats(db, actor);
+    if (!rows.length && !((defaultSettings().approvers ?? []) as string[]).includes(actor)) return Response.json({ error: "Seat decisions are for the people who approve seats." }, { status: 403 });
+    const room = await approvalHeadroom(db);
+    return c.json({ requests: rows.map((r) => ({ ...r, budget: room.get(r.id) ?? null })), slack: Boolean(cfg.slack), actor });
+  });
+  app.post("/api/seat-decisions/:id", async (c) => {
+    const b = await c.req.json<{ decision?: string; reason?: string }>().catch(() => ({}) as { decision?: string; reason?: string });
+    if (b.decision !== "approve" && b.decision !== "decline") return Response.json({ error: "Choose approve or decline." }, { status: 400 });
+    const actor: string = c.get("actor");
+    const [req] = await db.query<{ event_id: string; status: string }>("SELECT event_id, status FROM seat_requests WHERE id = $1", [c.req.param("id")]);
+    if (!req) return Response.json({ error: "That seat request does not exist." }, { status: 404 });
+    if (req.status === "pending" && !((await getSettings(db.query, req.event_id)).approvers ?? []).includes(actor)) return Response.json({ error: "Seat decisions are for the people who approve seats." }, { status: 403 });
+    try {
+      const r = await decideSeat(db, { requestId: c.req.param("id"), actor, decision: b.decision, reason: b.reason, userMap: cfg.slack?.userMap });
+      if (r.already_decided) return Response.json({ error: `Already ${r.status} by ${r.decided_by}.`, status: r.status, decided_by: r.decided_by }, { status: 409 });
+      cfg.kick?.(r.event_id);
+      return c.json(r);
+    } catch (e) { if (e instanceof RuleError) return Response.json({ error: e.message }, { status: 409 }); throw e; }
+  });
+
   app.get("/api/catalog", async (c) => c.json({ catalog: await db.query(CATALOG_SQL) }));
   // Add event, from the Events tab. GTM Engineering and the seat approvers only; the server decides, not the screen.
   app.post("/api/catalog", async (c) => {

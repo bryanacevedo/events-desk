@@ -7,6 +7,8 @@ export interface Mode {
   demo: boolean;
   liveSpend: boolean;
   databaseUrl?: string;
+  /** Sim mode (decision 102): simulated vendors and the demo lifecycle over a simulation database. Present only when on. */
+  sim?: true;
 }
 
 export const LIVE_REQUIRED = [
@@ -33,6 +35,14 @@ const userMapError = (raw: string | undefined) => { try { parseUserMap(raw); ret
 export function resolveMode(argv: string[], env: Record<string, string | undefined>): Mode {
   if (argv.includes("--demo")) return { demo: true, liveSpend: false };
   const liveSpend = env.LIVE_SPEND === "1";
+  // Sim mode (decision 102) needs both switches, set on purpose, and can never sit beside anything that spends or sends.
+  const sim = env.SIM_MODE === "1";
+  if (sim) {
+    if (env.SIM_DB_GUARD !== "1") throw new Error("SIM_MODE=1 needs SIM_DB_GUARD=1 as well, so only a simulation database can be used. Refusing to start.");
+    if (liveSpend) throw new Error("SIM_MODE=1 cannot run with LIVE_SPEND=1: a simulation must never spend. Refusing to start.");
+    if (env.LIVE_SEND === "1") throw new Error("SIM_MODE=1 cannot run with LIVE_SEND=1: a simulation must never send. Refusing to start.");
+    if (!env.DATABASE_URL?.trim()) throw new Error("SIM_MODE=1 needs DATABASE_URL, the simulation database it runs over. Refusing to start.");
+  }
   if (liveSpend) {
     const missing = LIVE_REQUIRED.filter((k) => !env[k]?.trim());
     if (missing.length) throw new Error(`LIVE_SPEND=1 needs ${missing.join(", ")}. Refusing to start.`);
@@ -42,5 +52,8 @@ export function resolveMode(argv: string[], env: Record<string, string | undefin
       throw new Error(`LIVE_SPEND=1 needs a complete Google sign-in: ${GOOGLE_SIGN_INS.service_account.join(", ")} or ${GOOGLE_SIGN_INS.oauth.join(", ")}. Refusing to start.`);
     }
   }
-  return { demo: false, liveSpend, databaseUrl: env.DATABASE_URL };
+  return { demo: false, liveSpend, databaseUrl: env.DATABASE_URL, ...(sim ? { sim: true as const } : {}) };
 }
+
+/** Whether this process may run the pipeline and the lifecycle. A real database with spend off never does, because that would write mock vendors' fake emails into real events; sim mode is the one exception (decision 102). */
+export const mayRunPipeline = (m: Mode) => m.liveSpend || !m.databaseUrl || Boolean(m.sim);

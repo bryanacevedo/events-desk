@@ -38,6 +38,8 @@ The actor header is not proof of identity, so live mode keeps the check real: th
 
 Unchanged on purpose: a human confirms before any paid step, the ledger reserves under a row lock, per-step caps, a paid call with an unknown outcome is never repeated, and the refusal to run on stale totals. Only who confirms changed.
 
+Superseded in part by decision 103 (2026-11-17): seat decisions can also be taken on the in-app Seat decisions screen, mainly where Slack is not connected. Slack is still the main path.
+
 ## 11. New events run the two-card flow (2026-11-08)
 The Research card then the Outreach card is the design, and the older single cost card priced every company as if it were enriched. New events default to `two_card` (migration 0015 changes the column default; events that already exist keep their flow). Single-card remains supported for events already running it and for the tests that are about its mechanics, which now say so explicitly. Seeds and the shared test helpers go through the real two-card flow, including the uploader's confirmation, the cases and the Outreach card, rather than a shortcut.
 
@@ -514,3 +516,18 @@ New step `repeat_word`: one call per passing pattern per reading, the row insert
 
 The tracker, ranking and repeat reads use the deps clock, else `DEMO_TODAY` only when the demo server set it (`DEMO_TODAY_SET`, to the world's 2026-11-24), else the wall clock. Other desk views keep the database clock (decision 91). The world clock is not moved.
 
+## 102. Sim mode runs the demo's lifecycle over a simulation database, only when both switches are set (2026-11-17)
+
+**What.** With `SIM_DB_GUARD=1` and `SIM_MODE=1` both set, the server builds the simulated vendors and the demo's lifecycle (simulated sequencer and LinkedIn tools, simulated CRM) over the `DATABASE_URL` it was given, and runs the pipeline and the lifecycle tick. The sequencer, My day, replies, meetings, the scanner routes and the dinner reminder then exist on a simulation database such as Neon. It prints a startup line saying sim mode is on. It is off by default. With one switch or neither, nothing changes: a real database still refuses mock vendors and builds no lifecycle. `SIM_MODE=1` without `SIM_DB_GUARD=1` refuses to start, as does `SIM_MODE=1` with `LIVE_SPEND=1` or `LIVE_SEND=1`, or without a `DATABASE_URL`. `--demo` still wins over everything.
+
+**Why.** The simulation week needs the after-delivery screens on Neon, and the old rule (a real database never gets mock vendors, so no lifecycle) left them out. The guard (`simguard.ts`) already limits which hosts and database names are allowed, so sim mode requires it rather than trusting the URL. A sim can never spend or send, so the refusals sit beside the two live switches.
+
+**Who decided.** Bryan accepted the recommended defaults on 2026-11-17. Code: `src/server/modes.ts` (`resolveMode`, `mayRunPipeline`), `src/server/sim-mode.ts`, `src/server/node.ts`. Tests: `tests/sim-mode.test.ts`.
+
+## 103. A manager can decide a seat in the app; Slack stays the main path (2026-11-17)
+
+**What.** A Seat decisions screen (`/seat-decisions`, `GET /api/seat-decisions` and `POST /api/seat-decisions/:id`) lists the pending seat requests the person may decide, with the requester, event, ticket and travel cost, goal, expected meetings, decide-by date, budget headroom and the two answers, and has Approve and Decline (a reason is required). Only the event's approvers see it; anyone else gets 403, and nobody is offered their own request. The route calls `decideSeat`, the same function Slack's buttons call, so the rules, the activity line and the next steps (the event moves to approved, the kit offer, the pipeline kick) are the same. A request already decided returns 409 ("Already approved by ..."), never a second decision. When Slack is connected the screen says so, and either place works once; the Slack card is not edited when the decision is made here, and a later click on it answers "Already approved by ...". Plan decisions are not covered and stay in Slack.
+
+**Why.** Decision 10 sends seat decisions through Slack, which leaves a desk without Slack unable to decide any seat. The acting person is still the self-asserted name behind the write key (README, "There is no real login"), so this is a fallback with the same trust as the rest of the desk, not a stronger one.
+
+**Who decided.** Bryan accepted the recommended defaults on 2026-11-17. Code: `src/server/seat-routes.ts`, `src/app/SeatDecisions.tsx`. Tests: `tests/seat-decisions.test.ts`.

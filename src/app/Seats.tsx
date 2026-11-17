@@ -14,13 +14,13 @@ import { DecisionLine } from "./access";
 import { firstName, money, shortDate } from "./words";
 
 function Decide({ r, onDone }: { r: SeatRequest; onDone: () => void }) {
-  const { actor, demo, decisions, needs } = useActor();
+  const { actor, demo, decisions, needs, go } = useActor();
   const [declining, setDeclining] = useState(false);
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  if (!demo) return <DecisionLine decisions={decisions} />;
+  if (!demo) return <>{decisions === "slack" ? <DecisionLine decisions={decisions} /> : null}{needs?.approvers.includes(actor) && r.requester !== actor ? <p className="small"><Link to="/seat-decisions" go={go}>{decisions === "slack" ? "Or decide here" : "Decide here"}</Link></p> : decisions === "none" ? <DecisionLine decisions={decisions} /> : null}</>;
   if (!needs?.approvers.includes(actor) || r.requester === actor) return null;
   const decide = async (decision: "approve" | "decline") => {
     setBusy(true);
