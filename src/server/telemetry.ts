@@ -17,10 +17,11 @@ export async function startTelemetry(service: string, env: Record<string, string
     const headers = Object.fromEntries((env.OTEL_EXPORTER_OTLP_HEADERS ?? "").split(",").filter(Boolean).map((h) => { const i = h.indexOf("="); return [h.slice(0, i).trim(), decodeURIComponent(h.slice(i + 1).trim())]; }));
     const provider = new node.NodeTracerProvider({
       resource: res.resourceFromAttributes({ "service.name": service }),
-      spanProcessors: [new node.BatchSpanProcessor(new exp.OTLPTraceExporter({ url: `${endpoint}/v1/traces`, headers }))],
+      spanProcessors: [new node.BatchSpanProcessor(new exp.OTLPTraceExporter({ url: `${endpoint}/v1/traces`, headers }), { scheduledDelayMillis: 1000 })],
     });
     provider.register();
     process.on("beforeExit", () => { void provider.shutdown(); });
+    for (const sig of ["SIGTERM", "SIGINT"] as const) process.once(sig, () => { void provider.shutdown().finally(() => process.exit(0)); });
     api = a;
     return true;
   } catch {
