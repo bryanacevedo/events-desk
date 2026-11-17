@@ -1,6 +1,6 @@
 # Events Desk: project status
 
-**Updated:** 2026-11-17. **Decisions:** `docs/DECISIONS.md`, 1 to 109. **Render:** auto-deploy is off on the service (verified through the Render API on 2026-11-16, read-only); a push deploys nothing and a deploy happens only when Bryan says. `render.yaml` does not say so: the setting lives on the Render service, where auto-deploy was turned off because the monthly build minutes ran out; nothing in this repository changes it. The last Events Desk deploy, on 2026-11-15, ended build_failed, so the live demo at https://events-desk.onrender.com lags `main`; no live commit is claimed here.
+**Updated:** 2026-11-17. **Decisions:** `docs/DECISIONS.md`, 1 to 110. **Render:** auto-deploy is off on the service (verified through the Render API on 2026-11-16, read-only); a push deploys nothing and a deploy happens only when Bryan says. `render.yaml` does not say so: the setting lives on the Render service, where auto-deploy was turned off because the monthly build minutes ran out; nothing in this repository changes it. The last Events Desk deploy, on 2026-11-15, ended build_failed, so the live demo at https://events-desk.onrender.com lags `main`; no live commit is claimed here.
 
 Docs are part of done: README, PROJECT-STATUS and docs change in the same commit as the behaviour, counts or setup they describe. `make docs-check` (also run by the suite) enforces it.
 
@@ -9,7 +9,7 @@ Docs are part of done: README, PROJECT-STATUS and docs change in the same commit
 CI was red since the optional OpenTelemetry commit (b436554): `sdk-trace-node` 2.12.1 (and its `sdk-trace-base` and `context-async-hooks`) peer on `@opentelemetry/api` below 1.10, while `resources` 3.1.1, `exporter-trace-otlp-http` 0.301.2 and the root `api` ^1.10.0 need 1.10 or higher; no `sdk-trace-node` 3.x exists. The four packages now all sit on the 2.x generation (`api` ^1.9.1, `resources` ^2.12.1, `exporter-trace-otlp-http` ^0.223.2, `sdk-trace-node` ^2.12.1) and the lock is regenerated; `npm ci` passes on Node 24 and npm 11 with no flags. `src/server/telemetry.ts` is unchanged and uses the same calls; tracing stays optional and off unless `OTEL_EXPORTER_OTLP_ENDPOINT` is set. The tracing path itself was not run against a collector here. Not pushed.
 ## Static snapshot on Cloudflare Pages (2026-11-17, bl_116, branch `simfix/events-snapshot`)
 
-Worktree `.wt/simfix-events-snapshot`, from `origin/main` df54e74, not pushed. Decision 109. `make snapshot` builds the demo as read-only static files (`docs/RUNBOOK.md`); `.github/workflows/static-snapshot.yml` builds it and publishes to the Pages project `events-desk-demo` only with both Cloudflare secrets. Staged and noindex: no README link, no address in any doc.
+Worktree `.wt/simfix-events-snapshot`, from `origin/main` df54e74, not pushed. Decisions 109 and 110 (the Overview week block says "This week" once). `make snapshot` builds the demo as read-only static files (`docs/RUNBOOK.md`); `.github/workflows/static-snapshot.yml` builds it and publishes to the Pages project `events-desk-demo` only with both Cloudflare secrets. Staged and noindex: no README link, no address in any doc.
 
 **Not proven:** Safari and Firefox (the shim needs `DecompressionStream`, Safari 16.4 and up); the workflow's own run on GitHub (the YAML was read, not run); every one of the 3,274 people sheets opened in a browser (coverage is by the build's checks and spot checks).
 
@@ -201,7 +201,7 @@ Worktree `~/Developer/events-desk/.claude/worktrees/admiring-kepler-c6dcf2`, bra
 
 **Not done (next, in order; done since, see 'Redesign step 1, finished'):** live-mode Slack plan card; sponsorship, deliverables, `list_source`, Overview year plan and week's deadlines (0050, 0051, session 2 of the original plan); the assessment, organizer request, past events read against their goals, the Money20/20 USA 2026 seed (0052, session 3); a seed test for those; README for the plan. re:Invent's upload source "emailed by the organizer" waits for 0051.
 
-**Spec:** `docs/SPEC.md`, goldfish-reviewed 2026-11-08 before any code (12 Major, 13 Nit, no Blocker; 24 fixed, 1 moot because a clause gate was closed). It has been edited to match the code since. **Decisions:** `docs/DECISIONS.md`, 1 to 109.
+**Spec:** `docs/SPEC.md`, goldfish-reviewed 2026-11-08 before any code (12 Major, 13 Nit, no Blocker; 24 fixed, 1 moot because a clause gate was closed). It has been edited to match the code since. **Decisions:** `docs/DECISIONS.md`, 1 to 110.
 
 ## Now (2026-11-12)
 

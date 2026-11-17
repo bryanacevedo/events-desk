@@ -583,3 +583,11 @@ The tracker, ranking and repeat reads use the deps clock, else `DEMO_TODAY` only
 **What it gives up.** A typed search, a combined filter and pages past the first two of a single filter in a list; every write; the scanner phone app; uploads, Slack, the directory and recordings; the clock moves. `docs/RUNBOOK.md` lists them. The scanner's read is the one read that touches the database (it retries badge scans waiting for a person), on the temporary copy, and the build stops if anything else changes.
 
 **Who decided.** Bryan's task of 2026-11-17 (hosting, bl_116). Code: `scripts/build-static-snapshot.ts`, `scripts/static-snapshot/shim.js`, `src/app/DemoBar.tsx`, `.github/workflows/static-snapshot.yml`. Tests: `tests/static-snapshot.test.ts`.
+
+## 110. The Overview week block says "This week" once (2026-11-17)
+
+**What.** When every open deadline falls in the "This week" group, the group label (a tray header in layout B, a ledger label in layout A) is not drawn, because it repeats the section heading and its count. In layout B the two columns collapse to one full-width column whenever one side is empty, so a lone tray no longer sits in the right half of the row. Layout C and the year blocks are unchanged.
+
+**Why.** The public demo showed "This week 3" as the heading at the left and the same words again on a card pushed to the right half of the row.
+
+**Who decided.** Bryan's screenshot of the demo Overview, 2026-11-17. Code: `src/app/Overview.tsx`, `src/app/styles.css`. Tests: `tests/overview-week-heading.test.ts`.

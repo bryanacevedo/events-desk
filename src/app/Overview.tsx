@@ -104,7 +104,9 @@ const goWords = (g: { meetings_held: number | null; accounts_met: number | null 
 const day = (ymd: string) => new Date(`${ymd.slice(0, 10)}T12:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 
 /** Layout A, "Ledger": the week as a full-width hairline ledger grouped Late, Today, This week. Status is the due word in ink. */
-function WeekA({ rows, go, logos }: { rows: DeadlineRow[]; go: (to: string) => void; logos: Map<string, string | null> }) {
+export function WeekA({ rows, go, logos }: { rows: DeadlineRow[]; go: (to: string) => void; logos: Map<string, string | null> }) {
+  /* The section heading already says "This week" and counts it: when that is the only group, the ledger drops the group label rather than repeat it. */
+  const solo = rows.length > 0 && rows.every((r) => r.group === "week");
   return (
     <section className="ov" aria-label="This week">
       <div className="ov-h"><h2 className="display">This week</h2>{rows.length > 0 && <span>{rows.length}</span>}</div>
@@ -114,8 +116,8 @@ function WeekA({ rows, go, logos }: { rows: DeadlineRow[]; go: (to: string) => v
             const mine = rows.filter((r) => r.group === g);
             if (!mine.length) return null;
             return (
-              <div className={`led-g ${g}`} key={g}>
-                <h3 className="led-gh">{GROUP_WORDS[g]}<span>{mine.length}</span></h3>
+              <div className={`led-g ${g}${solo ? " solo" : ""}`} key={g}>
+                {!solo && <h3 className="led-gh">{GROUP_WORDS[g]}<span>{mine.length}</span></h3>}
                 <div className="led-rows">
                   {mine.map((r) => (
                     <Link to={`/event/${r.event_id}`} go={go} className="led-r" key={`${r.kind}:${r.ref_id}`} data-row={`${r.kind}:${r.ref_id}`}>
@@ -203,13 +205,17 @@ function Moneys({ e, total }: { e: { planned_cents?: number; contracted_cents?: 
 }
 
 /** Layout B, "Trays": the week as trays of white rows side by side, the year as one tray per quarter. */
-function WeekB({ rows, go, logos }: { rows: DeadlineRow[]; go: (to: string) => void; logos: Map<string, string | null> }) {
+export function WeekB({ rows, go, logos }: { rows: DeadlineRow[]; go: (to: string) => void; logos: Map<string, string | null> }) {
+  /* The section heading already says "This week" and counts it: when that is the only group there is, its tray carries no header of its own, and a lone column fills the row. */
+  const solo = rows.length > 0 && rows.every((r) => r.group === "week");
+  const left = rows.some((r) => r.group === "late" || r.group === "today");
+  const right = rows.some((r) => r.group === "week");
   const tray = (g: DeadlineRow["group"]) => {
     const mine = rows.filter((r) => r.group === g);
     if (!mine.length) return null;
     return (
       <div className={`tray ${g}`} key={g}>
-        <h3><b>{GROUP_WORDS[g]}</b><span>{mine.length}</span></h3>
+        {!(solo && g === "week") && <h3><b>{GROUP_WORDS[g]}</b><span>{mine.length}</span></h3>}
         {mine.map((r) => (
           <Link to={`/event/${r.event_id}`} go={go} className="wk-r" key={`${r.kind}:${r.ref_id}`} data-row={`${r.kind}:${r.ref_id}`}>
             <EventLogo name={r.event_name} website={logos.get(r.event_id)} size={34} />
@@ -224,7 +230,7 @@ function WeekB({ rows, go, logos }: { rows: DeadlineRow[]; go: (to: string) => v
     <section className="ov ovb" aria-label="This week">
       <div className="ov-h"><h2 className="display">This week</h2>{rows.length > 0 && <span>{rows.length}</span>}</div>
       {rows.length === 0 ? <p className="mute tray-empty">Nothing is due this week.</p> : (
-        <div className="wk-cols">
+        <div className={`wk-cols${left && right ? "" : " one"}`}>
           <div className="wk-col">{tray("late")}{tray("today")}</div>
           <div className="wk-col">{tray("week")}</div>
         </div>

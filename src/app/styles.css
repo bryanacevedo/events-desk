@@ -2567,6 +2567,7 @@ section.more[aria-label="More"] { max-width: none; }
 /* The week and the year on Overview (direction A, provisional): both are ledgers on the page's full width. Hairlines, single-line rows, one right edge. */
 .led { border-top: 1px solid var(--line-2); }
 .led-g { display: grid; grid-template-columns: 128px minmax(0, 1fr); border-bottom: 1px solid var(--line-2); }
+.led-g.solo { grid-template-columns: minmax(0, 1fr); }
 .led-gh { display: flex; align-items: baseline; gap: 8px; margin: 0; padding: 11px 0; font: 500 14px/22px var(--sans); } .led-gh span { color: var(--mute); font-weight: 400; }
 .led-r { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1.2fr) minmax(0, 1fr) 124px; gap: 16px; align-items: center; min-height: 44px; font-size: 14px; border-top: 1px solid var(--line); color: var(--ink); text-decoration: none; transition: background-color 150ms ease-out, box-shadow 150ms ease-out; }
 .led-r:first-child { border-top: 0; }
@@ -2980,6 +2981,7 @@ a:hover > .swap .due, a:focus-visible > .swap .due { opacity: 0; transform: tran
 
 /* Overview layouts B (trays) and C (timeline) beside A (ledger), a per-person choice (decision 81). Each is scoped to its own root so it shares nothing with the other two. */
 .ovb .wk-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.ovb .wk-cols.one { grid-template-columns: minmax(0, 1fr); }
 .ovb .wk-col { display: grid; gap: 12px; min-width: 0; }
 .ovb .wk-r { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 56px; padding: 9px 12px 9px 10px; border-radius: 12px; background: var(--ground); transition: transform 200ms var(--ease), box-shadow 200ms ease-out; }
 .ovb .wk-r:hover, .ovb .yb-r:hover { transform: translateX(3px); box-shadow: 0 8px 16px -10px rgba(21, 35, 27, 0.3); }
