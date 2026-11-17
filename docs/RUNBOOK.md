@@ -66,7 +66,7 @@ action on the newer deployment.
   (a rep opening Settings, money for a non-lead) are the server's answers, saved as they were.
 - **Search and filters inside a list.** The people and companies lists of every event are saved page by page for the default
   view, and the first two pages of each single filter (priority, tier, source, dropped, all). A typed search, a combined filter
-  or a page past those answers "not in the snapshot", and the list says it could not load. Budget and Usage keep the default
+  or a page past those answers "not in the snapshot", and the list says "Not in the snapshot.". Budget and Usage keep the default
   view of every page, not their filters or search.
 - **My day, replies, meetings, debriefs, the sequences and the cases** are the sample's own state when the snapshot was taken.
   Pressing a reply handled, booking a slot or answering a debrief is refused.

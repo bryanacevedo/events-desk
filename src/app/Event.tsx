@@ -40,7 +40,7 @@ const fileType = (name: string) => (name.toLowerCase().endsWith(".xlsx") ? XLSX 
 /** Rows per page in the people and company tables: a page fits on a screen, and search, filters and pages do the rest. */
 const PAGE = 12;
 /** What a list says in the static snapshot (decision 109) when the search, filter or page asked for is not among the saved answers. */
-const NOT_IN_SNAPSHOT = "This is not in the snapshot: it keeps each list's first pages and single filters, and no typed search. Run the desk yourself to search and filter.";
+const NOT_IN_SNAPSHOT = "Not in the snapshot.";
 const CASE_STAGES: Stage[] = ["ready_for_review", "finding_people", "flagging", "delivered", "paused"];
 const uploaderOf = (d: EventPayload) => d.list.upload?.uploaded_by ?? d.event.requested_by;
 const pendingCard = (d: EventPayload) => (d.cards ?? (d.card ? [d.card] : [])).find((c) => c.status === "pending") ?? null;
