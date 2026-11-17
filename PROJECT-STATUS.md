@@ -4,6 +4,10 @@
 
 Docs are part of done: README, PROJECT-STATUS and docs change in the same commit as the behaviour, counts or setup they describe. `make docs-check` (also run by the suite) enforces it.
 
+## CI fix: `npm ci` ERESOLVE on the optional OpenTelemetry packages (2026-11-17, branch `simfix/events-ci`)
+
+CI was red since the optional OpenTelemetry commit (b436554): `sdk-trace-node` 2.12.1 (and its `sdk-trace-base` and `context-async-hooks`) peer on `@opentelemetry/api` below 1.10, while `resources` 3.1.1, `exporter-trace-otlp-http` 0.301.2 and the root `api` ^1.10.0 need 1.10 or higher; no `sdk-trace-node` 3.x exists. The four packages now all sit on the 2.x generation (`api` ^1.9.1, `resources` ^2.12.1, `exporter-trace-otlp-http` ^0.223.2, `sdk-trace-node` ^2.12.1) and the lock is regenerated; `npm ci` passes on Node 24 and npm 11 with no flags. `src/server/telemetry.ts` is unchanged and uses the same calls; tracing stays optional and off unless `OTEL_EXPORTER_OTLP_ENDPOINT` is set. The tracing path itself was not run against a collector here. Not pushed.
+
 ## Simulation fixes: first paint, the sample's own words, plan decisions without Slack (2026-11-17, branch `simfix/events-desk`)
 
 Worktree `.wt/simfix-events-desk`, from `origin/main` 216c0fe, not pushed. Decisions 104 to 108, migration 0062. From the first-visit review (`workday-sim-plan/runs/s4/demo-user/SYNTHESIS.txt`) and the S5 review (`runs/s5/REVIEW.txt`).
