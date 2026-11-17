@@ -12,6 +12,7 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { startTelemetry } from "./telemetry.ts";
 import { createApp } from "./app.ts";
 import { canWrite, drainQuietly } from "./crm-outbox.ts";
 import { migrate, pglite, postgresJs, type Db } from "./db.ts";
@@ -45,6 +46,7 @@ import { systemMailAuth } from "./sending.ts";
 
 const root = fileURLToPath(new URL("../..", import.meta.url));
 const port = Number(process.env.PORT ?? 8787);
+await startTelemetry("events-desk");
 const migrateOnly = process.argv.includes("--migrate");
 
 let mode;

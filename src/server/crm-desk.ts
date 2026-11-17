@@ -5,6 +5,7 @@
    A 409 `erased` from CRM Desk is a finished write with nothing written: the create answers a null id, as it does for
    nobody to write to. */
 
+import { tracedFetch } from "./telemetry.ts";
 import { CrmAlreadyExists, CrmUnknownStatus, heatOf, type AccountType, type Crm, type CrmAccount, type CrmAccountQuery, type CrmOpportunity, type CrmPatch, type CrmPersonQuery, type CrmRecord } from "./providers.ts";
 
 type Fetch = typeof fetch;
@@ -22,7 +23,7 @@ const MEETING: Record<string, "booked" | "held" | "cancelled"> = { booked: "book
 const NOBODY = { id: null as unknown as string };
 const NOTHING: CrmAccount = { owner: null, deal_name: null, deal_stage: null, last_activity: null, heat: null, account_type: null };
 
-export function crmDeskCrm(url: string, key: string, doFetch: Fetch = fetch, timeoutMs = 15000): Crm {
+export function crmDeskCrm(url: string, key: string, doFetch: Fetch = tracedFetch, timeoutMs = 15000): Crm {
   const base = url.replace(/\/$/, "") + "/api/v1";
   let users: Record<string, string> | null = null;
   let features: { at: number; meanings: string[] } | null = null;

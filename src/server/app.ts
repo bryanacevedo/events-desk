@@ -1,5 +1,6 @@
 /* Events Desk API. Writes need a display name and, when WRITE_KEY is set, the key. */
 
+import { traceRequests } from "./telemetry.ts";
 import { worldSlice } from "./world-slice.ts";
 import { definitionVersions, listDefinitions, readDefinition } from "./definitions.ts";
 import { START, refusalFor, integrationView, integrationCounts } from "./integration.ts";
@@ -69,6 +70,7 @@ const WEBSITE = "(SELECT c.website FROM catalog_events c WHERE c.id = events.cat
 
 export function createApp(db: Db, cfg: AppConfig) {
   const app = new Hono<Ctx>();
+  app.use("*", traceRequests()); // off unless OTEL_EXPORTER_OTLP_ENDPOINT is set (local only)
 
   // Every response says how it may be framed and sniffed. Logos come from Google's favicon service, avatars from this server.
   app.use("*", secureHeaders({ xFrameOptions: "DENY", referrerPolicy: "strict-origin-when-cross-origin", crossOriginEmbedderPolicy: false, crossOriginResourcePolicy: false,
