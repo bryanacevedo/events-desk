@@ -34,6 +34,6 @@ For the film in `~/Developer/events-rethink/PLAN.md` section 11. Notes only: no 
 
 ## Not proven, so not in the film
 
-- A send, a reply or a meeting held at an event on a real clock: the rehearsal has no sends from Events Desk and the demo's activities are stand-ins.
+- A send, a reply or a meeting held at an event on a real clock: the rehearsal journals only one send and one meeting from Events Desk and the demo's activities are stand-ins.
 - Anything live on Render.
 - Market Desk's tier replacing the priority-or-tier rule for targets (cross-repo item 11, open).
