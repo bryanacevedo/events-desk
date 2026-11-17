@@ -47,7 +47,9 @@ describe("first paint", () => {
     expect(app).toContain("demo === null ? <PageSkeleton />");
   });
   it("sends the scripts compressed and cacheable, because hashed files never change under their name", () => {
-    const node = src("src/server/node.ts");
+    // The middleware moved from node.ts to static.ts (decision 106, review fix); tests/static-files.test.ts also runs it.
+    expect(src("src/server/node.ts")).toContain("mountStatic(api)");
+    const node = src("src/server/static.ts");
     expect(node).toContain('compress()');
     expect(node).toContain("max-age=31536000, immutable");
   });
@@ -213,6 +215,36 @@ describe("a plan is decided in the app when there is no Slack (decision 104)", (
     expect(r.status).toBe(200);
     expect((await db.query<{ stage: string }>("SELECT stage FROM events WHERE id = $1", [id]))[0].stage).toBe("declined");
   });
+  it("with Slack connected the decision route does not exist (the card is the one path)", async () => {
+    const app = createApp(db, { demo: false, slack: { signingSecret: "s", botToken: "t", channel: "C", approvers: ["U1"] } as never });
+    const id = await draftPlan(db, { name: "Slack Summit" });
+    await submitPlan(db, CAMILLE, id);
+    const r = await app.request(`/api/events/${id}/plan/decision`, { method: "POST", headers: as(DAN), body: body({ decision: "approve" }) });
+    expect(r.status).toBe(404);
+    expect((await db.query<{ plan_approved_by: string | null }>("SELECT plan_approved_by FROM events WHERE id = $1", [id]))[0].plan_approved_by).toBeNull();
+  });
+  it("a second decision is refused: approve twice changes nothing, decline after approve and decline twice are refused", async () => {
+    const app = createApp(db, { demo: false });
+    const id = await draftPlan(db, { name: "Twice Summit" });
+    await submitPlan(db, CAMILLE, id);
+    const post = (b: unknown) => app.request(`/api/events/${id}/plan/decision`, { method: "POST", headers: as(DAN), body: body(b) });
+    expect((await post({ decision: "approve" })).status).toBe(200);
+    const [first] = await db.query<{ plan_approved_at: string }>("SELECT plan_approved_at::text AS plan_approved_at FROM events WHERE id = $1", [id]);
+    const again = await post({ decision: "approve" });
+    expect(again.status).toBe(200);
+    expect(((await again.json()) as { changed?: boolean }).changed).toBe(false);
+    expect((await db.query<{ plan_approved_at: string }>("SELECT plan_approved_at::text AS plan_approved_at FROM events WHERE id = $1", [id]))[0].plan_approved_at).toBe(first.plan_approved_at);
+    const late = await post({ decision: "decline", reason: "Changed my mind" });
+    expect(late.status).toBe(409);
+    expect(JSON.stringify(await late.json())).toContain("already approved");
+    // A plan declined once cannot be declined again.
+    const id2 = await draftPlan(db, { name: "Declined Twice Summit" });
+    await submitPlan(db, CAMILLE, id2);
+    const post2 = (b: unknown) => app.request(`/api/events/${id2}/plan/decision`, { method: "POST", headers: as(DAN), body: body(b) });
+    expect((await post2({ decision: "decline", reason: "Not this year" })).status).toBe(200);
+    expect((await post2({ decision: "decline", reason: "Not this year" })).status).toBe(409);
+    expect((await db.query<{ stage: string }>("SELECT stage FROM events WHERE id = $1", [id2]))[0].stage).toBe("declined");
+  });
   it("the desk says where decisions are taken: the app, unless Slack is connected", async () => {
     expect((await (await createApp(db, { demo: false }).request("/api/health")).json() as { decisions: string }).decisions).toBe("panel");
   });
@@ -313,5 +345,19 @@ describe("small fixes from the review", () => {
 describe("contrast", () => {
   it("every text colour in the stylesheets reads at 4.5:1, and small text at 7:1", () => {
     for (const args of [[], ["--strict"]]) expect(() => execFileSync("node", ["scripts/contrast.mjs", ...args], { stdio: "pipe" })).not.toThrow();
+  });
+});
+
+describe("review fixes on the small things", () => {
+  it("Close the result is offered only where the server would accept it (motion none)", () => {
+    expect(src("src/app/Plan.tsx")).toContain('p.event.motion === "none"');
+    expect(src("src/server/plan.ts")).toContain('hosted, motion: e.motion }');
+    expect(src("src/server/plan.ts")).toContain('if (e.motion !== "none") throw new RuleError("This event\'s result closes when it is scored.")');
+  });
+  it("the skipped count is the rows left out, not the 200 kept", () => {
+    expect(src("src/app/Choosing.tsx")).toContain("last.row_count - last.added - last.updated");
+  });
+  it("meetings coming up are counted from the sample day in the demo", () => {
+    expect(src("src/app/Motion.tsx")).toContain("sample.day ? Date.parse(");
   });
 });

@@ -300,11 +300,14 @@ function Repeats({ data, lead, reload }: { data: Repeat; lead: boolean; reload: 
 function LastImportResult({ last }: { last: LastImport }) {
   const why = new Map<string, number>();
   for (const s of last.skipped) why.set(s.why, (why.get(s.why) ?? 0) + 1);
+  // The server keeps at most 200 skipped rows (and why), so the count is what the file had less what went in, not the length of the kept list.
+  const skipped = Math.max(0, last.row_count - last.added - last.updated);
   return (
     <div className="ch-last" aria-label="Last import">
       <p className="small mute">Last import: {last.actor}, {new Date(last.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}, {plural(last.row_count, "row")}</p>
-      <dl className="pl-figs"><div><dd>{num(last.added)}</dd><dt>added</dt></div><div><dd>{num(last.updated)}</dd><dt>updated</dt></div>{last.skipped.length > 0 && <div><dd>{num(last.skipped.length)}</dd><dt>skipped</dt></div>}</dl>
+      <dl className="pl-figs"><div><dd>{num(last.added)}</dd><dt>added</dt></div><div><dd>{num(last.updated)}</dd><dt>updated</dt></div>{skipped > 0 && <div><dd>{num(skipped)}</dd><dt>skipped</dt></div>}</dl>
       {why.size > 0 && <ul className="reasons" aria-label="Rows skipped">{[...why].map(([w, n]) => <li key={w}><b>{num(n)}</b><span>{w}</span></li>)}</ul>}
+      {skipped > last.skipped.length && <p className="small mute">Reasons are listed for the first {num(last.skipped.length)} rows left out.</p>}
     </div>
   );
 }

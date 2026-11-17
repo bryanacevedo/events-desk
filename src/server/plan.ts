@@ -574,7 +574,7 @@ export async function planView(db: Db, deps: LifecycleDeps | undefined, eventId:
   for (const n of ownWaiting) notes.push(`${n}'s own pass waits on another approver.`);
   if (over_plan) notes.push(money ? `Over plan by ${dollars(budget.total_actual_cents - budget.total_planned_cents)}.` : "Over plan.");
   const view = {
-    event: { id: e.id, name: e.name, venue: e.venue, starts_on: e.starts_on, last_day: e.last_day, country: e.country ?? null, stage: e.stage, decline_reason: e.decline_reason, approval_mode: e.approval_mode ?? "per_seat", hosted },
+    event: { id: e.id, name: e.name, venue: e.venue, starts_on: e.starts_on, last_day: e.last_day, country: e.country ?? null, stage: e.stage, decline_reason: e.decline_reason, approval_mode: e.approval_mode ?? "per_seat", hosted, motion: e.motion },
     stage_line: { plan_stage, plan_stage_label: planStageLabel(plan_stage), list_stage: e.stage, list_stage_label: stageLabel(e.stage), waiting_on: planWaitingOn(e, { hosted, submitted: Boolean(e.plan_submitted_at), guests: gc }), paused: e.stage === "paused" },
     reason: e.reason || "", reason_words: e.reason ? null : "No reason was written",
     goal: { meetings_held: e.goal_meetings_held, accounts_met: e.goal_accounts_met, pipeline_cents: e.goal_pipeline_cents },

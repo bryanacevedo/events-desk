@@ -75,7 +75,7 @@ export function mountPlanRoutes(app: Hono<any>, db: Db, cfg: Cfg) {
     });
   }
   app.post("/api/events/:id/plan/close", async (c) => {
-    // Decision 4: the planner who wrote the plan can close plan against actual, with or without the sending stage.
+    // Decision 105: any configured planner, leadership or GTM Engineering can close plan against actual, for any event whose sending never started.
     if (!isLead(actorOf(c)) && !planner(c)) return refuse("Closing a result is for planners, leadership and GTM Engineering.", 403);
     return run(() => closeResult(db, actorOf(c), id(c), todayOf(cfg.lifecycle)));
   });

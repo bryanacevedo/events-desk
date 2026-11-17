@@ -29,7 +29,8 @@ type Act = (m: "POST", p: string, b?: unknown, say?: string) => void;
 
 const TOOL_NAME: Record<string, string> = { instantly: "Instantly", heyreach: "HeyReach", smartlead: "Smartlead", apollo: "Apollo" };
 /** A meeting still booked after its time has gone is not "coming up": nobody has said whether it happened. */
-const passed = (m: { scheduled_at: string }) => Date.parse(m.scheduled_at) < Date.now();
+/** The clock is the sample's own day in the demo (sample.day, noon UTC), so "coming up" agrees with the dates the sample was built around. */
+const passedAt = (now: number) => (m: { scheduled_at: string }) => Date.parse(m.scheduled_at) < now;
 const CODE: Record<string, string> = { interested: "interested", meeting_request: "wants a meeting", referral: "pointed us to someone" };
 const REASON: Record<string, string> = { not_connected: "Not connected", health_unknown: "Health not reported", low_health: "Health too low", still_warming: "Still warming up", high_bounce: "Bounces too high", high_spam: "Spam too high", fully_booked: "Used by other sequences", domain_full: "Domain has enough", no_auth: "Domain not set up to send", failed_placement: "Landing in spam", stale_placement: "Not tested lately", not_tested: "Not tested", warmup_off: "Warmup off", burned: "Domain resting", primary_domain: "Company's own domain", no_consent: "Rep has not agreed" };
 const when = (iso: string) => new Date(iso).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "UTC" });
@@ -130,7 +131,7 @@ function DeskPanel({ id, actor }: { id: string; actor: string }) {
 }
 
 export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
-  const { actor, demo, needs } = useActor();
+  const { actor, demo, needs, sample } = useActor();
   // What the event cost and returned is leadership's and GTM Engineering's view, as on Budget.
   const lead = isGtm(actor) || Boolean(needs?.approvers.includes(actor));
   const [o, setO] = useState<Overview | null>(null);
@@ -163,7 +164,8 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
       setNote(r.data?.did ?? say); await load(); onChange();
     } finally { setBusy(false); }
   };
-  if (!o) return done ? <p className="md-clear">{NOT_AVAILABLE("Outreach")}</p> : <BlockSkeleton />;;
+  if (!o) return done ? <p className="md-clear">{NOT_AVAILABLE("Outreach")}</p> : <BlockSkeleton />;
+  const passed = passedAt(demo && sample.day ? Date.parse(`${sample.day}T12:00:00Z`) : Date.now());
   const f = o.funnel, s = o.live_score, started = o.motion !== "none";
   const free = slots.slots.filter((x) => !x.meeting_id), roster = slots.roster.map((x) => x.rep);
   const booked = new Set(o.meetings.map((m) => m.contact_id).filter(Boolean) as string[]);

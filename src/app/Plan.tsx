@@ -130,8 +130,8 @@ export function PlanTab({ id, listRows, onChange }: { id: string; listRows: numb
     planning && !submitted && money_ ? { label: "Ask for approval", run: () => send("POST", `/api/events/${id}/plan/submit`, actor) }
     : planning && submitted && isApprover && decisions === "panel" ? { label: "Approve the plan", run: () => send("POST", `/api/events/${id}/plan/decision`, actor, { decision: "approve" }) }
     : !planning && p.approval.over_budget && isApprover && decisions === "panel" ? { label: "Approve again", run: () => send("POST", `/api/events/${id}/plan/decision`, actor, { decision: "approve" }) }
-    // Decision 105: once the event is over, a planner closes plan against actual. It does not wait for the sending stage, which another desk may run.
-    : p.can_plan && !p.judged_at && p.stage_line.plan_stage === "following_up" && p.event.stage !== "declined" ? { label: "Close the result", run: () => send("POST", `/api/events/${id}/plan/close`, actor) }
+    // Decision 105: once the event is over and its sending never started (motion none), a planner closes plan against actual. An event with a motion is closed when it is scored, so the server (plan.ts closeResult) would refuse the button.
+    : p.can_plan && !p.judged_at && p.stage_line.plan_stage === "following_up" && p.event.motion === "none" && p.event.stage !== "declined" ? { label: "Close the result", run: () => send("POST", `/api/events/${id}/plan/close`, actor) }
     : null;
   const canEdit = p.can_plan && p.event.stage !== "declined";
   const waitingOnDecision = isApprover && !p.approval.approved_at && ((planning && submitted) || (!planning && p.approval.over_budget));

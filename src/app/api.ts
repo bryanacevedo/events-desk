@@ -125,7 +125,7 @@ export interface AssessmentData {
   organizer_request: OrganizerRequest | null; request_offered: boolean; request_open: boolean;
 }
 export interface PlanData {
-  event: { id: string; name: string; venue: string; starts_on: string; last_day: string; stage: string; decline_reason: string | null; approval_mode: "per_seat" | "budget"; hosted: boolean };
+  event: { id: string; name: string; venue: string; starts_on: string; last_day: string; stage: string; decline_reason: string | null; approval_mode: "per_seat" | "budget"; hosted: boolean; motion?: string };
   stage_line: { plan_stage: string; plan_stage_label: string; list_stage: string; list_stage_label: string; waiting_on: string; paused: boolean };
   reason: string; reason_words: string | null;
   goal: { meetings_held: number | null; accounts_met: number | null; pipeline_cents?: number | null };
