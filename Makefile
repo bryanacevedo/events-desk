@@ -1,4 +1,4 @@
-.PHONY: docs-check demo-snapshot world deps demo dev test audit ask evals-live apollo-check publish-sample google-auth
+.PHONY: docs-check snapshot demo-snapshot world deps demo dev test audit ask evals-live apollo-check publish-sample google-auth
 deps: ; @[ -d node_modules ] || npm ci
 demo: deps ; npm run demo
 dev: deps ; npm run dev
@@ -17,3 +17,8 @@ docs-check: ; node scripts/docs-check.mjs
 # The sample data the hosted demo opens. Rebuild it when the seed or the sample data changes.
 demo-snapshot:
 	node scripts/demo-snapshot.mjs
+
+# The public demo as a static snapshot in .snapshot/ (docs/RUNBOOK.md). Builds the app, opens the demo sample in this process and saves every answer the screens read.
+snapshot: deps
+	npm run build
+	node scripts/build-static-snapshot.ts --out .snapshot

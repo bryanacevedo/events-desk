@@ -13,3 +13,4 @@ design/.*
 design/qa/
 evals/recordings/partial/
 .claude/
+.snapshot/

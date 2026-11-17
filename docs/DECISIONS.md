@@ -574,3 +574,12 @@ The tracker, ranking and repeat reads use the deps clock, else `DEMO_TODAY` only
 
 **Who decided.** The S5 review's small safe fixes. Code: `src/server/guest-import.ts`, `src/server/choosing-routes.ts`, `src/app/Choosing.tsx`. Tests: `tests/simfix.test.ts`.
 
+## 109. The demo as a static snapshot on Cloudflare Pages (2026-11-17)
+
+**What.** `make snapshot` (`scripts/build-static-snapshot.ts`) opens the sample the Render demo opens (`samples/demo-snapshot.tgz`, unpacked into a temporary folder) in its own process, with `PUBLIC_DEMO=1`, and reads every page's data the way the screens do, as each person in Acting as and as a visitor who has not chosen yet. The answers, the workbooks, scan CSVs and upload files the pages link to, and the built app go into `.snapshot/`, with a fetch shim (`scripts/static-snapshot/shim.js`) that answers `/api` from the saved files and refuses every change with "This public demo does not take changes. To try them, run the desk yourself: the README shows how." The demo bar says it is a snapshot and cannot be hidden; no other desk is linked; the bundle carries a noindex meta, an `X-Robots-Tag` header and a `robots.txt` that disallows everything. A GitHub Actions workflow builds it and publishes to the Pages project `events-desk-demo` only when both Cloudflare secrets exist. It is staged: no README link, no address anywhere.
+
+**Why.** The Render demo sleeps, takes a minute to wake, and accepts changes a stranger can leave for the next visitor. A static copy costs nothing, answers at once and cannot be changed. The same pattern as the CRM, Market and Account Desk snapshots.
+
+**What it gives up.** A typed search, a combined filter and pages past the first two of a single filter in a list; every write; the scanner phone app; uploads, Slack, the directory and recordings; the clock moves. `docs/RUNBOOK.md` lists them. The scanner's read is the one read that touches the database (it retries badge scans waiting for a person), on the temporary copy, and the build stops if anything else changes.
+
+**Who decided.** Bryan's task of 2026-11-17 (hosting, bl_116). Code: `scripts/build-static-snapshot.ts`, `scripts/static-snapshot/shim.js`, `src/app/DemoBar.tsx`, `.github/workflows/static-snapshot.yml`. Tests: `tests/static-snapshot.test.ts`.

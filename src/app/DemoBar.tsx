@@ -1,6 +1,6 @@
 /* The slim bar at the top of every screen of the sample desk: what this is, what happens to a change, and which day the sample was built around.
    It says what is true of this desk. The public demo takes changes (they live in the running copy and are shared with the next visitor, until it restarts)
-   and refuses files; its refusal says "This public demo does not take files", so the bar uses the same words. Dismissed for the session with Hide. */
+   and refuses files; its refusal says "This public demo does not take files", so the bar uses the same words. Dismissed for the session with Hide, except in the static snapshot (decision 109), whose note says it is a snapshot and stays. */
 
 import { useState } from "react";
 import type { Sample } from "./App";
@@ -15,19 +15,19 @@ export const sampleDayWords = (ymd: string) => new Date(`${ymd}T12:00:00Z`).toLo
 export function demoBarWords(sample: Sample): string[] {
   return [
     "A sample company with invented data.",
-    sample.publicDemo ? "A change is shared with the next visitor and is gone when the demo restarts. This public demo does not take files." : "A change is gone when the demo restarts.",
+    sample.snapshot ? `This is a read-only snapshot taken ${sample.snapshot}. Nothing you change is saved, and files and searches inside a list are not in it.` : sample.publicDemo ? "A change is shared with the next visitor and is gone when the demo restarts. This public demo does not take files." : "A change is gone when the demo restarts.",
     sample.day ? `Sample events are set around ${sampleDayWords(sample.day)}; days to go count from today.` : "Days to go count from today.",
   ];
 }
 
 export function DemoBar({ sample }: { sample: Sample }) {
   const [off, setOff] = useState(hidden);
-  if (off) return null;
+  if (off && !sample.snapshot) return null;
   const [who, change, day] = demoBarWords(sample);
   return (
     <div className="demo-bar" role="note" aria-label="About this demo">
       <p><b>Sample.</b> {who} {change} {day}</p>
-      <button type="button" onClick={() => { try { sessionStorage.setItem(KEY, "1"); } catch { /* private window */ } setOff(true); }}>Hide</button>
+      {!sample.snapshot && <button type="button" onClick={() => { try { sessionStorage.setItem(KEY, "1"); } catch { /* private window */ } setOff(true); }}>Hide</button>}
     </div>
   );
 }

@@ -34,7 +34,7 @@ const ObjectSheets = page(() => import("./Objects"), "ObjectSheets");
 export const PEOPLE = PERSONAS.map((p) => p.name);
 interface Ctx { actor: string; demo: boolean; sample: Sample; decisions: Decisions; needs: Needs | null; refresh: () => Promise<void>; go: (to: string) => void; /** A line at the foot of the screen that stays across a page change, for a thing that was just sent. */ toast: (words: string) => void }
 /** What the demo says about itself (from /api/health): whether it is the public one, and the day its sample events were set around. */
-export interface Sample { publicDemo: boolean; day: string | null }
+export interface Sample { publicDemo: boolean; day: string | null; /** Set only by the static snapshot (decision 109): the day it was taken, as words. */ snapshot?: string | null }
 const AppCtx = createContext<Ctx>({ actor: PEOPLE[0], demo: false, sample: { publicDemo: false, day: null }, decisions: "none", needs: null, refresh: async () => {}, go: (to) => { location.href = to; }, toast: () => {} });
 export const useActor = () => useContext(AppCtx);
 
@@ -97,7 +97,7 @@ export function App() {
   const [note, setNote] = useState("");
   useEffect(() => { if (!note) return; const t = setTimeout(() => setNote(""), 7000); return () => clearTimeout(t); }, [note]);
   const [sample, setSample] = useState<Sample>({ publicDemo: false, day: null });
-  useEffect(() => { get<{ demo: boolean; decisions?: string; public_demo?: boolean; sample_day?: string | null }>("/api/health").then((h) => { setDemo(Boolean(h?.demo)); setDecisions(decisionsOf(h)); setSample({ publicDemo: Boolean(h?.public_demo), day: h?.sample_day ?? null }); }); }, []);
+  useEffect(() => { get<{ demo: boolean; decisions?: string; public_demo?: boolean; sample_day?: string | null; snapshot?: { taken_on: string } }>("/api/health").then((h) => { setDemo(Boolean(h?.demo)); setDecisions(decisionsOf(h)); setSample({ publicDemo: Boolean(h?.public_demo), day: h?.sample_day ?? null, snapshot: h?.snapshot?.taken_on ?? null }); }); }, []);
   useEffect(() => { refresh(); }, [pathname, refresh]);
   // How many people are waiting on whoever is acting, across events.
   const [waiting, setWaiting] = useState(0), [dayHas, setDayHas] = useState(false), [speaks, setSpeaks] = useState(false), [kits, setKits] = useState(0);

@@ -1,0 +1,59 @@
+# The public demo as a static snapshot (docs/RUNBOOK.md, Static snapshot). Opens the demo the hosted instance opens
+# (samples/demo-snapshot.tgz) in this process, reads it the way the screens do, and keeps the bundle as an artifact. It
+# publishes to Cloudflare Pages (project events-desk-demo) only when both Cloudflare secrets are set; without them the
+# run still builds and passes. It needs no database service: the demo's database runs inside the build.
+name: static snapshot
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "migrations/**"
+      - "samples/demo-snapshot.tgz"
+      - "index.html"
+      - "public/**"
+      - "package-lock.json"
+      - "scripts/build-static-snapshot.ts"
+      - "scripts/static-snapshot/**"
+      - ".github/workflows/static-snapshot.yml"
+
+concurrency:
+  group: static-snapshot
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      HAS_CLOUDFLARE: ${{ secrets.CLOUDFLARE_API_TOKEN != '' && secrets.CLOUDFLARE_ACCOUNT_ID != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "26"
+          cache: npm
+      - run: npm ci
+      - name: Build the app
+        run: npm run build
+      - name: Build the snapshot
+        run: node scripts/build-static-snapshot.ts --out .snapshot
+      - uses: actions/upload-artifact@v4
+        with:
+          name: events-desk-snapshot-${{ github.sha }}
+          path: .snapshot
+          retention-days: 30
+      - name: Deploy to Cloudflare Pages
+        if: env.HAS_CLOUDFLARE == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes wrangler@4.156.1 pages deploy .snapshot --project-name events-desk-demo --branch main --commit-hash "${{ github.sha }}" --commit-dirty=true
+      - name: No Cloudflare secrets, so no deploy
+        if: env.HAS_CLOUDFLARE != 'true'
+        run: echo "CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID is not set. The bundle is in this run's artifacts; nothing was deployed."

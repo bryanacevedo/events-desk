@@ -203,6 +203,8 @@ Open http://localhost:8787, or set `PORT` if that port is taken. The demo needs 
 
 `make ask Q="How many priority A contacts are there?"` asks Concierge about a throwaway copy of the older sample data, with a scripted model, so it can only answer that kind of question.
 
+`make snapshot` builds the demo as a static, read-only snapshot in `.snapshot/`: the same screens over answers saved from the demo's sample, with every change refused. See `docs/RUNBOOK.md`.
+
 ## Run the tests
 
 ```bash

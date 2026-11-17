@@ -39,6 +39,8 @@ const XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 const fileType = (name: string) => (name.toLowerCase().endsWith(".xlsx") ? XLSX : "text/csv");
 /** Rows per page in the people and company tables: a page fits on a screen, and search, filters and pages do the rest. */
 const PAGE = 12;
+/** What a list says in the static snapshot (decision 109) when the search, filter or page asked for is not among the saved answers. */
+const NOT_IN_SNAPSHOT = "This is not in the snapshot: it keeps each list's first pages and single filters, and no typed search. Run the desk yourself to search and filter.";
 const CASE_STAGES: Stage[] = ["ready_for_review", "finding_people", "flagging", "delivered", "paused"];
 const uploaderOf = (d: EventPayload) => d.list.upload?.uploaded_by ?? d.event.requested_by;
 const pendingCard = (d: EventPayload) => (d.cards ?? (d.card ? [d.card] : [])).find((c) => c.status === "pending") ?? null;
@@ -428,9 +430,10 @@ function ArriveAt({ id }: { id: string }) {
 /** The people on the list: searched, filtered and paged on the server. A row opens the person. */
 function PeopleTable({ id, hasPriorities, reloadKey, past = false }: { id: string; hasPriorities: boolean; reloadKey: number; past?: boolean }) {
   const [f, setF] = useUrlState(["q", "p", "t", "s", "src", "page", "person"], { s: "kept" });
-  const { go } = useActor();
+  const { go, sample } = useActor();
   const [typed, setTyped] = useState(f.q);
   const [page, setPage] = useState<Page<PersonRow> | null>(null);
+  const [gone, setGone] = useState(false);
   // A link to a person (?person=…) opens their panel on arrival.
   const [open, setOpen] = useState<string | null>(f.person || null);
   // The person's sheet lives in the address: closing it closes the row's highlight, and an opt-out in it reloads the list.
@@ -444,7 +447,7 @@ function PeopleTable({ id, hasPriorities, reloadKey, past = false }: { id: strin
   useEffect(() => {
     let live = true;
     const qs = new URLSearchParams({ q: f.q, priority: f.p, tier: f.t, status: f.s || "kept", source: f.src, offset: String(offset), limit: String(PAGE) });
-    get<Page<PersonRow>>(`/api/events/${id}/people?${qs}`).then((p) => { if (live) setPage(p); });
+    get<Page<PersonRow>>(`/api/events/${id}/people?${qs}`).then((p) => { if (live) { setPage(p); setGone(p === null); } });
     return () => { live = false; };
   }, [id, f.q, f.p, f.t, f.s, f.src, offset, reloadKey, stale]);
   const rows = page?.rows ?? [];
@@ -468,6 +471,7 @@ function PeopleTable({ id, hasPriorities, reloadKey, past = false }: { id: strin
           <select value={f.s || "kept"} onChange={(ev) => setF({ s: ev.target.value, page: "" })}><option value="kept">Kept</option><option value="dropped">Dropped</option><option value="all">Kept and dropped</option></select>
         </label>
       </div>
+      {gone && sample.snapshot && <p className="mute">{NOT_IN_SNAPSHOT}</p>}
       <ul className="prows">
         {rows.map((c) => (
           <li key={c.id} className={open === c.id ? "open" : undefined} data-person={c.id}>
@@ -506,15 +510,16 @@ function ListTables({ id, hasPriorities, reloadKey, past = false }: { id: string
 
 function CompaniesTable({ id, reloadKey }: { id: string; reloadKey: number }) {
   const [f, setF] = useUrlState(["cq", "ct", "cpage", "co"], {});
-  const { go } = useActor();
+  const { go, sample } = useActor();
   const [typed, setTyped] = useState(f.cq);
   useEffect(() => { setTyped(f.cq); }, [f.cq]);
   const [page, setPage] = useState<Page<CompanyRow> | null>(null);
+  const [gone, setGone] = useState(false);
   const offset = (Math.max(1, Number(f.cpage) || 1) - 1) * PAGE;
   useEffect(() => { const t = setTimeout(() => { if (typed !== f.cq) setF({ cq: typed, cpage: "" }); }, 250); return () => clearTimeout(t); }, [typed]);
   useEffect(() => {
     let live = true;
-    get<Page<CompanyRow>>(`/api/events/${id}/companies?${new URLSearchParams({ q: f.cq, tier: f.ct, offset: String(offset), limit: String(PAGE) })}`).then((p) => { if (live) setPage(p); });
+    get<Page<CompanyRow>>(`/api/events/${id}/companies?${new URLSearchParams({ q: f.cq, tier: f.ct, offset: String(offset), limit: String(PAGE) })}`).then((p) => { if (live) { setPage(p); setGone(p === null); } });
     return () => { live = false; };
   }, [id, f.cq, f.ct, offset, reloadKey]);
   const rows = page?.rows ?? [];
@@ -528,6 +533,7 @@ function CompaniesTable({ id, reloadKey }: { id: string; reloadKey: number }) {
           {[["", "All"], ["1", "Tier 1"], ["2", "Tier 2"], ["3", "Tier 3"], ["unknown", "No tier"]].map(([v, l]) => <button key={v} type="button" aria-pressed={f.ct === v} onClick={() => setF({ ct: v, cpage: "" })}>{l}</button>)}
         </div>
       </div>
+      {gone && sample.snapshot && <p className="mute">{NOT_IN_SNAPSHOT}</p>}
       <ul className="prows">
         {rows.map((r) => (
           <li key={r.id}>
