@@ -120,7 +120,7 @@ Answering yes after the event's day began is refused ("The date has passed"); th
 
 ## 7. Invitations
 
-- The host's template is fixed text with the event, day, venue, a sentence from `welcome`, the guest's first name, and the RSVP link (`APP_URL` or the request's origin, plus `/rsvp/<token>`). No model writes it (the Yuno rule).
+- The host's template is fixed text with the event, day, venue, a sentence from `welcome`, the guest's first name, and the RSVP link (`APP_URL` or the request's origin, plus `/rsvp/<token>`). No model writes it.
 - `GET /api/events/:id/guests/:gid/invitation` returns `{ subject, body, link }`, refused with the reason when the country rule blocks the guest.
 - `POST .../invitation` (`{ sent_on?, mailbox? }`) logs it: `guest_invitations` row, `invited_at`, status `listed` to `invited`, a `guest_log` row. It is refused for a guest whose country is blocked or unknown ("Email in Germany needs a region rule first", the Account Desk's own wording) and for a guest with no email. The owner or the host or a planner may log it; nobody else.
 - A guest list row says whether the invitation went and when ("Invited 12 Nov by Camille"). Nothing the desk does sends it.
