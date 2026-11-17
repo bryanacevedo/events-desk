@@ -7,9 +7,21 @@
     <meta name="description" content="Takes a conference from seat request to a delivered prospect list, with a human on every paid step." />
     <title>Events Desk</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M3 18.5h18M6.5 18.5v3M17.5 18.5v3' stroke='%2315231B' stroke-width='1.8' stroke-linecap='round'/%3E%3Cpath d='M5.5 7.5a1.5 1.5 0 0 1 1.5-1.5h10a1.5 1.5 0 0 1 1.5 1.5v2.1a1.4 1.4 0 0 0 0 2.8v2.1a1.5 1.5 0 0 1-1.5 1.5H7a1.5 1.5 0 0 1-1.5-1.5v-2.1a1.4 1.4 0 0 0 0-2.8Z' fill='%231F5D3F'/%3E%3Cpath d='M11 8.5v1M11 11.5v1M11 14.5v1' stroke='%23FFFFFF' stroke-width='1.4' stroke-linecap='round'/%3E%3C/svg%3E" />
+    <style>
+      /* Painted from the first byte, before any script: the sidebar and a page in grey. React replaces it when the app starts. */
+      body { margin: 0; font: 400 15px/22px system-ui, -apple-system, sans-serif; color: #15231B; background: #fff; }
+      .boot { display: flex; min-height: 100vh; }
+      .boot-side { width: 232px; flex: none; padding: 14px 12px; background: #F4F6F4; box-sizing: border-box; }
+      .boot-side b { display: block; padding: 4px 10px; font-size: 17px; font-weight: 600; }
+      .boot-main { flex: 1; min-width: 0; padding: 24px 40px; }
+      .boot i { display: block; height: 14px; margin: 14px 0; border-radius: 8px; background: #F4F6F4; }
+      .boot-side i { background: #E3E8E4; height: 16px; margin: 16px 10px; }
+      .boot h1 { margin: 0 0 8px; font-size: 28px; line-height: 36px; font-weight: 600; }
+      @media (max-width: 760px) { .boot-side { display: none; } .boot-main { padding: 16px; } }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><div class="boot" role="status" aria-busy="true"><nav class="boot-side" aria-hidden="true"><b>Events Desk</b><i></i><i></i><i></i><i></i><i></i></nav><main class="boot-main"><h1>Events Desk</h1><span style="position:absolute;left:-9999px">Loading.</span><i style="width:320px;max-width:80%"></i><i></i><i style="width:90%"></i><i style="width:70%"></i><i style="width:80%"></i></main></div></div>
     <script type="module" src="/src/app/main.tsx"></script>
   </body>
 </html>

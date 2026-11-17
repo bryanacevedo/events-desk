@@ -63,7 +63,15 @@ function FloatingSheet({ title, canDismiss, onClose, children }: { title: string
   dismiss.current = { canDismiss, onClose };
   useEffect(() => {
     const before = document.activeElement as HTMLElement | null;
-    panel.current?.querySelector<HTMLElement>("input, select, textarea")?.focus();
+    // Focus goes into the dialog and stays there: the first field, or the dialog itself when it has none yet. A page that redraws behind it (the list of events
+    // loading, a fade) must not take focus back, so it is set again on the next frame if it has landed outside.
+    const into = () => {
+      const p = panel.current; if (!p) return;
+      if (p.contains(document.activeElement) && document.activeElement !== p) return;
+      (p.querySelector<HTMLElement>("input, select, textarea") ?? p).focus({ preventScroll: true });
+    };
+    into();
+    const frame = requestAnimationFrame(into);
     document.body.style.overflow = "hidden";
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") { e.preventDefault(); if (dismiss.current.canDismiss) dismiss.current.onClose(); return; }
@@ -75,11 +83,11 @@ function FloatingSheet({ title, canDismiss, onClose, children }: { title: string
       else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
     };
     document.addEventListener("keydown", onKey);
-    return () => { document.removeEventListener("keydown", onKey); document.body.style.overflow = ""; before?.focus?.(); };
+    return () => { cancelAnimationFrame(frame); document.removeEventListener("keydown", onKey); document.body.style.overflow = ""; before?.focus?.(); };
   }, []);
   return createPortal(
     <div className="float-scrim" onMouseDown={(e) => { if (e.target === e.currentTarget && dismiss.current.canDismiss) dismiss.current.onClose(); }}>
-      <aside className="float" ref={panel} role="dialog" aria-modal="true" aria-label={title}>
+      <aside className="float" ref={panel} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1}>
         <header className="float-h"><h2 className="display">{title}</h2><button className="sheet-x" type="button" aria-label="Close" onClick={onClose}>&times;</button></header>
         <div className="float-b">{children}</div>
       </aside>

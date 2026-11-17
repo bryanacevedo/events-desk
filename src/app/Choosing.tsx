@@ -11,13 +11,15 @@ import { useActor } from "./App";
 import { isGtm } from "../shared/roles";
 import { ExpandRow, ShowMore } from "./Patterns";
 import { Form } from "./PlanEdit";
-import { CHOOSING_FAILED, LOADING } from "./access";
-import { money, num, shortDate } from "./words";
+import { CHOOSING_FAILED, NO_FILES } from "./access";
+import { money, num, plural, shortDate } from "./words";
+import { PageSkeleton, Empty } from "./Skeleton";
 
 type Cands = Awaited<ReturnType<typeof candidates>>;
 type Cand = Cands["candidates"][number];
 type Repeat = Awaited<ReturnType<typeof repeatView>>;
-type Targets = { total: number; by_source: Record<string, number> };
+type LastImport = { actor: string; row_count: number; added: number; updated: number; skipped: { row: number; why: string }[]; created_at: string };
+type Targets = { total: number; by_source: Record<string, number>; last_import?: LastImport | null };
 
 const SOURCE_WORDS: Record<string, string> = { upload: "Uploaded", manual: "Added by hand", crm: "From the CRM", market_desk: "From Market Desk" };
 const KIND_WORDS: Record<string, string> = { page: "Named on a page", past: "On an earlier list", captured: "People already captured" };
@@ -294,32 +296,45 @@ function Repeats({ data, lead, reload }: { data: Repeat; lead: boolean; reload: 
 
 /* ------------------------------------------------------------------ target accounts */
 
+/** The last import, kept on the desk: what it added, updated and left out, and why, for whoever opens the page next. */
+function LastImportResult({ last }: { last: LastImport }) {
+  const why = new Map<string, number>();
+  for (const s of last.skipped) why.set(s.why, (why.get(s.why) ?? 0) + 1);
+  return (
+    <div className="ch-last" aria-label="Last import">
+      <p className="small mute">Last import: {last.actor}, {new Date(last.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}, {plural(last.row_count, "row")}</p>
+      <dl className="pl-figs"><div><dd>{num(last.added)}</dd><dt>added</dt></div><div><dd>{num(last.updated)}</dd><dt>updated</dt></div>{last.skipped.length > 0 && <div><dd>{num(last.skipped.length)}</dd><dt>skipped</dt></div>}</dl>
+      {why.size > 0 && <ul className="reasons" aria-label="Rows skipped">{[...why].map(([w, n]) => <li key={w}><b>{num(n)}</b><span>{w}</span></li>)}</ul>}
+    </div>
+  );
+}
+
 function TargetAccounts({ data, reload }: { data: Targets; reload: () => Promise<void> }) {
-  const { actor } = useActor();
-  const [busy, setBusy] = useState(false), [error, setError] = useState(""), [done, setDone] = useState<{ added: number; updated: number; skipped: number } | null>(null);
+  const { actor, sample } = useActor();
+  const [busy, setBusy] = useState(false), [error, setError] = useState("");
   const pick = async (f: File | undefined) => {
     if (!f) return;
-    setBusy(true); setError(""); setDone(null);
+    setBusy(true); setError("");
     const r = await send<{ added: number; updated: number; skipped: unknown[] }>("POST", "/api/target-accounts/import", actor, { text: await f.text() });
     setBusy(false);
     if (!r.ok) { setError(r.error); return; }
-    setDone({ added: r.data.added, updated: r.data.updated, skipped: r.data.skipped.length });
     await reload();
   };
+  const last = data.last_import;
   const sources = Object.entries(data.by_source).sort((a, b) => b[1] - a[1]);
   return (
     <div className="rs-sec">
       <h3 className="rs-h">Target accounts</h3>
-      {data.total === 0 ? <p className="mute">No target accounts yet.</p> : (
+      {data.total === 0 ? <Empty what="The companies the team most wants to meet. Choosing matches them against each event." example="Lumen Ledger, lumenledger.example, owner Maya Ortiz." /> : (
         <dl className="pl-figs" aria-label="Target accounts">
           <div><dd>{num(data.total)}</dd><dt>target accounts{sources.length === 1 ? `, ${(SOURCE_WORDS[sources[0][0]] ?? sources[0][0]).toLowerCase()}` : ""}</dt></div>
           {sources.length > 1 && sources.map(([k, n]) => <div key={k}><dd>{num(n)}</dd><dt>{(SOURCE_WORDS[k] ?? k).toLowerCase()}</dt></div>)}
         </dl>
       )}
       <div className="pl-edit-row">
-        <label className="btn line small">{busy ? "Reading the file…" : "Upload a CSV"}<input className="sr-only" type="file" accept=".csv,text/csv" aria-label="Upload a CSV of target accounts" disabled={busy} onChange={(e) => { void pick(e.target.files?.[0]); e.target.value = ""; }} /></label>
+        <label className="btn line small" title={sample.publicDemo ? NO_FILES : undefined}>{busy ? "Reading the file…" : "Upload a CSV"}<input className="sr-only" type="file" accept=".csv,text/csv" aria-label="Upload a CSV of target accounts" disabled={busy} onChange={(e) => { void pick(e.target.files?.[0]); e.target.value = ""; }} /></label>
       </div>
-      {done && <dl className="pl-figs" aria-label="Uploaded"><div><dd>{num(done.added)}</dd><dt>added</dt></div><div><dd>{num(done.updated)}</dd><dt>updated</dt></div>{done.skipped > 0 && <div><dd>{num(done.skipped)}</dd><dt>skipped</dt></div>}</dl>}
+      {last && <LastImportResult last={last} />}
       {error && <p role="alert" className="error small">{error}</p>}
     </div>
   );
@@ -337,7 +352,7 @@ export function Choosing({ go: _go }: { go: (to: string) => void }) {
   const loadTargets = async () => { setTargets(await get<Targets>("/api/target-accounts")); };
   const loadAll = async () => { await Promise.all([loadCands(), loadRep(), loadTargets()]); setReady(true); };
   useEffect(() => { void loadAll(); }, [actor]);
-  if (!ready) return <p className="md-clear">{LOADING}</p>;
+  if (!ready) return <PageSkeleton />;
   return (
     <section className="choosing" data-ready="1">
       <header className="hero"><div><h1>Choosing</h1></div></header>

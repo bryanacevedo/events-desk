@@ -7,7 +7,7 @@ import { createPortal } from "react-dom";
 import { get, read, send, type GuestOut, type HostedPage, type ImportResult, type Invitation, type ReminderPreview, type ReminderSent } from "./api";
 import { PEOPLE, useActor } from "./App";
 import { Form } from "./PlanEdit";
-import { useSheet } from "./SideSheet";
+import { useSheet } from "./useSheet";
 import { Upload } from "./Upload";
 import { money, num, plural } from "./words";
 

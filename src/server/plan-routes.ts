@@ -64,8 +64,9 @@ export function mountPlanRoutes(app: Hono<any>, db: Db, cfg: Cfg) {
       return r;
     });
   });
-  // The panel decision exists in demo mode only. A live setup decides on the plan card in Slack, as it does for seats.
-  if (cfg.demo) {
+  // The panel decision (decision 104): the demo has it, and so does a desk with no Slack, so a plan is never stuck for want of a chat tool. It runs the same approvePlan and declinePlan
+  // the Slack plan card calls (approvers only, never the person who wrote the plan). With Slack connected the card is the one path and this route does not exist.
+  if (cfg.demo || !cfg.slack) {
     app.post("/api/events/:id/plan/decision", async (c) => {
       const b = await body(c);
       if (b.decision !== "approve" && b.decision !== "decline") return refuse("Choose approve or decline.", 400);
@@ -74,7 +75,8 @@ export function mountPlanRoutes(app: Hono<any>, db: Db, cfg: Cfg) {
     });
   }
   app.post("/api/events/:id/plan/close", async (c) => {
-    if (!isLead(actorOf(c))) return refuse("Closing a result is for leadership and GTM Engineering.", 403);
+    // Decision 4: the planner who wrote the plan can close plan against actual, with or without the sending stage.
+    if (!isLead(actorOf(c)) && !planner(c)) return refuse("Closing a result is for planners, leadership and GTM Engineering.", 403);
     return run(() => closeResult(db, actorOf(c), id(c), todayOf(cfg.lifecycle)));
   });
 

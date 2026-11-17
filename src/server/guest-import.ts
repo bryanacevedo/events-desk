@@ -139,6 +139,10 @@ export async function importTargetAccounts(db: Db, actor: string, csv: string) {
       try { const s = await saveTargetAccount(q, actor, r, "upload"); if (s.created) out.added++; else out.updated++; }
       catch (e) { if (e instanceof HostedInvalid) out.skipped.push({ row: i + 2, why: e.message }); else throw e; }
     }
+    // Kept as the last import, so what was added, updated and left out (and why) is still there when the page is opened again.
+    await q(`INSERT INTO target_account_last_import (id, actor, row_count, added, updated, skipped) VALUES ('last', $1, $2, $3, $4, $5::jsonb)
+             ON CONFLICT (id) DO UPDATE SET actor = $1, row_count = $2, added = $3, updated = $4, skipped = $5::jsonb, created_at = now()`,
+      [actor, out.rows, out.added, out.updated, JSON.stringify(out.skipped.slice(0, 200))]);
     return out;
   });
 }

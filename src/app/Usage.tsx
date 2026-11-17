@@ -5,9 +5,10 @@
 import { useEffect, useState } from "react";
 import type { usageView } from "../server/usage";
 import { CREDIT_VENDORS, type CreditVendor } from "../shared/vendors";
-import { SideSheet } from "./SideSheet";
+import { SideSheet } from "./LazySheet";
 import { get } from "./api";
 import { EventLogo } from "./EventLogo";
+import { plainTools } from "./tools";
 import { daysTo, shortDate } from "./words";
 
 type View = Awaited<ReturnType<typeof usageView>>;
@@ -45,7 +46,7 @@ function Pool({ x, year, month, big = false }: { x: VendorUse; year: number; mon
       <header className="pool-h">
         <EventLogo name={x.vendor} website={SITES[x.vendor]} size={big ? 48 : 36} />
         <div className="pool-who">
-          <h2 className="pool-n">{x.vendor}</h2>
+          <h2 className="pool-n">{plainTools(x.vendor)}</h2>
           <p className="small mute">Resets {r.label}{r.days > 0 && <>, {r.days} {r.days === 1 ? "day" : "days"}</>}{x.saved > 0 && <> · {n(x.saved)} saved</>}</p>
         </div>
         {big && figure}

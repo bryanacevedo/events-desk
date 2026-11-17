@@ -5,6 +5,8 @@
    event opens in the side sheet; Add event opens its form in one too. */
 
 import { LOADING } from "./access";
+import { sentTo } from "./waiting";
+import { Glossary } from "./Glossary";
 import { useEffect, useRef, useState } from "react";
 import type { EventRow } from "../shared/domain";
 import { isGtm } from "../shared/roles";
@@ -13,10 +15,11 @@ import { Link, useActor } from "./App";
 import { EventLogo } from "./EventLogo";
 import { RequestSeats } from "./RequestForm";
 import { NewPlan } from "./NewPlan";
-import { SideSheet } from "./SideSheet";
+import { SideSheet } from "./LazySheet";
 import { holderWords, stepAt, type Needs } from "./waiting";
 import { city, countdown, daysTo, firstName, isRunning, plural, shortDate, todayYmd } from "./words";
 import { afterStep, deliveredWords } from "./stages";
+import { PageSkeleton, Empty } from "./Skeleton";
 
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const noon = (s: string) => new Date(`${s.slice(0, 10)}T12:00:00`);
@@ -28,7 +31,7 @@ const REGIONS: [string, string, string[]][] = [
   ["apac", "Asia Pacific", ["Thailand", "Japan", "Singapore", "Australia", "India"]],
 ];
 const regionOf = (country: string) => REGIONS.find((r) => r[2].includes(country))?.[0] ?? "other";
-const PLAN_STAGE_WORDS: Record<string, string> = { planning: "Planning", confirmed: "Confirmed", preparing: "Preparing", live: "Live", following_up: "Following up", judged: "Judged" };
+const PLAN_STAGE_WORDS: Record<string, string> = { planning: "Planning", confirmed: "Confirmed", preparing: "Preparing", live: "Live", following_up: "Following up", judged: "Scored" };
 const TIMES = { coming: "Coming", past: "Past", all: "All" } as const;
 type TimeKey = keyof typeof TIMES;
 /** The states an event can be in, in the order of its life: the same steps as its header. */
@@ -66,7 +69,7 @@ function stateOf(r: Row, today: string, needs: Needs): State {
 }
 
 export function Events({ go, sheetId, requesting, preselect, search }: { go: (to: string) => void; sheetId: string | null; requesting: boolean; preselect: string | null; search: URLSearchParams }) {
-  const { needs, actor } = useActor();
+  const { needs, actor, toast } = useActor();
   useEffect(() => { if (sheetId) document.body.classList.add("sheet-open"); else document.body.classList.remove("sheet-open"); return () => document.body.classList.remove("sheet-open"); }, [sheetId]);
   // The axis is laid out in percent; which month labels fit depends on its real width.
   const axisRef = useRef<HTMLDivElement>(null);
@@ -79,7 +82,7 @@ export function Events({ go, sheetId, requesting, preselect, search }: { go: (to
     setTrackW(el.clientWidth || 700);
     return () => ro.disconnect();
   }, [needs]);
-  if (!needs) return <p className="md-clear">{LOADING}</p>;
+  if (!needs) return <PageSkeleton />;
 
   const today = todayYmd();
   const time: TimeKey = (search.get("time") as TimeKey) in TIMES ? (search.get("time") as TimeKey) : "coming";
@@ -151,10 +154,10 @@ export function Events({ go, sheetId, requesting, preselect, search }: { go: (to
         <span className="spacer" />
         {canPlanHere && <Link to={withParam("plan", "1")} go={go} className="btn line small tl-add">New plan</Link>}
         {canAdd && <Link to={withParam("add", "1")} go={go} className="btn line small tl-add">Add event</Link>}
-        <Link to={withParam("request", "1")} go={go} className="btn phone-only">Request a seat</Link>
+        <Link to={withParam("request", "1")} go={go} className="btn line small phone-only">Request a seat</Link>
       </header>
 
-      {requesting && <RequestSeats preselect={preselect} onDone={() => go(needs?.approvers.includes(actor) ? "/seats?mine=1&status=all" : "/my-day")} onClose={() => go(keepQuery())} />}
+      {requesting && <RequestSeats preselect={preselect} onDone={() => { toast(sentTo(needs, actor)); go(needs?.approvers.includes(actor) ? "/seats?mine=1&status=all" : "/my-day"); }} onClose={() => go(keepQuery())} />}
 
       <div className="filters tl-filters" role="group" aria-label="Find and filter events">
         <form className="search" onSubmit={(ev) => ev.preventDefault()} role="search">
@@ -219,10 +222,11 @@ export function Events({ go, sheetId, requesting, preselect, search }: { go: (to
               ? <Link key={r.key} to={withParam("event", r.e.id)} go={go} data-opens-sheet="" data-row={r.key} className={`tl-row${past ? " past" : ""}`} aria-current={sheetId === r.key ? "page" : undefined} aria-label={label}>{inner}</Link>
               : <Link key={r.key} to={`/events?request=1&catalog=${r.c!.id}`} go={go} data-row={r.key} className="tl-row listed" aria-label={`${r.name}, ${countdown(r.starts_on)}, not requested. Request a seat`}>{inner}</Link>;
           })}
-          {!shown.length && <p className="mute tl-empty">{windowRows.length ? "Nothing matches." : time === "past" ? "Nothing has happened yet." : "Nothing coming up."}</p>}
+          {!shown.length && (windowRows.length ? <p className="mute tl-empty">Nothing matches.</p> : <Empty className="tl-empty" what={time === "past" ? "Events that have happened show here, with what they returned." : "Events coming up show here, with where each one stands."} example="SaaStr Annual 2027, 12 May: waiting on seats, Dan decides." />)}
         </div>
       </section>
 
+      <Glossary />
       {sheetId && <SideSheet id={sheetId} go={go} close={() => go(keepQuery())} />}
       {planning && canPlanHere && <NewPlan onDone={(id) => go(`/events?event=${id}`)} onClose={() => go(keepQuery())} />}
       {adding && canAdd && <AddEvent onDone={() => go(keepQuery())} onClose={() => go(keepQuery())} />}

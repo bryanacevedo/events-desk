@@ -1,8 +1,16 @@
 # Events Desk: project status
 
-**Updated:** 2026-11-17. **Decisions:** `docs/DECISIONS.md`, 1 to 103. **Render:** auto-deploy is off on the service (verified through the Render API on 2026-11-16, read-only); a push deploys nothing and a deploy happens only when Bryan says. `render.yaml` does not say so: the setting lives on the Render service, where auto-deploy was turned off because the monthly build minutes ran out; nothing in this repository changes it. The last Events Desk deploy, on 2026-11-15, ended build_failed, so the live demo at https://events-desk.onrender.com lags `main`; no live commit is claimed here.
+**Updated:** 2026-11-17. **Decisions:** `docs/DECISIONS.md`, 1 to 108. **Render:** auto-deploy is off on the service (verified through the Render API on 2026-11-16, read-only); a push deploys nothing and a deploy happens only when Bryan says. `render.yaml` does not say so: the setting lives on the Render service, where auto-deploy was turned off because the monthly build minutes ran out; nothing in this repository changes it. The last Events Desk deploy, on 2026-11-15, ended build_failed, so the live demo at https://events-desk.onrender.com lags `main`; no live commit is claimed here.
 
 Docs are part of done: README, PROJECT-STATUS and docs change in the same commit as the behaviour, counts or setup they describe. `make docs-check` (also run by the suite) enforces it.
+
+## Simulation fixes: first paint, the sample's own words, plan decisions without Slack (2026-11-17, branch `simfix/events-desk`)
+
+Worktree `.wt/simfix-events-desk`, from `origin/main` 216c0fe, not pushed. Decisions 104 to 108, migration 0062. From the first-visit review (`workday-sim-plan/runs/s4/demo-user/SYNTHESIS.txt`) and the S5 review (`runs/s5/REVIEW.txt`).
+
+**Built:** a grey shell in `index.html`; the app draws before `/api/health` answers; every page is its own file; open cases in one read (`GET /api/cases/open`); scripts compressed and cached for a year; skeletons for every wait, and a settle of 120 ms for a page change (decision 106). A slim demo bar, a first screen with one sentence, one first step and a tour of two short lists, tools named by their job in the sample, a glossary, empty places with an example, "Request a seat" made quiet, contrast measured by `scripts/contrast.mjs` (decision 107). Plan decisions in the app when there is no Slack (104); a planner closes plan against actual, and Results lists it (105); the last target import kept (108). Small fixes: the scanner's person under its own key, a line saying who a seat request went to, drop reasons at the quoted stage, the waiting plan and abstract under Needs me now, the scanner link before delivery, focus into the Request a seat dialog, a stacked timeline under 1000 px so a long title cannot print over the status, "Declined" and "Scored" said one way, booth meetings and people met told apart, a booked meeting whose time has passed no longer "coming up", one row for the event the seed made twice.
+
+**Not proven:** the 3 to 18 second blanks on the live demo were not reproduced (the sandbox cannot reach it); locally every read answers in under 100 ms, so the fix removes the stacked waits that could be measured (uncompressed 720 kB, no cache header, a gate on `/api/health`, about 15 reads before the first paint) and nothing more is claimed. The new screens were looked at in the browser pane at 800 and 390 px only where noted in the report. New screen sentences are in `docs/SCREEN-COPY.txt` for Bryan to read.
 
 ## Sim mode and in-app seat decisions (2026-11-17, branch `product/events`)
 
@@ -182,7 +190,7 @@ Worktree `~/Developer/events-desk/.claude/worktrees/admiring-kepler-c6dcf2`, bra
 
 **Not done (next, in order; done since, see 'Redesign step 1, finished'):** live-mode Slack plan card; sponsorship, deliverables, `list_source`, Overview year plan and week's deadlines (0050, 0051, session 2 of the original plan); the assessment, organizer request, past events read against their goals, the Money20/20 USA 2026 seed (0052, session 3); a seed test for those; README for the plan. re:Invent's upload source "emailed by the organizer" waits for 0051.
 
-**Spec:** `docs/SPEC.md`, goldfish-reviewed 2026-11-08 before any code (12 Major, 13 Nit, no Blocker; 24 fixed, 1 moot because a clause gate was closed). It has been edited to match the code since. **Decisions:** `docs/DECISIONS.md`, 1 to 103.
+**Spec:** `docs/SPEC.md`, goldfish-reviewed 2026-11-08 before any code (12 Major, 13 Nit, no Blocker; 24 fixed, 1 moot because a clause gate was closed). It has been edited to match the code since. **Decisions:** `docs/DECISIONS.md`, 1 to 108.
 
 ## Now (2026-11-12)
 

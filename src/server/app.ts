@@ -172,7 +172,7 @@ export function createApp(db: Db, cfg: AppConfig) {
   app.get("/api/health", async (c) => {
     const stale = tickStale();
     const [a] = await db.query<{ n: number }>("SELECT count(*)::int AS n FROM alerts WHERE day = $1", [new Date().toISOString().slice(0, 10)]).catch(() => [{ n: -1 }]);
-    return c.json({ ok: !stale, demo: cfg.demo, decisions: cfg.demo ? "panel" : cfg.slack ? "slack" : "none", tick: { started_at: tickState.startedAt, finished_at: tickState.finishedAt, stale }, alerts_today: a?.n ?? 0 }, stale ? 503 : 200);
+    return c.json({ ok: !stale, demo: cfg.demo, decisions: cfg.slack && !cfg.demo ? "slack" : "panel", public_demo: Boolean(cfg.publicDemo), sample_day: cfg.demo ? process.env.DEMO_TODAY ?? null : null, tick: { started_at: tickState.startedAt, finished_at: tickState.finishedAt, stale }, alerts_today: a?.n ?? 0 }, stale ? 503 : 200);
   });
 
   // The rules every new event starts from, read-only. The ICP screen shows them until uploading a document exists.
@@ -366,6 +366,10 @@ export function createApp(db: Db, cfg: AppConfig) {
 
   // Review cases. The shape is what the Cases screen reads: id, kind, summary, facts, suggested, options, decision (null while open).
   app.get("/api/events/:id/cases", async (c) => c.json({ cases: await listCases(db, c.req.param("id")) }));
+  // Open cases across events in one read, for the sidebar and Overview: one query instead of one per delivered event (the first paint waited on those).
+  app.get("/api/cases/open", async (c) => c.json({ events: await db.query<{ event_id: string; n: number; summary: string }>(
+    `SELECT r.event_id, count(*)::int AS n, (array_agg(r.summary ORDER BY r.created_at, r.id))[1] AS summary
+       FROM review_cases r JOIN events e ON e.id = r.event_id WHERE r.status = 'open' AND e.stage IN ('delivered', 'ready_for_review') GROUP BY r.event_id`) }));
 
   // Registered before the :caseId route so "skip" is never read as an id.
   app.post("/api/events/:id/cases/skip", async (c) => {

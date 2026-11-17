@@ -3,13 +3,14 @@
    the clock, the thread, who they are, and every step so far. The sheet lives in the URL (?reply= or ?meeting=), so it survives a reload. */
 
 import { companyDisplayName as co, dealDisplayName } from "../shared/names";
+import { toolName } from "./tools";
 import { isGtm } from "../shared/roles";
 import { useEffect, useState, type CSSProperties } from "react";
 import { get, send } from "./api";
 import { Link, useActor } from "./App";
 import { EventLogo } from "./EventLogo";
 import { PersonAvatar } from "./PersonAvatar";
-import { useSheet } from "./SideSheet";
+import { useSheet } from "./useSheet";
 import { companyHref, eventHref, personHref, To } from "./To";
 import { OptOut, PriorityGrid, whyPriority } from "./Person";
 
@@ -331,7 +332,7 @@ export function ReplySheet({ id, close, changed }: { id: string; close: () => vo
   if (!r) return <Shell label="Reply" close={close} />;
   const act = async (fn: () => Promise<unknown>) => { setBusy(true); try { await fn(); await load(); changed?.(); } finally { setBusy(false); } };
   const name = r.full_name ?? "Someone", first = name.split(" ")[0];
-  const tool = TOOL_NAME[r.connector] ?? "the tool";
+  const tool = toolName(r.connector);
 
   return (
     <Shell label={`Reply from ${name}`} close={close} event={{ id: r.event_id, name: r.event, website: r.website }}>
@@ -377,7 +378,7 @@ export function ReplySheet({ id, close, changed }: { id: string; close: () => vo
       <WhoFacts w={r} />
       {r.account && <AccountBlock a={r.account} eventId={r.event_id} named />}
       <Path steps={r.path} tz={(r as { timezone?: string | null }).timezone} />
-      {r.contact_id && !(backHref()?.kind === "person" && backHref()?.id === r.contact_id) && <Link to={objectHref("person", r.contact_id, true)} go={go} className="btn ob-record to" data-opens-sheet="">Open {first}'s record <Arrow /></Link>}
+      {r.contact_id && !(backHref()?.kind === "person" && backHref()?.id === r.contact_id) && <Link to={objectHref("person", r.contact_id, true)} go={go} className="btn ob-record to" data-opens-sheet="">Open {first}'s page <Arrow /></Link>}
     </Shell>
   );
 }
@@ -436,7 +437,7 @@ export function MeetingSheet({ id, close, changed }: { id: string; close: () => 
       {m.brief && <WhoFacts w={{ ...m.brief, full_name: m.full_name }} met={m.brief.met_note} />}
       {m.account && <AccountBlock a={m.account} eventId={m.event_id} named />}
       <Path steps={m.path} tz={(m as { timezone?: string | null }).timezone} />
-      {m.contact_id && !(backHref()?.kind === "person" && backHref()?.id === m.contact_id) && <Link to={objectHref("person", m.contact_id, true)} go={go} className="btn ob-record to" data-opens-sheet="">Open {first}'s record <Arrow /></Link>}
+      {m.contact_id && !(backHref()?.kind === "person" && backHref()?.id === m.contact_id) && <Link to={objectHref("person", m.contact_id, true)} go={go} className="btn ob-record to" data-opens-sheet="">Open {first}'s page <Arrow /></Link>}
     </Shell>
   );
 }
@@ -795,7 +796,7 @@ export function SequenceSheet({ id, close }: { id: string; close: () => void; ch
   useEffect(() => { setS(null); get<SequenceDetailData>(`/api/events/${eventId}/sequences/${sid}`).then((x) => setS(x ?? "missing")); }, [id]);
   if (s === "missing") return <Shell label="Sequence" close={close}><p className="mute">That sequence is not on this event.</p></Shell>;
   if (!s) return <Shell label="Sequence" close={close} />;
-  const tool = TOOL[s.connector] ?? s.connector;
+  const tool = toolName(s.connector, s.connector);
   const fig = (v: number | null, label: string) => <p className={v === null ? "nr" : undefined}><b>{v === null ? "None" : v.toLocaleString("en-US")}</b><span>{v === null ? `${label}, not reported` : label}</span></p>;
   const topStep = Math.max(1, ...(s.steps ?? []).map((x) => x.sent));
   // A sequence that ran its course is not anyone taken out: only a reason about the person counts here.

@@ -13,6 +13,8 @@ export const decisionsOf = (h: { demo?: boolean; decisions?: string } | null): D
 export const plannerAccess = (needs: Needs | null, actor: string, lead: boolean): Access => (lead ? "yes" : needs === null ? "loading" : needs.planners.includes(actor) ? "yes" : "no");
 
 export const LOADING = "Loading.";
+/** What the public demo says to an upload, before the click: the same words its server refuses with. */
+export const NO_FILES = "This public demo does not take files.";
 /** A read that finished and brought nothing: this desk does not run that part, which is not the same as one still loading. */
 export const NOT_AVAILABLE = (what: string) => `${what} is not available on this desk.`;
 

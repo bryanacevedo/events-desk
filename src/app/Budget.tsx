@@ -4,7 +4,7 @@
 
 import { useEffect, useState } from "react";
 import type { budgetView } from "../server/budget";
-import { SideSheet } from "./SideSheet";
+import { SideSheet } from "./LazySheet";
 import { EventLogo } from "./EventLogo";
 import { get, send } from "./api";
 import { useActor } from "./App";
@@ -13,7 +13,7 @@ import { money, shortDate } from "./words";
 
 type PlanTable = { events: { event_id: string; name: string; starts_on: string; plan_stage: string; planned_cents: number; contracted_cents: number; actual_cents: number }[]; total_planned_cents: number; total_contracted_cents: number; total_actual_cents: number };
 type View = Awaited<ReturnType<typeof budgetView>> & { plan?: PlanTable };
-const STAGE_WORDS: Record<string, string> = { planning: "Planning", confirmed: "Confirmed", preparing: "Preparing", live: "Live", following_up: "Following up", judged: "Judged" };
+const STAGE_WORDS: Record<string, string> = { planning: "Planning", confirmed: "Confirmed", preparing: "Preparing", live: "Live", following_up: "Following up", judged: "Scored" };
 const cell = (c: number, none = false) => (none && c === 0 ? <>none</> : <><i>$</i>{(c / 100).toLocaleString("en-US", { maximumFractionDigits: 0 })}</>);
 
 /** What each event planned, what its agreements oblige, and what was paid, with the year's totals. Under the ticket block, which stays as it was. */

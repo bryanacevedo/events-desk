@@ -11,6 +11,7 @@ import { companyHref, personHref, To } from "./To";
 import { CODE_WORDS, dayIn, headIn, MeetingRows, meetTime, objectHref, ObjectSheets, openObject, ReplyRows, SeqName } from "./Objects";
 import { money, num, plural, shortDate } from "./words";
 import { isGtm } from "../shared/roles";
+import { BlockSkeleton } from "./Skeleton";
 
 interface Sender { address: string; role: "primary" | "spare"; daily_share: number; health: number | null }
 interface Sequence { id: string; name: string; channel: "email" | "linkedin"; priority: string; phase?: "pre" | "post"; zone_group?: string; adding?: number; connector: string; state: string; pause_reason: string | null; senders_needed: number | null; peak_daily: number | null; sender_status: "ok" | "short" | "not_visible" | null; sender_excluded: { address: string; reason: string }[]; enrolled: number; paused: number; senders: Sender[]; timing_note: string | null; external_id: string | null; checklist_at: string | null }
@@ -27,6 +28,8 @@ interface Overview {
 type Act = (m: "POST", p: string, b?: unknown, say?: string) => void;
 
 const TOOL_NAME: Record<string, string> = { instantly: "Instantly", heyreach: "HeyReach", smartlead: "Smartlead", apollo: "Apollo" };
+/** A meeting still booked after its time has gone is not "coming up": nobody has said whether it happened. */
+const passed = (m: { scheduled_at: string }) => Date.parse(m.scheduled_at) < Date.now();
 const CODE: Record<string, string> = { interested: "interested", meeting_request: "wants a meeting", referral: "pointed us to someone" };
 const REASON: Record<string, string> = { not_connected: "Not connected", health_unknown: "Health not reported", low_health: "Health too low", still_warming: "Still warming up", high_bounce: "Bounces too high", high_spam: "Spam too high", fully_booked: "Used by other sequences", domain_full: "Domain has enough", no_auth: "Domain not set up to send", failed_placement: "Landing in spam", stale_placement: "Not tested lately", not_tested: "Not tested", warmup_off: "Warmup off", burned: "Domain resting", primary_domain: "Company's own domain", no_consent: "Rep has not agreed" };
 const when = (iso: string) => new Date(iso).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "UTC" });
@@ -44,7 +47,7 @@ const openFold = (title: string) => {
 /** The meetings behind each funnel row, by the same rules as the funnel (migrations/0041 event_funnel). */
 const MEET_VIEWS = {
   reply: ["Booked from a reply", (m: Meeting) => Boolean(m.from_reply) && ["booked", "held", "no_show", "rescheduled"].includes(m.status)],
-  booth: ["Met at the booth", (m: Meeting) => m.status === "held" && !m.from_reply],
+  booth: ["Meetings at the booth", (m: Meeting) => m.status === "held" && !m.from_reply],
   held: ["Meetings held", (m: Meeting) => m.status === "held"],
 } as const;
 const STATE: Record<string, string> = { active: "Live", paused: "Paused", archived: "Ended", draft: "Draft" };
@@ -160,7 +163,7 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
       setNote(r.data?.did ?? say); await load(); onChange();
     } finally { setBusy(false); }
   };
-  if (!o) return <p className="md-clear">{done ? NOT_AVAILABLE("Outreach") : LOADING}</p>;
+  if (!o) return done ? <p className="md-clear">{NOT_AVAILABLE("Outreach")}</p> : <BlockSkeleton />;;
   const f = o.funnel, s = o.live_score, started = o.motion !== "none";
   const free = slots.slots.filter((x) => !x.meeting_id), roster = slots.roster.map((x) => x.rep);
   const booked = new Set(o.meetings.map((m) => m.contact_id).filter(Boolean) as string[]);
@@ -234,7 +237,7 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
               <Row label="Replied" n={f.replied} of={f.kept} onOpen={hot.length ? () => document.querySelector(".m-replies")?.scrollIntoView({ behavior: "smooth", block: "start" }) : () => openFold("Replies")} />
               {/* Where meetings came from, then every meeting held: the same total as every other screen. */}
               <Row label="Booked from a reply" onOpen={() => showMeetings("reply")} n={f.booked} of={f.kept} />
-              {(f.held_all ?? f.held) > f.held && <Row label="Met at the booth" n={(f.held_all ?? f.held) - f.held} of={f.kept} onOpen={() => showMeetings("booth")} />}
+              {(f.held_all ?? f.held) > f.held && <Row label="Meetings at the booth" n={(f.held_all ?? f.held) - f.held} of={f.kept} onOpen={() => showMeetings("booth")} />}
               <Row label="Meetings held" n={f.held_all ?? f.held} of={f.kept} onOpen={() => showMeetings("held")} />
               {mine > 0 && <Row label="Held back by account owners" n={mine} of={f.kept} tone="t3" />}
             </ul>
@@ -269,7 +272,7 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
         )}
         {o.replies.some((r) => (r.signal ?? "reply") === "reply") && <RepliesFold replies={o.replies.filter((r) => (r.signal ?? "reply") === "reply")} open={sheet.reply} />}
         {o.meetings.length > 0 && (
-          <Fold icon={<Icon.calendar />} title="Meetings" peek={<>{num(o.meetings.filter((m) => m.status === "held").length)} held<i>{num(o.meetings.filter((m) => ["booked", "rescheduled"].includes(m.status)).length)} coming up</i></>}>
+          <Fold icon={<Icon.calendar />} title="Meetings" peek={<>{num(o.meetings.filter((m) => m.status === "held").length)} held<i>{num(o.meetings.filter((m) => ["booked", "rescheduled"].includes(m.status) && !passed(m)).length)} coming up</i></>}>
             {meetView ? (() => {
               const [title, test] = MEET_VIEWS[meetView], rows = o.meetings.filter(test);
               return (
@@ -280,7 +283,7 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
               );
             })() : (
             <div className="mt-cols">
-              {([["Coming up", (m: Meeting) => ["booked", "rescheduled"].includes(m.status)], ["Meeting held", (m: Meeting) => m.status === "held"], ["Did not happen", (m: Meeting) => ["no_show", "cancelled"].includes(m.status)]] as const).map(([title, test]) => {
+              {([["Coming up", (m: Meeting) => ["booked", "rescheduled"].includes(m.status) && !passed(m)], ["Date passed, not marked", (m: Meeting) => ["booked", "rescheduled"].includes(m.status) && passed(m)], ["Meeting held", (m: Meeting) => m.status === "held"], ["Did not happen", (m: Meeting) => ["no_show", "cancelled"].includes(m.status)]] as const).map(([title, test]) => {
                 const rows = o.meetings.filter(test);
                 if (!rows.length) return null;
                 return (
@@ -320,7 +323,7 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
           </Fold>
         )}
         {started && (
-          <Fold icon={<Icon.people />} title="Met at the booth" peek={o.captures.length ? num(o.captures.length) : undefined}>
+          <Fold icon={<Icon.people />} title="Met at the booth" peek={o.captures.length ? `${num(o.captures.length)} ${o.captures.length === 1 ? "person" : "people"}` : undefined}>
             {o.captures.length > 0 && <ul className="mc-list">{o.captures.slice(0, 24).map((c) => (
               <li key={c.id} className={c.temperature === "hot" ? "hot" : undefined}>
                 <PersonAvatar name={c.full_name ?? "Someone"} size={30} />

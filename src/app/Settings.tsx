@@ -8,6 +8,7 @@ import type { icpOverview } from "../server/icp";
 import type { settingsView } from "../server/settings-view";
 import { get, send } from "./api";
 import { Link, useActor } from "./App";
+import { plainTools } from "./tools";
 import { EventLogo } from "./EventLogo";
 import { CompileFlow } from "./Icp";
 import { Icon } from "./icons";
@@ -338,7 +339,7 @@ function ViewSection({ which }: { which: Exclude<Section, "icp"> }) {
     const conn = (names: (c: (typeof all)[number]) => boolean) => all.filter(names).map((c) => (
       <div className="conn" key={c.name}>
         <EventLogo name={c.name} website={SITES[c.name]} size={34} />
-        <span className="conn-who"><b>{c.name}</b>{c.pool && <span>{c.pool.allotment === null ? "Pool not set" : `${c.pool.allotment.toLocaleString("en-US")} credits a ${c.pool.period}`}</span>}</span>
+        <span className="conn-who"><b>{plainTools(c.name)}</b>{c.pool && <span>{c.pool.allotment === null ? "Pool not set" : `${c.pool.allotment.toLocaleString("en-US")} credits a ${c.pool.period}`}</span>}</span>
         <span className={`conn-state ${c.state.replace(" ", "-")}`}><i aria-hidden="true" />{c.state === "simulated" ? "Simulated" : c.state === "connected" ? "Connected" : "Not connected"}</span>
       </div>
     ));

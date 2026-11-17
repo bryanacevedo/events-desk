@@ -50,7 +50,7 @@ export function nextLine(e: EventRow): string {
     case "ready_for_review": return "Settle open cases, then verify and find contacts.";
     case "paused": return "Paused.";
     case "delivered": return "Outreach list ready.";
-    case "declined": return `Ended. ${e.decline_reason ?? ""}`.trim();
+    case "declined": return `Declined. ${e.decline_reason ?? ""}`.trim();
   }
 }
 
@@ -70,7 +70,7 @@ export function stageSentence(e: EventRow, s: Settings | null): string {
     case "finding_people": return "Finding people at the companies that fit.";
     case "paused": return "Paused. The latest activity says why.";
     case "delivered": return "Outreach list ready.";
-    case "declined": return `Ended. ${e.decline_reason ?? ""}`.trim();
+    case "declined": return `Declined. ${e.decline_reason ?? ""}`.trim();
   }
 }
 

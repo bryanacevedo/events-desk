@@ -170,14 +170,14 @@ export function mountLifecycle(app: App, db: Db, deps: LifecycleDeps, opts: { ba
   app.get("/api/motion/templates", async (c) => c.json({ templates: await db.query("SELECT id, name, version, channel, phase, audience, steps, external_id, approved_by, approved_at::text AS approved_at FROM sequence_templates WHERE retired_at IS NULL ORDER BY channel, phase") }));
   app.post("/api/motion/templates", guarded(async (c) => { if (!isGtm(c.get("actor"))) throw new RuleError("Templates are GTM Engineering's to approve."); const b = await body(c); return approveTemplate(db, c.get("actor"), { name: String(b.name ?? ""), channel: b.channel, phase: b.phase, steps: Array.isArray(b.steps) ? b.steps : [], external_id: b.external_id ?? null, audience: ["attendees", "prospects"].includes(String(b.audience)) ? String(b.audience) : "all" }); }));
   app.post("/api/motion/placement", guarded(async (c) => { if (!isGtm(c.get("actor"))) throw new RuleError("Placement results are GTM Engineering's to record."); const b = await body(c); return recordPlacement(db, { domain: String(b.domain ?? ""), inbox_rate: Number(b.inbox_rate), tool: String(b.tool ?? "manual"), tested_at: String(b.tested_at ?? new Date().toISOString()) }); }));
-  // Every event whose sending is done, with its latest written scorecard, or its reading so far while it waits for day 30.
+  // Every event whose sending is done, or whose result a planner closed without it (decision 104), with its latest written scorecard, or its reading so far while it waits for day 30.
   app.get("/api/results", async (c) => {
     const events = await db.query<{ id: string; name: string; starts_on: string; venue: string | null; motion: string; website: string | null; brand_color: string | null; card: { window_days: number; metrics: any } | null; asked: number; written: number }>(
       `SELECT e.id, e.name, e.starts_on::text AS starts_on, e.venue, e.motion,
               (SELECT c.website FROM catalog_events c WHERE c.id = e.catalog_id) AS website, (SELECT c.brand_color FROM catalog_events c WHERE c.id = e.catalog_id) AS brand_color,
               (SELECT json_build_object('window_days', s.window_days, 'metrics', s.metrics) FROM scorecards s WHERE s.event_id = e.id ORDER BY s.window_days DESC LIMIT 1) AS card,
               (SELECT count(*)::int FROM debriefs d WHERE d.event_id = e.id) AS asked, (SELECT count(*)::int FROM debriefs d WHERE d.event_id = e.id AND d.status <> 'waiting') AS written
-       FROM events e WHERE e.stage = 'delivered' AND e.parent_event_id IS NULL AND e.motion IN ('closing', 'scored') ORDER BY e.starts_on DESC`);
+       FROM events e WHERE e.parent_event_id IS NULL AND ((e.stage = 'delivered' AND e.motion IN ('closing', 'scored')) OR (e.judged_at IS NOT NULL AND e.stage <> 'declined')) ORDER BY e.starts_on DESC`);
     const rows = [];
     for (const e of events) {
       const m = e.card?.metrics ?? await computeScorecard(db, deps, e.id, 30, { write: false }).catch(() => null);

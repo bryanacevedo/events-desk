@@ -4,7 +4,7 @@
    Money is leadership's and planners'. The server sends a rep no money; a section that would be empty for them is not drawn. */
 
 import { useEffect, useState, type ReactNode } from "react";
-import { get, send, type KitOffer, type PlanBudgetCategory, type PlanData, type PlanInvolvement, type PlanPerson } from "./api";
+import { get, send, type KitOffer, type PlanBudgetCategory, type PlanData, type PlanInvolvement, type PlanPerson, type SpeakingData } from "./api";
 import { useActor } from "./App";
 import { Icon } from "./icons";
 import { Fold } from "./Motion";
@@ -18,6 +18,7 @@ import { TalkBlock } from "./PlanTalk";
 import { Tracker } from "./Tracker";
 import { LIST_SOURCE_WORDS } from "../shared/plan";
 import { money, num, shortDate } from "./words";
+import { PageSkeleton } from "./Skeleton";
 
 
 type PV = "a" | "b" | "c";
@@ -30,7 +31,7 @@ const KIND_WORDS: Record<string, string> = { passes: "Passes", sponsorship: "Spo
 const HOSTED_WORDS: Record<string, string> = { dinner: "Dinner", side_event: "Side event", roadshow_stop: "Roadshow stop", webinar: "Webinar", customer_event: "Customer event" };
 const ROLE_WORDS: Record<string, string> = { attend: "Attend", host: "Host", speak: "Speak" };
 const SEAT_WORDS: Record<string, string> = { approved: "Pass approved", pending: "Pass waiting", declined: "Pass declined" };
-const PLAN_WORDS: Record<string, string> = { planning: "Planning", confirmed: "Confirmed", preparing: "Preparing", live: "Live", following_up: "Following up", judged: "Judged" };
+const PLAN_WORDS: Record<string, string> = { planning: "Planning", confirmed: "Confirmed", preparing: "Preparing", live: "Live", following_up: "Following up", judged: "Scored" };
 /** Which way of taking part a budget category belongs under, in the By involvement view. */
 const TRAY_OF: Record<string, PlanInvolvement["kind"]> = { passes: "passes", travel: "passes", sponsorship: "sponsorship", booth: "sponsorship", swag: "sponsorship", dinners: "hosted", other: "hosted" };
 
@@ -114,11 +115,12 @@ export function PlanTab({ id, listRows, onChange }: { id: string; listRows: numb
   const [view, setView] = useState<PV>(() => readView(actor));
   const [busy, setBusy] = useState(false), [error, setError] = useState("");
   const [kits, setKits] = useState<KitOffer[]>([]), [kit, setKit] = useState<string | null>(null);
-  const load = async () => { setP(await get<PlanData>(`/api/events/${id}/plan`)); setPlanLoads((n) => n + 1); setKits((await get<{ offers: KitOffer[] }>(`/api/kit/offers?event=${id}`))?.offers ?? []); };
+  const [talks, setTalks] = useState<SpeakingData["talks"]>([]);
+  const load = async () => { setP(await get<PlanData>(`/api/events/${id}/plan`)); setPlanLoads((n) => n + 1); setKits((await get<{ offers: KitOffer[] }>(`/api/kit/offers?event=${id}`))?.offers ?? []); setTalks((await get<SpeakingData>(`/api/events/${id}/speaking`))?.talks ?? []); };
   const saved = async () => { await load(); onChange(); };
   useEffect(() => { load(); }, [id, actor]);
   useEffect(() => { setView(readView(actor)); }, [actor]);
-  if (!p) return <p className="md-clear">{LOADING}</p>;
+  if (!p) return <PageSkeleton />;
   const pick = (v: PV) => { setView(v); saveView(actor, v); };
   const money_ = Boolean(p.budget);
   const isApprover = Boolean(needs?.approvers.includes(actor)) && actor !== p.approval.requested_by;
@@ -128,6 +130,8 @@ export function PlanTab({ id, listRows, onChange }: { id: string; listRows: numb
     planning && !submitted && money_ ? { label: "Ask for approval", run: () => send("POST", `/api/events/${id}/plan/submit`, actor) }
     : planning && submitted && isApprover && decisions === "panel" ? { label: "Approve the plan", run: () => send("POST", `/api/events/${id}/plan/decision`, actor, { decision: "approve" }) }
     : !planning && p.approval.over_budget && isApprover && decisions === "panel" ? { label: "Approve again", run: () => send("POST", `/api/events/${id}/plan/decision`, actor, { decision: "approve" }) }
+    // Decision 105: once the event is over, a planner closes plan against actual. It does not wait for the sending stage, which another desk may run.
+    : p.can_plan && !p.judged_at && p.stage_line.plan_stage === "following_up" && p.event.stage !== "declined" ? { label: "Close the result", run: () => send("POST", `/api/events/${id}/plan/close`, actor) }
     : null;
   const canEdit = p.can_plan && p.event.stage !== "declined";
   const waitingOnDecision = isApprover && !p.approval.approved_at && ((planning && submitted) || (!planning && p.approval.over_budget));
@@ -253,6 +257,9 @@ export function PlanTab({ id, listRows, onChange }: { id: string; listRows: numb
     );
   } else {
     const open: string[] = [...p.notes];
+    // What waits on this person to decide: the plan, and an abstract another person wrote.
+    if (waitingOnDecision) open.push(planning ? "The plan waits for your approval" : "The plan is over its approved budget and waits for your approval");
+    for (const t of talks) if (t.next.startsWith("Needs a second person to approve the abstract") && t.abstract_by !== actor && !(t.abstract_editors ?? []).includes(actor) && (p.can_plan || isApprover)) open.push(`The abstract of "${t.title}" waits for a second person to approve it`);
     if (!p.reason) open.push("No reason was written");
     if (p.goal.meetings_held === null && p.goal.accounts_met === null && !(p.goal.pipeline_cents)) open.push("No goal was set");
     const waiting = people.filter((x) => x.seat_status === "pending").length;

@@ -16,64 +16,91 @@
 #, added by #
 #Syncs only while this page stays open#.
 A line for the version history
+A page for a phone at the booth: it saves each badge or conversation, and sends them when there is signal.
+A set of messages sent one after another to a person, until they reply.
 Account Desk runs the outreach for this event.
 Accounts you know will be there (optional)
 Add a way of taking part
 Budget is for leadership and GTM Engineering.
+Choose Dan Whitlock under Acting as, open Seats, and decide a request.
 Choose one video, or screenshots of the list.
 Choosing could not load. Try again.
 Choosing is for planners, leadership and GTM Engineering.
+Choosing: which events to repeat, and where the numbers are too thin to say.
 Confirmed by #, #
 Counted by this desk, not a finding
+Days to go count from today.
 Declined by ##
 Domain not set up to send
 Each side keeps the guests it invited
 Ends in #, made #
+Events Desk takes a conference from the request for a seat to a list of people to contact, and shows which events paid back.
+Events coming up show here, with where each one stands.
+Events that have happened show here, with what they returned.
+Events: every listed event by date, and who each one waits on.
 Every way of taking part is on the plan.
 From the attendee file (unverified):
 Guarantee sent to the venue
 Held back by account owners
 How to give the page
+How well a company fits who the team sells to. Tier 1 is the closest fit.
+If you are judging the build
+Images and text made for a talk or a seat, for the person to post themselves. The desk never posts.
 It will not share the list
 It will share the list
 Keep it as my rule
-Last day of the event
 Last time below the median
 Leave out the answer to #
 Logo, PNG up to 500 KB
+Lumen Ledger, lumenledger.example, owner Maya Ortiz.
+Maya Ortiz, SDR, asks for a seat at SaaStr Annual 2027: goal new pipeline, 6 meetings, ticket $2,495.
+Money20/20 USA 2026, with its replies and meetings.
 My event is not listed
 Needs a second person to approve the abstract
 Needs a second person to approve the slides
+Next step: talk to us about running this on your own events.
+Next step: to try it on your own events and lists, run it yourself (the README shows how) or ask whoever sent you this link.
 No conference starts in the next year.
 No email, no CRM task.
-No event has finished sending yet.
 No past event has a goal and a written scorecard yet.
 No past event has a written scorecard yet.
 Not read: the card ran out
 Nothing in that video looked like a list.
 Nothing is due this week.
 Nothing needs anyone right now.
+On a plan: the reason for going, the ways the team takes part (passes, a talk, a booth), and the people who go.
 One company per line: name, employees, industry, business model, expected tier, kind (won, lost or bad fit)
 One ticket ###
+Open Money20/20 USA 2026 and read its Outreach: who replied, who met us, who was set aside and why.
 Open the link in your invitation email again, or ask the person who invited you for a new one.
+Open the plan of an event: its goal against what happened.
 Open this page in Safari to scan codes, or take a photo with the phone's camera, or type the person.
+Outreach has started for the event and the messages are going out.
+Overview: every event on a line from earlier to later, with where each one stands.
 Page # of #
 Paste the text of the page
+People left out of outreach because a salesperson already owns that account.
 People to look for per company
+People written to, people who answered, and meetings held. People met at the booth have no outreach, so they count only as meetings.
+Planning, Confirmed, Preparing, Live, Following up, Scored
 Publish although it got under # right
 Reading replies, waiting on the uploader
 Real event names, simulated attendees.
+Request a seat: the form a rep fills in and an approver reads.
 Request email to the organizer
+Research companies, Verify and find contacts, Outreach list ready
 Results are for planners, leadership and GTM Engineering.
+Results: pipeline per dollar for the events that finished.
 Review the cost to verify and find contacts
+SaaStr Annual 2027, 12 May: waiting on seats, Dan decides.
 Save the document as .txt or .md, or paste its text.
-Saved. Their outreach is stopped, and a task for today is in the CRM.
-Saved. Their outreach is stopped.
 Say when you sent it
 Says unsubscribe, read as something else
+Scans are kept on the phone and sent when it has signal.
 Scans marked from the session, and meetings held with those people.
 Screen recording, for an app with no website
 Seat and plan decisions need Slack connected. Nobody can decide this here yet.
+Seat requests show here, grouped by event, one row per person.
 Seats are for leadership and GTM Engineering.
 Send the slides to the organizer
 Shown once. It cannot be read again after this closes.
@@ -88,29 +115,41 @@ That person is not on the list.
 That reply is no longer here.
 That sequence is not on this event.
 The Google Sheet stays in Drive.
+The companies the team most wants to meet. Choosing matches them against each event.
 The list takes new yes answers
 The plan was made, but # Add the rest on the plan.
 The rules changed since this test. Test again before publishing.
+The run stopped because a step failed. Resume tries it again.
 The sentence, word for word
 The side that owns the account keeps all its guests
+The steps from an attendee list to a list of people to write to: look each company up, check the emails and find more people, then the list is ready.
 This browser cannot read that video. Take screenshots of the list and choose them instead.
 This browser will not keep scans after the page closes. Sync before you leave.
 This draft was thrown away.
 This kit could not be opened.
 This looks like Slack's default picture
+This public demo does not take files.
 Those notes are not here.
+Three ways to lay out the same Overview: one list, boxes by kind, or along a calendar.
 To change anything, write to #.
 Travel per person, dollars (optional)
+Two sources disagree and the desk will not pick one alone, such as one company under two names. A person settles each.
 Up to ##
 Upload a CSV of target accounts
 Usage is for leadership and GTM Engineering.
 Waiting on # to run this.
+Waiting on seats, No attendee list yet, Ready to run
 Ways to get it, in order
 Web portal, with the browser extension
+Where an event is in its plan: written and waiting for approval, approved, within 30 days of the doors, happening, after it, and closed with a result.
 Where the file came from
+Where the list is: seats waiting for a decision, seats approved and no attendee list in, list in and the cost agreed.
 Where the pipeline came from
+Which people at a company to write to first.
+Who you are in this sample. Each person sees and may do different things. GTM Team is GTM Engineering.
 Why they are one conference
 Why this match is wrong
+Why we go, Taking part, Who goes
 Why you are passing on #
 Will not share the list
 You post this yourself. Events Desk never posts for you.

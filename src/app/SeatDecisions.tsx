@@ -7,6 +7,7 @@ import { get, send, GOAL_WORDS, type SeatRequest } from "./api";
 import { useActor } from "./App";
 import { LOADING } from "./access";
 import { money, shortDate } from "./words";
+import { BlockSkeleton } from "./Skeleton";
 
 interface Res { requests: SeatRequest[]; slack: boolean }
 
@@ -55,7 +56,7 @@ export function SeatDecisions() {
   return (
     <>
       <header className="hero" data-ready="1"><div><h1>Seat decisions</h1></div></header>
-      {res === undefined && <p className="mute">{LOADING}</p>}
+      {res === undefined && <BlockSkeleton />}
       {res === null && <p className="md-clear">Seats are for leadership and GTM Engineering.</p>}
       {res && <>
         {res.slack && <p className="small mute">Also in Slack</p>}

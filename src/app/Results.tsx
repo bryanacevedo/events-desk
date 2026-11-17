@@ -7,9 +7,10 @@ import { useEffect, useState, type CSSProperties } from "react";
 import { get, send } from "./api";
 import { Link, useActor } from "./App";
 import { EventLogo } from "./EventLogo";
-import { SideSheet } from "./SideSheet";
+import { SideSheet } from "./LazySheet";
 import { isGtm } from "../shared/roles";
 import { money, num, shortDate } from "./words";
+import { PageSkeleton, Empty } from "./Skeleton";
 
 interface Row { id: string; name: string; starts_on: string; venue: string | null; website: string | null; final: boolean; window_days: number | null; cost_cents: number; pipeline_cents: number; won_cents: number; per_dollar: number | null; held: number; deals: number; scored: boolean; costs_missing: number; notes: { asked: number; written: number } }
 interface Learning { table: { group_kind: string; group_value: string; people: number; held: number; rate: number | null; enough: boolean }[]; dropped_who_dealt: { domain: string; name: string; dropped: number; opportunities: number }[] | null; proposals: { id: string; kind: string; subject: string; evidence: { people: number; held: number; rate: number | null; overall_rate: number }; edit: { verdict: "raise" | "lower" }; status: string }[] }
@@ -30,7 +31,7 @@ export function Results({ go }: { go: (to: string) => void }) {
   const [rows, setRows] = useState<Row[] | null>(null), [learn, setLearn] = useState<Learning | null>(null), [busy, setBusy] = useState(false);
   const load = async () => { setRows((await get<{ events: Row[] }>("/api/results"))?.events ?? []); setLearn(await get<Learning>("/api/motion/learning")); };
   useEffect(() => { load(); }, []);
-  if (!rows) return null;
+  if (!rows) return <PageSkeleton />;
 
   const cost = rows.reduce((n, r) => n + r.cost_cents, 0), pipeline = rows.reduce((n, r) => n + r.pipeline_cents, 0), held = rows.reduce((n, r) => n + r.held, 0);
   const ranked = [...rows].sort((a, b) => (b.per_dollar ?? -1) - (a.per_dollar ?? -1));
@@ -42,7 +43,7 @@ export function Results({ go }: { go: (to: string) => void }) {
     <section className="results" data-ready="1">
       <header className="hero"><div><h1>Results</h1></div></header>
 
-      {!rows.length ? <p className="md-clear">No event has finished sending yet.</p> : (
+      {!rows.length ? <Empty what="Each event that has finished sending shows here, ranked by pipeline per dollar." example="Money20/20 USA 2026: $480K pipeline on $120K, 10 meetings held, 4.0x." /> : (
         <>
           <header className="md-hero rs-hero">
             <div className="md-hello">

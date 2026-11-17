@@ -293,6 +293,8 @@ Bryan: "cut those sequences... why did you think it was a good idea to run a seq
 
 New events are budget mode: a planner writes the plan, an approver who did not write it approves the planned total, and that approval covers the passes inside it. A seat is still a `seat_requests` row, so tickets, the ticket budget and event cost work unchanged. An approver's own pass waits for a different approver. A rep still asks through Seats, and the ask lands on the plan as "ask to go". Going over the approved amount warns, waits for the approver, and never blocks. Events made before this stay per-seat, with decisions 10 and 13 as written. This amends decision 13 for new events only.
 
+Superseded in part by decision 104 (2026-11-17): a desk with no Slack decides a plan in the app, the same `approvePlan`; with Slack connected the card stays the one path. Superseded in part by decision 105 (2026-11-17): a planner can close the result.
+
 ## 49. Planned, contracted, actual; and actual is never stored (2026-11-13)
 
 A budget line holds planned and contracted. Actual is read from where money is already recorded: tickets, travel, and the cost ledger of decision 40. `eventCost` stays the one source, so the plan, the Cost tab, the Result and the Budget cannot disagree. "Committed" keeps its decision 15 meaning (approved seats not yet bought) and is not used for budget lines. This extends decision 15: Budget still answers the ticket question first, and now also shows each event's three columns. Spend on a top-up's own hidden event stays out of `eventCost` of the shown event, as it does today.
@@ -531,3 +533,44 @@ The tracker, ranking and repeat reads use the deps clock, else `DEMO_TODAY` only
 **Why.** Decision 10 sends seat decisions through Slack, which leaves a desk without Slack unable to decide any seat. The acting person is still the self-asserted name behind the write key (README, "There is no real login"), so this is a fallback with the same trust as the rest of the desk, not a stronger one.
 
 **Who decided.** Bryan accepted the recommended defaults on 2026-11-17. Code: `src/server/seat-routes.ts`, `src/app/SeatDecisions.tsx`. Tests: `tests/seat-decisions.test.ts`.
+
+## 104. A plan is decided in the app when there is no Slack (2026-11-17)
+
+**What.** `POST /api/events/:id/plan/decision` exists in the demo and on a desk with no Slack, as well as the Slack plan card. It runs the same `approvePlan` and `declinePlan`: the person must be one of the event's approvers and not the one who wrote the plan, and a decline needs a reason. With Slack connected the card is the one path and the route does not exist. `/api/health.decisions` says `panel` for the demo and for a desk with no Slack, `slack` with Slack. The Plan tab shows Approve the plan and Decline wherever the desk says `panel`; a plan or an abstract that waits for the person is listed under Needs me now.
+
+**Why.** The standalone day found a plan stuck at "needs Slack connected" with nobody able to approve it, while seats already had a panel (decision 103). Bryan approved decision 3 of the simulation review on 2026-11-17: plan decisions without Slack get the same approval panel as seats.
+
+**Who decided.** Bryan, 2026-11-17. Code: `src/server/plan-routes.ts`, `src/server/app.ts` (health), `src/app/Plan.tsx`. Tests: `tests/simfix.test.ts`; `tests/access-states.test.ts` changed (health says `panel` with no Slack, where it said `none`).
+
+## 105. A planner closes plan against actual without the sending stage (2026-11-17)
+
+**What.** `POST /api/events/:id/plan/close` is open to planners as well as leadership and GTM Engineering, and the Plan tab offers Close the result to a planner once the event is over and not yet scored. `GET /api/results` lists an event whose result was closed this way, beside the events that reached closing or scored. An event whose sending has reached closing or scored still closes when it is scored, as before.
+
+**Why.** Where another desk runs the outreach, this desk's own sending never starts, so Results stayed empty and nobody could close a result. Bryan approved decision 4 of the simulation review on 2026-11-17.
+
+**Who decided.** Bryan, 2026-11-17. Code: `src/server/plan-routes.ts`, `src/server/lifecycle-routes.ts`, `src/app/Plan.tsx`. Tests: `tests/simfix.test.ts`.
+
+## 106. First paint: the shell first, pages on their own, one read for open cases (2026-11-17)
+
+**What.** The page ships with a grey shell in `index.html`; the app draws its sidebar and bar before it knows whether it is the demo; every page is its own file, fetched when opened; the open cases of every event come from `GET /api/cases/open` (one query) instead of one read per delivered event; the scripts and styles go out compressed and with a one-year immutable cache header (their names carry a hash); a page change settles in 120 ms; every wait draws a skeleton (`src/app/Skeleton.tsx`) instead of a blank screen or the word Loading. Empty places say what goes there and show an example marked as one.
+
+**Why.** The standalone day measured blank screens of 3 to 18 seconds. Measured here: the app was one 522 kB script (138 kB compressed) that arrived uncompressed with no cache header, the page drew nothing until `/api/health` answered, and the shell then waited for about 15 reads, one per delivered event. On a free instance, each of those waits stacked. The cause on the live demo is not proven: nothing was timed there (the sandbox cannot reach it).
+
+**Who decided.** The simulation review ranked it first. Code: `index.html`, `src/app/App.tsx`, `src/app/Skeleton.tsx`, `src/app/waiting.ts`, `src/server/node.ts`, `src/server/app.ts`. Tests: `tests/simfix.test.ts`.
+
+## 107. The sample says what it is; third-party tools are named by their job (2026-11-17)
+
+**What.** A slim bar at the top of every screen of the demo says: a sample company with invented data; that a change is shared with the next visitor and gone when the demo restarts, and (public demo) that it takes no files, in the words its server refuses with; and the day the sample was set around (`/api/health.sample_day`), while days to go are counted from today. A file upload says so in a tooltip before the click. The Overview opens with one sentence of what the desk is for, one first step (a finished event) and a tour of four steps for someone judging the build and four for someone who runs events; the buyer's list ends with a next step that names no address, because none exists yet (`CONTACT_URL` in `src/app/start.tsx`). In the sample, Apollo, Instantly, HeyReach, Smartlead, ZeroBounce, Gong and Slack read as "people finder (sample)", "email tool (sample)" and so on; a real desk keeps the vendor's name. A person's page is called a page, not a record. "Request a seat" is a quiet button. Contrast: `scripts/contrast.mjs` measures every text colour (4.5:1, and 7:1 under 13 px), and the suite runs it.
+
+**Why.** The first-visit review found no demo notice on the screen, an unexplained frozen-looking date, names of tools the visitor cannot see, and a loudest button that sent a stranger to a form. Statements about the demo are true of this desk: the public demo accepts changes (they live in the running copy) and refuses files, unlike the other desks, which refuse writes.
+
+**Who decided.** Bryan's brief of 2026-11-17. Code: `src/app/DemoBar.tsx`, `src/app/start.tsx`, `src/app/tools.ts`, `src/app/Glossary.tsx`. Tests: `tests/simfix.test.ts`.
+
+## 108. The last target account import stays on the desk (2026-11-17)
+
+**What.** Migration 0062 keeps the last import of target accounts (who, rows, added, updated, the rows left out and why). `GET /api/target-accounts` returns it as `last_import` and Choosing shows it to whoever opens the page, instead of only to the person who uploaded in that visit.
+
+**Why.** The standalone review found the result visible only in the uploader's session.
+
+**Who decided.** The S5 review's small safe fixes. Code: `src/server/guest-import.ts`, `src/server/choosing-routes.ts`, `src/app/Choosing.tsx`. Tests: `tests/simfix.test.ts`.
+

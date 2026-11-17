@@ -12,13 +12,14 @@ import { AFTER, afterStep } from "./stages";
 import { get, send, type HostedPage, type Card, type CompanyRow, type EventPayload, type Page, type Pending, type PersonRow, type ReviewCase, type SeatRequest, type Spread, type TopUpCounts, type TopUpItem, type UploadItem } from "./api";
 import { Link, useActor } from "./App";
 import { LOADING } from "./access";
+import { plainTools } from "./tools";
 import { objectHref, ObjectSheets } from "./Objects";
 import { Cases, openCases } from "./Cases";
 import { Motion } from "./Motion";
 import { ResultView } from "./Result";
 import { PlanTab } from "./Plan";
 import { Guests } from "./Guests";
-import { Scanner } from "./Scanner";
+import { Scanner, ScannerLink } from "./Scanner";
 import { CheckIn } from "./CheckIn";
 import { HostedResult } from "./HostedResult";
 import { Upload } from "./Upload";
@@ -32,6 +33,7 @@ import { STEPS, stepAt, waiting as waitingOn } from "./waiting";
 import { PersonAvatar } from "./PersonAvatar";
 import { canEnd, countdown, daysTo, dropWords, firstName, initials, isRunning, longDate, money, moneyFine, num, plural, stageSentence } from "./words";
 import { cardBreakdown, creditWork } from "../shared/vendors";
+import { PageSkeleton } from "./Skeleton";
 
 const XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 const fileType = (name: string) => (name.toLowerCase().endsWith(".xlsx") ? XLSX : "text/csv");
@@ -79,7 +81,7 @@ export function useEvent(id: string): EventState {
     else if (e.stage === "delivered") note = `Outreach list ready. ${plural(data.list.people, "person", "people")} to reach${open.length ? `, ${open.length} to settle` : ""}.`;
     else if (e.stage === "quoted") note = `${card?.kind === "research" ? "Research card" : "Cost card"} waiting on ${who}.`;
     else if (e.stage === "ready_for_review") note = card ? `Companies researched. Waiting on ${who} to verify and find contacts.` : (data.open_cases ?? 0) > 0 ? `Research done. ${plural(data.open_cases ?? 0, "case")} to settle before verifying contacts.` : "Research done. Ready for the Outreach card.";
-    else if (e.stage === "paused") { const why = data.activity.find((a) => a.kind === "stage" && /failing|Paused before/.test(a.detail))?.detail; note = why ? `Paused: ${why.replace(/\.$/, "")}.` : stageSentence(e, data.settings); }
+    else if (e.stage === "paused") { const why = data.activity.find((a) => a.kind === "stage" && /failing|Paused before/.test(a.detail))?.detail; note = why ? `Paused: ${plainTools(why.replace(/\.$/, ""))}.` : stageSentence(e, data.settings); }
     else note = stageSentence(e, data.settings);
   }
   return { id, data, cases, missing, load, open, rows, note };
@@ -544,6 +546,12 @@ function CompaniesTable({ id, reloadKey }: { id: string; reloadKey: number }) {
   );
 }
 
+/** Why rows were set aside, one line each with how many. Shown from the mapping to the run, so nobody loses sight of them at the price. */
+function DropReasons({ d }: { d: EventPayload }) {
+  if (!d.list.dropped.length) return null;
+  return <ul className="reasons" aria-label="Rows set aside">{d.list.dropped.map((x) => <li key={x.reason}><b>{num(x.n)}</b><span>{dropWords(x.reason)}</span></li>)}</ul>;
+}
+
 function MappedStep({ d, onChange, onError, compact }: { d: EventPayload; onChange: () => void; onError: (m: string) => void; compact?: boolean }) {
   const { actor } = useActor();
   const s = d.settings!;
@@ -558,7 +566,7 @@ function MappedStep({ d, onChange, onError, compact }: { d: EventPayload; onChan
   return (
     <section className="mapped" aria-label="Attendee list">
       <Figures items={[[d.list.upload?.row_count ?? 0, "rows"], [d.list.companies, "companies"], [d.list.people, "people named"], [d.list.company_only, "company only"]]} />
-      {!compact && d.list.dropped.length > 0 && <ul className="reasons">{d.list.dropped.map((x) => <li key={x.reason}><b>{num(x.n)}</b><span>{dropWords(x.reason)}</span></li>)}</ul>}
+      {!compact && <DropReasons d={d} />}
       {!topUp && <div className="mapped-set">
         <label className="field"><span>People to look for per company</span><input className="input" type="number" min="1" max="25" inputMode="numeric" value={n} onChange={(ev) => setN(ev.target.value)} style={{ maxWidth: 120 }} /></label>
         <label className="check"><input type="checkbox" checked={prospects} onChange={(ev) => setProspects(ev.target.checked)} /><span>Add prospects</span></label>
@@ -617,6 +625,8 @@ export function StageBlock({ ev, go, compact }: { ev: EventState; go: (to: strin
       {stage === "mapped" && d.settings && <MappedStep d={d} onError={setError} onChange={reload} compact={compact} />}
 
       {stage === "quoted" && card && <RunStep d={d} card={card} onChange={reload} onError={setError} compact={compact} />}
+      {/* The rows set aside stay readable where the run is priced, not only before it. */}
+      {stage === "quoted" && !compact && <DropReasons d={d} />}
 
       {isRunning(stage) && <Progress d={d} />}
 
@@ -695,7 +705,7 @@ export function StageBlock({ ev, go, compact }: { ev: EventState; go: (to: strin
 
       {stage === "paused" && !compact && <PeopleTable id={e.id} hasPriorities={d.list.priorities.length > 0} reloadKey={reloads} />}
 
-      {stage === "declined" && <p className="mute">{e.decline_reason ?? "Ended."}</p>}
+      {stage === "declined" && <p className="mute">{e.decline_reason ?? "Declined."}</p>}
       {error && <p role="alert" className="error">{error}</p>}
     </>
   );
@@ -767,16 +777,17 @@ function HostedViews({ views, startAt }: { views: Partial<Record<HView, React.Re
 }
 
 /** Before delivery the page is one job, so it stays whole; the plan is its first tab beside it. */
-function PreViews({ plan, startAtPlan, children }: { plan: React.ReactNode; startAtPlan: boolean; children: React.ReactNode }) {
-  const fromHash = () => (location.hash === "#plan" ? "plan" : location.hash === "#list" ? "list" : null);
-  const [view, setView] = useState<"plan" | "list">(() => fromHash() ?? (startAtPlan ? "plan" : "list"));
-  const pick = (v: "plan" | "list") => { setView(v); history.replaceState(null, "", `${location.pathname}${location.search}#${v}`); };
+function PreViews({ plan, startAtPlan, scanner, children }: { plan: React.ReactNode; startAtPlan: boolean; scanner?: React.ReactNode; children: React.ReactNode }) {
+  type PV = "plan" | "list" | "scanner";
+  const fromHash = (): PV | null => (location.hash === "#plan" ? "plan" : location.hash === "#list" ? "list" : location.hash === "#scanner" && scanner ? "scanner" : null);
+  const [view, setView] = useState<PV>(() => fromHash() ?? (startAtPlan ? "plan" : "list"));
+  const pick = (v: PV) => { setView(v); history.replaceState(null, "", `${location.pathname}${location.search}#${v}`); };
   return (
     <>
       <div className="seg views" role="tablist" aria-label="View">
-        {([["plan", "Plan"], ["list", "List"]] as const).map(([k, label]) => <button key={k} type="button" role="tab" aria-selected={view === k} aria-pressed={view === k} onClick={() => pick(k)}>{label}</button>)}
+        {([["plan", "Plan"], ["list", "List"], ...(scanner ? [["scanner", "Scanner"] as const] : [])] as const).map(([k, label]) => <button key={k} type="button" role="tab" aria-selected={view === k} aria-pressed={view === k} onClick={() => pick(k)}>{label}</button>)}
       </div>
-      <div role="tabpanel" className="views-panel" aria-label={view === "plan" ? "Plan" : "List"}>{view === "plan" ? plan : children}</div>
+      <div role="tabpanel" className="views-panel" aria-label={view === "plan" ? "Plan" : view === "scanner" ? "Scanner" : "List"}>{view === "plan" ? plan : view === "scanner" ? scanner : children}</div>
     </>
   );
 }
@@ -819,7 +830,7 @@ function tell(rows: Activity[]): StoryLine[] {
     });
     else if (settled.test(a.detail)) group(`s:${a.actor}`, a, (r) => r.actor === a.actor && settled.test(r.detail), (same) => ({ who, text: `${name} settled ${plural(same.length, "case")}` }));
     else {
-      const t = clean(a.detail.startsWith(`${a.actor} `) ? a.detail.slice(a.actor.length + 1) : a.detail);
+      const t = plainTools(clean(a.detail.startsWith(`${a.actor} `) ? a.detail.slice(a.actor.length + 1) : a.detail));
       lines.push({ key: a.id, who, text: human ? `${name} ${/^[A-Z][a-z]+ed\b/.test(t) ? t[0].toLowerCase() + t.slice(1) : t}` : t });
     }
   }
@@ -959,7 +970,7 @@ export function Event({ id, go }: { id: string; go: (to: string) => void }) {
   const parent = ev.data?.event.parent_event_id;
   useEffect(() => { if (parent) go(`/event/${parent}`); }, [parent]);
   if (ev.missing) return <div className="empty" data-ready="1">That event does not exist. <Link to="/events" go={go} className="to">Back to Events</Link></div>;
-  if (!ev.data || parent || hosted === undefined) return <p className="md-clear">{LOADING}</p>;
+  if (!ev.data || parent || hosted === undefined) return <PageSkeleton />;
   if (hosted && hash === "#check-in") return hosted.can_check_in ? <CheckIn id={id} page={hosted} reload={loadHosted} go={go} /> : <div className="empty" data-ready="1">Check-in is for the people on this event&apos;s list. <Link to={`/event/${id}#guests`} go={go} className="to">Back to the guests</Link></div>;
   const d = ev.data, e = d.event, stage: Stage = e.stage;
   const going = (needs?.requests ?? []).filter((r) => r.event_id === e.id && r.status === "approved");
@@ -1072,7 +1083,7 @@ export function Event({ id, go }: { id: string; go: (to: string) => void }) {
           details: <>{facts}<AttendeeList d={d} go={go} onChange={ev.load} />{more}</>,
         }} />
       ) : (
-        <PreViews plan={<PlanTab id={e.id} listRows={d.list?.upload?.row_count ?? 0} onChange={ev.load} />} startAtPlan={planFirst}>
+        <PreViews plan={<PlanTab id={e.id} listRows={d.list?.upload?.row_count ?? 0} onChange={ev.load} />} startAtPlan={planFirst} scanner={stage === "declined" ? undefined : <ScannerLink id={e.id} />}>
           <AttendeeList d={d} go={go} onChange={ev.load} />
           <StageBlock ev={ev} go={go} />
           {more}

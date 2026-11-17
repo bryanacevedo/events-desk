@@ -9,6 +9,7 @@ import { copyText, Facts, HSheet } from "./Guests";
 import { Form } from "./PlanEdit";
 import { METHOD_WORDS, STATE_WORDS, type ScanState } from "../shared/scan";
 import { num, plural } from "./words";
+import { BlockSkeleton } from "./Skeleton";
 
 interface Cfg { qualifiers: { id: string; label: string }[]; notice: { text: string; version: number }; organizer: "swapcard" | null; organizer_ready: boolean; set_up: boolean; can_setup: boolean; setup_refs?: { event_ref: string; exhibitor_ref: string }; mine: number }
 interface Row {
@@ -24,6 +25,19 @@ const stateWord = (r: Row) => (r.review === "open" ? "Near match" : r.state === 
 const quiet = (r: Row) => r.review !== "open" && r.state === "placed";
 const source = (r: Row) => ((r.method === "badge_code" || r.method === "badge_id" || r.method === "badge_photo") && r.temperature !== "hot" && !r.met ? "Badge scan" : "Conversation");
 
+/** The scanner's address, before the list is delivered: the booth team can open it on a phone as soon as the event has a page. The full Scanner tab (scans, near matches) comes with the delivered list. */
+export function ScannerLink({ id }: { id: string }) {
+  const [copied, setCopied] = useState(false);
+  const link = `${location.origin}/scan/${id}`;
+  return (
+    <section className="actions" aria-label="Scanner link">
+      <a href={link} className="btn line" target="_blank" rel="noopener noreferrer">Open the scanner</a>
+      <button type="button" className="btn line" onClick={async () => { if (await copyText(link)) { setCopied(true); setTimeout(() => setCopied(false), 2000); } }}>{copied ? "Copied" : "Copy scanner link"}</button>
+      <span className="small mute">Scans are kept on the phone and sent when it has signal.</span>
+    </section>
+  );
+}
+
 export function Scanner({ id, eventName }: { id: string; eventName: string }) {
   const { actor } = useActor();
   const [cfg, setCfg] = useState<Cfg | null>(null), [page, setPage] = useState<Page | null>(null), [filter, setFilter] = useState<Filter>("all"), [all, setAll] = useState(false);
@@ -33,7 +47,7 @@ export function Scanner({ id, eventName }: { id: string; eventName: string }) {
     setCfg(c); setPage(p); setDone(true);
   }, [id]);
   useEffect(() => { void load(); }, [load, actor]);
-  if (!cfg || !page) return <div className="empty" data-ready="1">{done ? NOT_AVAILABLE("The scanner") : "Loading the scanner."}</div>;
+  if (!cfg || !page) return <div className="empty" data-ready="1">{done ? NOT_AVAILABLE("The scanner") : <BlockSkeleton label="Loading the scanner." />}</div>;
 
   const link = `${location.origin}/scan/${id}`;
   const hasTalk = page.scans.some((r) => r.talk_title);

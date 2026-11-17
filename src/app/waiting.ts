@@ -5,7 +5,7 @@
 
 import type { EventRow } from "../shared/domain";
 import type { Settings } from "../shared/cost";
-import { get, type CatalogEntry, type Pending, type ReviewCase, type SeatRequest } from "./api";
+import { get, type CatalogEntry, type Pending, type SeatRequest } from "./api";
 import { daysTo, firstName, money, plural } from "./words";
 
 export interface NeedItem {
@@ -28,6 +28,16 @@ export const holderWords = (approvers: string[]) => {
   return names.length ? (names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} or ${names[names.length - 1]}`) : "an approver";
 };
 
+/** The same event twice (one name, one first day) is shown once: the demo's own seed and the shared world each made Money20/20 Europe 2027. The one with a plan is kept. */
+export function oneRowEach<T extends Pick<EventRow, "name" | "starts_on"> & { approval_mode?: string | null }>(events: T[]): T[] {
+  const seen = new Map<string, T>();
+  for (const e of events) {
+    const key = `${e.name.trim().toLowerCase()}|${e.starts_on.slice(0, 10)}`, was = seen.get(key);
+    if (!was || (e.approval_mode === "budget" && was.approval_mode !== "budget")) seen.set(key, e);
+  }
+  return events.filter((e) => [...seen.values()].includes(e));
+}
+
 export async function loadNeeds(): Promise<Needs> {
   const [ev, sr, cat, df] = await Promise.all([
     get<{ events: EventRow[] }>("/api/events"),
@@ -35,7 +45,7 @@ export async function loadNeeds(): Promise<Needs> {
     get<{ catalog: CatalogEntry[] }>("/api/catalog"),
     get<{ settings: Settings }>("/api/settings/defaults"),
   ]);
-  const events = ev?.events ?? [];
+  const events = oneRowEach(ev?.events ?? []);
   const approvers = df?.settings.approvers ?? [];
   const planners = df?.settings.planners ?? [];
   const requests = sr?.requests ?? [];
@@ -51,18 +61,23 @@ export async function loadNeeds(): Promise<Needs> {
     if (e.stage === "mapped") items.push({ id: `step:${e.id}`, kind: "step", holder: e.requested_by, eventId: e.id, eventName: e.name, what: `${e.name} has attendees in; its card is not priced yet.`, fix: "Price it" });
     if (e.stage === "paused") items.push({ id: `paused:${e.id}`, kind: "paused", holder: "Anyone", eventId: e.id, eventName: e.name, what: `${e.name} is paused. The latest activity says why.`, fix: "Resume it" });
   }
-  const reviewable = events.filter((e) => e.stage === "delivered" || e.stage === "ready_for_review");
-  const caseLists = await Promise.all(reviewable.map((e) => get<{ cases: ReviewCase[] } | ReviewCase[]>(`/api/events/${e.id}/cases`)));
-  reviewable.forEach((e, i) => {
-    const k = caseLists[i];
-    const open = (Array.isArray(k) ? k : k?.cases ?? []).filter((c) => !c.decision);
-    if (open.length) items.push({ id: `case:${e.id}`, kind: "case", holder: "Anyone", eventId: e.id, eventName: e.name, caseCount: open.length, what: `${e.name} has ${open.length === 1 ? "1 conflict" : `${open.length} conflicts`} to settle.`, fix: "Settle it", detail: open[0].summary });
-  });
+  // One read for every event's open cases (it was one read per delivered event, and the first paint waited for all of them).
+  const open = (await get<{ events: { event_id: string; n: number; summary: string }[] }>("/api/cases/open"))?.events ?? [];
+  for (const c of open) {
+    const e = events.find((x) => x.id === c.event_id);
+    if (e) items.push({ id: `case:${e.id}`, kind: "case", holder: "Anyone", eventId: e.id, eventName: e.name, caseCount: c.n, what: `${e.name} has ${c.n === 1 ? "1 conflict" : `${c.n} conflicts`} to settle.`, fix: "Settle it", detail: c.summary });
+  }
   // Soonest first.
   const when = (i: NeedItem) => daysTo(events.find((e) => e.id === i.eventId)?.starts_on ?? "2099-01-01");
   items.sort((a, b) => when(a) - when(b));
   return { items, approvals, approvers, planners, events, requests, catalog: cat?.catalog ?? [] };
 }
+
+/** What a person reads after asking for a seat: who it went to. The person asking is not one of the approvers who can decide it. */
+export const sentTo = (needs: Pick<Needs, "approvers"> | null, actor: string) => {
+  const who = (needs?.approvers ?? []).filter((a) => a !== actor);
+  return `Sent to ${who.length ? holderWords(who) : "an approver"} for approval. Their answer shows on your page.`;
+};
 
 /** Plain words for a cost card's kind. */
 export const cardWords = (kind: Pending["kind"]) => kind === "research" ? "Research card" : kind === "outreach" ? "Contacts card" : "Cost card";
@@ -99,6 +114,6 @@ export function waiting(e: EventRow, approvers: string[]): { who: string | null;
     case "ready_for_review": return { who: req, initials: ini(owner), words: `${req}: settle open cases, then verify and find contacts`, tone: "wait" };
     case "paused": return { who: "Anyone", initials: "!", words: "Anyone: resume it", tone: "wait" };
     case "delivered": return { who: null, initials: "✓", words: "Outreach list ready", tone: "ok" };
-    case "declined": return { who: null, initials: "·", words: `Ended. ${e.decline_reason ?? ""}`.trim(), tone: "none" };
+    case "declined": return { who: null, initials: "·", words: `Declined. ${e.decline_reason ?? ""}`.trim(), tone: "none" };
   }
 }

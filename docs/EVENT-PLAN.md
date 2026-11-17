@@ -424,8 +424,8 @@ Words: "Held 14 of 25 meetings", "Met 6 of 10 target accounts", "$310,000 of $40
 | `GET /api/events/:id/plan` | anyone | reason, goal, involvements, who goes, sponsorship, deadlines, assessment, request, list source. A rep gets no budget, no price, no pipeline goal. Over-plan and over-budget states are sent as booleans (`over_plan`, `over_budget`) beside the cents, so a rep's screen can say "Over plan" with no figure |
 | `PATCH /api/events/:id/plan` | planner | reason, goal, dates, pass price |
 | `POST /api/events/:id/plan/submit` | planner | ask for approval |
-| `POST /api/events/:id/plan/decision` | approver, not the maker; demo only | `{ decision, reason }` |
-| `POST /api/events/:id/plan/close` | lead | close the result |
+| `POST /api/events/:id/plan/decision` | approver, not the maker; the demo and a desk with no Slack (decision 104) | `{ decision, reason }` |
+| `POST /api/events/:id/plan/close` | planner or lead (decision 105) | close the result |
 | `POST /api/events/:id/involvements`, `PATCH` and `DELETE .../:iid` | planner | delete is a drop with a reason |
 | `POST /api/events/:id/people`, `PATCH`, `DELETE .../:pid` | planner; a rep may post only themselves ("ask to go") | `{ person, team, role_title, roles, needs_pass }`. Removal needs a reason and declines the linked seat |
 | `POST /api/seat-requests` | as today | a budget-mode event's ask becomes "ask to go" (6.2) |

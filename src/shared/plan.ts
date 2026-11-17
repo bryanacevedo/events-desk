@@ -7,7 +7,7 @@ import { addDays } from "./motion.ts";
 export const PLAN_STAGES = ["planning", "confirmed", "preparing", "live", "following_up", "judged"] as const;
 export type PlanStage = (typeof PLAN_STAGES)[number];
 
-const PLAN_LABEL: Record<PlanStage, string> = { planning: "Planning", confirmed: "Confirmed", preparing: "Preparing", live: "Live", following_up: "Following up", judged: "Judged" };
+const PLAN_LABEL: Record<PlanStage, string> = { planning: "Planning", confirmed: "Confirmed", preparing: "Preparing", live: "Live", following_up: "Following up", judged: "Scored" };
 export const planStageLabel = (s: PlanStage) => PLAN_LABEL[s];
 
 /** How many days before the first day a confirmed budget-mode plan counts as preparing. The default lives in config/defaults.json (plan.prepare_days_before). */

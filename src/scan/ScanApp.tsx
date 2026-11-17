@@ -23,7 +23,8 @@ interface Draft {
 
 const normEmailLike = (e?: string) => Boolean(e && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e.trim()));
 const clock = (ms: number) => new Date(ms).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }).toLowerCase();
-const storedActor = () => { try { const a = localStorage.getItem("actor"); return a && PEOPLE.includes(a) ? a : PEOPLE[0]; } catch { return PEOPLE[0]; } };
+// The scanner keeps its own person ("scan-actor"): choosing who is scanning on a phone must not change who the desk app is acting as. It starts from the desk's person until one is chosen here.
+const storedActor = () => { try { const a = localStorage.getItem("scan-actor") ?? localStorage.getItem("actor"); return a && PEOPLE.includes(a) ? a : PEOPLE[0]; } catch { return PEOPLE[0]; } };
 const hourIn = (zone: string, at = new Date()) => { try { return Number(new Intl.DateTimeFormat("en-GB", { hour: "numeric", hourCycle: "h23", timeZone: zone }).format(at)); } catch { return at.getHours(); } };
 const dayIn = (zone: string, at = new Date()) => { try { return new Intl.DateTimeFormat("en-CA", { timeZone: zone }).format(at); } catch { return at.toISOString().slice(0, 10); } };
 
@@ -41,7 +42,7 @@ export function ScanApp() {
   const [lastSync, setLastSync] = useState("");
   const actorRef = useRef(actor);
   actorRef.current = actor;
-  const setActor = (a: string) => { setActorState(a); try { localStorage.setItem("actor", a); } catch { /* private window */ } };
+  const setActor = (a: string) => { setActorState(a); try { localStorage.setItem("scan-actor", a); } catch { /* private window */ } };
 
   const reload = useCallback(async () => setItems(await allItems(eventId)), [eventId]);
 

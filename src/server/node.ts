@@ -9,6 +9,7 @@
 import { execFileSync } from "node:child_process";
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
+import { compress } from "hono/compress";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -174,9 +175,12 @@ if (mayRun && lifecycle && !mode.demo) {
   setInterval(tick, 5 * 60_000).unref();
 }
 if (existsSync(join(root, "dist"))) {
+  // First paint: the scripts and styles went out uncompressed (about 720 kB) and with no cache header, so every visit fetched them again. Hashed files never change under their name.
+  api.use("/assets/*", compress(), async (c, next) => { await next(); if (c.res.ok) c.header("Cache-Control", "public, max-age=31536000, immutable"); });
+  api.use("/index.html", compress());
   api.use("/*", serveStatic({ root: "./dist" }));
   // The page itself is never cached, so a new build reaches the browser on the next load; its hashed assets can be.
-  api.get("*", async (c, next) => { await next(); c.header("Cache-Control", "no-cache"); });
+  api.get("*", compress(), async (c, next) => { await next(); c.header("Cache-Control", "no-cache"); });
   api.get("*", serveStatic({ path: "./dist/index.html" }));
 }
 

@@ -11,7 +11,9 @@ import { RequestSeats } from "./RequestForm";
 import { useRef, useState } from "react";
 import { Icon } from "./icons";
 import { DecisionLine } from "./access";
+import { sentTo } from "./waiting";
 import { firstName, money, shortDate } from "./words";
+import { PageSkeleton, Empty } from "./Skeleton";
 
 function Decide({ r, onDone }: { r: SeatRequest; onDone: () => void }) {
   const { actor, demo, decisions, needs, go } = useActor();
@@ -75,8 +77,8 @@ const STATUS_WORDS = { waiting: "Waiting", approved: "Approved", declined: "Decl
 type StatusKey = keyof typeof STATUS_WORDS;
 
 export function Seats({ go, search, requesting, preselect }: { go: (to: string) => void; search: URLSearchParams; requesting: boolean; preselect: string | null }) {
-  const { needs, actor, refresh } = useActor();
-  if (!needs) return null;
+  const { needs, actor, refresh, toast } = useActor();
+  if (!needs) return <PageSkeleton />;
   const status = (search.get("status") as StatusKey) in STATUS_WORDS ? (search.get("status") as StatusKey) : "waiting";
   const eventId = search.get("event") ?? "", team = search.get("team") ?? "", mine = search.get("mine") === "1";
   const all = needs.requests;
@@ -110,10 +112,10 @@ export function Seats({ go, search, requesting, preselect }: { go: (to: string) 
       <header className="hero" data-ready="1">
         <div><h1>Seats</h1></div>
         <span className="spacer" />
-        <Link to="/seats?request=1" go={go} className="btn phone-only">Request a seat</Link>
+        <Link to="/seats?request=1" go={go} className="btn line small phone-only">Request a seat</Link>
       </header>
 
-      {requesting && <RequestSeats preselect={preselect} onDone={() => go(needs?.approvers.includes(actor) ? "/seats?mine=1&status=all" : "/my-day")} onClose={() => go("/seats")} />}
+      {requesting && <RequestSeats preselect={preselect} onDone={() => { toast(sentTo(needs, actor)); go(needs?.approvers.includes(actor) ? "/seats?mine=1&status=all" : "/my-day"); }} onClose={() => go("/seats")} />}
 
       <div className="filters" role="group" aria-label="Filter seat requests">
         <div className="seg" role="group" aria-label="Status">
@@ -162,7 +164,7 @@ export function Seats({ go, search, requesting, preselect }: { go: (to: string) 
             </article>
           );
         })}
-        {!groups.length && <p className="mute gap">{all.length ? "Nothing matches." : "No seat requests."}</p>}
+        {!groups.length && (all.length ? <p className="mute gap">Nothing matches.</p> : <Empty className="gap" what="Seat requests show here, grouped by event, one row per person." example="Maya Ortiz, SDR, asks for a seat at SaaStr Annual 2027: goal new pipeline, 6 meetings, ticket $2,495." />)}
       </section>
     </>
   );

@@ -49,9 +49,9 @@ describe("/api/health.decisions", () => {
   let db: Db;
   beforeEach(async () => { db = await freshDb(); });
   const read = async (cfg: Parameters<typeof createApp>[1]) => (await createApp(db, cfg).request("/api/health")).json();
-  it("is panel in the demo, slack with Slack, none with neither", async () => {
+  it("is panel in the demo, slack with Slack, and panel with neither (decision 104: a desk with no Slack decides in the app)", async () => {
     expect((await read({ demo: true })).decisions).toBe("panel");
     expect((await read({ demo: false, slack: { signingSecret: "s", botToken: "t", channel: "C", approvers: ["U1"] } as never })).decisions).toBe("slack");
-    expect((await read({ demo: false })).decisions).toBe("none");
+    expect((await read({ demo: false })).decisions).toBe("panel");
   });
 });

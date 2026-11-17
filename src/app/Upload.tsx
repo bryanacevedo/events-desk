@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { send } from "./api";
 import { useActor } from "./App";
+import { NO_FILES } from "./access";
 import { LIST_SOURCE_WORDS, UPLOAD_SOURCES } from "../shared/plan";
 
 const XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
@@ -10,7 +11,7 @@ const fileType = (name: string) => (name.toLowerCase().endsWith(".xlsx") ? XLSX 
 
 /** `sources` swaps the list-source choice for another set of choices (the hosted import asks Luma or Splash) sent under `sourceHeader`; the file waits for the choice either way. */
 export function Upload({ label, path, accept, onDone, primary, small, question, sources, sourceHeader }: { label: string; path: string; accept: string; onDone: (data?: unknown) => void; primary?: boolean; small?: boolean; question?: string; sources?: { value: string; label: string }[]; sourceHeader?: string }) {
-  const { actor } = useActor();
+  const { actor, sample } = useActor();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [source, setSource] = useState<string>("");
@@ -32,7 +33,7 @@ export function Upload({ label, path, accept, onDone, primary, small, question, 
         </select>
       </label>
       {!sources && source === "other" && <label className="field up-pick"><span>Where from</span><input className="input" value={note} maxLength={200} onChange={(e) => setNote(e.target.value)} autoComplete="off" /></label>}
-      <label className={`btn${primary ? "" : " line"}${small ? " small" : ""}${ready ? "" : " is-off"}`} aria-disabled={!ready}>{busy ? "Reading the file…" : label}<input className="sr-only" type="file" accept={accept} aria-label={label} onChange={(ev) => pick(ev.target.files?.[0])} disabled={busy || !ready} /></label>
+      <label className={`btn${primary ? "" : " line"}${small ? " small" : ""}${ready ? "" : " is-off"}`} aria-disabled={!ready} title={sample.publicDemo ? NO_FILES : undefined}>{busy ? "Reading the file…" : label}<input className="sr-only" type="file" accept={accept} aria-label={label} onChange={(ev) => pick(ev.target.files?.[0])} disabled={busy || !ready} /></label>
       {error && <p role="alert" className="error">{error}</p>}
     </div>
   );

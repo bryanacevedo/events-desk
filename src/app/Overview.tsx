@@ -8,12 +8,15 @@ import { get, send, type DeadlineRow, type LiveRow, type OutreachNeed, type Resu
 import { Link, useActor } from "./App";
 import { EventLogo } from "./EventLogo";
 import { Chevron, SheetButton, ShowMore } from "./Patterns";
-import { SideSheet } from "./SideSheet";
+import { SideSheet } from "./LazySheet";
 import { stepAt, type NeedItem } from "./waiting";
 import { city, daysTo, money, num, plural, shortDate, todayYmd } from "./words";
 import { AFTER, afterStep, deliveredWords } from "./stages";
 import { isGtm } from "../shared/roles";
 import { DEFAULT_OVERVIEW_VIEW, type OverviewView } from "../server/view-prefs";
+import { PageSkeleton, Empty } from "./Skeleton";
+import { StartHere } from "./start";
+import { Glossary } from "./Glossary";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const monthKey = (ymd: string) => ymd.slice(0, 7);
@@ -31,7 +34,7 @@ function cardState(e: EventRow, today: string): { words: string; tone: "ok" | "w
     case "ready_for_review": return { words: "Cases to settle", tone: "wait" };
     case "tiering": case "enriching": case "flagging": case "researching": case "finding_people": return { words: "Running", tone: "run" };
     case "delivered": { const w = deliveredWords(e); return { words: w.words, tone: w.waiting ? "wait" : "ok" }; }
-    case "declined": return { words: "Ended", tone: "off" };
+    case "declined": return { words: "Declined", tone: "off" };
   }
 }
 
@@ -97,7 +100,7 @@ function untilt(ev: PointerEvent<HTMLDivElement>) {
 }
 
 const GROUP_WORDS: Record<DeadlineRow["group"], string> = { late: "Late", today: "Today", week: "This week" };
-const goWords = (g: { meetings_held: number | null; accounts_met: number | null }) => [g.meetings_held !== null ? plural(g.meetings_held, "meeting") : "", g.accounts_met !== null ? plural(g.accounts_met, "account") : ""].filter(Boolean).join(", ") || "No goal was set";
+const goWords = (g: { meetings_held: number | null; accounts_met: number | null }) => [g.meetings_held !== null ? plural(g.meetings_held, "meeting") : "", g.accounts_met !== null ? plural(g.accounts_met, "account") : ""].filter(Boolean).join(", ") || "No goal";
 const day = (ymd: string) => new Date(`${ymd.slice(0, 10)}T12:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 
 /** Layout A, "Ledger": the week as a full-width hairline ledger grouped Late, Today, This week. Status is the due word in ink. */
@@ -344,9 +347,10 @@ function YearC({ year, go, logos }: { year: YearPlanRead; go: (to: string) => vo
 }
 
 const VIEWS: [OverviewView, string][] = [["a", "Ledger"], ["b", "Trays"], ["c", "Timeline"]];
+const VIEW_HINT: Record<OverviewView, string> = { a: "The same events as one list", b: "The same events in boxes by kind", c: "The same events along a calendar" };
 
 export function Overview({ go, sheetId }: { go: (to: string) => void; sheetId: string | null }) {
-  const { needs, actor } = useActor();
+  const { needs, actor, demo } = useActor();
   const [ov, setOv] = useState<{ needs: OutreachNeed[]; live: LiveRow[]; results: ResultRow[]; year: YearPlanRead | null; deadlines: DeadlineRow[] } | null>(null);
   const [view, setView] = useState<OverviewView>(DEFAULT_OVERVIEW_VIEW);
   const picked = useRef(0);
@@ -370,7 +374,7 @@ export function Overview({ go, sheetId }: { go: (to: string) => void; sheetId: s
     void send("PUT", "/api/overview/view", actor, { view: v }).then((r) => { if (!r.ok && n === picked.current) setView(was); });
   };
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
-  if (!needs) return <p className="md-clear">{LOADING}</p>;
+  if (!needs) return <PageSkeleton />;
 
   const today = todayYmd();
   const all = [...needs.events].sort((a, b) => a.starts_on.localeCompare(b.starts_on) || a.name.localeCompare(b.name));
@@ -393,12 +397,14 @@ export function Overview({ go, sheetId }: { go: (to: string) => void; sheetId: s
           <h1>Overview</h1>
         </div>
         <span className="spacer" />
-        <div className="seg" role="group" aria-label="Overview layout">{VIEWS.map(([v, w]) => <button key={v} type="button" aria-pressed={view === v} onClick={() => pick(v)}>{w}</button>)}</div>
+        <div className="seg" role="group" aria-label="Overview layout">{VIEWS.map(([v, w]) => <button key={v} type="button" title={VIEW_HINT[v]} aria-pressed={view === v} onClick={() => pick(v)}>{w}</button>)}</div>
         <div className="rail-arrows" aria-hidden="true">
           <button type="button" className="arrow" onClick={() => step(-1)} aria-label="Earlier events">←</button>
           <button type="button" className="arrow" onClick={() => step(1)} aria-label="Later events">→</button>
         </div>
       </header>
+
+      {demo && <StartHere go={go} />}
 
       <section className="railwrap" aria-label="Events in date order">
         <div className="rail" ref={rail} tabIndex={0} onKeyDown={onKey} onPointerMove={tilt} onPointerOut={untilt} aria-label="Events, left is earlier, right is later">
@@ -446,7 +452,7 @@ export function Overview({ go, sheetId }: { go: (to: string) => void; sheetId: s
                 <span className="seatcall-go" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M3 8h9.5M8.5 4l4 4-4 4" /></svg></span>
               </Link>
             )
-            : <p className="mute tray-empty">No seat requests waiting.</p>}
+            : <Empty className="tray-empty" what="Seat requests waiting for a decision show here." example="Maya Ortiz, SDR: a seat at SaaStr Annual 2027, ticket $2,495, 6 meetings expected." />}
       </div>
 
 
@@ -522,7 +528,10 @@ export function Overview({ go, sheetId }: { go: (to: string) => void; sheetId: s
                       <li key={r.id} className="opens" data-opens-sheet="" onClick={(ev) => { if (!(ev.target as HTMLElement).closest("a, button")) go(`/?event=${r.id}`); }}>
                         <EventLogo name={r.name} website={r.website} size={34} />
                         <div className="who-text"><p className="name"><Link to={`/?event=${r.id}`} go={go} title={r.name} data-opens-sheet="">{r.name}</Link></p><p className="small mute">{deliveredWords({ ...r, stage: "delivered" } as unknown as EventRow).words}</p></div>
-                        {started
+                        {started && r.sent === 0 && r.replied === 0 && r.held > 0
+                          // Nobody was written to, and meetings were still held: they were met in person, so a "0 reached" beside them would read as a mistake.
+                          ? <p className="abc" aria-label={`No outreach sent, ${r.held} meetings held in person`}><span className="a"><i>met in person</i>{num(r.held)}</span></p>
+                          : started
                           ? <p className="abc" aria-label={`${r.sent} reached, ${r.replied} replies, ${r.held} meetings held`}><span className={r.sent ? "" : "zero"}><i>reached</i>{num(r.sent)}</span><span className={r.replied ? "" : "zero"}><i>replies</i>{num(r.replied)}</span><span className={`a${r.held ? "" : " zero"}`}><i>meetings</i>{num(r.held)}</span></p>
                           : <p className="abc"><span><i>to reach</i>{num(r.kept)}</span></p>}
                         {!started && r.sheet_url ? <SheetButton href={r.sheet_url} compact label={`Open the outreach sheet for ${r.name}`} /> : <span />}
@@ -531,7 +540,7 @@ export function Overview({ go, sheetId }: { go: (to: string) => void; sheetId: s
                   })}
                 </ul>
               </div>
-            ) : <p className="mute tray-empty">No lists delivered yet.</p>}
+            ) : <Empty className="tray-empty" what="Events with a finished attendee list show here, with how outreach is going." example="Money20/20 USA 2026: 18 reached, 5 replies, 10 meetings held." />}
           </section>
 
           {ov && ov.results.length > 0 && (needs.approvers.includes(actor) || isGtm(actor)) && (
@@ -552,6 +561,7 @@ export function Overview({ go, sheetId }: { go: (to: string) => void; sheetId: s
           )}
         </div>
       </div>
+      <Glossary />
       {sheetId && <SideSheet id={sheetId} go={go} close={() => go("/")} />}
     </>
   );

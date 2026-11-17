@@ -15,6 +15,7 @@ import { Chevron } from "./Patterns";
 import { PersonAvatar } from "./PersonAvatar";
 import { eventHref, personHref, To } from "./To";
 import { plural, todayYmd } from "./words";
+import { PageSkeleton } from "./Skeleton";
 
 interface Brief { person: string; title: string | null; company: string; tier: number | null; why: string | null; industry: string | null; employees: string | null; owner: string | null; deal: string | null; said: string | null; met_note: string | null }
 interface Day {
@@ -41,7 +42,7 @@ export function MyDay() {
   const [allKits, setAllKits] = useState(false), [mine, setMine] = useState<HostedMine | null>(null), [kits, setKits] = useState<KitOffer[]>([]), [kit, setKit] = useState<KitOffer | null>(null);
   const load = async () => { const day = await get<Day>(`/api/motion/my-day?rep=${encodeURIComponent(actor)}`); setD(day); setDone(true); setMine(await get<HostedMine>("/api/hosted/mine")); setKits(((await get<{ offers: KitOffer[] }>("/api/kit/offers"))?.offers ?? []).filter((o) => o.person === actor)); };
   useEffect(() => { load(); }, [actor]);
-  if (!d) return <p className="md-clear">{done ? NOT_AVAILABLE("My day") : LOADING}</p>;
+  if (!d) return done ? <p className="md-clear">{NOT_AVAILABLE("My day")}</p> : <PageSkeleton />;;
   const today = new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
   const figures: [number, string][] = [[d.replies.length, d.replies.length === 1 ? "reply to answer" : "replies to answer"], [d.meetings.length, d.meetings.length === 1 ? "meeting" : "meetings"], [d.captures.length, d.captures.length === 1 ? "person met" : "people met"]];
 

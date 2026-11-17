@@ -39,7 +39,9 @@ export function mountChoosing(app: Hono<any>, db: Db, cfg: Cfg) {
       "SELECT id, name, domain, country, owner, open_deal, deal_stage, source, created_at::text AS created_at FROM target_accounts ORDER BY lower(name), id");
     const by_source: Record<string, number> = {};
     for (const a of accounts) by_source[a.source] = (by_source[a.source] ?? 0) + 1;
-    return c.json({ accounts, total: accounts.length, by_source });
+    const [last] = await db.query<{ actor: string; row_count: number; added: number; updated: number; skipped: { row: number; why: string }[]; created_at: string }>(
+      "SELECT actor, row_count, added, updated, skipped, created_at::text AS created_at FROM target_account_last_import WHERE id = 'last'");
+    return c.json({ accounts, total: accounts.length, by_source, last_import: last ?? null });
   });
 
   app.post("/api/choosing/:catalogId/pages", async (c) => {
