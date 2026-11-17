@@ -55,6 +55,10 @@ describe("in-app seat decisions", () => {
     expect(again.status).toBe(409);
     expect(((await again.json()) as { error: string }).error).toMatch(/Already approved by Dan Whitlock/);
     expect((await db.query<{ status: string }>("SELECT status FROM seat_requests WHERE id = $1", [id]))[0].status).toBe("approved");
+    // Someone who is not an approver is refused, and is not told who decided.
+    const outsider = await decide(as, PRIYA, id, { decision: "approve" });
+    expect(outsider.status).toBe(403);
+    expect(JSON.stringify(await outsider.json())).not.toContain("Dan Whitlock");
     expect(((await (await as(DAN, "/api/seat-decisions")).json()) as { requests: unknown[] }).requests).toEqual([]);
   });
 

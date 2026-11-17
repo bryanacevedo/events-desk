@@ -57,8 +57,9 @@ export function mountSeatRoutes(app: Hono<any>, db: Db, cfg: { demo: boolean; sl
     const actor: string = c.get("actor");
     const [req] = await db.query<{ event_id: string; status: string }>("SELECT event_id, status FROM seat_requests WHERE id = $1", [c.req.param("id")]);
     if (!req) return Response.json({ error: "That seat request does not exist." }, { status: 404 });
-    if (req.status === "pending" && !((await getSettings(db.query, req.event_id)).approvers ?? []).includes(actor)) return Response.json({ error: "Seat decisions are for the people who approve seats." }, { status: 403 });
     try {
+      // Approvers only, whatever the request's status, so someone else never learns who decided it.
+      if (!((await getSettings(db.query, req.event_id)).approvers ?? []).includes(actor)) return Response.json({ error: "Seat decisions are for the people who approve seats." }, { status: 403 });
       const r = await decideSeat(db, { requestId: c.req.param("id"), actor, decision: b.decision, reason: b.reason, userMap: cfg.slack?.userMap });
       if (r.already_decided) return Response.json({ error: `Already ${r.status} by ${r.decided_by}.`, status: r.status, decided_by: r.decided_by }, { status: 409 });
       cfg.kick?.(r.event_id);

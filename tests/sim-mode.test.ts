@@ -36,6 +36,8 @@ describe("sim mode", () => {
     expect(() => resolveMode([], { ...both, LIVE_SPEND: "1" })).toThrow(/must never spend/);
     expect(() => resolveMode([], { ...both, LIVE_SEND: "1" })).toThrow(/must never send/);
     expect(() => resolveMode([], { SIM_DB_GUARD: "1", SIM_MODE: "1" })).toThrow(/needs DATABASE_URL/);
+    expect(() => resolveMode([], { ...both, TRANSACTIONAL_URL: "https://mail.example", TRANSACTIONAL_KEY: "k" })).toThrow(/TRANSACTIONAL_URL or TRANSACTIONAL_KEY/);
+    expect(() => resolveMode([], { ...both, TRANSACTIONAL_KEY: "k" })).toThrow(/TRANSACTIONAL_URL or TRANSACTIONAL_KEY/);
   });
   it("--demo still wins over everything", () => {
     expect(resolveMode(["--demo"], { ...both, LIVE_SPEND: "1" })).toEqual({ demo: true, liveSpend: false });

@@ -6,7 +6,7 @@ Docs are part of done: README, PROJECT-STATUS and docs change in the same commit
 
 ## Sim mode and in-app seat decisions (2026-11-17, branch `product/events`)
 
-Sim mode (decision 102): `SIM_DB_GUARD=1` plus `SIM_MODE=1` builds the simulated vendors and the demo lifecycle over a simulation `DATABASE_URL`; off by default, refuses beside `LIVE_SPEND` or `LIVE_SEND` or without the guard. Seat decisions in the app (decision 103): `/seat-decisions` for approvers, the same `decideSeat` as Slack, a second decision refused. Tests `tests/sim-mode.test.ts` and `tests/seat-decisions.test.ts`. Not verified: a real start of `node.ts` over Neon (sim mode was tested through `resolveMode`, `buildSim` and `createApp`), and the new screen in a browser. Not pushed or deployed.
+Sim mode (decision 102): `SIM_DB_GUARD=1` plus `SIM_MODE=1` builds the simulated vendors and the demo lifecycle over a simulation `DATABASE_URL`; off by default, refuses beside `LIVE_SPEND`, `LIVE_SEND` or a transactional sender, or without the guard. Seat decisions in the app (decision 103): `/seat-decisions` for approvers, the same `decideSeat` as Slack, a second decision refused. Tests `tests/sim-mode.test.ts` and `tests/seat-decisions.test.ts`. Not verified: a real start of `node.ts` over Neon (sim mode was tested through `resolveMode`, `buildSim` and `createApp`), and the new screen in a browser. Not pushed or deployed.
 
 ## S6 public doc pass (2026-11-17, bl_144)
 

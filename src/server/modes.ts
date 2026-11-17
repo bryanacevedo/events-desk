@@ -41,6 +41,7 @@ export function resolveMode(argv: string[], env: Record<string, string | undefin
     if (env.SIM_DB_GUARD !== "1") throw new Error("SIM_MODE=1 needs SIM_DB_GUARD=1 as well, so only a simulation database can be used. Refusing to start.");
     if (liveSpend) throw new Error("SIM_MODE=1 cannot run with LIVE_SPEND=1: a simulation must never spend. Refusing to start.");
     if (env.LIVE_SEND === "1") throw new Error("SIM_MODE=1 cannot run with LIVE_SEND=1: a simulation must never send. Refusing to start.");
+    if (env.TRANSACTIONAL_URL?.trim() || env.TRANSACTIONAL_KEY?.trim()) throw new Error("SIM_MODE=1 cannot run with TRANSACTIONAL_URL or TRANSACTIONAL_KEY set: reminders would reach a real mail sender. Refusing to start.");
     if (!env.DATABASE_URL?.trim()) throw new Error("SIM_MODE=1 needs DATABASE_URL, the simulation database it runs over. Refusing to start.");
   }
   if (liveSpend) {
