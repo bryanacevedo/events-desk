@@ -17,4 +17,9 @@ describe("simulation database guard", () => {
     expect(() => simGuard("postgres://u@127.0.0.1:5432/customers", on)).toThrow(/refusing local/);
     expect(() => simGuard("postgres://u@127.0.0.1:54329/p3_events", on)).not.toThrow();
   });
+  it("refuses URLs the driver would read differently, and lookalike local names", () => {
+    for (const u of ["postgres://a@prod.example.com,x@127.0.0.1/p3_events", "postgres://u@127.0.0.1/p3_x?host=prod.example.com", "postgres://u@127.0.0.1/p3_x?database=prod",
+      "postgres://u@127.0.0.1/eventsprod", "postgres://u@127.0.0.1/p3_x?options=-c%20y"]) expect(() => simGuard(u, on), u).toThrow();
+    expect(() => simGuard("postgres://u@127.0.0.1/p3_events", { ...on, PGHOST: "prod.example.com" })).toThrow(/PG\*/);
+  });
 });

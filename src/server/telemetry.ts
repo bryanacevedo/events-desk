@@ -11,7 +11,7 @@ const LOCAL = ["127.0.0.1", "localhost", "[::1]", "::1"];
 export async function startTelemetry(service: string, env: Record<string, string | undefined> = process.env): Promise<boolean> {
   const endpoint = (env.OTEL_EXPORTER_OTLP_ENDPOINT ?? "").trim().replace(/\/$/, "");
   if (!endpoint || api) return !!api;
-  if (!LOCAL.includes(new URL(endpoint).hostname)) throw new Error("Telemetry goes to this machine only: OTEL_EXPORTER_OTLP_ENDPOINT must be localhost.");
+  for (const v of [env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT, endpoint]) if (v && !LOCAL.includes(new URL(v).hostname)) throw new Error("Telemetry goes to this machine only: OTEL_EXPORTER_OTLP_ENDPOINT must be localhost.");
   try {
     const [a, node, exp, res] = await Promise.all([import("@opentelemetry/api"), import("@opentelemetry/sdk-trace-node"), import("@opentelemetry/exporter-trace-otlp-http"), import("@opentelemetry/resources")]);
     const headers = Object.fromEntries((env.OTEL_EXPORTER_OTLP_HEADERS ?? "").split(",").filter(Boolean).map((h) => { const i = h.indexOf("="); return [h.slice(0, i).trim(), decodeURIComponent(h.slice(i + 1).trim())]; }));
