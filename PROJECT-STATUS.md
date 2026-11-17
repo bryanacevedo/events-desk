@@ -1,6 +1,6 @@
 # Events Desk: project status
 
-**Updated:** 2026-11-17. **Decisions:** `docs/DECISIONS.md`, 1 to 101. **Render:** auto-deploy is off on the service (verified through the Render API on 2026-11-16, read-only); a push deploys nothing and a deploy happens only when Bryan says. The last Events Desk deploy, on 2026-11-15, ended build_failed, so the live demo at https://events-desk.onrender.com lags `main`; no live commit is claimed here.
+**Updated:** 2026-11-17. **Decisions:** `docs/DECISIONS.md`, 1 to 101. **Render:** auto-deploy is off on the service (verified through the Render API on 2026-11-16, read-only); a push deploys nothing and a deploy happens only when Bryan says. `render.yaml` does not say so: the setting lives on the Render service, where auto-deploy was turned off because the monthly build minutes ran out; nothing in this repository changes it. The last Events Desk deploy, on 2026-11-15, ended build_failed, so the live demo at https://events-desk.onrender.com lags `main`; no live commit is claimed here.
 
 Docs are part of done: README, PROJECT-STATUS and docs change in the same commit as the behaviour, counts or setup they describe. `make docs-check` (also run by the suite) enforces it.
 
