@@ -1,0 +1,11 @@
+{
+  "BASE": "Only scripts/e2e-scan.mjs, a developer script that points at a running demo.",
+  "CHROME_PATH": "Only scripts/audit-interactions.mjs, a developer script (the README names CHROME for the audits).",
+  "SHOTS": "Only scripts/e2e-scan.mjs, a developer script: a folder for screenshots.",
+  "SNAPSHOT_PORT": "Only scripts/demo-snapshot.mjs, a developer script: the port it builds the snapshot on.",
+  "WASM": "Only scripts/e2e-scan.mjs, a developer script: forces the scanner's WebAssembly path.",
+  "TMPDIR": "A system variable (the operating system's temporary folder).",
+  "DEMO_TODAY": "Set by the demo server itself for the demo's own day; not a setting a person chooses.",
+  "DEMO_TODAY_SET": "Set by the demo server itself to say DEMO_TODAY came from it; never set by hand.",
+  "EVALS_STRICT": "Set by CI so a stale recording fails the build; the README names the strict evals in the Tests paragraph."
+}

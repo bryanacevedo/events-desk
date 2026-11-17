@@ -161,6 +161,8 @@ Build of `docs/DATA-HYGIENE.md`, phase 2, migration 0037. **Salesforce is not co
 
 **Not decided here:** Do Not Call blocking calls only remains the default pending the owner's confirmation. Every rate in `SIM_RATES.crm` is authored, not measured.
 
+Superseded in part by decision 46 (2026-11-12): the desk can now use CRM Desk as a live CRM with `CRM=crmdesk`, so "live mode keeps `noCrm`" holds only while `CRM` is unset; Salesforce is still not connected.
+
 ## 29. New registrations run as a hidden event and merge in one transaction (2026-11-09)
 Build of `docs/NEW-REGISTRATIONS.md`, section 2, as corrected by 4a, migration 0038. Mocks and simulated vendors only; no real vendor or model call was made. A top-up is an event row with `parent_event_id`, invisible on every list. The parent never leaves `delivered`. The code is `src/server/top-up.ts` and `src/server/inherit.ts`.
 

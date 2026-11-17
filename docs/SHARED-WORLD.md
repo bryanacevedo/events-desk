@@ -403,7 +403,7 @@ New: Events Desk `tests/journal-fetch.test.ts` (what is journaled and what is no
 
 ### 14.9 Not in this part
 
-Moving the world clock; a sending Events Desk under `INTEGRATED_WITH=account_desk` (it is off by design, 13.1); Market Desk's tier replacing the priority-or-tier rule (cross-repo item 11, still open); a rehearsal in which Account Desk reacts to Events Desk's members over days (the wiring proof shows one read and one stop, not the weeks); Render deploys (rule 20: not deployed, Render deploys on hold); new screens.
+Moving the world clock; a sending Events Desk under `INTEGRATED_WITH=account_desk` (it is off by design, 13.1); Market Desk's tier replacing the priority-or-tier rule (cross-repo item 11, still open); a rehearsal in which Account Desk reacts to Events Desk's members over days (the wiring proof shows one read and one stop, not the weeks); Render deploys (not deployed: deploys are manual); new screens.
 
 ### 14.10 Goldfish review of section 14 (fresh Opus, 2026-11-15): 1 Blocker, 8 Majors, 6 Nits, and what changed
 

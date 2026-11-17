@@ -6,7 +6,7 @@ Events Desk is for a person who runs events all year. You go to a lot of confere
 
 You ask for a seat. Someone approves it. You upload the attendee list. The desk works out which companies and people matter, finds and checks their emails, and hands back a Google Sheet (or an Excel file) your sales team can work from. If more people register later, you upload the new file and the desk adds only the new ones.
 
-**[Try the live demo](https://events-desk.onrender.com)** · [Film (3:41)](https://bryanacevedo.github.io/project-videos/video/events-desk.mp4) · [Decisions](docs/DECISIONS.md). Everything in the demo is invented and every vendor is simulated. If it has been idle, the first load takes about a minute.
+**[Try the live demo](https://events-desk.onrender.com)** · [Film (3:41)](https://bryanacevedo.github.io/project-videos/video/events-desk.mp4) · [Decisions](docs/DECISIONS.md). Everything in the demo is invented and every vendor is simulated. If it has been idle, the first load takes about a minute. The hosted demo is redeployed by hand, not on every push, so it can be behind the code in this repository.
 
 It is a portfolio project. Read "What is proven and what is not" below before you trust any number in it.
 
@@ -64,6 +64,10 @@ An event no longer starts at an uploaded list. It starts as a plan, and the list
 - **The result against the goal.** After the event, Result shows the goal beside what happened, as counts: "Held 10 of 16 meetings", "Met 4 of 10 target accounts". Pipeline against its goal is shown to leadership and planners only. A rep sees no money anywhere in a plan.
 
 The design is in [docs/EVENT-PLAN.md](docs/EVENT-PLAN.md), with the decisions (47 to 57) in [docs/DECISIONS.md](docs/DECISIONS.md).
+
+## Choosing events
+
+The Choosing page (leadership, GTM and planners) ranks next year's candidate conferences by target accounts likely there (from speaker and sponsor pages you paste or upload, earlier editions' lists and people already captured), cost and last edition's return, by a printed rule with no blended score; and shows which past events to repeat with counts, a correction for many comparisons and "too few to say" under the floor. The Plan tab's Goal shows the meeting goal tracker by rep. Spec `docs/CHOOSING.md`.
 
 ## Speaking and the "I'm going" kit
 
@@ -185,7 +189,7 @@ The company-tier report also shows the second look: a second model that re-check
 
 The Summary check has seen three real model calls. Eight of the nine parts passed the checks first time, and the ninth was a false rejection that is fixed. Three calls is too few to call a rate.
 
-**Tests.** `npx vitest run` passes every test on PGlite (1,158 passed and 12 skipped on 2026-11-12), and locally on a real Postgres with `TEST_ALL_ON_POSTGRES` set; `npx tsc --noEmit` is clean. Twelve tests are skipped by default. Three are the CRM Desk half of the CRM contract tests (`tests/crm-desk-contract.test.ts`), which run only against a running CRM Desk named by `CRM_DESK_URL`, `CRM_DESK_KEY` and `CRM_DESK_ADMIN_KEY`. Seven need a real Postgres and run in CI, which starts one; the whole suite has also passed on real Postgres. One is the `NOT MEASURED` check in `tests/company-tier-evals.test.ts`, which runs only when that recording is stale. One is the gate benchmark at 10,000 people (`BENCH_GATE=1`, `tests/gate-scale.bench.test.ts`). Continuous integration runs the type check, the tests with evals held strict, the build and a boot smoke test on every push.
+**Tests.** `npx vitest run` passes every test on PGlite, and locally on a real Postgres with `TEST_ALL_ON_POSTGRES` set; `npx tsc --noEmit` is clean. This README states no test counts, because they go stale; `npx vitest run` prints the real ones, and a few tests are skipped by default. Some are the CRM Desk half of the CRM contract tests (`tests/crm-desk-contract.test.ts`), which run only against a running CRM Desk named by `CRM_DESK_URL`, `CRM_DESK_KEY` and `CRM_DESK_ADMIN_KEY`. Some need a real Postgres and run in CI, which starts one; the whole suite has also passed on real Postgres. One is the `NOT MEASURED` check in `tests/company-tier-evals.test.ts`, which runs only when that recording is stale. One is the gate benchmark at 10,000 people (`BENCH_GATE=1`, `tests/gate-scale.bench.test.ts`). The full suite is slow on a busy machine: if a test times out, run `npx vitest run --testTimeout=60000`. Continuous integration runs the type check, the tests with evals held strict, the build and a boot smoke test on every push. `make docs-check` (also run by the suite) fails when this README, PROJECT-STATUS or the decisions drift from the code: migration range, environment variables, decision count and the status date.
 
 ## Run the demo
 
@@ -221,7 +225,7 @@ The license is noncommercial. Running this inside a business needs a separate li
 3. Create a Slack app with the `chat:write`, `commands`, `channels:manage` and `users.profile:read` scopes (the last only so a person can tap "Use my Slack photo" in their kit) (the desk opens one public channel per event when its first cost card goes out, sets its topic, invites everyone with an approved seat who is in `SLACK_USER_MAP` and whoever a card is for, and archives it 90 days after the event's last day), the command `/ask-desk` pointing at `/slack/commands`, and interactivity pointing at `/slack/interactions`. Slack must be able to reach those URLs. Seat requests are made in the web app, not in Slack. Each event's cards go to its own channel, which the desk opens: a cost card there @mentions the uploader. Seat requests go to `SLACK_SEATS_CHANNEL`, and problems with no event to `SLACK_OPS_CHANNEL`; both default to `SLACK_APPROVALS_CHANNEL`. Set `APPROVER_SLACK_IDS` (the Slack user IDs of the seat approvers) and `SLACK_USER_MAP` (JSON, person name to Slack user ID, such as `{"Maya Ortiz": "U01ABC"}`): a cost card can be confirmed only by the Slack user mapped to whoever uploaded the list, and the same map stops a mapped requester approving their own seat. `/ask-desk` answers only mapped users and approvers. If Slack refuses a card, the event's activity says so and the event page can send it again.
 4. Google Sheet delivery needs one complete sign-in. With a personal Gmail account, set `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` and `GOOGLE_OAUTH_REFRESH_TOKEN` (the last comes from `make google-auth OUT=<new file>`), and optionally `GOOGLE_SHARE_EMAILS` for editors. With none, each Sheet stays private to you. With Workspace, use a service account, a Shared Drive folder and `GOOGLE_SHARE_DOMAIN`. Never "anyone with the link". Step-by-step instructions are in [docs/GOOGLE-SETUP.md](docs/GOOGLE-SETUP.md). If the Google app is left in testing mode, its refresh token expires after 7 days.
 5. Publish an ICP in Settings first. Without a published ICP, events fall back to the older single-prompt tiering.
-6. Run `npm ci`, `npm run build` and `npm run migrate`, then `LIVE_SPEND=1 npm start`. Slack must reach the server through a tunnel or proxy; set `HOST` only if you have put your own access control in front of it.
+6. Run `npm ci`, `npm run build` and `npm run migrate` (applies migrations 0001 to 0061 from `migrations/`), then `LIVE_SPEND=1 npm start`. Slack must reach the server through a tunnel or proxy; set `HOST` only if you have put your own access control in front of it.
 
 ### Choosing the CRM
 
@@ -243,5 +247,3 @@ All four films: https://bryanacevedo.github.io/project-videos/
 ## License
 
 [PolyForm Noncommercial 1.0.0](LICENSE.md). See [NOTICE](NOTICE) and [CREDITS.md](CREDITS.md).
-
-**Choosing events (step 7).** The Choosing page (leadership, GTM and planners) ranks next year's candidate conferences by target accounts likely there (from speaker and sponsor pages you paste or upload, earlier editions' lists and people already captured), cost and last edition's return, by a printed rule with no blended score; and shows which past events to repeat with counts, a correction for many comparisons and "too few to say" under the floor. The Plan tab's Goal shows the meeting goal tracker by rep. Spec `docs/CHOOSING.md`.

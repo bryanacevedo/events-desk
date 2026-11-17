@@ -21,7 +21,7 @@ For the film in `~/Developer/events-rethink/PLAN.md` section 11. Notes only: no 
 
 - Show the audit's last line (`N of M checks passed`) once, as proof that four desks agree; do not read the check names aloud.
 - The CRM Desk screen must be the rehearsal's database, not a hosted demo: the hosted demos are separate builds.
-- Do not show the Render pages (not deployed: Render deploys on hold, SESSIONS rule 20) and do not claim a live install.
+- Do not show the Render pages (deploys are manual and the live demo lags main) and do not claim a live install.
 - Nothing is sent in any shot. Say "drafts" where the on-screen word is Draft.
 - Where a screen shows an example address (`.example`), keep it on screen: it is the proof the world is simulated.
 

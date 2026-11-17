@@ -1,8 +1,16 @@
 # Events Desk: project status
 
+**Updated:** 2026-11-17. **Decisions:** `docs/DECISIONS.md`, 1 to 101. **Render:** auto-deploy is off on the service (verified through the Render API on 2026-11-16, read-only); a push deploys nothing and a deploy happens only when Bryan says. The last Events Desk deploy, on 2026-11-15, ended build_failed, so the live demo at https://events-desk.onrender.com lags `main`; no live commit is claimed here.
+
+Docs are part of done: README, PROJECT-STATUS and docs change in the same commit as the behaviour, counts or setup they describe. `make docs-check` (also run by the suite) enforces it.
+
+## S2b: docs never stale (2026-11-17)
+
+README refreshed (no test counts, migration range, stray Choosing paragraph made a section, deploys are manual); `.env.example` lists the 15 variables it was missing and 9 developer or internal ones are on the gate's allowlist; stale lines about Render and the decision range corrected; one superseded decision annotated. Docs gate `scripts/docs-check.mjs` with `tests/docs-check.test.ts` and `make docs-check`; a pre-push hook is proposed in `docs/PRE-PUSH-HOOK.md`, not installed. Left as they are, by rule: decisions 50 to 57 sit out of numeric order in `docs/DECISIONS.md` and decision 83 is dated before 81.
+
 ## Redesign step 7: before the list, and choosing events (2026-11-15)
 
-Worktree `.wt/ev7-events-desk`, branch `ev7/before-the-list`. Spec `docs/CHOOSING.md` (goldfish-reviewed by a fresh Opus agent before code: 2 Blockers, 12 Majors, all fixed in the spec), decisions 96 to 101, migration 0061. Not deployed: Render deploys on hold (SESSIONS rule 20).
+Worktree `.wt/ev7-events-desk`, branch `ev7/before-the-list`. Spec `docs/CHOOSING.md` (goldfish-reviewed by a fresh Opus agent before code: 2 Blockers, 12 Majors, all fixed in the spec), decisions 96 to 101, migration 0061. Not deployed: auto-deploy is off on Render and a deploy happens only when Bryan says.
 
 **Built:** target accounts read and matched against pasted or uploaded speaker and sponsor pages (code, with the line quoted; a wrong match is rejected with a reason, held per conference), earlier editions' lists and people already captured; the meeting goal tracker in the Plan tab's Goal (by rep, who has nothing booked, one held figure with the Result); the Choosing page (leadership, GTM, planners) ranking candidates by a printed rule from overlap, cost and last edition's return; which events to repeat with Fisher exact, Bonferroni over the pairs looked at, "too few to say" under 5 a side, a Repeat or Drop decision with a reason; a model step `repeat_word` that words passing patterns, checked in code, template in the demo. Accounts met now counts the team's target list when it has one (caption says the basis).
 
@@ -14,7 +22,7 @@ Worktree `.wt/ev7-events-desk`, branch `ev7/before-the-list`. Spec `docs/CHOOSIN
 
 ## Redesign step 6, part 4 of 4: the four-desk rehearsal, the real calls, the snapshot, the film notes (2026-11-15)
 
-Worktree `.wt/ev6p4-events-desk`, branch `ev6p4/part4`. Spec `docs/SHARED-WORLD.md` section 14 (goldfish-reviewed by a fresh Opus agent before code: 1 Blocker, 8 Majors, 6 Nits, all in 14.10), 14.11 (what was built), decision 95, `docs/FILM-NOTES.md`. Not deployed: Render deploys on hold (SESSIONS rule 20).
+Worktree `.wt/ev6p4-events-desk`, branch `ev6p4/part4`. Spec `docs/SHARED-WORLD.md` section 14 (goldfish-reviewed by a fresh Opus agent before code: 1 Blocker, 8 Majors, 6 Nits, all in 14.10), 14.11 (what was built), decision 95, `docs/FILM-NOTES.md`. Not deployed: auto-deploy is off on Render and a deploy happens only when Bryan says.
 
 **Built:** `scripts/rehearse.ts` and `src/server/journal-fetch.ts` (Events Desk's own sweep and outbox run against a live CRM Desk, every write journaled without the key); lumen-world `stage/rehearse.py` step 7b, audit check 10, `stage/wire.py` (real HTTP between the three servers) and `stage/contract.py`; CRM Desk's replay learns the `events_desk` actor and a fifth key; Account Desk reads Events Desk in its own job (`crm_members`); a test of the key compare (`tests/desk-read.test.ts`); `tests/journal-fetch.test.ts`; the demo snapshot rebuilt on world 1.3.0.
 
@@ -162,11 +170,11 @@ Worktree `~/Developer/events-desk/.claude/worktrees/admiring-kepler-c6dcf2`, bra
 
 **Not done (next, in order; done since, see 'Redesign step 1, finished'):** live-mode Slack plan card; sponsorship, deliverables, `list_source`, Overview year plan and week's deadlines (0050, 0051, session 2 of the original plan); the assessment, organizer request, past events read against their goals, the Money20/20 USA 2026 seed (0052, session 3); a seed test for those; README for the plan. re:Invent's upload source "emailed by the organizer" waits for 0051.
 
-**Updated:** 2026-11-12. **Spec:** `docs/SPEC.md`, goldfish-reviewed 2026-11-08 before any code (12 Major, 13 Nit, no Blocker; 24 fixed, 1 moot because a clause gate was closed). It has been edited to match the code since. **Decisions:** `docs/DECISIONS.md`, 1 to 101.
+**Spec:** `docs/SPEC.md`, goldfish-reviewed 2026-11-08 before any code (12 Major, 13 Nit, no Blocker; 24 fixed, 1 moot because a clause gate was closed). It has been edited to match the code since. **Decisions:** `docs/DECISIONS.md`, 1 to 101.
 
 ## Now (2026-11-12)
 
-- `main` holds the upgrade below and the CRM switch, Render now redeploys on every push to `main` by itself. Checked live on 2026-11-12: the upgrade's security headers and the sidebar tagline "From the seat to the result" (83ea0fa) are on https://events-desk.onrender.com. The CRM switch (dfc9bc8) went out by auto-deploy and was not checked on the live site; it changes nothing while `CRM` is unset.
+- `main` holds the upgrade below and the CRM switch. (Corrected 2026-11-17: Render auto-deploy is OFF, verified through the Render API on 2026-11-16, so a push deploys nothing; the 2026-11-12 line that said it redeployed on every push was wrong.) Checked live on 2026-11-12: the upgrade's security headers and the sidebar tagline "From the seat to the result" (83ea0fa) are on https://events-desk.onrender.com. The CRM switch (dfc9bc8) was not checked on the live site; it changes nothing while `CRM` is unset.
 - CRM switch (decision 46): `CRM` unset keeps today's CRM (`simCrm` in the demo, `noCrm` live); `CRM=crmdesk` uses CRM Desk through `src/server/crm-desk.ts` with `CRM_DESK_URL` and `CRM_DESK_KEY`; `CRM=salesforce` is refused. Contract tests 1, 3, 4, 5 and 6 in `tests/crm-desk-contract.test.ts`; the three against a running CRM Desk are skipped without `CRM_DESK_URL`, `CRM_DESK_KEY` and `CRM_DESK_ADMIN_KEY`.
 - Design-lint held items cleared on 2026-11-12 with Bryan's approval: all five idle `breathe` loops removed (T6; running states keep their colour, no motion) and the `.al-meta` separator dot replaced by a 1px `--line-2` hairline. `docs/DESIGN-LINT-BASELINE.txt` is now empty. Suite after: 1,159 passed, 12 skipped.
 - `npx vitest run` on 2026-11-12: 1,158 passed, 12 skipped (1,170).
@@ -289,11 +297,11 @@ From `node scripts/eval-report.ts` and the title report from the same code. Deta
 
 Cache markers, tests and cache-aware cost accounting are in; measured with real calls on 2026-11-14: warm input cost about 87 to 91% lower on the tasks measured (see decision 83). On main.
 
-Gate results (2026-11-15, unattended writer): both Events Desk audits clean on a fresh demo server; full suite 1,820 passed 14 skipped; Account Desk full suite green and coverage 99 scenarios 92 shown 0 missing; lumen-world 57 tests, ruff clean, rehearse --verify identical (CRM 5, Market 1, Account 4), audit 9 of 9. Not deployed: Render deploys on hold (SESSIONS rule 20).
+Gate results (2026-11-15, unattended writer): both Events Desk audits clean on a fresh demo server; full suite 1,820 passed 14 skipped; Account Desk full suite green and coverage 99 scenarios 92 shown 0 missing; lumen-world 57 tests, ruff clean, rehearse --verify identical (CRM 5, Market 1, Account 4), audit 9 of 9. Not deployed: auto-deploy is off on Render and a deploy happens only when Bryan says.
 
 ## Rehearsal made deterministic (2026-11-16, session ec-shrink)
 
 Before, the four-desk rehearsal wrote a different Events Desk half on every run (481, 483 and 485 steps in three runs; 477 and 478 in two 3-day runs). Causes and fixes: `scripts/rehearse.ts` numbers the desk's ids for that run (an uploaded list's contact ids come from `crypto.randomUUID`), picks its 30 people by email and name, fixes the wall clock to the demo's day, and turns vacuum and parallel scans off for its database. `src/server/crm-sync.ts` (the order members are queued in) and `src/server/crm-outbox.ts` (the order the outbox is written to the CRM, and the email queue) now break ties by email before the id; same results, a fixed order. Test: `tests/rehearse-order.test.ts` (5 tests); `crm-sync`, `crm-desk-contract` and `crm-hygiene` tests pass. Proved: two full four-desk runs at the same time on separate copies came out byte-identical (22,987 steps, 479 from this desk). The desk itself keeps its random ids.
 
 ## Simulation database guard and tracing (2026-11-16, session S3, bl_148)
-Events Desk can run against its own Neon simulation project (aws-us-east-1, Postgres 18.7) by `DATABASE_URL` alone: the default is unchanged and the public demo keeps its built-in database. A guard (`src/server/simguard.ts`, on only when `SIM_DB_GUARD=1`) refuses any host that is not this laptop or a simulation project and any database not named `neondb` or `sim_*`; tested. Optional OpenTelemetry tracing (`telemetry`, off unless `OTEL_EXPORTER_OTLP_ENDPOINT` is set, localhost only). Tools and measurements: `~/Developer/workday-sim-plan/simdb` and `observability`, PLAN.md Revision 6. Finding: a live rebuild over Neon's 60 ms round trip is far too slow (hours), so databases are built on the laptop and copied in bulk. Not deployed (rule 20).
+Events Desk can run against its own Neon simulation project (aws-us-east-1, Postgres 18.7) by `DATABASE_URL` alone: the default is unchanged and the public demo keeps its built-in database. A guard (`src/server/simguard.ts`, on only when `SIM_DB_GUARD=1`) refuses any host that is not this laptop or a simulation project and any database not named `neondb` or `sim_*`; tested. Optional OpenTelemetry tracing (`telemetry`, off unless `OTEL_EXPORTER_OTLP_ENDPOINT` is set, localhost only). Tools and measurements: `~/Developer/workday-sim-plan/simdb` and `observability`, PLAN.md Revision 6. Finding: a live rebuild over Neon's 60 ms round trip is far too slow (hours), so databases are built on the laptop and copied in bulk. Not deployed: auto-deploy is off on Render and a deploy happens only when Bryan says.

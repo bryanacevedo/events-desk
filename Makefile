@@ -1,4 +1,4 @@
-.PHONY: demo-snapshot world deps demo dev test audit ask evals-live apollo-check publish-sample google-auth
+.PHONY: docs-check demo-snapshot world deps demo dev test audit ask evals-live apollo-check publish-sample google-auth
 deps: ; @[ -d node_modules ] || npm ci
 demo: deps ; npm run demo
 dev: deps ; npm run dev
@@ -10,6 +10,9 @@ apollo-check: deps ; node scripts/apollo-check.ts "$(COMPANY)" "$(MATCHES)"
 publish-sample: deps ; node --env-file-if-exists=.env scripts/publish-sample.ts $(ARGS)
 google-auth: deps ; node --env-file-if-exists=.env scripts/google-auth.ts --out "$(OUT)"
 world: deps ; node scripts/gen-world.ts
+
+# Fails when README, PROJECT-STATUS or the decisions drift from the code. Fast, needs no install or database.
+docs-check: ; node scripts/docs-check.mjs
 
 # The sample data the hosted demo opens. Rebuild it when the seed or the sample data changes.
 demo-snapshot:
