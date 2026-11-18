@@ -1,12 +1,19 @@
 # Events Desk: project status
 
-**Updated:** 2026-11-18. **Decisions:** `docs/DECISIONS.md`, 1 to 112. **Render:** auto-deploy is off on the service (verified through the Render API on 2026-11-16, read-only); a push deploys nothing and a deploy happens only when Bryan says. `render.yaml` does not say so: the setting lives on the Render service, where auto-deploy was turned off because the monthly build minutes ran out; nothing in this repository changes it. The last Events Desk deploy, on 2026-11-15, ended build_failed, so the live demo at https://events-desk.onrender.com lags `main`; no live commit is claimed here.
+**Updated:** 2026-11-18. **Decisions:** `docs/DECISIONS.md`, 1 to 113. **Render:** auto-deploy is off on the service (verified through the Render API on 2026-11-16, read-only); a push deploys nothing and a deploy happens only when Bryan says. `render.yaml` does not say so: the setting lives on the Render service, where auto-deploy was turned off because the monthly build minutes ran out; nothing in this repository changes it. The last Events Desk deploy, on 2026-11-15, ended build_failed, so the live demo at https://events-desk.onrender.com lags `main`; no live commit is claimed here.
 
 Docs are part of done: README, PROJECT-STATUS and docs change in the same commit as the behaviour, counts or setup they describe. `make docs-check` (also run by the suite) enforces it.
 
 ## Integrated week 2: the target account import reads an export's headers (2026-11-18, branch `wk2fix/events-desk`)
 
 From the integrated week re-run (`workday-sim-plan/runs/s8-week2`): a target account file headed "Account name, Website, Account owner" was refused ("The file needs a name column."). The import now maps those usual export headers to its columns (decision 112, `tests/guest-import.test.ts`). Nothing else changed.
+
+Four small fixes from the same week (branch `wk2fix/events-desk`, `tests/simfix.test.ts`):
+
+- Results: a result a planner closed reads "Scored", as the Plan tab does (`/api/results` `final` is true when `motion` is scored or `judged_at` is set).
+- Plan: "Close the result" asks first, in a dialog that states the goal against the result in one sentence (decision 113).
+- Event: each line in the attendee list says where the list came from, from `list_source` (`LIST_SOURCE_WORDS`).
+- Plan, speaking: the person who wrote or edited an abstract is no longer offered "Approve the abstract"; the server already refused it.
 
 ## CI fix: `npm ci` ERESOLVE on the optional OpenTelemetry packages (2026-11-17, branch `simfix/events-ci`)
 
@@ -209,7 +216,7 @@ Worktree `~/Developer/events-desk/.claude/worktrees/admiring-kepler-c6dcf2`, bra
 
 **Not done (next, in order; done since, see 'Redesign step 1, finished'):** live-mode Slack plan card; sponsorship, deliverables, `list_source`, Overview year plan and week's deadlines (0050, 0051, session 2 of the original plan); the assessment, organizer request, past events read against their goals, the Money20/20 USA 2026 seed (0052, session 3); a seed test for those; README for the plan. re:Invent's upload source "emailed by the organizer" waits for 0051.
 
-**Spec:** `docs/SPEC.md`, goldfish-reviewed 2026-11-08 before any code (12 Major, 13 Nit, no Blocker; 24 fixed, 1 moot because a clause gate was closed). It has been edited to match the code since. **Decisions:** `docs/DECISIONS.md`, 1 to 112.
+**Spec:** `docs/SPEC.md`, goldfish-reviewed 2026-11-08 before any code (12 Major, 13 Nit, no Blocker; 24 fixed, 1 moot because a clause gate was closed). It has been edited to match the code since. **Decisions:** `docs/DECISIONS.md`, 1 to 113.
 
 ## Now (2026-11-12)
 

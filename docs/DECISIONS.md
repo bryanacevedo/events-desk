@@ -607,3 +607,11 @@ The tracker, ranking and repeat reads use the deps clock, else `DEMO_TODAY` only
 **Why.** In the integrated week (2026-11-18, `workday-sim-plan/runs/s8-week2`) the target account file the field marketer's manager left, headed "Account name, Website, Country, Account owner, Open deal", was refused for having no name column, so the whole list never reached the desk (S5's done-check also counted 0). A planner cannot rename columns from the browser.
 
 **Who decided.** Integrated week 2 (small fix, no product change: the same table and route). Code: `src/server/guest-import.ts`. Tests: `tests/guest-import.test.ts` ("reads an export's usual headers").
+
+## 113. Closing a result asks first (2026-11-18)
+
+**What.** "Close the result" on the Plan page opens a dialog before anything is sent. It states the goal against the result in one sentence ("Against the goal, the result is 3 of 5 meetings held, 1 of 2 target accounts met, and it cannot be reopened.") and closes only on "Close the result"; "Not yet" leaves the plan as it was. An event with no goal reads "No goal was set, so the result closes with nothing to compare it to, and it cannot be reopened." The same pass makes a closed result read "Scored" in Results, as the Plan tab does.
+
+**Why.** In the integrated week (2026-11-18) a planner's click closed the result at once, and nothing in the server reopens it (`closeResult`, decision 105).
+
+**Who decided.** Integrated week 2 (small fix). Code: `src/app/Plan.tsx`, `src/server/lifecycle-routes.ts`. Tests: `tests/simfix.test.ts` (integrated week 2).

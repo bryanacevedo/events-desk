@@ -278,6 +278,8 @@ describe("a planner closes plan against actual without the sending stage (decisi
     expect(e).toEqual({ judged_by: CAMILLE, motion: "none" });
     const rows = (await (await http.request("/api/results", { headers: as(DAN) })).json() as { events: { id: string }[] }).events;
     expect(rows.map((r) => r.id)).toContain(id);
+    // A result a planner closed reads Scored, the word the Plan tab uses, not Closing (integrated week 2).
+    expect((rows as { id: string; final: boolean }[]).find((r) => r.id === id)!.final).toBe(true);
   });
   it("the plan page offers the close to a planner once the event is over", () => {
     expect(src("src/app/Plan.tsx")).toContain("Close the result");
@@ -363,5 +365,31 @@ describe("review fixes on the small things", () => {
   });
   it("meetings coming up are counted from the sample day in the demo", () => {
     expect(src("src/app/Motion.tsx")).toContain("sample.day ? Date.parse(");
+  });
+});
+
+describe("integrated week 2: small fixes on the desk's own screens", () => {
+  it("asks before the result is closed, and states the goal against the result in one sentence", () => {
+    const plan = src("src/app/Plan.tsx");
+    expect(plan).toContain('import { ConfirmDialog } from "./Patterns"');
+    expect(plan).toContain('<ConfirmDialog title="Close the result?"');
+    expect(plan).toContain("Against the goal, the result is ");
+    expect(plan).toContain("confirm: true, run: () => send(\"POST\", `/api/events/${id}/plan/close`");
+    expect(plan).toContain("act.confirm ?");
+  });
+  it("the list on the Event page says where it came from", async () => {
+    const id = await deliverEvent(db, LIST, {}, "Listed");
+    const http = createApp(db, { demo: true });
+    const d = await (await http.request(`/api/events/${id}`, { headers: as(CAMILLE) })).json() as { uploads: { list_source: string }[] };
+    expect(d.uploads.length).toBeGreaterThan(0);
+    expect(typeof d.uploads[0].list_source).toBe("string");
+    const ev = src("src/app/Event.tsx");
+    expect(ev).toContain("LIST_SOURCE_WORDS[u.list_source as ListSource]");
+    expect(ev).toContain("{u.source && <>");
+  });
+  it("the person who wrote or edited an abstract is not offered to approve it", () => {
+    const t = src("src/app/PlanTalk.tsx");
+    expect(t).toContain("t.abstract_by === actor || (t.abstract_editors ?? []).includes(actor)");
+    expect(t).toContain('a === "approve-abstract" && ownWords ? false');
   });
 });

@@ -103,7 +103,8 @@ export function TalkBlock({ eventId, involvement, saved }: { eventId: string; in
 
   const step = actOf(t.next);
   const act = async (path: string) => { setBusy(true); setError(""); const r = await send("POST", `/api/talks/${t.id}/${path}`, actor); setBusy(false); if (!r.ok) { setError(r.error); return; } await changed(); };
-  const canDo = (a: Act) => (a === "write" || a === "slides-link" || a === "submit" ? t.can_write : planner);
+  const ownWords = t.abstract_by === actor || (t.abstract_editors ?? []).includes(actor);
+  const canDo = (a: Act) => a === "approve-abstract" && ownWords ? false : (a === "write" || a === "slides-link" || a === "submit" ? t.can_write : planner);
   const button = step && step[1] && canDo(step[1]) ? (
     <button type="button" className="btn small" disabled={busy} onClick={() => {
       const a = step[1];

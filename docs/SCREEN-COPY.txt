@@ -7,8 +7,11 @@
 # of # confirmed
 # of # held a meeting
 # of # live
+# of # meetings held
 # of # met accounts have pipeline
 # of # others
+# of # pipeline
+# of # target accounts met
 # of # used
 # read from #
 # still registered will be marked as no-shows.
@@ -21,6 +24,7 @@ A set of messages sent one after another to a person, until they reply.
 Account Desk runs the outreach for this event.
 Accounts you know will be there (optional)
 Add a way of taking part
+Against the goal, the result is #, and it cannot be reopened.
 Budget is for leadership and GTM Engineering.
 Choose Dan Whitlock under Acting as, open Seats, and decide a request.
 Choose one video, or screenshots of the list.
@@ -60,6 +64,7 @@ Needs a second person to approve the abstract
 Needs a second person to approve the slides
 No conference starts in the next year.
 No email, no CRM task.
+No goal was set, so the result closes with nothing to compare it to, and it cannot be reopened.
 No past event has a goal and a written scorecard yet.
 No past event has a written scorecard yet.
 Not read: the card ran out

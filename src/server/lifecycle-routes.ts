@@ -172,8 +172,8 @@ export function mountLifecycle(app: App, db: Db, deps: LifecycleDeps, opts: { ba
   app.post("/api/motion/placement", guarded(async (c) => { if (!isGtm(c.get("actor"))) throw new RuleError("Placement results are GTM Engineering's to record."); const b = await body(c); return recordPlacement(db, { domain: String(b.domain ?? ""), inbox_rate: Number(b.inbox_rate), tool: String(b.tool ?? "manual"), tested_at: String(b.tested_at ?? new Date().toISOString()) }); }));
   // Every event whose sending is done, or whose result a planner closed without it (decision 104), with its latest written scorecard, or its reading so far while it waits for day 30.
   app.get("/api/results", async (c) => {
-    const events = await db.query<{ id: string; name: string; starts_on: string; venue: string | null; motion: string; website: string | null; brand_color: string | null; card: { window_days: number; metrics: any } | null; asked: number; written: number }>(
-      `SELECT e.id, e.name, e.starts_on::text AS starts_on, e.venue, e.motion,
+    const events = await db.query<{ id: string; name: string; starts_on: string; venue: string | null; motion: string; judged_at: string | null; website: string | null; brand_color: string | null; card: { window_days: number; metrics: any } | null; asked: number; written: number }>(
+      `SELECT e.id, e.name, e.starts_on::text AS starts_on, e.venue, e.motion, e.judged_at::text AS judged_at,
               (SELECT c.website FROM catalog_events c WHERE c.id = e.catalog_id) AS website, (SELECT c.brand_color FROM catalog_events c WHERE c.id = e.catalog_id) AS brand_color,
               (SELECT json_build_object('window_days', s.window_days, 'metrics', s.metrics) FROM scorecards s WHERE s.event_id = e.id ORDER BY s.window_days DESC LIMIT 1) AS card,
               (SELECT count(*)::int FROM debriefs d WHERE d.event_id = e.id) AS asked, (SELECT count(*)::int FROM debriefs d WHERE d.event_id = e.id AND d.status <> 'waiting') AS written
@@ -186,7 +186,7 @@ export function mountLifecycle(app: App, db: Db, deps: LifecycleDeps, opts: { ba
       // took over is not counted twice in the totals. A written card itself stays as it was written.
       const [led] = e.card ? await db.query<{ cents: number; won: number; n: number }>("SELECT coalesce(sum(amount_cents), 0)::bigint AS cents, coalesce(sum(amount_cents) FILTER (WHERE won), 0)::bigint AS won, count(*)::int AS n FROM attribution_claims WHERE event_id = $1", [e.id]) : [];
       const pipeline = led ? Number(led.cents) : m.influence.pipeline_cents, cost = m.cost.dollars_cents;
-      rows.push({ id: e.id, name: e.name, starts_on: e.starts_on, venue: e.venue, website: e.website, brand_color: e.brand_color, final: e.motion === "scored", window_days: e.card?.window_days ?? null,
+      rows.push({ id: e.id, name: e.name, starts_on: e.starts_on, venue: e.venue, website: e.website, brand_color: e.brand_color, final: e.motion === "scored" || e.judged_at !== null, window_days: e.card?.window_days ?? null,
         cost_cents: cost, pipeline_cents: pipeline, won_cents: led ? Number(led.won) : m.influence.won.cents, per_dollar: m.influence.available && cost ? Math.round((pipeline / cost) * 100) / 100 : null,
         held: m.held_all, deals: led ? led.n : m.influence.opportunities, control: m.control, scored: Boolean(m.score), costs_missing: m.roi.cost_missing.length, notes: { asked: e.asked, written: e.written } });
     }

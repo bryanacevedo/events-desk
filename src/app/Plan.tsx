@@ -19,6 +19,7 @@ import { Tracker } from "./Tracker";
 import { LIST_SOURCE_WORDS } from "../shared/plan";
 import { money, num, shortDate } from "./words";
 import { PageSkeleton } from "./Skeleton";
+import { ConfirmDialog } from "./Patterns";
 
 
 type PV = "a" | "b" | "c";
@@ -113,7 +114,7 @@ export function PlanTab({ id, listRows, onChange }: { id: string; listRows: numb
   const { actor, decisions, needs } = useActor();
   const [p, setP] = useState<PlanData | null>(null), [planLoads, setPlanLoads] = useState(0);
   const [view, setView] = useState<PV>(() => readView(actor));
-  const [busy, setBusy] = useState(false), [error, setError] = useState("");
+  const [busy, setBusy] = useState(false), [error, setError] = useState(""), [closing, setClosing] = useState(false);
   const [kits, setKits] = useState<KitOffer[]>([]), [kit, setKit] = useState<string | null>(null);
   const [talks, setTalks] = useState<SpeakingData["talks"]>([]);
   const load = async () => { setP(await get<PlanData>(`/api/events/${id}/plan`)); setPlanLoads((n) => n + 1); setKits((await get<{ offers: KitOffer[] }>(`/api/kit/offers?event=${id}`))?.offers ?? []); setTalks((await get<SpeakingData>(`/api/events/${id}/speaking`))?.talks ?? []); };
@@ -126,12 +127,12 @@ export function PlanTab({ id, listRows, onChange }: { id: string; listRows: numb
   const isApprover = Boolean(needs?.approvers.includes(actor)) && actor !== p.approval.requested_by;
   const submitted = Boolean(p.approval.submitted_at);
   const planning = p.stage_line.plan_stage === "planning" && p.event.stage !== "declined";
-  const act: { label: string; run: () => Promise<unknown> } | null =
+  const act: { label: string; run: () => Promise<unknown>; confirm?: boolean } | null =
     planning && !submitted && money_ ? { label: "Ask for approval", run: () => send("POST", `/api/events/${id}/plan/submit`, actor) }
     : planning && submitted && isApprover && decisions === "panel" ? { label: "Approve the plan", run: () => send("POST", `/api/events/${id}/plan/decision`, actor, { decision: "approve" }) }
     : !planning && p.approval.over_budget && isApprover && decisions === "panel" ? { label: "Approve again", run: () => send("POST", `/api/events/${id}/plan/decision`, actor, { decision: "approve" }) }
     // Decision 105: once the event is over and its sending never started (motion none), a planner closes plan against actual. An event with a motion is closed when it is scored, so the server (plan.ts closeResult) would refuse the button.
-    : p.can_plan && !p.judged_at && p.stage_line.plan_stage === "following_up" && p.event.motion === "none" && p.event.stage !== "declined" ? { label: "Close the result", run: () => send("POST", `/api/events/${id}/plan/close`, actor) }
+    : p.can_plan && !p.judged_at && p.stage_line.plan_stage === "following_up" && p.event.motion === "none" && p.event.stage !== "declined" ? { label: "Close the result", confirm: true, run: () => send("POST", `/api/events/${id}/plan/close`, actor) }
     : null;
   const canEdit = p.can_plan && p.event.stage !== "declined";
   const waitingOnDecision = isApprover && !p.approval.approved_at && ((planning && submitted) || (!planning && p.approval.over_budget));
@@ -142,7 +143,16 @@ export function PlanTab({ id, listRows, onChange }: { id: string; listRows: numb
     const r = (await act.run()) as { ok: boolean; error?: string };
     setBusy(false);
     if (!r.ok) { setError(r.error ?? ""); return; }
+    setClosing(false);
     await load(); onChange();
+  };
+  /** The goal against the result, in one sentence, for the dialog that asks before a result is closed. */
+  const closeLine = () => {
+    const r = p.result, parts: string[] = [];
+    if (r?.meetings) parts.push(`${num(r.meetings.actual)} of ${num(r.meetings.goal)} meetings held`);
+    if (r?.accounts) parts.push(`${num(r.accounts.actual)} of ${num(r.accounts.goal)} target accounts met`);
+    if (r?.pipeline && r.pipeline.goal_cents !== undefined && r.pipeline.actual_cents !== undefined) parts.push(`${dollars(r.pipeline.actual_cents)} of ${dollars(r.pipeline.goal_cents)} pipeline`);
+    return parts.length ? `Against the goal, the result is ${parts.join(", ")}, and it cannot be reopened.` : "No goal was set, so the result closes with nothing to compare it to, and it cannot be reopened.";
   };
 
   const live = p.involvements.filter((i) => i.status !== "dropped");
@@ -298,9 +308,14 @@ export function PlanTab({ id, listRows, onChange }: { id: string; listRows: numb
           <div className="seg pl-switch" role="group" aria-label="Plan view">
             {VIEW_WORDS.map(([k, w]) => <button key={k} type="button" aria-pressed={view === k} onClick={() => pick(k)}>{w}</button>)}
           </div>
-          {act && <button type="button" className="btn" disabled={busy} onClick={go}>{act.label}</button>}
+          {act && <button type="button" className="btn" disabled={busy} onClick={act.confirm ? () => { setError(""); setClosing(true); } : go}>{act.label}</button>}
         </div>
       </header>
+      {closing && act?.confirm && (
+        <ConfirmDialog title="Close the result?" confirm="Close the result" cancel="Not yet" busy={busy} error={error} onConfirm={go} onClose={() => setClosing(false)}>
+          <p>{closeLine()}</p>
+        </ConfirmDialog>
+      )}
       {error && <p role="alert" className="error small">{error}</p>}
       {waitingOnDecision && decisions !== "panel" && <DecisionLine decisions={decisions} />}
       {canDecline && <div className="pl-decline"><DeclineBox id={id} saved={saved} /></div>}

@@ -22,7 +22,7 @@ export interface EventPayload {
 }
 export type { CompanyRow, PersonRow, Spread };
 /** One attendee list received, oldest first. `has_file` is false for a list uploaded before originals were kept. */
-export interface UploadItem { id: string; filename: string; uploaded_by: string; created_at: string; row_count: number; has_file: boolean; file_rows: number | null; already_in: number | null; top_up_id: string | null }
+export interface UploadItem { id: string; list_source?: string; source_note?: string; filename: string; uploaded_by: string; created_at: string; row_count: number; has_file: boolean; file_rows: number | null; already_in: number | null; top_up_id: string | null }
 /** New registrations for a delivered event: running, stopped or merged. */
 export interface TopUpItem { id: string; stage: string; ended_at: string | null; ended_reason: string | null; merged_at: string | null; created_at: string; upload_id: string | null; filename: string | null; uploaded_by: string | null; file_rows: number | null; already_in: number | null; new_rows: number | null; has_file: boolean }
 export interface TopUpCounts { file_rows: number; already_in: number; new_rows: number; dropped: number; top_up_id: string | null }

@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { OLD_SHEET_ERROR, type EventRow, type Stage } from "../shared/domain";
 import { AFTER, afterStep } from "./stages";
+import { LIST_SOURCE_WORDS, type ListSource } from "../shared/plan";
 import { get, send, type HostedPage, type Card, type CompanyRow, type EventPayload, type Page, type Pending, type PersonRow, type ReviewCase, type SeatRequest, type Spread, type TopUpCounts, type TopUpItem, type UploadItem } from "./api";
 import { Link, useActor } from "./App";
 import { LOADING } from "./access";
@@ -178,8 +179,8 @@ function AttendeeList({ d, go, onChange }: { d: EventPayload; go: (to: string) =
   const tops = d.top_ups ?? [];
   const running = tops.find((t) => !t.ended_at && !t.merged_at) ?? null;
   const rows = [
-    ...uploads.map((u) => ({ key: u.id, filename: u.filename, who: u.uploaded_by, at: u.created_at, n: u.file_rows ?? u.row_count, fresh: u.top_up_id ? u.row_count : null, stopped: false, has_file: u.has_file, base: `/api/events/${e.id}/uploads/${u.id}`, first: !u.top_up_id })),
-    ...tops.filter((t) => !t.merged_at && t.upload_id).map((t) => ({ key: t.id, filename: t.filename ?? "", who: t.uploaded_by ?? "", at: t.created_at, n: t.file_rows ?? 0, fresh: t.new_rows, stopped: Boolean(t.ended_at), has_file: t.has_file, base: `/api/events/${t.id}/uploads/${t.upload_id}`, first: false })),
+    ...uploads.map((u) => ({ key: u.id, filename: u.filename, who: u.uploaded_by, at: u.created_at, n: u.file_rows ?? u.row_count, source: u.list_source ? [LIST_SOURCE_WORDS[u.list_source as ListSource], u.list_source === "other" ? u.source_note ?? "" : ""].filter(Boolean).join(": ") : "", fresh: u.top_up_id ? u.row_count : null, stopped: false, has_file: u.has_file, base: `/api/events/${e.id}/uploads/${u.id}`, first: !u.top_up_id })),
+    ...tops.filter((t) => !t.merged_at && t.upload_id).map((t) => ({ key: t.id, filename: t.filename ?? "", who: t.uploaded_by ?? "", at: t.created_at, n: t.file_rows ?? 0, source: "", fresh: t.new_rows, stopped: Boolean(t.ended_at), has_file: t.has_file, base: `/api/events/${t.id}/uploads/${t.upload_id}`, first: false })),
   ].sort((a, b) => a.at.localeCompare(b.at));
   return (
     <section className="alist" aria-label="Attendee list">
@@ -193,7 +194,7 @@ function AttendeeList({ d, go, onChange }: { d: EventPayload; go: (to: string) =
           <li key={u.key}>
             <div className="al-main">
               <p className="al-name">{u.filename || "Attendee list"}</p>
-              <p className="al-meta">{u.who}<i aria-hidden="true" />{day(u.at)}<i aria-hidden="true" />{plural(u.n, "attendee")}{u.fresh !== null && !u.stopped && <><i aria-hidden="true" />{num(u.fresh)} new</>}{u.stopped && <><i aria-hidden="true" />Stopped</>}{!u.has_file && <><i aria-hidden="true" />Rebuilt from the rows</>}</p>
+              <p className="al-meta">{u.who}<i aria-hidden="true" />{day(u.at)}<i aria-hidden="true" />{plural(u.n, "attendee")}{u.source && <><i aria-hidden="true" />{u.source}</>}{u.fresh !== null && !u.stopped && <><i aria-hidden="true" />{num(u.fresh)} new</>}{u.stopped && <><i aria-hidden="true" />Stopped</>}{!u.has_file && <><i aria-hidden="true" />Rebuilt from the rows</>}</p>
             </div>
             <div className="al-side">
               {canReplace && u.first && <Upload small label="Replace" path={`/api/events/${e.id}/upload`} accept={`.csv,.xlsx,text/csv,${XLSX}`} onDone={onChange} />}
