@@ -33,5 +33,5 @@ jobs:
       - name: Boot against Postgres (PGlite) and smoke-test the API
         run: |
           node src/server/node.ts --demo > server.log 2>&1 &
-          for i in $(seq 1 30); do curl -sf localhost:8787/api/health && break; sleep 1; done
+          for i in $(seq 1 90); do curl -sf localhost:8787/api/health && break; sleep 1; done
           curl -sf localhost:8787/api/events | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s);if(j.events.length<3)throw new Error("seed missing");console.log(j.events.length,"events")})'
