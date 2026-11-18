@@ -174,7 +174,7 @@ Answering yes after the event's day began is refused ("The date has passed"); th
 
 ## 14. Target accounts
 
-- `POST /api/target-accounts/import` (CSV: `name, domain, country, owner, open_deal, deal_stage`) and `POST /api/target-accounts` (one). Alone, these are the only way in; with a CRM connected and `CRM=crmdesk`, the same table can be filled from its accounts (not built in this step: the route is the seam and the README says so).
+- `POST /api/target-accounts/import` (CSV: `name, domain, country, owner, open_deal, deal_stage`) (also read under an export's usual headers: `Account name`, `Company`, `Website`, `Account owner`, `Deal`, `Stage`; decision 112) and `POST /api/target-accounts` (one). Alone, these are the only way in; with a CRM connected and `CRM=crmdesk`, the same table can be filled from its accounts (not built in this step: the route is the seam and the README says so).
 - `GET /api/events/:id/guests/suggestions` lists target accounts with an open deal or an owner that are not already on the event's list, with their owner. "Add" creates a guest placeholder (a person is needed to invite: name and email are required to invite, not to list, so a company-only placeholder may be added with a contact name typed by the owner). The list never adds a person without an owner.
 - A guest nominated by an AE records `nominated_by` and takes the nominator as owner by default.
 - Two pools (a conference's attendees plus local people) stay possible: a hosted event with `conference_event_id` offers that conference's tier 1 companies as suggestions too. This is the community-voice note and is a suggestion list only.

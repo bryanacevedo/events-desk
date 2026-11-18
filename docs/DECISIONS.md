@@ -599,3 +599,11 @@ The tracker, ranking and repeat reads use the deps clock, else `DEMO_TODAY` only
 **Why.** Decision 107 left the address unset because none existed. Bryan chose one.
 
 **Who decided.** Bryan, 2026-11-17. Code: `src/app/start.tsx`. Tests: `tests/simfix.test.ts` pins the exact address and subject, the link text and that mailto has no target or rel (it replaces the check that the line invented no address and that the only link was the first step).
+
+## 112. The target account import reads an export's usual headers (2026-11-18)
+
+**What.** `POST /api/target-accounts/import` (the Choosing upload) reads the same columns under the headers a CRM or spreadsheet export uses: `Account name`, `Account`, `Company` or `Company name` for the name; `Website`, `URL` or `Company domain` for the domain; `Account owner` or `Owner name` for the owner; `Country code`, `Deal` and `Stage` for the rest. Only these exact names (case and spaces ignored); a file with none of them is still refused with "The file needs a name column."
+
+**Why.** In the integrated week (2026-11-18, `workday-sim-plan/runs/s8-week2`) the target account file the field marketer's manager left, headed "Account name, Website, Country, Account owner, Open deal", was refused for having no name column, so the whole list never reached the desk (S5's done-check also counted 0). A planner cannot rename columns from the browser.
+
+**Who decided.** Integrated week 2 (small fix, no product change: the same table and route). Code: `src/server/guest-import.ts`. Tests: `tests/guest-import.test.ts` ("reads an export's usual headers").

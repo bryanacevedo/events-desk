@@ -126,10 +126,24 @@ export async function saveTargetAccount(q: Db["query"], actor: string, input: Ta
 
 export const addTargetAccount = (db: Db, actor: string, input: TargetInput) => db.tx((q) => saveTargetAccount(q, actor, input, "manual"));
 
-/** A CSV of `name, domain, country, owner, open_deal, deal_stage`. A row with no name is skipped and counted. */
+/* The headers a CRM or spreadsheet export uses for the same columns (integrated week 2, 2026-11-18: a file headed
+   "Account name, Website, Account owner" was refused for having no name column). Only these exact names, never a guess. */
+const TARGET_HEADERS: Record<string, string> = {
+  account_name: "name", account: "name", company: "name", company_name: "name",
+  website: "domain", web_site: "domain", company_domain: "domain", url: "domain",
+  account_owner: "owner", owner_name: "owner", country_code: "country", deal: "open_deal", stage: "deal_stage",
+};
+const targetRow = (row: Record<string, string>) => {
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(row)) { const to = TARGET_HEADERS[k] ?? k; if (!(to in out) || !text(out[to])) out[to] = v; }
+  return out;
+};
+
+/** A CSV of `name, domain, country, owner, open_deal, deal_stage`, or the same columns under an export's usual headers
+    ("Account name", "Website", "Account owner", ...). A row with no name is skipped and counted. */
 export async function importTargetAccounts(db: Db, actor: string, csv: string) {
   if (typeof csv !== "string" || !csv.trim()) throw new HostedInvalid("The file is empty.");
-  const rows = parse(csv);
+  const rows = parse(csv).map(targetRow);
   if (rows.length > MAX_IMPORT_ROWS) throw new HostedInvalid(`Import up to ${MAX_IMPORT_ROWS} rows at a time.`);
   if (rows.length && !("name" in rows[0])) throw new HostedInvalid("The file needs a name column.");
   return db.tx(async (q) => {

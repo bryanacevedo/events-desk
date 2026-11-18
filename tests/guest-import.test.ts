@@ -127,6 +127,17 @@ describe("imports are uploads", () => {
 });
 
 describe("target accounts and suggestions", () => {
+  it("reads an export's usual headers (Account name, Website, Account owner) as the same columns", async () => {
+    const db = await freshDb();
+    const r = await importTargetAccounts(db, CAMILLE, "Account name,Website,Country,Account owner,Open deal\nHarbor Ledger Systems,harborledger.example,United States,Maya Ortiz,Yes\nTessellate Payments,tessellatepay.example,United Kingdom,Priya Nair,No\n");
+    expect(r).toMatchObject({ rows: 2, added: 2, updated: 0, skipped: [] });
+    expect(await db.query("SELECT name, domain, country, owner FROM target_accounts ORDER BY name")).toEqual([
+      { name: "Harbor Ledger Systems", domain: "harborledger.example", country: "US", owner: "Maya Ortiz" },
+      { name: "Tessellate Payments", domain: "tessellatepay.example", country: "GB", owner: "Priya Nair" },
+    ]);
+    await expect(importTargetAccounts(db, CAMILLE, "Firm,Website\nAcme,acme.example\n")).rejects.toThrow("The file needs a name column.");
+  });
+
   it("imports accounts, lists those with a deal or an owner that are not on the list, and never adds a person without an owner", async () => {
     const db = await freshDb();
     const id = await hostedDinner(db, { capacity: 10 });
