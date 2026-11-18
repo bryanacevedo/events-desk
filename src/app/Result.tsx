@@ -205,9 +205,9 @@ function GoalOutcome({ id }: { id: string }) {
   const rows: { n: string; w: string; short: string }[] = [];
   const gap = (n: number) => (n > 0 ? `${num(n)} short` : "Goal met");
   if (r.meetings) rows.push({ n: `${num(r.meetings.actual)} of ${num(r.meetings.goal)}`, w: "meetings held", short: gap(r.meetings.short_by) });
-  if (r.accounts) rows.push({ n: `${num(r.accounts.actual)} of ${num(r.accounts.goal)}`, w: "target accounts met", short: gap(r.accounts.short_by) });
+  if (r.accounts) rows.push({ n: `${num(r.accounts.actual)} of ${num(r.accounts.goal)}`, w: r.accounts_basis === "tier1" ? "tier 1 companies met" : "target accounts met", short: gap(r.accounts.short_by) });
   const pl = r.pipeline;
-  if (pl && pl.goal_cents !== undefined && pl.actual_cents !== undefined) rows.push({ n: `${money(pl.actual_cents)} of ${money(pl.goal_cents)}`, w: "pipeline", short: pl.short_by_cents ? `${money(pl.short_by_cents)} short` : "Goal met" });
+  if (pl && pl.goal_cents !== undefined && pl.actual_cents != null) rows.push({ n: `${money(pl.actual_cents)} of ${money(pl.goal_cents)}`, w: "pipeline", short: pl.short_by_cents ? `${money(pl.short_by_cents)} short` : "Goal met" });
   return (
     <section className="pl-sec rs-goal" aria-label="Goal"><h2>Goal</h2>
       <div className="pl-body">{rows.length ? <dl className="pl-figs">{rows.map((x) => <div key={x.w}><dd>{x.n}</dd><dt>{x.w}</dt><i className="pl-gap">{x.short}</i></div>)}</dl> : <p className="mute">No goal was set.</p>}</div>

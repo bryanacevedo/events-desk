@@ -11,7 +11,6 @@
 # of # met accounts have pipeline
 # of # others
 # of # pipeline
-# of # target accounts met
 # of # used
 # read from #
 # still registered will be marked as no-shows.
@@ -160,3 +159,4 @@ Will not share the list
 Write to Bryan about your own data
 You post this yourself. Events Desk never posts for you.
 chance of luck allowed each, # split by the groups compared
+pipeline not read, no CRM connected (goal #)

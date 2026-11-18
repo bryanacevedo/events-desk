@@ -138,6 +138,13 @@ describe("target accounts and suggestions", () => {
     await expect(importTargetAccounts(db, CAMILLE, "Firm,Website\nAcme,acme.example\n")).rejects.toThrow("The file needs a name column.");
   });
 
+  it("reads the desk's own header over an export's header, whichever comes first", async () => {
+    const db = await freshDb();
+    expect(await importTargetAccounts(db, CAMILLE, "Account name,name\nAlias Co,Real Co\n")).toMatchObject({ rows: 1, added: 1 });
+    expect(await importTargetAccounts(db, CAMILLE, "name,Account name\n,Filled Co\n")).toMatchObject({ rows: 1, added: 1 });
+    expect((await db.query<{ name: string }>("SELECT name FROM target_accounts ORDER BY name")).map((r) => r.name)).toEqual(["Filled Co", "Real Co"]);
+  });
+
   it("imports accounts, lists those with a deal or an owner that are not on the list, and never adds a person without an owner", async () => {
     const db = await freshDb();
     const id = await hostedDinner(db, { capacity: 10 });

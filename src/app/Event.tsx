@@ -179,7 +179,7 @@ function AttendeeList({ d, go, onChange }: { d: EventPayload; go: (to: string) =
   const tops = d.top_ups ?? [];
   const running = tops.find((t) => !t.ended_at && !t.merged_at) ?? null;
   const rows = [
-    ...uploads.map((u) => ({ key: u.id, filename: u.filename, who: u.uploaded_by, at: u.created_at, n: u.file_rows ?? u.row_count, source: u.list_source ? [LIST_SOURCE_WORDS[u.list_source as ListSource], u.list_source === "other" ? u.source_note ?? "" : ""].filter(Boolean).join(": ") : "", fresh: u.top_up_id ? u.row_count : null, stopped: false, has_file: u.has_file, base: `/api/events/${e.id}/uploads/${u.id}`, first: !u.top_up_id })),
+    ...uploads.map((u) => ({ key: u.id, filename: u.filename, who: u.uploaded_by, at: u.created_at, n: u.file_rows ?? u.row_count, source: u.list_source && !(u.list_source === "other" && (!u.source_note || u.source_note === "Not recorded")) ? [LIST_SOURCE_WORDS[u.list_source as ListSource], u.list_source === "other" ? u.source_note ?? "" : ""].filter(Boolean).join(": ") : "", fresh: u.top_up_id ? u.row_count : null, stopped: false, has_file: u.has_file, base: `/api/events/${e.id}/uploads/${u.id}`, first: !u.top_up_id })),
     ...tops.filter((t) => !t.merged_at && t.upload_id).map((t) => ({ key: t.id, filename: t.filename ?? "", who: t.uploaded_by ?? "", at: t.created_at, n: t.file_rows ?? 0, source: "", fresh: t.new_rows, stopped: Boolean(t.ended_at), has_file: t.has_file, base: `/api/events/${t.id}/uploads/${t.upload_id}`, first: false })),
   ].sort((a, b) => a.at.localeCompare(b.at));
   return (

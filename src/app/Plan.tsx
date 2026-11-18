@@ -110,6 +110,15 @@ const StageFacts = ({ p }: { p: PlanData }) => (
 
 const Sec = ({ title, children }: { title: string; children: ReactNode }) => <section className="pl-sec" aria-label={title}><h2>{title}</h2><div className="pl-body">{children}</div></section>;
 
+/** The goal against the result, in one sentence, for the dialog that asks before a result is closed. A pipeline no CRM read is never a pipeline of $0. */
+export function closeSentence(r: PlanData["result"] | null | undefined): string {
+  const parts: string[] = [];
+  if (r?.meetings) parts.push(`${num(r.meetings.actual)} of ${num(r.meetings.goal)} meetings held`);
+  if (r?.accounts) parts.push(`${num(r.accounts.actual)} of ${num(r.accounts.goal)} ${r.accounts_basis === "tier1" ? "tier 1 companies met" : "target accounts met"}`);
+  if (r?.pipeline && r.pipeline.goal_cents !== undefined) parts.push(r.pipeline.read !== false && r.pipeline.actual_cents != null ? `${dollars(r.pipeline.actual_cents)} of ${dollars(r.pipeline.goal_cents)} pipeline` : `pipeline not read, no CRM connected (goal ${dollars(r.pipeline.goal_cents)})`);
+  return parts.length ? `Against the goal, the result is ${parts.join(", ")}, and it cannot be reopened.` : "No goal was set, so the result closes with nothing to compare it to, and it cannot be reopened.";
+}
+
 export function PlanTab({ id, listRows, onChange }: { id: string; listRows: number; onChange: () => void }) {
   const { actor, decisions, needs } = useActor();
   const [p, setP] = useState<PlanData | null>(null), [planLoads, setPlanLoads] = useState(0);
@@ -145,14 +154,6 @@ export function PlanTab({ id, listRows, onChange }: { id: string; listRows: numb
     if (!r.ok) { setError(r.error ?? ""); return; }
     setClosing(false);
     await load(); onChange();
-  };
-  /** The goal against the result, in one sentence, for the dialog that asks before a result is closed. */
-  const closeLine = () => {
-    const r = p.result, parts: string[] = [];
-    if (r?.meetings) parts.push(`${num(r.meetings.actual)} of ${num(r.meetings.goal)} meetings held`);
-    if (r?.accounts) parts.push(`${num(r.accounts.actual)} of ${num(r.accounts.goal)} target accounts met`);
-    if (r?.pipeline && r.pipeline.goal_cents !== undefined && r.pipeline.actual_cents !== undefined) parts.push(`${dollars(r.pipeline.actual_cents)} of ${dollars(r.pipeline.goal_cents)} pipeline`);
-    return parts.length ? `Against the goal, the result is ${parts.join(", ")}, and it cannot be reopened.` : "No goal was set, so the result closes with nothing to compare it to, and it cannot be reopened.";
   };
 
   const live = p.involvements.filter((i) => i.status !== "dropped");
@@ -313,10 +314,10 @@ export function PlanTab({ id, listRows, onChange }: { id: string; listRows: numb
       </header>
       {closing && act?.confirm && (
         <ConfirmDialog title="Close the result?" confirm="Close the result" cancel="Not yet" busy={busy} error={error} onConfirm={go} onClose={() => setClosing(false)}>
-          <p>{closeLine()}</p>
+          <p>{closeSentence(p.result)}</p>
         </ConfirmDialog>
       )}
-      {error && <p role="alert" className="error small">{error}</p>}
+      {error && !closing && <p role="alert" className="error small">{error}</p>}
       {waitingOnDecision && decisions !== "panel" && <DecisionLine decisions={decisions} />}
       {canDecline && <div className="pl-decline"><DeclineBox id={id} saved={saved} /></div>}
       {view !== "c" && notes}

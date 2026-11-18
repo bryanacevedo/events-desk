@@ -135,7 +135,9 @@ const TARGET_HEADERS: Record<string, string> = {
 };
 const targetRow = (row: Record<string, string>) => {
   const out: Record<string, string> = {};
-  for (const [k, v] of Object.entries(row)) { const to = TARGET_HEADERS[k] ?? k; if (!(to in out) || !text(out[to])) out[to] = v; }
+  // The desk's own headers are read first; an export's header fills only the cells they leave empty, whichever comes first in the file.
+  for (const [k, v] of Object.entries(row)) if (!(k in TARGET_HEADERS)) out[k] = v;
+  for (const [k, v] of Object.entries(row)) { const to = TARGET_HEADERS[k]; if (to && (!(to in out) || !text(out[to]))) out[to] = v; }
   return out;
 };
 

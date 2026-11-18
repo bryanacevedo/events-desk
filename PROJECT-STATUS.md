@@ -13,6 +13,7 @@ Four small fixes from the same week (branch `wk2fix/events-desk`, `tests/simfix.
 - Results: a result a planner closed reads "Scored", as the Plan tab does (`/api/results` `final` is true when `motion` is scored or `judged_at` is set).
 - Plan: "Close the result" asks first, in a dialog that states the goal against the result in one sentence (decision 113).
 - Event: each line in the attendee list says where the list came from, from `list_source` (`LIST_SOURCE_WORDS`).
+- Review of the above: the close dialog says "pipeline not read, no CRM connected" instead of $0 and "tier 1 companies met" when that is the basis, and shows a failed close's error once; an export header no longer overwrites the desk's own header in the target account import (decision 112); the attendee list line hides a source that was never recorded.
 - Plan, speaking: the person who wrote or edited an abstract is no longer offered "Approve the abstract"; the server already refused it.
 
 ## CI fix: `npm ci` ERESOLVE on the optional OpenTelemetry packages (2026-11-17, branch `simfix/events-ci`)

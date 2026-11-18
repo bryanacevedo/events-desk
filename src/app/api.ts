@@ -129,7 +129,7 @@ export interface PlanData {
   stage_line: { plan_stage: string; plan_stage_label: string; list_stage: string; list_stage_label: string; waiting_on: string; paused: boolean };
   reason: string; reason_words: string | null;
   goal: { meetings_held: number | null; accounts_met: number | null; pipeline_cents?: number | null };
-  result: { meetings: GoalLine | null; accounts: GoalLine | null; pipeline: { goal_cents?: number; actual_cents?: number; short_by_cents?: number } | null; words: string[] };
+  result: { meetings: GoalLine | null; accounts: GoalLine | null; accounts_basis?: "target_list" | "tier1"; pipeline: { goal_cents?: number; actual_cents?: number | null; short_by_cents?: number | null; read?: boolean } | null; words: string[] };
   approval: { submitted_at: string | null; approved_by: string | null; approved_at: string | null; approved_budget_cents?: number | null; requested_by: string; approvers: string[]; over_budget: boolean; over_plan: boolean; waiting_seats: number };
   involvements: PlanInvolvement[]; side_events: { id: string; name: string; starts_on: string; hosted_format: string; plan_stage: string }[]; who_goes: PlanPerson[];
   notes: string[]; judged_at: string | null; can_plan: boolean;

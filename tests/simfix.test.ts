@@ -12,6 +12,7 @@ import type { Db } from "../src/server/db.ts";
 import type { LifecycleDeps } from "../src/server/lifecycle-deps.ts";
 import { mockLlm } from "../src/server/providers.ts";
 import { createPlan, submitPlan } from "../src/server/plan.ts";
+import { closeSentence } from "../src/app/Plan.tsx";
 import { demoBarWords, sampleDayWords } from "../src/app/DemoBar.tsx";
 import { Glossary, WORDS } from "../src/app/Glossary.tsx";
 import { BlockSkeleton, Empty, PageSkeleton } from "../src/app/Skeleton.tsx";
@@ -373,9 +374,17 @@ describe("integrated week 2: small fixes on the desk's own screens", () => {
     const plan = src("src/app/Plan.tsx");
     expect(plan).toContain('import { ConfirmDialog } from "./Patterns"');
     expect(plan).toContain('<ConfirmDialog title="Close the result?"');
-    expect(plan).toContain("Against the goal, the result is ");
     expect(plan).toContain("confirm: true, run: () => send(\"POST\", `/api/events/${id}/plan/close`");
     expect(plan).toContain("act.confirm ?");
+  });
+  it("the close sentence never calls an unread pipeline $0 and names a tier 1 count as tier 1 companies", () => {
+    const g = (goal: number, actual: number) => ({ goal, actual, short_by: Math.max(goal - actual, 0) });
+    const base = { meetings: g(5, 3), accounts: null, pipeline: null, words: [] };
+    expect(closeSentence({ ...base, pipeline: { goal_cents: 4000000, actual_cents: null, read: false } })).toBe("Against the goal, the result is 3 of 5 meetings held, pipeline not read, no CRM connected (goal $40,000), and it cannot be reopened.");
+    expect(closeSentence({ ...base, pipeline: { goal_cents: 4000000, actual_cents: 1000000, read: true } })).toContain("$10,000 of $40,000 pipeline");
+    expect(closeSentence({ ...base, accounts: g(2, 1), accounts_basis: "tier1" })).toContain("1 of 2 tier 1 companies met");
+    expect(closeSentence({ ...base, accounts: g(2, 1), accounts_basis: "target_list" })).toContain("1 of 2 target accounts met");
+    expect(closeSentence({ meetings: null, accounts: null, pipeline: null, words: [] })).toMatch(/^No goal was set/);
   });
   it("the list on the Event page says where it came from", async () => {
     const id = await deliverEvent(db, LIST, {}, "Listed");
