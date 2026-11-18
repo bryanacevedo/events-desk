@@ -14,7 +14,7 @@ in no README, no post and no link, and the whole bundle tells search engines to 
    It reads nothing else. It refuses to start when `DATABASE_URL` is set, and the copy it reads is thrown away afterwards.
 2. Runs the app in the same process (`createApp(...).fetch`, no port) with `PUBLIC_DEMO=1`, the sample's own day (2026-11-24)
    and the same start the hosted demo makes (`src/server/node.ts`).
-3. Reads every page's data the way the screens do, as each person in **Acting as** (Maya Ortiz, Camille Laurent, Dan Whitlock,
+3. Reads every page's data the way the screens do, as each person in **Acting as** (Maya Okafor, Camille Laurent, Dan Whitlock,
    GTM Team) and as a visitor who has not chosen yet. An answer every one of them gets alike is saved once; otherwise one per person.
 4. Saves the answers as gzip shards (`_snapshot/abc.json.gz`, by the first three characters of the SHA-1 of the request), the
    workbooks, scan CSVs, scanner codes and uploaded files the pages link to as plain files, and the built app beside them.

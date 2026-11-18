@@ -1,6 +1,6 @@
 # Events Desk: project status
 
-**Updated:** 2026-11-18. **Decisions:** `docs/DECISIONS.md`, 1 to 113. **Render:** auto-deploy is off on the service (verified through the Render API on 2026-11-16, read-only); a push deploys nothing and a deploy happens only when Bryan says. `render.yaml` does not say so: the setting lives on the Render service, where auto-deploy was turned off because the monthly build minutes ran out; nothing in this repository changes it. The Render service events-desk.onrender.com was suspended on 2026-11-18 at Bryan's word (it answers 503; suspended, not deleted); the only public demo is the static snapshot on Cloudflare Pages (`docs/RUNBOOK.md`), which the README does not link yet.
+**Updated:** 2026-11-18. **Decisions:** `docs/DECISIONS.md`, 1 to 117. **Render:** auto-deploy is off on the service (verified through the Render API on 2026-11-16, read-only); a push deploys nothing and a deploy happens only when Bryan says. `render.yaml` does not say so: the setting lives on the Render service, where auto-deploy was turned off because the monthly build minutes ran out; nothing in this repository changes it. The Render service events-desk.onrender.com was suspended on 2026-11-18 at Bryan's word (it answers 503; suspended, not deleted); the only public demo is the static snapshot on Cloudflare Pages (`docs/RUNBOOK.md`), which the README does not link yet.
 
 Docs are part of done: README, PROJECT-STATUS and docs change in the same commit as the behaviour, counts or setup they describe. `make docs-check` (also run by the suite) enforces it.
 
@@ -15,6 +15,16 @@ Four small fixes from the same week (branch `wk2fix/events-desk`, `tests/simfix.
 - Event: each line in the attendee list says where the list came from, from `list_source` (`LIST_SOURCE_WORDS`).
 - Review of the above: the close dialog says "pipeline not read, no CRM connected" instead of $0 and "tier 1 companies met" when that is the basis, and shows a failed close's error once; an export header no longer overwrites the desk's own header in the target account import (decision 112); the attendee list line hides a source that was never recorded.
 - Plan, speaking: the person who wrote or edited an abstract is no longer offered "Approve the abstract"; the server already refused it.
+
+Second pass on the same week (branch `wk2fix/events-desk`, decisions 114 to 117, `tests/wk2fix.test.ts`; Updated 2026-11-18):
+
+- J14: no check-in or walk-in before the event's first day, and the seed's roadshow stop is dated its demo day before its check-ins (114).
+- J10, m13, m14, m20: "Waiting on you" (`GET /api/waiting`, `/waiting`) lists seats, plans and abstracts across events with a link to each; a seat approval asks first and keeps a note; "Approve the plan" says it also approves waiting seats; My day shows guests eight at a time; a dialog returns focus to its button (115).
+- J11, J12, J13, J15, m11, m12, m15, m16, m17, m18 (116): set-aside reasons open their people, merged scans say so, Outreach rows say nothing has come back, a badge code can be typed, "Maya Okafor" replaces "Maya Ortiz" everywhere (the avatar file is `maya-okafor.jpg`), one label for the talk action, the made plan is confirmed, the reminder is signed by its sender and names no setting, a walk-in belongs to the person at the door, the follow-up date can be set, the deliverable owner offers the team and rows keep their place.
+- J16: investigated; a delivered list outside the 45 day window or delivered before the CRM was connected had no campaign in the CRM. The sweep now queues it; people follow in it once the window opens (117).
+- CI: the boot smoke step waits up to 90 s (was 30 s).
+- m21 was already fixed in 3f941f6 (upload line shows a source only when one was recorded); a test now pins it.
+- Not done: the roster from the shared team file (J15), bulk edit of deliverables (m15), the CRM hand-over state per scan (J11). `tests/directory-readers.test.ts` binds a local port and fails with EPERM inside the sandbox; not changed.
 
 ## CI fix: `npm ci` ERESOLVE on the optional OpenTelemetry packages (2026-11-17, branch `simfix/events-ci`)
 
@@ -217,7 +227,7 @@ Worktree `~/Developer/events-desk/.claude/worktrees/admiring-kepler-c6dcf2`, bra
 
 **Not done (next, in order; done since, see 'Redesign step 1, finished'):** live-mode Slack plan card; sponsorship, deliverables, `list_source`, Overview year plan and week's deadlines (0050, 0051, session 2 of the original plan); the assessment, organizer request, past events read against their goals, the Money20/20 USA 2026 seed (0052, session 3); a seed test for those; README for the plan. re:Invent's upload source "emailed by the organizer" waits for 0051.
 
-**Spec:** `docs/SPEC.md`, goldfish-reviewed 2026-11-08 before any code (12 Major, 13 Nit, no Blocker; 24 fixed, 1 moot because a clause gate was closed). It has been edited to match the code since. **Decisions:** `docs/DECISIONS.md`, 1 to 113.
+**Spec:** `docs/SPEC.md`, goldfish-reviewed 2026-11-08 before any code (12 Major, 13 Nit, no Blocker; 24 fixed, 1 moot because a clause gate was closed). It has been edited to match the code since. **Decisions:** `docs/DECISIONS.md`, 1 to 117.
 
 ## Now (2026-11-12)
 

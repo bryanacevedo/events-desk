@@ -24,7 +24,7 @@ Calendar and All events are merged into **Events**. Approvals is replaced by **S
 
 ## Personas
 
-Acting as: Maya Ortiz (SDR, requests seats, uploads attendee lists, runs them), Dan Whitlock (approves seats), GTM Team (GTM Engineering, the only one with Settings). This stands in for a real login later.
+Acting as: Maya Okafor (SDR, requests seats, uploads attendee lists, runs them), Dan Whitlock (approves seats), GTM Team (GTM Engineering, the only one with Settings). This stands in for a real login later.
 
 ## Overview
 

@@ -387,7 +387,7 @@ The Chrome extension carries a capture key a person makes in the desk's settings
 
 ## 70. Reads are staged first and brought in later, with a source sentence the server builds (2026-11-14)
 
-A person seen in a directory or a recording is a read (`directory_reads`), not yet a person on the event. A read is staged, to check, brought in or dismissed, decided by one pure function (`judgeRead`) for both paths. Bring in turns the staged reads (and the ones already brought in, so a replacement loses nobody) into a CSV and runs `ingestUpload`, so Layer 0, the cost cards and tiering do for these people what they do for a file. The source sentence ("read from the Swapcard directory of AWS re:Invent 2026 by Maya Ortiz on 2026-11-14") and the terms note come from the platform, the event, the key's owner, the server's date and the event's confirmed `terms` answer; the request carries neither, so a page or an extension that lies cannot write them. Each person keeps the path they came by (`directory_extension` or `screen_recording`) and the two upload sources are not accepted from the `x-list-source` header. Reads reference contacts with `ON DELETE SET NULL` because a replacement deletes contacts; erasure is explicit, by contact, by name and company on any event, and by profile link, and reads never brought in go 90 days after the event's last day.
+A person seen in a directory or a recording is a read (`directory_reads`), not yet a person on the event. A read is staged, to check, brought in or dismissed, decided by one pure function (`judgeRead`) for both paths. Bring in turns the staged reads (and the ones already brought in, so a replacement loses nobody) into a CSV and runs `ingestUpload`, so Layer 0, the cost cards and tiering do for these people what they do for a file. The source sentence ("read from the Swapcard directory of AWS re:Invent 2026 by Maya Okafor on 2026-11-14") and the terms note come from the platform, the event, the key's owner, the server's date and the event's confirmed `terms` answer; the request carries neither, so a page or an extension that lies cannot write them. Each person keeps the path they came by (`directory_extension` or `screen_recording`) and the two upload sources are not accepted from the `x-list-source` header. Reads reference contacts with `ON DELETE SET NULL` because a replacement deletes contacts; erasure is explicit, by contact, by name and company on any event, and by profile link, and reads never brought in go 90 days after the event's last day.
 
 ## 71. The blocked-country list now binds the email gate for everyone (2026-11-14)
 
@@ -615,3 +615,37 @@ The tracker, ranking and repeat reads use the deps clock, else `DEMO_TODAY` only
 **Why.** In the integrated week (2026-11-18) a planner's click closed the result at once, and nothing in the server reopens it (`closeResult`, decision 105).
 
 **Who decided.** Integrated week 2 (small fix). Code: `src/app/Plan.tsx`, `src/server/lifecycle-routes.ts`. Tests: `tests/simfix.test.ts` (integrated week 2).
+
+## 114. Nobody is checked in before the event's first day (2026-11-18)
+
+**What.** `checkIn` and `walkIn` (`src/server/hosted.ts`) refuse before the event's first day in the event's own time zone: "Check-in opens on 19 Nov, the first day of the event." The seed's roadshow stop is dated its demo day before its check-ins are made (`seed-hosted.ts`), so a snapshot built on any day shows no guest attended early.
+
+**Why.** CRM Desk reads an attended guest as a person who came. In the integrated week (2026-11-18) the seed's check-ins sat before the event's day and CRM showed Capitol Revenue Roadshow as "Attended" before 19 Nov. Importing a list that already carries check-in times (`guest-import.ts`) is not a check-in at the door and is unchanged.
+
+**Who decided.** Integrated week 2 (finding J14, default of review-crm). Tests: `tests/hosted-checkin.test.ts`, `tests/hosted-seed.test.ts`.
+
+## 115. One page for what waits on a person, and a seat approval that asks first (2026-11-18)
+
+**What.** `GET /api/waiting` answers, for the person acting, the seat requests they can decide, the plans asked for and not yet approved (not their own), and the abstracts another person wrote (planners). The screen "Waiting on you" (`/waiting`, also `/seat-decisions`) lists them in three sections, each row linking to its item (a seat to `/seat-decisions?request=<id>`, a plan or abstract to the event's Plan tab), with a count in the menu. "Decide here" on Seats links to the one request. Approving a seat opens a dialog that states the ticket, travel and what is left in the quarter, with an optional note; the note is kept in the event's activity beside the line "Approved X's seat" and never in the decline reason. "Approve the plan" asks first when it also takes in waiting seats, and says how many. My day lists a hosted event's guests eight at a time. A dialog gives focus back to the button that opened it.
+
+**Why.** Every "Decide here" went to one unfiltered page, an approver had no list across events, one click approved a seat, and approving a plan also approved seats without saying so (integrated week 2, J10, m13, m14, m20).
+
+**Not done.** A plan that went over its approved budget and waits for a second approval is not in the list (it shows on its own Plan tab). Slack stays the main path where it is connected.
+
+**Who decided.** Integrated week 2 (default of review-market-events: one "Waiting on you" page). Code: `src/server/seat-routes.ts`, `src/server/seats.ts`, `src/app/SeatDecisions.tsx`, `src/app/Seats.tsx`. Tests: `tests/wk2fix.test.ts`.
+
+## 116. Small behaviours from the integrated week (2026-11-18)
+
+**What.** (1) A reminder is signed by the person sending it, and the refusal when no email sender is connected says so in plain words, with no setting names (they stay in the README and `.env.example`). (2) A walk-in's owner is the person adding them, not the host. (3) The organizer request's follow-up date can be set by hand ("Follow up on"); left alone it is still the day after the expected date, or a week after it was sent; a date before the day it was sent is refused. (4) The excluded-from-outreach reasons on the List tab open the people set aside for that reason (`GET /api/events/:id/people?status=dropped&reason=...`); a scan the near-match review merged reads "Merged with another scan". (5) A badge code can be typed in the scanner. (6) A seat in the demo and the seed belongs to Maya Okafor, the name the team file and every other desk use (was Maya Ortiz). (7) A row for Replies or Meetings under Account Desk's outreach says nothing has come back instead of doing nothing. (8) The deliverable owner offers the team's names, and rows keep their place while a due date is saved.
+
+**Not done.** The roster is still the four people of `src/shared/roles.ts`, not the shared team file (J15, a permission change); a bulk edit of deliverables (m15); the CRM hand-over state per scan or person (J11).
+
+**Who decided.** Integrated week 2 (findings J11 to J13, J15, m11 to m18, m21; small defaults of the reviews). Tests: `tests/wk2fix.test.ts`, `tests/hosted-reminders.test.ts`.
+
+## 117. A delivered list has its campaign in the CRM whenever the CRM is connected (2026-11-18)
+
+**What.** The CRM sweep (`syncCrm`, `src/server/crm-sync.ts`) queues the campaign of every event whose list is delivered (kept people with an address), not only of events with a member to write or a submitted plan. People are still written as `targeted` only from 45 days before the event until it ends (`TARGET_LEAD_DAYS`, decision of `docs/SHARED-WORLD.md` 13.9 item 11) and only where the CRM already holds the person (or the uploader turned leads on); they follow in the same campaign when the window opens. The campaign key is `campaign:<event id>`, so no second campaign is made.
+
+**Why.** Investigated for finding J16 ("People in the CRM 0", no Qatar campaign): a list delivered before the CRM was connected, or for an event more than 45 days away, left no campaign in the CRM, because the campaign was queued only at delivery (when the CRM could write) or by a member or plan. Members outside the window are deferred by design, not dropped.
+
+**Who decided.** Integrated week 2 (question 10: investigate first). Code: `src/server/crm-sync.ts`. Tests: `tests/member-statuses.test.ts` ("a delivered list reaches the CRM whenever the CRM is connected").

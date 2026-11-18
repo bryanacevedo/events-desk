@@ -55,8 +55,8 @@ Keep it as my rule
 Last time below the median
 Leave out the answer to #
 Logo, PNG up to 500 KB
-Lumen Ledger, lumenledger.example, owner Maya Ortiz.
-Maya Ortiz, SDR, asks for a seat at SaaStr Annual 2027: goal new pipeline, 6 meetings, ticket $2,495.
+Lumen Ledger, lumenledger.example, owner Maya Okafor.
+Maya Okafor, SDR, asks for a seat at SaaStr Annual 2027: goal new pipeline, 6 meetings, ticket $2,495.
 Money20/20 USA 2026, with its replies and meetings.
 My event is not listed
 Needs a second person to approve the abstract
@@ -160,3 +160,11 @@ Write to Bryan about your own data
 You post this yourself. Events Desk never posts for you.
 chance of luck allowed each, # split by the groups compared
 pipeline not read, no CRM connected (goal #)
+Decisions are for leadership, planners and GTM Engineering.
+# is checked in as a walk-in.
+The plan is made.
+Asked by #, #
+#, written by #
+Nothing is waiting on you.
+Over Q# by # after this seat.
+# left in Q# after this seat.

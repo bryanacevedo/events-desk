@@ -18,7 +18,7 @@ Order of paths on the event, as Bryan decided: the web portal through the extens
 - **Capture key**: a key a person makes in the desk's settings for the extension. It can add reads to events and list the events to choose from. It can do nothing else (section 5).
 - **Reader**: one small module in the extension that knows one platform's page. Swapcard's web app first.
 - **Bring in**: turn the staged reads of an event into the event's attendee list, through `ingestUpload` and Layer 0, with the source kind `directory_extension` or `screen_recording`.
-- **Source sentence**: what each person keeps: "read from the Swapcard directory of AWS re:Invent 2026 by Maya Ortiz on 2026-11-14", or "read from a screen recording of Brella for AWS re:Invent 2026 by Maya Ortiz on 2026-11-14". Built by the server from the platform, the event, the key's owner and the server's date. Never taken from the extension's text. **Terms note**: the event's confirmed `terms` answer from the assessment at the time of the read, or "Terms not assessed".
+- **Source sentence**: what each person keeps: "read from the Swapcard directory of AWS re:Invent 2026 by Maya Okafor on 2026-11-14", or "read from a screen recording of Brella for AWS re:Invent 2026 by Maya Okafor on 2026-11-14". Built by the server from the platform, the event, the key's owner and the server's date. Never taken from the extension's text. **Terms note**: the event's confirmed `terms` answer from the assessment at the time of the read, or "Terms not assessed".
 
 ## 3. Must not change, and the outreach rule
 
