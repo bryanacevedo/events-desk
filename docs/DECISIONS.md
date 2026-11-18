@@ -560,7 +560,7 @@ The tracker, ranking and repeat reads use the deps clock, else `DEMO_TODAY` only
 
 ## 107. The sample says what it is; third-party tools are named by their job (2026-11-17)
 
-**What.** A slim bar at the top of every screen of the demo says: a sample company with invented data; that a change is shared with the next visitor and gone when the demo restarts, and (public demo) that it takes no files, in the words its server refuses with; and the day the sample was set around (`/api/health.sample_day`), while days to go are counted from today. A file upload says so in a tooltip before the click. The Overview opens with one sentence of what the desk is for, one first step (a finished event) and a tour of four steps for someone judging the build and four for someone who runs events; the buyer's list ends with a next step that names no address, because none exists yet (`CONTACT_URL` in `src/app/start.tsx`). In the sample, Apollo, Instantly, HeyReach, Smartlead, ZeroBounce, Gong and Slack read as "people finder (sample)", "email tool (sample)" and so on; a real desk keeps the vendor's name. A person's page is called a page, not a record. "Request a seat" is a quiet button. Contrast: `scripts/contrast.mjs` measures every text colour (4.5:1, and 7:1 under 13 px), and the suite runs it.
+**What.** A slim bar at the top of every screen of the demo says: a sample company with invented data; that a change is shared with the next visitor and gone when the demo restarts, and (public demo) that it takes no files, in the words its server refuses with; and the day the sample was set around (`/api/health.sample_day`), while days to go are counted from today. A file upload says so in a tooltip before the click. The Overview opens with one sentence of what the desk is for, one first step (a finished event) and a tour of four steps for someone judging the build and four for someone who runs events; the buyer's list ends with a next step, a mail link to Bryan (`CONTACT_URL` in `src/app/start.tsx`, decision 111). In the sample, Apollo, Instantly, HeyReach, Smartlead, ZeroBounce, Gong and Slack read as "people finder (sample)", "email tool (sample)" and so on; a real desk keeps the vendor's name. A person's page is called a page, not a record. "Request a seat" is a quiet button. Contrast: `scripts/contrast.mjs` measures every text colour (4.5:1, and 7:1 under 13 px), and the suite runs it.
 
 **Why.** The first-visit review found no demo notice on the screen, an unexplained frozen-looking date, names of tools the visitor cannot see, and a loudest button that sent a stranger to a form. Statements about the demo are true of this desk: the public demo accepts changes (they live in the running copy) and refuses files, unlike the other desks, which refuse writes.
 
@@ -591,3 +591,11 @@ The tracker, ranking and repeat reads use the deps clock, else `DEMO_TODAY` only
 **Why.** The public demo showed "This week 3" as the heading at the left and the same words again on a card pushed to the right half of the row.
 
 **Who decided.** Bryan's screenshot of the demo Overview, 2026-11-17. Code: `src/app/Overview.tsx`, `src/app/styles.css`. Tests: `tests/overview-week-heading.test.ts`.
+
+## 111. The demo's next step is a mail link to Bryan (2026-11-17)
+
+**What.** The last line of the buyer's tour on the demo Overview is "Next step: Write to Bryan about your own data". The words after "Next step:" are a plain `mailto:bryan@leandrive.io?subject=Events%20Desk%20demo` link (`CONTACT_URL` in `src/app/start.tsx`). A mailto link opens the visitor's mail app, so it has no `target` and no `rel`. The old line (run it yourself or ask whoever sent the link) is gone from `docs/SCREEN-COPY.txt`.
+
+**Why.** Decision 107 left the address unset because none existed. Bryan chose one.
+
+**Who decided.** Bryan, 2026-11-17. Code: `src/app/start.tsx`. Tests: `tests/simfix.test.ts` pins the exact address and subject, the link text and that mailto has no target or rel (it replaces the check that the line invented no address and that the only link was the first step).

@@ -15,7 +15,7 @@ import { createPlan, submitPlan } from "../src/server/plan.ts";
 import { demoBarWords, sampleDayWords } from "../src/app/DemoBar.tsx";
 import { Glossary, WORDS } from "../src/app/Glossary.tsx";
 import { BlockSkeleton, Empty, PageSkeleton } from "../src/app/Skeleton.tsx";
-import { CONTACT_URL, NEXT_STEP, StartHere, TOUR_BUYER, TOUR_HIRING, VALUE_LINE } from "../src/app/start.tsx";
+import { CONTACT_URL, NEXT_STEP, NEXT_STEP_LEAD, NEXT_STEP_LINK, StartHere, TOUR_BUYER, TOUR_HIRING, VALUE_LINE } from "../src/app/start.tsx";
 import { plainTools, setSampleTools, toolName } from "../src/app/tools.ts";
 import { oneRowEach, sentTo } from "../src/app/waiting.ts";
 import { nextLine } from "../src/app/words.ts";
@@ -125,11 +125,15 @@ describe("the first screen", () => {
     expect(TOUR_HIRING.length).toBeLessThanOrEqual(6);
     expect(TOUR_BUYER.length).toBeLessThanOrEqual(6);
   });
-  it("ends the buyer's list with a next step that invents no address", () => {
-    expect(CONTACT_URL).toBeNull();
+  it("ends the buyer's list with a next step that is a plain mailto link", () => {
+    // Pinned to the exact address Bryan chose (2026-11-17); a changed address or subject must be a deliberate edit here.
+    expect(CONTACT_URL).toBe("mailto:bryan@leandrive.io?subject=Events%20Desk%20demo");
     const html = renderToStaticMarkup(createElement(StartHere, { go: () => {} }));
-    expect(html).toContain(NEXT_STEP);
-    expect(html.match(/href="[^"]+"/g)).toEqual(['href="/event/evt_money20-20-usa-2026#outreach"']);
+    expect(NEXT_STEP).toBe("Next step: Write to Bryan about your own data");
+    expect(html).toContain(`${NEXT_STEP_LEAD} <a href="${CONTACT_URL}">${NEXT_STEP_LINK}</a>`);
+    // A mailto link opens the mail app: no new tab, no rel. The only other link is the first step.
+    expect(html.match(/<a [^>]*>/g)).toEqual(['<a href="/event/evt_money20-20-usa-2026#outreach" class="btn">', `<a href="${CONTACT_URL}">`]);
+    expect(html).not.toMatch(/mailto:[^>]*(target|rel)=/);
   });
   it("shows only in the demo", () => {
     expect(src("src/app/Overview.tsx")).toContain("{demo && <StartHere go={go} />}");

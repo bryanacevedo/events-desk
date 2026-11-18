@@ -6,8 +6,8 @@ import { Link } from "./App";
 /** The finished event the first step opens: replies, meetings and what the desk set aside, all read after the event. */
 export const FIRST_STEP_EVENT = "evt_money20-20-usa-2026";
 
-/** Where a buyer goes next. Not set: there is no contact page to point at yet, so the line says how to try it without one. Put the real link here and the line uses it. */
-export const CONTACT_URL: string | null = null;
+/** Where a buyer goes next (Bryan, 2026-11-17): a mail to him. A mailto link opens in the mail app, so it carries no target or rel. */
+export const CONTACT_URL = "mailto:bryan@leandrive.io?subject=Events%20Desk%20demo";
 
 export const VALUE_LINE = "Events Desk takes a conference from the request for a seat to a list of people to contact, and shows which events paid back.";
 
@@ -25,9 +25,9 @@ export const TOUR_BUYER = [
   "Results: pipeline per dollar for the events that finished.",
 ] as const;
 
-export const NEXT_STEP = CONTACT_URL
-  ? "Next step: talk to us about running this on your own events."
-  : "Next step: to try it on your own events and lists, run it yourself (the README shows how) or ask whoever sent you this link.";
+export const NEXT_STEP_LEAD = "Next step:";
+export const NEXT_STEP_LINK = "Write to Bryan about your own data";
+export const NEXT_STEP = `${NEXT_STEP_LEAD} ${NEXT_STEP_LINK}`;
 
 export function StartHere({ go }: { go: (to: string) => void }) {
   return (
@@ -42,7 +42,7 @@ export function StartHere({ go }: { go: (to: string) => void }) {
         <div className="paths">
           <div><h3>If you are judging the build</h3><ol>{TOUR_HIRING.map((t) => <li key={t}>{t}</li>)}</ol></div>
           <div><h3>If you run events</h3><ol>{TOUR_BUYER.map((t) => <li key={t}>{t}</li>)}</ol>
-            <p className="next">{CONTACT_URL ? <a href={CONTACT_URL}>{NEXT_STEP}</a> : NEXT_STEP}</p></div>
+            <p className="next">{NEXT_STEP_LEAD} <a href={CONTACT_URL}>{NEXT_STEP_LINK}</a></p></div>
         </div>
       </details>
     </section>

@@ -342,6 +342,8 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
   const get = (name: string, dflt: string) => { const i = argv.indexOf(name); return i >= 0 ? argv[i + 1] : dflt; };
   const out = resolve(get("--out", join(ROOT, ".snapshot")));
   const t0 = Date.now();
+  // The database guard first: it must hold even where dist/ has not been built (CI runs the suite without a build).
+  if (process.env.DATABASE_URL?.trim()) throw new Error("DATABASE_URL is set. The snapshot reads only the demo sample (samples/demo-snapshot.tgz) and refuses to run beside a database URL: unset it.");
   if (!existsSync(join(ROOT, "dist", "index.html"))) throw new Error("dist/ is missing: run npm run build first (make snapshot does).");
   const { db, app, dir, today } = await openDemo();
   try {

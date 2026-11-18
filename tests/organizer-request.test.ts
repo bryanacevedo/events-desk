@@ -199,9 +199,12 @@ describe("nothing here sends mail", () => {
     expect(instantly.calls).toEqual([]);
     expect(heyreach.calls).toEqual([]);
     expect([notify.sent.length, notify.posts.length, notify.opsPosts.length]).toEqual([0, 0, 0]);
-    // The screens: no mailto link anywhere in the app.
-    const screens = readdirSync("src/app").filter((f) => f.endsWith(".tsx")).map((f) => readFileSync(`src/app/${f}`, "utf8")).join("\n");
+    // The screens: no mailto link anywhere in the app, except the demo's one next-step link to Bryan (decision 111, src/app/start.tsx,
+    // pinned to its exact address in tests/simfix.test.ts). That file may hold that one address and nothing else; every other screen holds none.
+    const files = readdirSync("src/app").filter((f) => f.endsWith(".tsx"));
+    const screens = files.filter((f) => f !== "start.tsx").map((f) => readFileSync(`src/app/${f}`, "utf8")).join("\n");
     expect(screens).not.toMatch(/mailto:/i);
+    expect(readFileSync("src/app/start.tsx", "utf8").match(/mailto:[^"\s]*/gi)).toEqual(["mailto:bryan@leandrive.io?subject=Events%20Desk%20demo"]);
     expect(DAN).toBeTruthy();
   });
 });

@@ -58,8 +58,6 @@ Money20/20 USA 2026, with its replies and meetings.
 My event is not listed
 Needs a second person to approve the abstract
 Needs a second person to approve the slides
-Next step: talk to us about running this on your own events.
-Next step: to try it on your own events and lists, run it yourself (the README shows how) or ask whoever sent you this link.
 No conference starts in the next year.
 No email, no CRM task.
 No past event has a goal and a written scorecard yet.
@@ -86,6 +84,7 @@ Planning, Confirmed, Preparing, Live, Following up, Scored
 Publish although it got under # right
 Reading replies, waiting on the uploader
 Real event names, simulated attendees.
+Reasons are listed for the first # rows left out.
 Request a seat: the form a rep fills in and an approver reads.
 Request email to the organizer
 Research companies, Verify and find contacts, Outreach list ready
@@ -128,6 +127,7 @@ This browser will not keep scans after the page closes. Sync before you leave.
 This draft was thrown away.
 This kit could not be opened.
 This looks like Slack's default picture
+This page could not load. The desk was probably updated while it was open.
 This public demo does not take files.
 Those notes are not here.
 Three ways to lay out the same Overview: one list, boxes by kind, or along a calendar.
@@ -152,7 +152,6 @@ Why this match is wrong
 Why we go, Taking part, Who goes
 Why you are passing on #
 Will not share the list
+Write to Bryan about your own data
 You post this yourself. Events Desk never posts for you.
 chance of luck allowed each, # split by the groups compared
-Reasons are listed for the first # rows left out.
-This page could not load. The desk was probably updated while it was open.
