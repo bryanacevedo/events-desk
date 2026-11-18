@@ -116,13 +116,21 @@ describe("Capitol Revenue Roadshow, at the door on the demo's day", () => {
   });
 });
 
+describe("the seed never checks a guest in before the event's first day (week 2, J14)", () => {
+  it("every attended guest was checked in on or after the event's start, so the CRM never reads attended early", async () => {
+    const rows = await q<{ id: string; day: string; starts_on: string }>("SELECT g.id, g.checked_in_at::date::text AS day, e.starts_on::text AS starts_on FROM event_guests g JOIN events e ON e.id = g.event_id WHERE g.status = 'attended' AND g.checked_in_at IS NOT NULL");
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.filter((r) => r.day < r.starts_on)).toEqual([]);
+  });
+});
+
 describe("the Orrery customer dinner in Lisbon is a hosted plan, not a seat suggestion", () => {
   it("has a host, six listed guests and no pending seat request", async () => {
     expect(await q("SELECT 1 FROM seat_requests WHERE suggestion IS NOT NULL AND status = 'pending'")).toEqual([]);
     const h = await hosted(ORRERY_DINNER);
-    expect(h.event).toMatchObject({ name: "Orrery customer dinner, Lisbon", format: "customer_event", hosts: ["Maya Ortiz"] });
+    expect(h.event).toMatchObject({ name: "Orrery customer dinner, Lisbon", format: "customer_event", hosts: ["Maya Okafor"] });
     expect(h.counts).toMatchObject({ total: 6, listed: 6 });
-    expect(h.guests.every((g: any) => g.owner === "Maya Ortiz" && g.status === "listed" && g.can_email)).toBe(true);
+    expect(h.guests.every((g: any) => g.owner === "Maya Okafor" && g.status === "listed" && g.can_email)).toBe(true);
     expect((await q("SELECT 1 FROM involvements WHERE event_id = $1 AND kind = 'hosted'", [ORRERY_DINNER])).length).toBe(1);
   });
 });

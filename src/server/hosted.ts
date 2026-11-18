@@ -390,6 +390,11 @@ export async function removeGuest(db: Db, deps: HostedDeps, actor: string, event
 
 /* ------------------------------------------------------------------ the door: check-in, walk-ins, closing */
 
+/** Nobody is at the door before the event's first day (in the event's own zone). CRM Desk reads an attended guest as a person who came, so an early check-in would say so before it happened (decision 114). */
+function notBeforeTheDay(ev: Pick<HostedEvent, "starts_on" | "zone">, now: Date, what: string) {
+  if (dayIn(now, ev.zone) < ev.starts_on) throw new RuleError(`${what} opens on ${shortDay(ev.starts_on)}, the first day of the event.`);
+}
+
 /** Checks a guest in. Capacity is not enforced at the door. Anyone not yet answered, registered, waitlisted, declined or marked no-show may be checked in. */
 export async function checkIn(db: Db, deps: HostedDeps, actor: string, eventId: string, gid: string) {
   const now = nowOf(deps);
@@ -397,6 +402,7 @@ export async function checkIn(db: Db, deps: HostedDeps, actor: string, eventId: 
     const ev = await hostedEvent(q, eventId);
     if (ev.webinar) throw new RuleError("A webinar has no check-in. Import its attendance instead.");
     await lockHosted(q, eventId);
+    notBeforeTheDay(ev, now, "Check-in");
     const g = await guestOf(q, eventId, gid, true);
     if (g.status === "attended") throw new RuleError("They are already checked in.");
     const err = transition(g.status, "attended", { by: "host" });
@@ -436,6 +442,7 @@ export async function walkIn(db: Db, deps: HostedDeps, actor: string, eventId: s
     const ev = await hostedEvent(q, eventId);
     if (ev.webinar) throw new RuleError("A webinar has no check-in. Import its attendance instead.");
     if (ev.stage === "declined") throw new RuleError("This event was declined, so its list is closed.");
+    notBeforeTheDay(ev, now, "Adding a walk-in");
     const h = await readHosted(q, eventId);
     const name = clip(input.name, 120, "the name");
     if (!name) throw new HostedInvalid("A walk-in needs a name.");
@@ -444,7 +451,7 @@ export async function walkIn(db: Db, deps: HostedDeps, actor: string, eventId: s
     const email = rawEmail || null;
     const company = clip(input.company, 120, "the company");
     await ensureFree(q, eventId, email, name, company);
-    const owner = (text(input.owner) || h.host_name || actor).slice(0, 60);
+    const owner = (text(input.owner) || actor).slice(0, 60);
     const id = newId("gst");
     await q(
       `INSERT INTO event_guests (id, event_id, name, email, company, title, country, owner, side, source, status, rsvp_token, checked_in_at, checked_in_by, created_by, created_at)

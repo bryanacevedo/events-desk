@@ -22,6 +22,18 @@ describe("check-in", () => {
     await expect(checkIn(db, d, CAMILLE, id, a)).rejects.toThrow(/already checked in/);
   });
 
+  it("nobody is checked in, and no walk-in added, before the event's first day (week 2, J14)", async () => {
+    const db = await freshDb();
+    const id = await hostedDinner(db);
+    const a = await yes(db, depsAt(BEFORE), id, "Ana Ruiz");
+    await expect(checkIn(db, depsAt(BEFORE), CAMILLE, id, a)).rejects.toThrow(/Check-in opens on 10 Jun/);
+    await expect(walkIn(db, depsAt(BEFORE), CAMILLE, id, { name: "Walt Inn" })).rejects.toThrow(/opens on 10 Jun/);
+    expect(await statusOf(db, a)).toBe("registered");
+    expect((await db.query("SELECT count(*)::int AS n FROM event_guests WHERE event_id = $1 AND source = 'walk_in'", [id]))[0].n).toBe(0);
+    await checkIn(db, depsAt(ON_THE_DAY), CAMILLE, id, a);
+    expect(await statusOf(db, a)).toBe("attended");
+  });
+
   it("a walk-in arrives attended, source walk_in, owned by the host by default, and capacity is not enforced at the door", async () => {
     const db = await freshDb();
     const id = await hostedDinner(db, { capacity: 1 });

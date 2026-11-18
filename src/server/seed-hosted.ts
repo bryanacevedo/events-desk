@@ -15,7 +15,7 @@ import { simulatedSender } from "./transactional.ts";
 import { seedHosted, YEAR } from "./seed-year.ts";
 import { addDays } from "../shared/motion.ts";
 
-const MAYA = "Maya Ortiz", PRIYA = "Priya Natarajan", LEO = "Leo Marsh";
+const MAYA = "Maya Okafor", PRIYA = "Priya Natarajan", LEO = "Leo Marsh";
 export const GOLDEN_GATE = "evt_y24", LAKESIDE = "evt_y18", RIVERBEND = "evt_y04", CASCADIA = "evt_y12", CAPITOL = "evt_y22";
 /** Fixed ids so restampDemoPlan can find the dated rows. */
 export const GG_STEP_FREE = "vcs_seed_gg_free", GG_STEP_FEE = "vcs_seed_gg_fee";
@@ -106,7 +106,9 @@ async function goldenGate(db: Db, today: string) {
 
 /** The roadshow stop on the demo's day: registered guests, one checked in, one walk-in. Its date is moved to the demo's day by restampDemoPlan. */
 async function capitol(db: Db, today: string) {
-  const id = CAPITOL, on = "2026-11-19";
+  // The stop is on the demo's day: check-in is refused before an event's first day, so the date is set before anyone is checked in (decision 114).
+  const id = CAPITOL, on = today;
+  await db.query("UPDATE events SET starts_on = $2::date, ends_on = NULL WHERE id = $1", [id, on]);
   await hostThe(db, id, MAYA, { capacity: 12, address: "225 Eastern Market, Washington", doors_at: "17:00", welcome: "A short evening for the buyers in Washington." });
   const list = people(14, 80);
   const ids: string[] = [];
