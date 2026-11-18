@@ -43,12 +43,12 @@ beforeAll(async () => {
   db = await freshDb();
   await seedIcp(db);
   icp = (await db.query<{ icp: Icp }>("SELECT icp FROM icp_versions WHERE version = 1"))[0].icp;
-  id = (await createEvent(db, "Maya Ortiz", { name: "Meridian", starts_on: "2027-03-30", seat_count: 60, seat_price_cents: 100, country: "Spain", flow: "two_card" })).id;
+  id = (await createEvent(db, "Maya Okafor", { name: "Meridian", starts_on: "2027-03-30", seat_count: 60, seat_price_cents: 100, country: "Spain", flow: "two_card" })).id;
   const pending = async () => (await db.query<{ id: string }>("SELECT id FROM approvals WHERE event_id = $1 AND status = 'pending'", [id]))[0].id;
   await decideApproval(db, { approvalId: await pending(), actor: "Dan Whitlock", decision: "approve" });
-  await ingestUpload(db, id, "Maya Ortiz", "large.csv", csv);
-  await requestResearchCard(db, id, "Maya Ortiz", exampleDns);
-  await decideApproval(db, { approvalId: await pending(), actor: "Maya Ortiz", decision: "approve" });
+  await ingestUpload(db, id, "Maya Okafor", "large.csv", csv);
+  await requestResearchCard(db, id, "Maya Okafor", exampleDns);
+  await decideApproval(db, { approvalId: await pending(), actor: "Maya Okafor", decision: "approve" });
   const t = Date.now();
   await processEvent(db, id, simDeps(world));
   seconds = (Date.now() - t) / 1000;

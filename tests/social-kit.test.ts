@@ -13,7 +13,7 @@ import { decideSeat, parseSeatRequest, requestSeat } from "../src/server/seats.t
 import { askKit, captions, cardSvg, datesWords, kitImage, kitSheet, KIT_SIZES, listOffers, patchOffer, photoOf, postingCounts, putOrganizerKit, putPhoto, removePhoto, renderCard, sniff, useSlackPhoto, type CardInput } from "../src/server/social-kit.ts";
 import { freshDb } from "./helpers.ts";
 
-const CAMILLE = "Camille Laurent", DAN = "Dan Whitlock", MAYA = "Maya Ortiz";
+const CAMILLE = "Camille Laurent", DAN = "Dan Whitlock", MAYA = "Maya Okafor";
 let db: Db, eventId: string;
 const png = (): Uint8Array => new Uint8Array(new Resvg('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="#336699"/></svg>').render().asPng());
 const input: CardInput = { facts: { event: "Money20/20 USA 2026", dates: "18 to 21 October 2026", place: "Las Vegas", talk: "Billing without surprises", booth: "", hashtag: "#Money2020", role: "speaking" }, person: "Camille Laurent", photo: null, logo: null, color: null };

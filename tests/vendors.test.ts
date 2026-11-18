@@ -68,11 +68,11 @@ describe("no vendor credit carries a dollar figure", () => {
   it("in the Usage, card, approvals and settings payloads", async () => {
     const db = await freshDb();
     await deliverEvent(db, CSV);
-    const id = (await createEvent(db, "Maya Ortiz", { name: "Second", starts_on: "2027-02-01", seat_count: 1, seat_price_cents: 100 })).id;
+    const id = (await createEvent(db, "Maya Okafor", { name: "Second", starts_on: "2027-02-01", seat_count: 1, seat_price_cents: 100 })).id;
     const [a] = await db.query<{ id: string }>("SELECT id FROM approvals WHERE event_id = $1", [id]);
     await decideApproval(db, { approvalId: a.id, actor: "Dan Whitlock", decision: "approve" });
-    await ingestUpload(db, id, "Maya Ortiz", "a.csv", CSV);
-    await requestResearchCard(db, id, "Maya Ortiz");
+    await ingestUpload(db, id, "Maya Okafor", "a.csv", CSV);
+    await requestResearchCard(db, id, "Maya Okafor");
     const app = createApp(db, { demo: true });
     const get = async (p: string) => (await app.request(p, { headers: { "x-actor": "GTM%20Team" } })).json() as Promise<any>;
 

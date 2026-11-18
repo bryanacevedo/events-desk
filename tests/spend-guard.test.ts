@@ -12,12 +12,12 @@ const csv = (n: number) => `Company,Name,Email\n${Array.from({ length: n }, (_, 
 
 async function approvedEvent(n: number) {
   const db = await freshDb();
-  const id = (await createEvent(db, "Maya Ortiz", { name: "T", starts_on: "2027-01-01", seat_count: 2, seat_price_cents: 100, flow: "single_card" })).id;
+  const id = (await createEvent(db, "Maya Okafor", { name: "T", starts_on: "2027-01-01", seat_count: 2, seat_price_cents: 100, flow: "single_card" })).id;
   const pending = async () => (await db.query<{ id: string }>("SELECT id FROM approvals WHERE event_id = $1 AND status = 'pending'", [id]))[0].id;
   await decideApproval(db, { approvalId: await pending(), actor: "Dan Whitlock", decision: "approve" });
-  await ingestUpload(db, id, "Maya Ortiz", "a.csv", csv(n));
-  await requestCard(db, id, "Maya Ortiz");
-  await decideApproval(db, { approvalId: await pending(), actor: "Maya Ortiz", decision: "approve" });
+  await ingestUpload(db, id, "Maya Okafor", "a.csv", csv(n));
+  await requestCard(db, id, "Maya Okafor");
+  await decideApproval(db, { approvalId: await pending(), actor: "Maya Okafor", decision: "approve" });
   return { db, id };
 }
 

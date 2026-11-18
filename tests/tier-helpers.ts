@@ -13,7 +13,7 @@ import { ingestUpload } from "../src/server/uploads.ts";
 import type { Settings } from "../src/shared/cost.ts";
 import type { FirmoRecord } from "../src/shared/tiering.ts";
 
-export const MAYA = "Maya Ortiz", DAN = "Dan Whitlock";
+export const MAYA = "Maya Okafor", DAN = "Dan Whitlock";
 export const defaults = (): Settings => JSON.parse(readFileSync("config/defaults.json", "utf8"));
 
 export interface Spec {

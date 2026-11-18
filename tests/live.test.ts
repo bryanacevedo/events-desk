@@ -180,16 +180,16 @@ describe("Slack cost cards go to the uploader, and only their Slack user can con
     id = (await createEvent(db, "UREQUESTER", { name: "T", starts_on: "2027-01-01", seat_count: 1, seat_price_cents: 100 }, undefined, ["UAPPROVER"])).id;
     const seats = (await db.query<{ id: string }>("SELECT id FROM approvals WHERE event_id = $1", [id]))[0].id;
     await decideApproval(db, { approvalId: seats, actor: "UAPPROVER", decision: "approve" });
-    await ingestUpload(db, id, "Maya Ortiz", "a.csv", csv);
+    await ingestUpload(db, id, "Maya Okafor", "a.csv", csv);
   };
   const quote = async () => {
-    const r = await app.request(`/api/events/${id}/quote`, { method: "POST", headers: { "x-actor": "Maya Ortiz" } });
+    const r = await app.request(`/api/events/${id}/quote`, { method: "POST", headers: { "x-actor": "Maya Okafor" } });
     if (r.status === 200) card = (await db.query<{ id: string }>("SELECT id FROM approvals WHERE event_id = $1 AND status = 'pending'", [id]))[0].id;
     return r;
   };
 
   it("sends the card to the uploader's Slack user and lets only that user confirm it", async () => {
-    await setup({ "Maya Ortiz": "UMAYA" });
+    await setup({ "Maya Okafor": "UMAYA" });
     expect((await quote()).status).toBe(200);
     const msg = calls.find((c) => c.url.includes("chat.postMessage"))!.body;
     expect(msg.text).toContain("<@UMAYA>");
@@ -199,7 +199,7 @@ describe("Slack cost cards go to the uploader, and only their Slack user can con
     expect(JSON.stringify(msg.blocks)).toContain("Confirm");
     // An approver who did not upload, and the person who requested the seats, are refused; nothing runs.
     await click("approve", "UAPPROVER");
-    expect(calls.at(-1)!.body.text).toMatch(/Only <@UMAYA> \(Maya Ortiz\), who uploaded/);
+    expect(calls.at(-1)!.body.text).toMatch(/Only <@UMAYA> \(Maya Okafor\), who uploaded/);
     await click("approve", "UREQUESTER");
     expect(await stage()).toBe("quoted");
     // A Slack user who is not mapped to the uploader cannot decline it either.
@@ -209,8 +209,8 @@ describe("Slack cost cards go to the uploader, and only their Slack user can con
     expect(await stage()).toBe("researching");
   });
   it("posts a waiting card again when asked, and refuses when none is waiting", async () => {
-    await setup({ "Maya Ortiz": "UMAYA" });
-    const resend = () => app.request(`/api/events/${id}/card/resend`, { method: "POST", headers: { "x-actor": "Maya Ortiz" } });
+    await setup({ "Maya Okafor": "UMAYA" });
+    const resend = () => app.request(`/api/events/${id}/card/resend`, { method: "POST", headers: { "x-actor": "Maya Okafor" } });
     expect((await resend()).status).toBe(409);
     await quote();
     const before = calls.filter((c) => c.url.includes("chat.postMessage")).length;
@@ -221,12 +221,12 @@ describe("Slack cost cards go to the uploader, and only their Slack user can con
     await setup({ "Someone Else": "UELSE" });
     const r = await quote();
     expect(r.status).toBe(409);
-    expect(((await r.json()) as { error: string }).error).toMatch(/Maya Ortiz uploaded the attendee list but has no Slack user in SLACK_USER_MAP/);
+    expect(((await r.json()) as { error: string }).error).toMatch(/Maya Okafor uploaded the attendee list but has no Slack user in SLACK_USER_MAP/);
     expect((await db.query("SELECT 1 FROM cost_cards WHERE event_id = $1", [id])).length).toBe(0);
     expect(await stage()).toBe("mapped");
   });
   it("refuses a click on a card whose uploader lost their mapping", async () => {
-    await setup({ "Maya Ortiz": "UMAYA" });
+    await setup({ "Maya Okafor": "UMAYA" });
     await quote();
     app = createApp(db, { demo: false, slack: cfg({}) });
     await click("approve", "UMAYA");
@@ -234,7 +234,7 @@ describe("Slack cost cards go to the uploader, and only their Slack user can con
     expect(await stage()).toBe("quoted");
   });
   it("voids the old card when someone else uploads the list again, and sends the new card to them", async () => {
-    await setup({ "Maya Ortiz": "UMAYA", "Sam Okafor": "USAM" });
+    await setup({ "Maya Okafor": "UMAYA", "Sam Okafor": "USAM" });
     await quote();
     const old = card;
     await ingestUpload(db, id, "Sam Okafor", "b.csv", csv);

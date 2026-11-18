@@ -11,7 +11,7 @@ import { recordConsent } from "../src/server/sending.ts";
 import type { CardMessage } from "../src/server/slack-cards.ts";
 import { deliverEvent } from "./helpers.ts";
 
-export const MAYA = "Maya Ortiz";
+export const MAYA = "Maya Okafor";
 export const OWNER = "Priya Natarajan";
 
 export const LIST = `Company,Name,Title,Email,LinkedIn

@@ -7,7 +7,7 @@ import { createCaptureKey } from "../src/server/directory.ts";
 import { createEvent } from "../src/server/events.ts";
 import type { Llm } from "../src/server/providers.ts";
 
-export const MAYA = "Maya Ortiz", DAN = "Dan Whitlock", LEO = "Leo Marsh", GTM = "GTM Team";
+export const MAYA = "Maya Okafor", DAN = "Dan Whitlock", LEO = "Leo Marsh", GTM = "GTM Team";
 
 /** An event as a person would have it before a list: requested, then approved by Dan. */
 export async function approvedEvent(db: Db, name = "AWS re:Invent 2026", over: { approve?: boolean } = {}) {

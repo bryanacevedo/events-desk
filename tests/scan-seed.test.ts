@@ -42,7 +42,7 @@ describe("the demo's scans", () => {
     expect((await readSettings(db.query, SCAN_EVENT_SETUP)).qualifiers).toHaveLength(3);
   });
   it("a rep reads their own scans and the hot ones reached the CRM outbox or the event's channel", async () => {
-    expect((await listScans(db, "Maya Ortiz", M2020)).scans.every((s) => s.rep === "Maya Ortiz")).toBe(true);
+    expect((await listScans(db, "Maya Okafor", M2020)).scans.every((s) => s.rep === "Maya Okafor")).toBe(true);
     expect(await db.query("SELECT 1 FROM notifications WHERE event_id = $1 AND card::text LIKE '%Henrik Solberg%'", [M2020])).toHaveLength(1);
   });
 });

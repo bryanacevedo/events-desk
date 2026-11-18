@@ -72,7 +72,7 @@ function placeOf(pathname: string): Place {
   if (/^\/event\//.test(pathname)) return "event";
   if (pathname === "/events") return "events";
   if (pathname === "/seats") return "seats";
-  if (pathname === "/seat-decisions") return "seatdecisions";
+  if (pathname === "/seat-decisions" || pathname === "/waiting") return "seatdecisions";
   if (pathname === "/budget") return "budget";
   if (pathname === "/results") return "results";
   if (pathname === "/choosing") return "choosing";
@@ -100,6 +100,8 @@ export function App() {
   useEffect(() => { get<{ demo: boolean; decisions?: string; public_demo?: boolean; sample_day?: string | null; snapshot?: { taken_on: string } }>("/api/health").then((h) => { setDemo(Boolean(h?.demo)); setDecisions(decisionsOf(h)); setSample({ publicDemo: Boolean(h?.public_demo), day: h?.sample_day ?? null, snapshot: h?.snapshot?.taken_on ?? null }); }); }, []);
   useEffect(() => { refresh(); }, [pathname, refresh]);
   // How many people are waiting on whoever is acting, across events.
+  const [decide, setDecide] = useState(0);
+  useEffect(() => { get<{ total: number }>("/api/waiting").then((d) => setDecide(d?.total ?? 0)); }, [actor, pathname]);
   const [waiting, setWaiting] = useState(0), [dayHas, setDayHas] = useState(false), [speaks, setSpeaks] = useState(false), [kits, setKits] = useState(0);
   useEffect(() => { get<{ replies: unknown[]; meetings: unknown[]; captures: unknown[]; notes?: unknown[] }>(`/api/motion/my-day?rep=${encodeURIComponent(actor)}`).then((d) => { setWaiting((d?.replies.length ?? 0) + (d?.notes?.length ?? 0)); setDayHas(Boolean(d && (d.replies.length || d.meetings.length || d.captures.length || d.notes?.length))); }); }, [actor, pathname]);
 
@@ -123,7 +125,7 @@ export function App() {
   const planner = plannerAccess(needs, actor, lead);
   const showDay = !lead || dayHas || kits > 0;
   const showSpeaking = plans || speaks;
-  const navAt = ["overview", ...(showDay ? ["myday"] : []), "events", ...(plans ? ["choosing"] : []), ...(lead ? ["seats"] : []), ...(lead ? ["budget"] : []), ...(plans ? ["results"] : []), ...(showSpeaking ? ["speaking"] : []), ...(lead ? ["usage"] : [])].indexOf(place);
+  const navAt = ["overview", ...(showDay ? ["myday"] : []), ...(plans ? ["seatdecisions"] : []), "events", ...(plans ? ["choosing"] : []), ...(lead ? ["seats"] : []), ...(lead ? ["budget"] : []), ...(plans ? ["results"] : []), ...(showSpeaking ? ["speaking"] : []), ...(lead ? ["usage"] : [])].indexOf(place);
 
   const item = (to: string, p: Place, label: string, icon: ReactNode, cls: string, badge?: number) => (
     <Link to={to} go={go} className={cls} aria-current={place === p ? "page" : undefined}>
@@ -145,6 +147,7 @@ export function App() {
           <div className="navlist" style={{ "--at": navAt } as React.CSSProperties} data-on={navAt >= 0 ? "" : undefined}>
             {item("/", "overview", "Overview", <Icon.overview />, "navitem")}
             {showDay && item("/my-day", "myday", "My day", <Icon.calendar />, "navitem", waiting)}
+            {plans && item("/waiting", "seatdecisions", "Waiting on you", <Icon.seats />, "navitem", decide)}
             {item("/events", "events", "Events", <Icon.events />, "navitem")}
             {plans && item("/choosing", "choosing", "Choosing", <Icon.choosing />, "navitem")}
             {lead && item("/seats", "seats", "Seats", <Icon.seats />, "navitem", approver ? count : 0)}
@@ -175,7 +178,7 @@ export function App() {
           {place === "overview" && <Overview go={go} sheetId={search.get("event")} />}
           {place === "events" && <Events go={go} sheetId={search.get("event")} requesting={search.get("request") === "1"} preselect={search.get("catalog")} search={search} />}
           {place === "seats" && (lead ? <Seats go={go} search={search} requesting={search.get("request") === "1"} preselect={search.get("catalog")} /> : <p className="md-clear">Seats are for leadership and GTM Engineering.</p>)}
-          {place === "seatdecisions" && (lead ? <SeatDecisions /> : <p className="md-clear">Seats are for leadership and GTM Engineering.</p>)}
+          {place === "seatdecisions" && (plans ? <SeatDecisions /> : <p className="md-clear">Decisions are for leadership, planners and GTM Engineering.</p>)}
           {place === "budget" && (lead ? <Budget go={go} search={search} /> : <p className="md-clear">Budget is for leadership and GTM Engineering.</p>)}
           {place === "results" && (planner === "yes" ? <Results go={go} /> : planner === "loading" ? <PageSkeleton /> : <p className="md-clear">Results are for planners, leadership and GTM Engineering.</p>)}
           {place === "choosing" && (planner === "yes" ? <Choosing go={go} /> : planner === "loading" ? <PageSkeleton /> : <p className="md-clear">Choosing is for planners, leadership and GTM Engineering.</p>)}

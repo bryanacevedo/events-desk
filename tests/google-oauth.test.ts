@@ -91,7 +91,7 @@ describe("OAuth user sign-in", () => {
     expect(sheetsFor(true, o).enabled).toBe(true);
   });
   it("live mode accepts either complete sign-in and refuses neither", () => {
-    const base = { ...Object.fromEntries(LIVE_REQUIRED.map((k) => [k, "x"])), SLACK_USER_MAP: '{"Maya Ortiz":"U01ABC"}' };
+    const base = { ...Object.fromEntries(LIVE_REQUIRED.map((k) => [k, "x"])), SLACK_USER_MAP: '{"Maya Okafor":"U01ABC"}' };
     const set = (keys: readonly string[]) => Object.fromEntries(keys.map((k) => [k, "x"]));
     expect(resolveMode([], { ...base, ...set(GOOGLE_SIGN_INS.oauth), LIVE_SPEND: "1" }).liveSpend).toBe(true);
     expect(resolveMode([], { ...base, ...set(GOOGLE_SIGN_INS.service_account), LIVE_SPEND: "1" }).liveSpend).toBe(true);

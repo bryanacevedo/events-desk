@@ -22,11 +22,11 @@ export const GOOGLE_SIGN_INS = {
   oauth: ["GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET", "GOOGLE_OAUTH_REFRESH_TOKEN"],
 } as const;
 
-/** SLACK_USER_MAP is JSON: {"Maya Ortiz": "U01ABC", ...}. A cost card is confirmed by the person who uploaded the list, and in live mode the Slack user is the proof of who that is. */
+/** SLACK_USER_MAP is JSON: {"Maya Okafor": "U01ABC", ...}. A cost card is confirmed by the person who uploaded the list, and in live mode the Slack user is the proof of who that is. */
 export function parseUserMap(raw: string | undefined): Record<string, string> {
   let j: unknown;
   try { j = JSON.parse(raw ?? ""); } catch { throw new Error("it is not valid JSON."); }
-  if (!j || typeof j !== "object" || Array.isArray(j) || !Object.keys(j).length) throw new Error('it must be a JSON object such as {"Maya Ortiz": "U01ABC"}.');
+  if (!j || typeof j !== "object" || Array.isArray(j) || !Object.keys(j).length) throw new Error('it must be a JSON object such as {"Maya Okafor": "U01ABC"}.');
   for (const [name, id] of Object.entries(j)) if (!name.trim() || typeof id !== "string" || !/^[UW][A-Z0-9]{2,}$/.test(id)) throw new Error(`"${name}" needs a Slack user ID such as U01ABC.`);
   return j as Record<string, string>;
 }

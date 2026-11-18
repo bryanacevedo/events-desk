@@ -4,7 +4,7 @@ import type { Db } from "../src/server/db.ts";
 import { decideSeat, parseSeatRequest, requestSeat, type SeatInput } from "../src/server/seats.ts";
 import { deliverEvent, freshDb } from "./helpers.ts";
 
-const MAYA = "Maya Ortiz", DAN = "Dan Whitlock", ANA = "Ana Duarte", LEO = "Leo Marsh";
+const MAYA = "Maya Okafor", DAN = "Dan Whitlock", ANA = "Ana Duarte", LEO = "Leo Marsh";
 const body = (o: Record<string, unknown> = {}) => ({
   catalog_id: "cat_a", team: "Sales", role: "SDR", goal: "new_pipeline", why_event: "Their buyers are the people we sell to.", why_you: "I run outreach for this region and know the accounts.", expected_meetings: 6, ...o,
 });
@@ -63,7 +63,7 @@ describe("seat requests", () => {
 
   it("cannot be approved by the person who asked, or by someone who is not an approver", async () => {
     const a = await req(MAYA);
-    await db.query("UPDATE event_settings SET settings = jsonb_set(settings, '{approvers}', '[\"Dan Whitlock\", \"Maya Ortiz\"]')");
+    await db.query("UPDATE event_settings SET settings = jsonb_set(settings, '{approvers}', '[\"Dan Whitlock\", \"Maya Okafor\"]')");
     await expect(decide(a.id, MAYA)).rejects.toThrow(/own request/);
     await expect(decide(a.id, "Random Person")).rejects.toThrow(/approvers/);
     expect((await decide(a.id, DAN)).status).toBe("approved");

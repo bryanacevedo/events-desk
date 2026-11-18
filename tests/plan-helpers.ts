@@ -6,7 +6,7 @@ import { addInvolvement, approvePlan, createPlan, submitPlan, updatePlan, type P
 
 export const CAMILLE = "Camille Laurent";
 export const DAN = "Dan Whitlock";
-export const MAYA = "Maya Ortiz";
+export const MAYA = "Maya Okafor";
 export const LEO = "Leo Marsh";
 export const TODAY = "2026-11-13";
 export const as = (a: string) => ({ "x-actor": encodeURIComponent(a), "content-type": "application/json" });

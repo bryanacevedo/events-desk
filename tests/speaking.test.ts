@@ -11,7 +11,7 @@ import { seedPlan } from "../src/server/seed-plan.ts";
 import { freshDb } from "./helpers.ts";
 import { TODAY } from "./plan-helpers.ts";
 
-const CAMILLE = "Camille Laurent", DAN = "Dan Whitlock", MAYA = "Maya Ortiz";
+const CAMILLE = "Camille Laurent", DAN = "Dan Whitlock", MAYA = "Maya Okafor";
 let db: Db, eventId: string;
 const fresh = async () => {
   const e = await createPlan(db, CAMILLE, { name: `Test Summit ${Math.random().toString(36).slice(2, 7)}`, venue: "Lisbon", country: "Portugal", starts_on: "2027-03-01", reason: "The buyers we sell to meet there once a year." });

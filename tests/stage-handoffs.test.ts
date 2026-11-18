@@ -16,7 +16,7 @@ import type { LifecycleDeps } from "../src/server/lifecycle-deps.ts";
 import { freshDb } from "./helpers.ts";
 import { clock, fakeCrm, fakeNotifier, LIST } from "./lifecycle-harness.ts";
 
-const MAYA = "Maya Ortiz", DAN = "Dan Whitlock";
+const MAYA = "Maya Okafor", DAN = "Dan Whitlock";
 
 describe("every stage hands off to the next", () => {
   it("from a seat request to a scored event", async () => {

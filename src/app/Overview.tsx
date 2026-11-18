@@ -458,7 +458,7 @@ export function Overview({ go, sheetId }: { go: (to: string) => void; sheetId: s
                 <span className="seatcall-go" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M3 8h9.5M8.5 4l4 4-4 4" /></svg></span>
               </Link>
             )
-            : <Empty className="tray-empty" what="Seat requests waiting for a decision show here." example="Maya Ortiz, SDR: a seat at SaaStr Annual 2027, ticket $2,495, 6 meetings expected." />}
+            : <Empty className="tray-empty" what="Seat requests waiting for a decision show here." example="Maya Okafor, SDR: a seat at SaaStr Annual 2027, ticket $2,495, 6 meetings expected." />}
       </div>
 
 

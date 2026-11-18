@@ -95,7 +95,7 @@ export function TalkBlock({ eventId, involvement, saved }: { eventId: string; in
     if (!planner) return <p className="mute">No words yet.</p>;
     return (
       <div className="pl-edit-row">
-        <button type="button" className="btn line small" disabled={busy} onClick={async () => { setBusy(true); setError(""); const r = await send("POST", `/api/events/${eventId}/talks`, actor, { involvement_id: involvement.id }); setBusy(false); if (!r.ok) { setError(r.error); return; } await changed(); }}>Make the words</button>
+        <button type="button" className="btn line small" disabled={busy} onClick={async () => { setBusy(true); setError(""); const r = await send("POST", `/api/events/${eventId}/talks`, actor, { involvement_id: involvement.id }); setBusy(false); if (!r.ok) { setError(r.error); return; } await changed(); setEditing(true); }}>Write the words</button>
         {error && <p role="alert" className="error small">{error}</p>}
       </div>
     );

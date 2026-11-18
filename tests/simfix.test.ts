@@ -149,7 +149,7 @@ describe("the first screen", () => {
     expect(WORDS.map((x) => x.join(" ")).join(" ")).not.toContain("\u2014");
   });
   it("shows what goes in an empty place, with an example marked as one", () => {
-    const html = renderToStaticMarkup(createElement(Empty, { what: "Seat requests show here.", example: "Maya Ortiz asks for a seat." }));
+    const html = renderToStaticMarkup(createElement(Empty, { what: "Seat requests show here.", example: "Maya Okafor asks for a seat." }));
     expect(html).toContain("Seat requests show here.");
     expect(html).toContain("<b>Example</b>");
   });
@@ -325,7 +325,7 @@ describe("small fixes from the review", () => {
     expect(s).not.toContain('localStorage.setItem("actor"');
   });
   it("says who a seat request went to, and not to the person who asked", () => {
-    expect(sentTo({ approvers: ["Dan Whitlock", "Leo Marsh"] }, "Maya Ortiz")).toBe("Sent to Dan or Leo for approval. Their answer shows on your page.");
+    expect(sentTo({ approvers: ["Dan Whitlock", "Leo Marsh"] }, "Maya Okafor")).toBe("Sent to Dan or Leo for approval. Their answer shows on your page.");
     expect(sentTo({ approvers: ["Dan Whitlock"] }, "Dan Whitlock")).toBe("Sent to an approver for approval. Their answer shows on your page.");
     expect(src("src/app/Events.tsx")).toContain("toast(sentTo(needs, actor))");
     expect(src("src/app/Seats.tsx")).toContain("toast(sentTo(needs, actor))");
@@ -373,8 +373,8 @@ describe("integrated week 2: small fixes on the desk's own screens", () => {
   it("asks before the result is closed, and states the goal against the result in one sentence", () => {
     const plan = src("src/app/Plan.tsx");
     expect(plan).toContain('import { ConfirmDialog } from "./Patterns"');
-    expect(plan).toContain('<ConfirmDialog title="Close the result?"');
-    expect(plan).toContain("confirm: true, run: () => send(\"POST\", `/api/events/${id}/plan/close`");
+    expect(plan).toContain("<ConfirmDialog title={act.title");
+    expect(plan).toContain('label: "Close the result", confirm: true, title: "Close the result?", body: closeSentence(p.result), run: () => send("POST", `/api/events/${id}/plan/close`');
     expect(plan).toContain("act.confirm ?");
   });
   it("the close sentence never calls an unread pipeline $0 and names a tier 1 count as tier 1 companies", () => {

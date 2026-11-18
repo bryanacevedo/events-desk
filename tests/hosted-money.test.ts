@@ -39,7 +39,7 @@ const as = (a: string) => ({ "x-actor": encodeURIComponent(a) });
 describe("a rep's hosted reads", () => {
   it("the page, the follow-up, the owner's list, the suggestions and the public link carry no cents key and no dollar text", async () => {
     const { db, id, a, app } = await setup();
-    await db.query("INSERT INTO target_accounts (id, name, owner, open_deal, created_by) VALUES ('tac_1', 'Acme', 'Maya Ortiz', 'Renewal worth $90,000', 'x')");
+    await db.query("INSERT INTO target_accounts (id, name, owner, open_deal, created_by) VALUES ('tac_1', 'Acme', 'Maya Okafor', 'Renewal worth $90,000', 'x')");
     const tok = await tokenOf(db, a);
     const reads = [`/api/events/${id}/hosted`, `/api/events/${id}/follow-up`, `/api/events/${id}/guests/suggestions`, "/api/hosted/mine", `/api/rsvp/${tok}`];
     const found: string[] = [];
@@ -63,7 +63,7 @@ describe("a rep's hosted reads", () => {
 
   it("a rep's suggestions carry no deal text with a dollar figure, and a planner's still do", async () => {
     const { db, id, app } = await setup();
-    await db.query("INSERT INTO target_accounts (id, name, owner, open_deal, deal_stage, created_by) VALUES ('tac_2', 'Zed Corp', 'Maya Ortiz', 'Renewal worth $90,000', 'Won $90,000', 'x')");
+    await db.query("INSERT INTO target_accounts (id, name, owner, open_deal, deal_stage, created_by) VALUES ('tac_2', 'Zed Corp', 'Maya Okafor', 'Renewal worth $90,000', 'Won $90,000', 'x')");
     const rep = JSON.stringify(await (await app.request(`/api/events/${id}/guests/suggestions`, { headers: as("Priya Nair") })).json());
     expect(rep).not.toContain("$90,000");
     expect(rep).toContain("Zed Corp");

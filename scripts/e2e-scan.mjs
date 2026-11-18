@@ -12,7 +12,7 @@ import { writeBarcode } from "zxing-wasm/writer";
 const BASE = process.env.BASE ?? "http://localhost:8982";
 const EVENT = process.env.EVENT ?? "evt_nrf-2026-retail-s-big-show";
 const CHROME = process.env.CHROME ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-const REP = "Maya Ortiz";
+const REP = "Maya Okafor";
 const work = join(process.env.TMPDIR ?? tmpdir(), "scan-e2e"); mkdirSync(work, { recursive: true });
 const STAMP = Date.now().toString(36);
 const email = `e2e.${STAMP}@orrery.example`;

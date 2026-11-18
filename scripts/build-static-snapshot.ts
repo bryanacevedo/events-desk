@@ -214,7 +214,7 @@ export async function crawlScanner(k: Crawl, ids: Ids): Promise<void> {
 
 export async function crawl(k: Crawl, ids: Ids, log: (s: string) => void = console.log): Promise<void> {
   // The shell and the pages that do not belong to one event.
-  for (const p of ["/api/health", "/api/overview", "/api/events", "/api/catalog", "/api/approvals", "/api/seat-requests", "/api/seat-decisions", "/api/choosing", "/api/choosing/repeat",
+  for (const p of ["/api/health", "/api/overview", "/api/events", "/api/catalog", "/api/approvals", "/api/seat-requests", "/api/seat-decisions", "/api/waiting", "/api/choosing", "/api/choosing/repeat",
     "/api/results", "/api/speaking", "/api/kit/offers", "/api/target-accounts", "/api/suppressions", "/api/settings/view", "/api/settings/defaults", "/api/icp", "/api/icp/sample-bench",
     "/api/integration", "/api/capture-keys", "/api/cases/open", "/api/motion/learning", "/api/hosted/mine"]) await k.read(p);
   for (const rep of PERSONAS.map((p) => p.name)) await k.read(`/api/motion/my-day?rep=${encodeURIComponent(rep)}`);

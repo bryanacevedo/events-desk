@@ -47,7 +47,7 @@ const DAN = "Dan Whitlock";
 const KNOWN = ["Pinefold, Larkspur Freight, Brightwater", "Kestrel Ledger, Nordvik Commerce", "Hoshi Retail Systems", "Quayside Data, Lumen Billing", "Altamar Logistics, Brightmoor Payments", "Ribeira Freight"];
 
 export const ROSTER: { name: string; team: string; role: string }[] = [
-  { name: "Maya Ortiz", team: "Outbound", role: "SDR" },
+  { name: "Maya Okafor", team: "Outbound", role: "SDR" },
   { name: "Priya Nair", team: "Outbound", role: "SDR" },
   { name: "Tomas Berg", team: "Outbound", role: "SDR" },
   { name: "Camille Laurent", team: "Field Marketing", role: "Field marketer" },
@@ -80,7 +80,7 @@ const PLAN: Record<number, [Upto, number, number, number?, string?]> = {
   11: ["delivered", 2, 0, 40, "Tomas Berg"], 12: ["delivered", 4, 0, 70], 13: ["delivered", 15, 0, 140, "Priya Nair"],
   14: ["delivered", 1, 0, 25], // about 25 rows
   15: ["review", 13, 0, 0], // the flagship: the whole of attendees-large.csv, research done, its cases open
-  16: ["approved", 2, 0], 17: ["delivered", 4, 0, 70, "Maya Ortiz"], 18: ["quoted", 10, 0, 120], 19: ["requested", 0, 2],
+  16: ["approved", 2, 0], 17: ["delivered", 4, 0, 70, "Maya Okafor"], 18: ["quoted", 10, 0, 120], 19: ["requested", 0, 2],
   20: ["paused", 12, 0, 140], 21: ["outreach", 10, 0, 100], 22: ["requested", 0, 6], 23: ["approved", 10, 2], 25: ["requested", 0, 3],
   27: ["approved", 4, 0], 28: ["mapped", 10, 0, 100], 29: ["requested", 0, 5], 31: ["approved", 3, 0], 32: ["mapped", 10, 0, 100],
   34: ["requested", 0, 2], 36: ["approved", 4, 0], 37: ["requested", 0, 6], 39: ["declined", 0, 3],
@@ -130,7 +130,7 @@ export async function seedReal(db: Db) {
       [cid, r.name, r.venue ?? "", r.city, r.country, r.start, r.end, r.organizer_url, price, r.list_price_usd === null, r.confidence, r.source_url, r.size, r.brand_color ?? null]);
     const plan = PLAN[i];
     if (!plan || plan[0] === "none") continue;
-    const [upto, approved, waiting, rows, uploader = "Maya Ortiz"] = plan;
+    const [upto, approved, waiting, rows, uploader = "Maya Okafor"] = plan;
     const total = approved + waiting;
     const id = slug(r.name);
     // A person asks once per event. People are dealt from the roster, a different start for each event, and the uploader always asks.
@@ -185,8 +185,8 @@ export async function seedReal(db: Db) {
   if (topUp) {
     await processEvent(db, topUp.id, deps);
     const late = windowCsv(cursor, 12, topUp.name).split("\n").slice(3).join("\n");
-    const made = await createTopUp(db, topUp.id, "Maya Ortiz", `${topUp.id.slice(4)}-late-registrations.csv`, windowCsv(topUp.from, topUp.rows, topUp.name) + late);
-    if (made.top_up_id) await requestResearchCard(db, made.top_up_id, "Maya Ortiz");
+    const made = await createTopUp(db, topUp.id, "Maya Okafor", `${topUp.id.slice(4)}-late-registrations.csv`, windowCsv(topUp.from, topUp.rows, topUp.name) + late);
+    if (made.top_up_id) await requestResearchCard(db, made.top_up_id, "Maya Okafor");
   }
   // The Orrery customer dinner in Lisbon was a pending seat suggestion. It is a hosted plan now (docs/HOSTED.md 17): a host, a dinner for customers, and six guests on the list, none invited yet.
   await seedOrreryDinner(db, ROSTER[0].name);

@@ -4,7 +4,7 @@
 export interface Persona { name: string; role: string }
 
 export const PERSONAS: Persona[] = [
-  { name: "Maya Ortiz", role: "SDR" },
+  { name: "Maya Okafor", role: "SDR" },
   { name: "Camille Laurent", role: "Field marketer" },
   { name: "Dan Whitlock", role: "Approves seats" },
   { name: "GTM Team", role: "GTM Engineering" },

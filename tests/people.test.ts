@@ -217,11 +217,11 @@ describe("the free people search in the Outreach flow", () => {
   it("leaves a title unplaced, and stores nobody, when the card has no model calls left for it", async () => {
     const r = await researchWith(db, CSV, { specs, people: { [HARBOR]: [found("p1", "Ana", "Vega", "Chief Vibes Officer")] } });
     const { requestOutreachCard } = await import("../src/server/research.ts");
-    await requestOutreachCard(db, r.id, "Maya Ortiz");
+    await requestOutreachCard(db, r.id, "Maya Okafor");
     await db.query("UPDATE cost_cards SET step_caps = jsonb_set(step_caps, '{title_parse,llm}', '0') WHERE event_id = $1 AND kind = 'outreach'", [r.id]);
     const a = (await db.query<{ id: string }>("SELECT id FROM approvals WHERE event_id = $1 AND status = 'pending'", [r.id]))[0].id;
     const { decideApproval } = await import("../src/server/approvals.ts");
-    await decideApproval(db, { approvalId: a, actor: "Maya Ortiz", decision: "approve" });
+    await decideApproval(db, { approvalId: a, actor: "Maya Okafor", decision: "approve" });
     const { processEvent } = await import("../src/server/pipeline.ts");
     await processEvent(db, r.id, r.deps);
     expect(await prospects(r.id)).toEqual([]);

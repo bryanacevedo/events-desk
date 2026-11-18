@@ -14,7 +14,7 @@ import { quoteOutreach, quoteResearch } from "../src/shared/cost.ts";
 import { DEFAULT_FLOW, validateRequest } from "../src/shared/domain.ts";
 import { freshDb } from "./helpers.ts";
 
-const MAYA = "Maya Ortiz", DAN = "Dan Whitlock";
+const MAYA = "Maya Okafor", DAN = "Dan Whitlock";
 const mock: Deps = { llm: mockLlm, vendorsFor: mockVendors };
 const LIST = [
   "Company Name,First Name,Last Name,Job Title,Work Email",

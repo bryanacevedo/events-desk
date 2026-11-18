@@ -8,7 +8,7 @@ import { initials } from "./words";
 
 export const PHOTOS: Record<string, string> = {
   "Dan Whitlock": "/avatars/dan-whitlock.jpg",
-  "Maya Ortiz": "/avatars/maya-ortiz.jpg",
+  "Maya Okafor": "/avatars/maya-okafor.jpg",
   "Priya Nair": "/avatars/priya-nair.jpg",
   "Tomas Berg": "/avatars/tomas-berg.jpg",
   "Camille Laurent": "/avatars/camille-laurent.jpg",

@@ -90,7 +90,7 @@ describe("every old list stage stays reachable inside preparing", () => {
   beforeAll(async () => { shared = await freshDb(); });
   for (const target of STAGES) {
     it(`a per-seat event reaches ${target} while preparing`, async () => {
-      const e = await createEvent(shared, "Maya Ortiz", { name: `Walk ${target}`, starts_on: "2027-09-01", seat_count: 1, seat_price_cents: 0, flow: "two_card" });
+      const e = await createEvent(shared, "Maya Okafor", { name: `Walk ${target}`, starts_on: "2027-09-01", seat_count: 1, seat_price_cents: 0, flow: "two_card" });
       expect(planStageOf(e, TODAY)).toBe("preparing");
       for (const to of walkTo(target)) {
         const moved = await moveEvent(shared, e.id, to, "Dan Whitlock", { reason: "r" });
@@ -141,8 +141,8 @@ describe("the stage is written by syncPlanStage, once", () => {
   });
 
   it("never touches a top-up", async () => {
-    const parent = await createEvent(db, "Maya Ortiz", { name: "P", starts_on: "2027-03-01", seat_count: 1, seat_price_cents: 0 });
-    await db.query("INSERT INTO events (id, name, venue, starts_on, seat_count, seat_price_cents, requested_by, parent_event_id) VALUES ('evt_top', 'P', '', '2027-03-01', 1, 0, 'Maya Ortiz', $1)", [parent.id]);
+    const parent = await createEvent(db, "Maya Okafor", { name: "P", starts_on: "2027-03-01", seat_count: 1, seat_price_cents: 0 });
+    await db.query("INSERT INTO events (id, name, venue, starts_on, seat_count, seat_price_cents, requested_by, parent_event_id) VALUES ('evt_top', 'P', '', '2027-03-01', 1, 0, 'Maya Okafor', $1)", [parent.id]);
     await syncAllPlanStages(db, { now: () => new Date("2028-01-01T00:00:00Z") });
     expect((await one<{ plan_stage: string }>(db, "SELECT plan_stage FROM events WHERE id = 'evt_top'")).plan_stage).toBe("preparing");
     expect((await one<{ plan_stage: string }>(db, "SELECT plan_stage FROM events WHERE id = $1", [parent.id])).plan_stage).toBe("following_up");
@@ -152,8 +152,8 @@ describe("the stage is written by syncPlanStage, once", () => {
 describe("backfill and the tick", () => {
   beforeEach(async () => { db = await freshDb(); });
   it("a migrated per-seat event is preparing, a scored one is judged, and one tick moves a past one to following up", async () => {
-    const past = await createEvent(db, "Maya Ortiz", { name: "Past", starts_on: "2026-01-10", ends_on: "2026-01-12", seat_count: 1, seat_price_cents: 0 });
-    const scored = await createEvent(db, "Maya Ortiz", { name: "Scored", starts_on: "2026-01-10", ends_on: "2026-01-12", seat_count: 1, seat_price_cents: 0 });
+    const past = await createEvent(db, "Maya Okafor", { name: "Past", starts_on: "2026-01-10", ends_on: "2026-01-12", seat_count: 1, seat_price_cents: 0 });
+    const scored = await createEvent(db, "Maya Okafor", { name: "Scored", starts_on: "2026-01-10", ends_on: "2026-01-12", seat_count: 1, seat_price_cents: 0 });
     // What migration 0049 does, run again on rows made before it: no dates, the same on any day.
     await db.query("UPDATE events SET motion = 'scored' WHERE id = $1", [scored.id]);
     await db.query("UPDATE events SET plan_stage = 'judged' WHERE motion = 'scored'");

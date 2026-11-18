@@ -9,7 +9,7 @@ import { addDays } from "../shared/motion.ts";
 import { dedupeKey, extensionSource, judgeRead, recordingSource } from "../shared/directory.ts";
 
 export const DIRECTORY_EVENT = "evt_money20-20-usa-2026", RECORDING_EVENT = "evt_salesforce-world-tour-tokyo-2026", SEED_RECORDING = "rec_seed_brella";
-const MAYA = "Maya Ortiz", CAMILLE = "Camille Laurent";
+const MAYA = "Maya Okafor", CAMILLE = "Camille Laurent";
 
 type Row = [name: string, title: string, company: string, location: string];
 /** [name, title, company, place]. Staged unless judgeRead says otherwise; the last three are the ones the rule holds back, each for a different reason. */

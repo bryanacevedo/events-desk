@@ -6,11 +6,11 @@ describe("what the person typed", () => {
   it("handles nothing", () => { expect(cleanReply(null)).toBe(""); expect(cleanReply("   ")).toBe(""); });
 
   it.each([
-    ["English", "Yes please\n\nOn Tue, Jan 12, 2027 at 9:00 AM Maya Ortiz <m@x.example> wrote:\n> Hi Ana"],
-    ["Spanish", "Yes please\n\nEl mar, 12 ene 2027 a las 9:00, Maya Ortiz escribió:\n> Hola"],
-    ["German", "Yes please\n\nAm 12.01.2027 um 09:00 schrieb Maya Ortiz <m@x.example>:\n> Hallo"],
-    ["French", "Yes please\n\nLe mar. 12 janv. 2027 à 09:00, Maya Ortiz a écrit :\n> Salut"],
-    ["Outlook", "Yes please\n\n________________________________\nFrom: Maya Ortiz\nSent: Tuesday\nTo: Ana"],
+    ["English", "Yes please\n\nOn Tue, Jan 12, 2027 at 9:00 AM Maya Okafor <m@x.example> wrote:\n> Hi Ana"],
+    ["Spanish", "Yes please\n\nEl mar, 12 ene 2027 a las 9:00, Maya Okafor escribió:\n> Hola"],
+    ["German", "Yes please\n\nAm 12.01.2027 um 09:00 schrieb Maya Okafor <m@x.example>:\n> Hallo"],
+    ["French", "Yes please\n\nLe mar. 12 janv. 2027 à 09:00, Maya Okafor a écrit :\n> Salut"],
+    ["Outlook", "Yes please\n\n________________________________\nFrom: Maya Okafor\nSent: Tuesday\nTo: Ana"],
     ["forwarded", "Yes please\n\n---------- Forwarded message ---------\nFrom: x"],
   ])("cuts the quoted thread (%s)", (_l, body) => expect(cleanReply(body)).toBe("Yes please"));
 

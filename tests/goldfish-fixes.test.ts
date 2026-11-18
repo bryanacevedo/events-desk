@@ -80,7 +80,7 @@ describe("a company that arrives after the free name pass still meets the lists"
     const p = await person(r.id, "Ana Ruiz");
     await db.query("UPDATE contacts SET company_id = 'co_nf', dropped_at = NULL, drop_reason = NULL WHERE id = $1", [p.id]);
     const caseId = await db.tx((q) => openCase(q, { eventId: r.id, kind: "company_not_found", companyId: "co_nf", summary: "Which company?", facts: [] }));
-    await answerCase(db, r.id, caseId!, "Maya Ortiz", "supply_domain", { domain: "banned.example" });
+    await answerCase(db, r.id, caseId!, "Maya Okafor", "supply_domain", { domain: "banned.example" });
     expect((await person(r.id, "Ana Ruiz")).drop_reason).toBe("excluded_company");
   });
 });
@@ -88,7 +88,7 @@ describe("a company that arrives after the free name pass still meets the lists"
 describe("an opt-out reaches the person everywhere", () => {
   const LIST = "Company,Name,Title,Email\nAcme,Ada Lovelace,VP Sales,ada@acme.com\n";
   it("keeps the name and company as well as the address", async () => {
-    await recordOptOut(db, "Maya Ortiz", { email: "ada@acme.com", name: "Ada Lovelace", company: "Acme" });
+    await recordOptOut(db, "Maya Okafor", { email: "ada@acme.com", name: "Ada Lovelace", company: "Acme" });
     expect(await isOptedOut(db, { name_key: nameKey("Ada Lovelace"), company_key: companyKey("Acme") })).toBe(true);
   });
   it("starts a rebuild of the delivered Sheet, and a Sheet that cannot be matched says so", async () => {
@@ -98,7 +98,7 @@ describe("an opt-out reaches the person everywhere", () => {
     const readReview = vi.fn(async () => [["Decision"]]);
     const sheets = { ...mockSheets, enabled: true, readReview, readTab: async () => [["Name"]] };
     const app = createApp(db, { demo: true, sheets });
-    const res = await app.request("/api/suppressions", { method: "POST", headers: { "x-actor": "Maya%20Ortiz", "content-type": "application/json" }, body: JSON.stringify({ email: kept.email }) });
+    const res = await app.request("/api/suppressions", { method: "POST", headers: { "x-actor": "Maya%20Okafor", "content-type": "application/json" }, body: JSON.stringify({ email: kept.email }) });
     expect(res.status).toBe(201);
     await vi.waitFor(() => expect(readReview).toHaveBeenCalled());
     await vi.waitFor(async () => expect((await db.query<{ sheet_error: string | null }>("SELECT sheet_error FROM events WHERE id = $1", [id]))[0].sheet_error).toBeTruthy());
@@ -107,14 +107,14 @@ describe("an opt-out reaches the person everywhere", () => {
 
 describe("an opt-out before the list is priced", () => {
   it("drops the person before Research can look them up", async () => {
-    await recordOptOut(db, "Maya Ortiz", { name: "Bo Lee", company: "Acme Cloud" });
+    await recordOptOut(db, "Maya Okafor", { name: "Bo Lee", company: "Acme Cloud" });
     const r = await researchWith(db, CSV, { specs, people: {} });
     expect((await person(r.id, "Bo Lee")).drop_reason).toBe("opted_out");
   });
   it("relabels someone already set aside, so they leave the Other attendees tab", async () => {
     const r = await researchWith(db, CSV, { specs, people: {} });
     await db.query("UPDATE contacts SET drop_reason = 'low_tier', dropped_at = now(), email = 'bo@acmecloud.example' WHERE event_id = $1 AND full_name = 'Bo Lee'", [r.id]);
-    const out = await recordOptOut(db, "Maya Ortiz", { email: "bo@acmecloud.example" });
+    const out = await recordOptOut(db, "Maya Okafor", { email: "bo@acmecloud.example" });
     expect(out.removed).toBe(0);
     expect(out.events).toEqual([r.id]);
     expect((await person(r.id, "Bo Lee")).drop_reason).toBe("opted_out");
@@ -135,7 +135,7 @@ describe("a run never stops with a job marked running", () => {
     expect(await stage(r.id)).toBe("ready_for_review");
     await moveEvent(db, r.id, "paused", "Events Desk");
     expect(await stage(r.id)).toBe("paused");
-    await moveEvent(db, r.id, "ready_for_review", "Maya Ortiz");
+    await moveEvent(db, r.id, "ready_for_review", "Maya Okafor");
     expect(await stage(r.id)).toBe("ready_for_review");
   });
   it("an outage met while closing a lost job pauses the event, and the resume carries on", async () => {
@@ -149,7 +149,7 @@ describe("a run never stops with a job marked running", () => {
     expect(await stage(r.id)).toBe("paused");
     expect((await db.query("SELECT 1 FROM jobs WHERE event_id = $1 AND status = 'running' AND lease_until > now()", [r.id])).length).toBe(0);
     fail = false;
-    await moveEvent(db, r.id, "finding_people", "Maya Ortiz");
+    await moveEvent(db, r.id, "finding_people", "Maya Okafor");
     await processEvent(db, r.id, r.deps);
     expect(l.calls.start.length).toBe(before + 1);
     expect(await stage(r.id)).toBe("delivered");

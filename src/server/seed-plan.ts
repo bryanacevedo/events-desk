@@ -23,7 +23,7 @@ import { addDays } from "../shared/motion.ts";
 import { STANDARD_DELIVERABLES } from "../shared/plan.ts";
 import { CAPITOL, GG_STEP_FEE, GG_STEP_FREE, GOLDEN_GATE, seedHostedYear } from "./seed-hosted.ts";
 
-const CAMILLE = "Camille Laurent", DAN = "Dan Whitlock", MAYA = "Maya Ortiz";
+const CAMILLE = "Camille Laurent", DAN = "Dan Whitlock", MAYA = "Maya Okafor";
 export const REINVENT = "evt_aws-re-invent-2026", M2020 = "evt_money20-20-usa-2026", DREAMFORCE = "evt_dreamforce-2026", GITEX = "evt_gitex-global-2026";
 export const DINNER_MADRID = "evt_demo_dinner_madrid", DINNER_M2020 = "evt_m2020_usa_2026_dinner";
 const delivId = (prefix: string, n: number) => `dlv_seed_${prefix}_${STANDARD_DELIVERABLES[n].kind}`;
@@ -228,7 +228,7 @@ export async function seedPastResults(db: Db, deps: LifecycleDeps) {
     if (!e) continue;
     const after = { ...deps, now: () => new Date(`${addDays(e.last_day, 1)}T12:00:00Z`) };
     const heldNow = async () => (await db.query<{ n: number }>("SELECT held_all AS n FROM event_funnel WHERE event_id = $1", [id]))[0].n;
-    // The reps who went, in name order: the held meetings are spread across them, so the tracker's by-rep list is real. Maya Ortiz when nobody is recorded as going.
+    // The reps who went, in name order: the held meetings are spread across them, so the tracker's by-rep list is real. Maya Okafor when nobody is recorded as going.
     const reps = (await db.query<{ requester: string }>("SELECT DISTINCT requester FROM seat_requests WHERE event_id = $1 AND status = 'approved' ORDER BY requester", [id])).map((r) => r.requester);
     if (!reps.length) reps.push(MAYA);
     if ((await heldNow()) < held) {

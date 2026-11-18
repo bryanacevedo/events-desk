@@ -12,9 +12,9 @@ const clock = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString("e
 const seatOf = (g: GuestOut) => g.seat;
 
 export function CheckIn({ id, page, reload, go }: { id: string; page: HostedPage; reload: () => Promise<void>; go: (to: string) => void }) {
-  const { actor } = useActor();
+  const { actor, toast } = useActor();
   const [q, setQ] = useState(""), [open, setOpen] = useState<string | null>(null), [busy, setBusy] = useState(""), [error, setError] = useState("");
-  const [walk, setWalk] = useState({ name: "", company: "", owner: page.settings.host_name || actor, email: "", seat: "" });
+  const [walk, setWalk] = useState({ name: "", company: "", owner: actor, email: "", seat: "" });
   const [closing, setClosing] = useState(false);
   const { event: ev, counts: c, guests } = page;
   const closed = Boolean(ev.closed_at), cap = c.capacity;
@@ -45,7 +45,7 @@ export function CheckIn({ id, page, reload, go }: { id: string; page: HostedPage
       if (r.ok && walk.seat.trim()) await send("PATCH", `/api/events/${id}/guests/${r.data.id}`, actor, { seat: walk.seat.trim() });
       return r;
     });
-    if (ok) { setQ(""); setWalk({ ...walk, name: "", company: "", email: "", seat: "" }); }
+    if (ok) { toast(`${name} is checked in as a walk-in.`); setQ(""); setWalk({ ...walk, name: "", company: "", email: "", seat: "" }); }
   };
   const close = async () => { if (await run("close", () => send("POST", `/api/events/${id}/close-attendance`, actor))) setClosing(false); };
   const saveSeat = async (g: GuestOut, seat: string) => { if (seat !== g.seat) await run(`seat-${g.id}`, () => send("PATCH", `/api/events/${id}/guests/${g.id}`, actor, { seat })); };

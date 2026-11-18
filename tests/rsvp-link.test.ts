@@ -55,7 +55,7 @@ describe("a bad link answers one 404", () => {
 
 describe("what the page says", () => {
   it("only the event, the day, the venue, the host, the welcome line and the guest's own first name, status and dietary note", async () => {
-    const a = await guest(db, id, "Ana Ruiz", { owner: "Maya Ortiz", company: "Acme", title: "CRO" });
+    const a = await guest(db, id, "Ana Ruiz", { owner: "Maya Okafor", company: "Acme", title: "CRO" });
     await guest(db, id, "Ben Cole", { company: "Rival Corp" });
     await invite(db, id, a.id);
     const r = await get(await tokenOf(db, a.id));
@@ -67,7 +67,7 @@ describe("what the page says", () => {
     expect(j.guest).toEqual({ first_name: "Ana", status: "invited", dietary: "" });
     expect(j.event).toMatchObject({ day: "2027-06-10", doors_at: "18:30", host_name: "Camille Laurent", welcome: "A small table and good food." });
     const text = JSON.stringify(j);
-    for (const leak of ["Maya Ortiz", "Ben", "Cole", "Rival", "Acme", "CRO", id, a.id, "ruiz", "cents", "$"]) expect(text, leak).not.toContain(leak);
+    for (const leak of ["Maya Okafor", "Ben", "Cole", "Rival", "Acme", "CRO", id, a.id, "ruiz", "cents", "$"]) expect(text, leak).not.toContain(leak);
   });
 
   it("answering needs no actor and no write key, records the answer with actor guest, and the first name is all it gives back", async () => {

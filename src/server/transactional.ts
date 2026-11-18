@@ -42,7 +42,8 @@ export function senderFromEnv(env: Record<string, string | undefined> = process.
   return url && key ? liveSender(url, key) : null;
 }
 
-export const NO_SENDER = "Live mode needs TRANSACTIONAL_URL and TRANSACTIONAL_KEY before the desk can send a reminder.";
+/** What a person reads when no mail sender is connected: plain words, not setting names (the names are in the README and .env.example). */
+export const NO_SENDER = "Reminders cannot be sent yet: no email sender is connected. Ask GTM Engineering to connect one.";
 
 /** Hands each queued outbox row to the sender. A row is claimed (state unknown) before the call, so a crash in the middle never repeats a send; the answer then sets sent or failed. */
 export async function deliverOutbox(db: Db, sender: TransactionalSender, ids: string[], now: Date = new Date()) {

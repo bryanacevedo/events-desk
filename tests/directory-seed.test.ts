@@ -29,7 +29,7 @@ describe("the demo's directory reads", () => {
   });
   it("builds the source sentence and terms note the way the server does, never from the read", async () => {
     const [r] = await db.query<{ source_text: string; terms_note: string; read_on: string }>("SELECT source_text, terms_note, read_on::text AS read_on FROM directory_reads WHERE event_id = $1 ORDER BY id LIMIT 1", [DIRECTORY_EVENT]);
-    expect(r.source_text).toBe(`read from the Swapcard directory of Money20/20 USA 2026 by Maya Ortiz on ${r.read_on}`);
+    expect(r.source_text).toBe(`read from the Swapcard directory of Money20/20 USA 2026 by Maya Okafor on ${r.read_on}`);
     expect(r.read_on).toBe("2026-11-12");
     expect(r.terms_note).toMatch(/^Terms/);
   });

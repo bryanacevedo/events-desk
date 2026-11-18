@@ -35,7 +35,7 @@ describe("a frame is read once", () => {
     const rs = await reads();
     expect(rs).toHaveLength(2);
     expect(rs[0]).toMatchObject({ full_name: "Ana Lima", via: "recording", platform: "Brella", state: "staged", read_by: MAYA, recording_id: r.id, location: "Lisbon, Portugal" });
-    expect(rs[0].source_text).toBe("read from a screen recording of Brella for AWS re:Invent 2026 by Maya Ortiz on 2026-11-14");
+    expect(rs[0].source_text).toBe("read from a screen recording of Brella for AWS re:Invent 2026 by Maya Okafor on 2026-11-14");
     expect(rs[0].terms_note).toBe("Terms not assessed");
     const [row] = await db.query<any>("SELECT * FROM recordings WHERE id = $1", [r.id]);
     expect(row).toMatchObject({ frames_sent: 1, frames_read: 1, frames_failed: 0, people: 2, state: "reading" });
@@ -127,8 +127,8 @@ describe("who and what", () => {
   it("only the person who made the recording may send frames or finish it", async () => {
     const llm = seeing([frame([ANA])]);
     const r = await rec(llm);
-    await expect(readFrame(db, llm, LEO, r.id, 0, JPEG, NOW)).rejects.toThrow(/Only Maya Ortiz, who made this recording/);
-    await expect(finishRecording(db, LEO, r.id)).rejects.toThrow(/Only Maya Ortiz/);
+    await expect(readFrame(db, llm, LEO, r.id, 0, JPEG, NOW)).rejects.toThrow(/Only Maya Okafor, who made this recording/);
+    await expect(finishRecording(db, LEO, r.id)).rejects.toThrow(/Only Maya Okafor/);
     expect(llm.calls).toBe(0);
     expect(await count(db, "llm_calls", `event_id = '${ev}'`)).toBe(0);
     await expect(readFrame(db, llm, MAYA, "rec_nope", 0, JPEG, NOW)).rejects.toThrow(/does not exist/);
@@ -200,11 +200,11 @@ describe("over HTTP", () => {
   it("makes a recording, reads a frame from the body with x-frame, and finishes; a frame can be 4 MB and not 5", async () => {
     const llm = seeing([frame([ANA])]);
     const app = createApp(db, { demo: true, llm });
-    const h = { "x-actor": "Maya%20Ortiz", "content-type": "application/json" };
+    const h = { "x-actor": "Maya%20Okafor", "content-type": "application/json" };
     const made = await app.request(`/api/events/${ev}/recordings`, { method: "POST", headers: h, body: JSON.stringify({ app_name: "Whova" }) });
     expect(made.status).toBe(201);
     const { id } = await made.json() as any;
-    const frames = (n: number, bytes: Uint8Array, who = "Maya%20Ortiz") => app.request(`/api/recordings/${id}/frames`, { method: "POST", headers: { "x-actor": who, "x-frame": String(n), "content-type": "image/jpeg" }, body: bytes as unknown as BodyInit });
+    const frames = (n: number, bytes: Uint8Array, who = "Maya%20Okafor") => app.request(`/api/recordings/${id}/frames`, { method: "POST", headers: { "x-actor": who, "x-frame": String(n), "content-type": "image/jpeg" }, body: bytes as unknown as BodyInit });
     const ok = await frames(0, JPEG);
     expect(ok.status).toBe(200);
     expect(await ok.json()).toMatchObject({ n: 0, state: "read", found: 1, repeat: false, frames_read: 1, frames_failed: 0, people: 1, to_check: 0 });
@@ -221,7 +221,7 @@ describe("over HTTP", () => {
   });
   it("the frame body is not a file route: a 2 MB JSON body anywhere else is still refused at 1 MB", async () => {
     const app = createApp(db, { demo: true, llm: seeing([frame([])]) });
-    const r = await app.request(`/api/events/${ev}/recordings`, { method: "POST", headers: { "x-actor": "Maya%20Ortiz", "content-type": "application/json" }, body: JSON.stringify({ app_name: "x".repeat(1_500_000) }) });
+    const r = await app.request(`/api/events/${ev}/recordings`, { method: "POST", headers: { "x-actor": "Maya%20Okafor", "content-type": "application/json" }, body: JSON.stringify({ app_name: "x".repeat(1_500_000) }) });
     expect(r.status).toBe(413);
   });
 });

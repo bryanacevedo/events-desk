@@ -12,7 +12,7 @@
 import { chromium } from "playwright-core";
 
 const base = process.argv[2] ?? `http://localhost:${process.env.PORT ?? 8787}`;
-const GTM = "GTM Team", MAYA = "Maya Ortiz";
+const GTM = "GTM Team", MAYA = "Maya Okafor";
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 // Each page is a path and who is acting. Settings is GTM Team's; Maya sees the refusal line there.
 const sections = ["", "?section=scoring", "?section=titles", "?section=lists", "?section=data", "?section=spend", "?section=connections", "?section=team"];
@@ -94,7 +94,7 @@ try {
 async function sheetBehaviour(width) {
   const page = await browser.newPage({ viewport: { width, height: 900 } });
   const bad = (m) => { problems++; console.log(`${width}px side sheet  ${m}`); };
-  await page.goto(base + "/"); await page.evaluate(() => localStorage.setItem("actor", "Maya Ortiz"));
+  await page.goto(base + "/"); await page.evaluate(() => localStorage.setItem("actor", "Maya Okafor"));
   for (const home of ["/", "/events"]) {
     const sel = home === "/" ? "a.card[data-opens-sheet]" : "a.tl-row[data-opens-sheet]";
     await page.goto(base + home, { waitUntil: "networkidle" }); await page.waitForSelector("[data-ready]");
@@ -296,7 +296,7 @@ async function scanPages() {
   for (const width of widths) {
     const phone = width < 500;
     const ctx = await browser.newContext({ viewport: { width, height: 812 }, isMobile: phone, hasTouch: phone });
-    await ctx.addInitScript(() => { try { localStorage.setItem("actor", "Maya Ortiz"); } catch {} });
+    await ctx.addInitScript(() => { try { localStorage.setItem("actor", "Maya Okafor"); } catch {} });
     const page = await ctx.newPage();
     for (const [what, act] of [["camera", null], ["today", ".sc-bar .textlink"], ["scan", ".sc-methods button:has-text('Type')"]]) {
       await page.goto(`${base}/scan/${id}`, { waitUntil: "networkidle" });

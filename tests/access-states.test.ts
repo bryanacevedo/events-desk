@@ -18,7 +18,7 @@ describe("a page waits for the planners instead of refusing", () => {
   });
   it("lets a planner in once they are known, and refuses someone who is not one", () => {
     expect(plannerAccess(needs(["Camille Laurent"]), "Camille Laurent", false)).toBe("yes");
-    expect(plannerAccess(needs(["Camille Laurent"]), "Maya Ortiz", false)).toBe("no");
+    expect(plannerAccess(needs(["Camille Laurent"]), "Maya Okafor", false)).toBe("no");
   });
   it("never makes leadership or GTM wait", () => {
     expect(plannerAccess(null, "Dan", true)).toBe("yes");

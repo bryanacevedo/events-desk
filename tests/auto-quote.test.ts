@@ -7,7 +7,7 @@ import type { Db } from "../src/server/db.ts";
 import { createEvent, moveEvent } from "../src/server/events.ts";
 import { freshDb } from "./helpers.ts";
 
-const MAYA = "Maya Ortiz", DAN = "Dan Whitlock", ANA = "Ana Duarte";
+const MAYA = "Maya Okafor", DAN = "Dan Whitlock", ANA = "Ana Duarte";
 const hdr = (a: string) => ({ "x-actor": encodeURIComponent(a) });
 const LIST = "Company,Name,Title,Email\nAcme,Ada Lovelace,VP Sales,ada@acme.com\nKestrel Foods,Bo Lindqvist,Head of Growth,bo@kestrel.example\n";
 let db: Db;

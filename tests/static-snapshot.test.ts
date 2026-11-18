@@ -29,7 +29,7 @@ function shimIn(dir: string, search = "") {
 describe("the shim and the build key a request the same way", () => {
   it("agree on paths with queries, encodings and unsorted pairs", () => {
     const { key } = shimIn(tmpdir());
-    for (const p of ["/api/overview", "/api/events/evt_a/people?q=&priority=A&tier=&status=kept&source=&offset=12&limit=12", "/api/motion/my-day?rep=Maya%20Ortiz", "/api/events/evt_a/deals/006%2F1?z=1&a=2&a=1"]) {
+    for (const p of ["/api/overview", "/api/events/evt_a/people?q=&priority=A&tier=&status=kept&source=&offset=12&limit=12", "/api/motion/my-day?rep=Maya%20Okafor", "/api/events/evt_a/deals/006%2F1?z=1&a=2&a=1"]) {
       const { createHash } = require("node:crypto") as typeof import("node:crypto");
       const shimKey = key("GET", new URL(p, "http://x"));
       expect(createHash("sha1").update(shimKey).digest("hex")).toBe(requestHash("GET", p));
@@ -72,7 +72,7 @@ describe("a small bundle, read through the shim", () => {
   it("refuses every change with the desk's own words, and never reaches a server", async () => {
     const { fetch, calls } = shimIn(out);
     for (const method of ["POST", "PATCH", "PUT", "DELETE"]) {
-      const r = await fetch("/api/events/evt_x/plan/submit", { method, headers: { "x-actor": "Maya%20Ortiz" }, body: "{}" });
+      const r = await fetch("/api/events/evt_x/plan/submit", { method, headers: { "x-actor": "Maya%20Okafor" }, body: "{}" });
       expect(r.status).toBe(403);
       expect((await r.json()).error).toBe("This public demo does not take changes. To try them, run the desk yourself: the README shows how.");
     }
@@ -157,7 +157,7 @@ describe("the crawl", () => {
       const last = await fingerprint(db);
       expect(Object.keys(last).filter((t) => last[t] !== before[t] && t !== 'scans')).toEqual([]);
       expect(k.sent.every((s) => s.startsWith("GET "))).toBe(true);
-      expect(IDENTITIES).toEqual(["", "Maya Ortiz", "Camille Laurent", "Dan Whitlock", "GTM Team"]);
+      expect(IDENTITIES).toEqual(["", "Maya Okafor", "Camille Laurent", "Dan Whitlock", "GTM Team"]);
       // Every path the screens read has a saved answer. A kind of record the sample has none of is not asked for.
       const missing = uncovered(k.manifest, [...k.files.keys()]);
       expect(missing).toEqual([]);

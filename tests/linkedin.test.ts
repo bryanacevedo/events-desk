@@ -12,7 +12,7 @@ import { cleanLinkedin } from "../src/shared/ingest.ts";
 import type { Settings } from "../src/shared/cost.ts";
 import { freshDb } from "./helpers.ts";
 
-const MAYA = "Maya Ortiz", DAN = "Dan Whitlock";
+const MAYA = "Maya Okafor", DAN = "Dan Whitlock";
 const LIST = "Company Name,Full Name,Job Title,Work Email\nTallgrass Software,Real Person,VP Sales,a@tallgrass.example\nTallgrass Software,Other Person,VP Sales,b@tallgrass.example\nTallgrass Software,Third Person,VP Sales,c@tallgrass.example\n";
 
 describe("cleanLinkedin", () => {
@@ -94,7 +94,7 @@ describe("live LinkedIn parsing", () => {
   const s = JSON.parse(JSON.stringify({ ...require_defaults() })) as Settings;
   const keys = { apollo: "a", zerobounce: "z" };
   const v = (body: unknown) => liveVendors(s, keys, { paceMs: 0, fetch: (async () => new Response(JSON.stringify(body), { status: 200 })) as typeof fetch });
-  const P = { full_name: "Maya Ortiz", company: "Brightwater Logistics", title: "VP", email: null };
+  const P = { full_name: "Maya Okafor", company: "Brightwater Logistics", title: "VP", email: null };
   it("Apollo match returns only clean profile URLs, and the lookup checks the company", async () => {
     const person = (url: string, org = "Brightwater Logistics") => ({ person: { email: "m@b.example", linkedin_url: url, organization: { name: org } } });
     expect((await v(person("http://linkedin.com/in/maya?x=1")).finders[0].find(P)).linkedin).toBe("https://www.linkedin.com/in/maya");

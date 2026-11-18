@@ -10,7 +10,7 @@ import { ingestUpload } from "../src/server/uploads.ts";
 import { finishTwoCard, freshDb } from "./helpers.ts";
 
 const LIST = readFileSync("samples/attendees.csv", "utf8");
-const MAYA = "Maya Ortiz", DAN = "Dan Whitlock";
+const MAYA = "Maya Okafor", DAN = "Dan Whitlock";
 
 describe("reviewing one person from the screen", () => {
   let db: Db, id: string, app: ReturnType<typeof createApp>;

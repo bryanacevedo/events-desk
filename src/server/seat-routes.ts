@@ -9,6 +9,7 @@ import { approvalHeadroom } from "./budget.ts";
 import { addCatalogEntry, decideSeat, Forbidden, Invalid, parseCatalogEntry, parseSeatRequest, requestSeat } from "./seats.ts";
 import { postSeatRequest, type SlackConfig } from "./slack.ts";
 import { defaultSettings, getSettings } from "./approvals.ts";
+import { speakingView } from "./talks.ts";
 
 export const CATALOG_SQL = `
   WITH live AS (SELECT DISTINCT ON (catalog_id) id, catalog_id, stage FROM events WHERE catalog_id IS NOT NULL AND stage <> 'declined' AND parent_event_id IS NULL ORDER BY catalog_id, created_at DESC)
@@ -41,6 +42,21 @@ export async function decidableSeats(db: Db, actor: string) {
   return out;
 }
 
+/** Everything that waits on this person to decide, across events: seat requests, plans asked for and not yet approved, and abstracts another person wrote (decision 115). */
+export async function waitingOn(db: Db, actor: string) {
+  const seats = (await decidableSeats(db, actor)).map((r) => ({ id: r.id as string, event_id: r.event_id as string, event: r.name as string, starts_on: r.starts_on as string, who: r.requester as string, role: r.role as string, ticket_cents: r.seat_price_cents as number }));
+  const plans: { event_id: string; event: string; starts_on: string; who: string; asked_on: string }[] = [];
+  for (const e of await db.query<{ id: string; name: string; starts_on: string; requested_by: string; asked: string }>("SELECT id, name, starts_on::text AS starts_on, requested_by, plan_submitted_at::date::text AS asked FROM events WHERE parent_event_id IS NULL AND plan_submitted_at IS NOT NULL AND plan_approved_at IS NULL AND stage <> 'declined' ORDER BY starts_on, name")) {
+    if (e.requested_by !== actor && ((await getSettings(db.query, e.id)).approvers ?? []).includes(actor)) plans.push({ event_id: e.id, event: e.name, starts_on: e.starts_on, who: e.requested_by, asked_on: e.asked });
+  }
+  const view = await speakingView(db, actor, new Date().toISOString().slice(0, 10));
+  const names = new Map((await db.query<{ id: string; name: string; starts_on: string }>("SELECT id, name, starts_on::text AS starts_on FROM events WHERE parent_event_id IS NULL")).map((e) => [e.id, e]));
+  const abstracts = view.can_write ? view.talks
+    .filter((t) => t.next.startsWith("Needs a second person to approve the abstract") && t.abstract_by !== actor && !(t.abstract_editors ?? []).includes(actor))
+    .map((t) => ({ event_id: t.event_id, event: t.event_name, starts_on: names.get(t.event_id)?.starts_on ?? "", talk_id: t.id, title: t.title, who: t.abstract_by ?? t.speaker })) : [];
+  return { seats, plans, abstracts, total: seats.length + plans.length + abstracts.length };
+}
+
 export function mountSeatRoutes(app: Hono<any>, db: Db, cfg: { demo: boolean; slack?: SlackConfig; kick?: (eventId: string) => void }) {
   // The in-app seat decision screen (decision 103): the same decideSeat Slack calls, so the rules, the activity line and the side effects are the same.
   // Slack stays the main path when it is connected; here a decision already made is refused with 409, never made twice.
@@ -51,6 +67,7 @@ export function mountSeatRoutes(app: Hono<any>, db: Db, cfg: { demo: boolean; sl
     const room = await approvalHeadroom(db);
     return c.json({ requests: rows.map((r) => ({ ...r, budget: room.get(r.id) ?? null })), slack: Boolean(cfg.slack), actor });
   });
+  app.get("/api/waiting", async (c) => c.json(await waitingOn(db, c.get("actor"))));
   app.post("/api/seat-decisions/:id", async (c) => {
     const b = await c.req.json<{ decision?: string; reason?: string }>().catch(() => ({}) as { decision?: string; reason?: string });
     if (b.decision !== "approve" && b.decision !== "decline") return Response.json({ error: "Choose approve or decline." }, { status: 400 });

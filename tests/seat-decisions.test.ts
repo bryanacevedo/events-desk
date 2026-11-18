@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { createApp } from "../src/server/app.ts";
 import { freshDb } from "./helpers.ts";
 
-const MAYA = "Maya Ortiz", DAN = "Dan Whitlock", PRIYA = "Priya Natarajan";
+const MAYA = "Maya Okafor", DAN = "Dan Whitlock", PRIYA = "Priya Natarajan";
 
 async function setup(opts: { slack?: boolean } = {}) {
   const db = await freshDb();

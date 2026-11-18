@@ -104,9 +104,9 @@ describe("keys and cleaning", () => {
 
 describe("what each person keeps", () => {
   it("the source sentences are built from the platform, the event, the person and the date", () => {
-    expect(extensionSource({ platform: "swapcard", eventName: "AWS re:Invent 2026", by: "Maya Ortiz", on: "2026-11-14" })).toBe("read from the Swapcard directory of AWS re:Invent 2026 by Maya Ortiz on 2026-11-14");
+    expect(extensionSource({ platform: "swapcard", eventName: "AWS re:Invent 2026", by: "Maya Okafor", on: "2026-11-14" })).toBe("read from the Swapcard directory of AWS re:Invent 2026 by Maya Okafor on 2026-11-14");
     expect(extensionSource({ platform: "other", eventName: "E", by: "M", on: "2026-11-14" })).toBe("read from a web directory of E by M on 2026-11-14");
-    expect(recordingSource({ app: "Brella", eventName: "AWS re:Invent 2026", by: "Maya Ortiz", on: "2026-11-14" })).toBe("read from a screen recording of Brella for AWS re:Invent 2026 by Maya Ortiz on 2026-11-14");
+    expect(recordingSource({ app: "Brella", eventName: "AWS re:Invent 2026", by: "Maya Okafor", on: "2026-11-14" })).toBe("read from a screen recording of Brella for AWS re:Invent 2026 by Maya Okafor on 2026-11-14");
   });
   it("the terms note is the confirmed answer or the plain fact that there is none", () => {
     expect(termsNote("No scraping of attendee data")).toBe("Terms: No scraping of attendee data");

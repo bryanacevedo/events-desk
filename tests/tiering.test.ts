@@ -123,7 +123,7 @@ describe("firmographics: cache, free search, then one paid enrich only for missi
   it("lets a human correction overwrite the cache, survive its age, and stop any search or purchase", async () => {
     const specs = { [ACME_D]: { search: { employees: 900 }, enrich: { industry: "B2B software", business_model: "B2B" } } };
     await researchWith(db, HEAD + row(ACME, ACME_D), { specs, name: "First" });
-    await correctFirmographics(db, ACME_D, ACME, { employees: 90, industry: "B2B software", business_model: "B2B" }, "Maya Ortiz");
+    await correctFirmographics(db, ACME_D, ACME, { employees: 90, industry: "B2B software", business_model: "B2B" }, "Maya Okafor");
     // A vendor result never replaces a correction, and an old fetched_at does not age it out.
     await putFirmographics(db, ACME_D, ACME, { employees: 5000 }, "vendor");
     await db.query("UPDATE company_cache SET fetched_at = now() - interval '400 days' WHERE domain = $1", [ACME_D]);

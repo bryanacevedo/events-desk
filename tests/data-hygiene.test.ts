@@ -444,7 +444,7 @@ describe("saved credits on Usage", () => {
 describe("Apollo's waterfall adapter, on faked responses", () => {
   const s = defaults();
   const v = (handler: (url: string, init?: RequestInit) => Response) => liveVendors(s, { apollo: "a", zerobounce: "z" }, { paceMs: 0, fetch: (async (u: string, i?: RequestInit) => handler(String(u), i)) as typeof fetch });
-  const P = { full_name: "Maya Ortiz", company: "Brightwater", domain: "brightwater.example" };
+  const P = { full_name: "Maya Okafor", company: "Brightwater", domain: "brightwater.example" };
   it("asks for poll_only with no webhook, by query string, and keeps a 64-bit request id exact", async () => {
     let url = "";
     const out = await v((u) => { url = u; return new Response(`{"request_id": 1039995589705121900, "waterfall": {"status": "accepted"}, "person": {"linkedin_url": "https://linkedin.com/in/maya", "organization": {"name": "Brightwater"}}}`); }).waterfall!.start(P);

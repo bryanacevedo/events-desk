@@ -21,7 +21,7 @@ interface Page { scans: Row[]; counts: Record<string, number>; reviews: Review[]
 const clock = (iso: string) => new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: false });
 const FILTERS = [["all", "All"], ["near", "Near match"], ["confirm", "To confirm"], ["lookup", "Waiting for lookup"], ["unplaced", "Not placed"]] as const;
 type Filter = (typeof FILTERS)[number][0];
-const stateWord = (r: Row) => (r.review === "open" ? "Near match" : r.state === "failed" && /not know this badge/.test(r.state_detail) ? "Badge not found" : STATE_WORDS[r.state]);
+const stateWord = (r: Row) => (r.review === "open" ? "Near match" : r.review === "same" ? "Merged with another scan" : r.state === "failed" && /not know this badge/.test(r.state_detail) ? "Badge not found" : STATE_WORDS[r.state]);
 const quiet = (r: Row) => r.review !== "open" && r.state === "placed";
 const source = (r: Row) => ((r.method === "badge_code" || r.method === "badge_id" || r.method === "badge_photo") && r.temperature !== "hot" && !r.met ? "Badge scan" : "Conversation");
 

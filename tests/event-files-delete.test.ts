@@ -8,7 +8,7 @@ import { decideSeat, parseSeatRequest, requestSeat } from "../src/server/seats.t
 import { usageView } from "../src/server/usage.ts";
 import { deliverEvent, freshDb } from "./helpers.ts";
 
-const MAYA = "Maya Ortiz", DAN = "Dan Whitlock", GTM = "GTM Team", ANA = "Ana Duarte";
+const MAYA = "Maya Okafor", DAN = "Dan Whitlock", GTM = "GTM Team", ANA = "Ana Duarte";
 const hdr = (a: string) => ({ "x-actor": encodeURIComponent(a) });
 const LIST = "Company,Name,Title,Email\nAcme,Ada Lovelace,VP Sales,ada@acme.com\nKestrel Foods,Bo Lindqvist,Head of Growth,bo@kestrel.example\n";
 let db: Db;

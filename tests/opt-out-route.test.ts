@@ -25,7 +25,7 @@ describe("opting someone out from the app", () => {
     const email = kept[0].email;
     const n = kept.filter((k) => k.email === email).length;
 
-    const r = await app().request("/api/suppressions", { method: "POST", headers: as("Maya Ortiz"), body: JSON.stringify({ email, reason: "Asked at the booth" }) });
+    const r = await app().request("/api/suppressions", { method: "POST", headers: as("Maya Okafor"), body: JSON.stringify({ email, reason: "Asked at the booth" }) });
     expect(r.status).toBe(201);
     expect(await r.json()).toEqual({ recorded: true, removed: n });
 
@@ -35,7 +35,7 @@ describe("opting someone out from the app", () => {
 
     const list = (await (await app().request("/api/suppressions")).json()) as { opt_outs: OptOut[] };
     expect(list.opt_outs).toHaveLength(1);
-    expect(list.opt_outs[0]).toMatchObject({ email, name: null, company: null, reason: "Asked at the booth", created_by: "Maya Ortiz" });
+    expect(list.opt_outs[0]).toMatchObject({ email, name: null, company: null, reason: "Asked at the booth", created_by: "Maya Okafor" });
     expect(list.opt_outs[0].created_at).toBeTruthy();
   });
 
@@ -50,9 +50,9 @@ describe("opting someone out from the app", () => {
   });
 
   it("refuses an address that is not one, and a name without a company", async () => {
-    const bad = await app().request("/api/suppressions", { method: "POST", headers: as("Maya Ortiz"), body: JSON.stringify({ email: "not an address" }) });
+    const bad = await app().request("/api/suppressions", { method: "POST", headers: as("Maya Okafor"), body: JSON.stringify({ email: "not an address" }) });
     expect(bad.status).toBe(409);
-    const half = await app().request("/api/suppressions", { method: "POST", headers: as("Maya Ortiz"), body: JSON.stringify({ name: "Ada Lovelace" }) });
+    const half = await app().request("/api/suppressions", { method: "POST", headers: as("Maya Okafor"), body: JSON.stringify({ name: "Ada Lovelace" }) });
     expect(half.status).toBe(409);
     expect(((await (await app().request("/api/suppressions")).json()) as { opt_outs: OptOut[] }).opt_outs).toHaveLength(0);
   });

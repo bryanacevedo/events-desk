@@ -34,10 +34,10 @@ describe("modes", () => {
     expect(resolveMode(["--demo"], keys)).toEqual({ demo: true, liveSpend: false });
   });
   it("refuses live spend while any key, Slack setting or database is missing", () => {
-    const all = { ...Object.fromEntries(LIVE_REQUIRED.map((k) => [k, "x"])), ...Object.fromEntries(GOOGLE_SIGN_INS.oauth.map((k) => [k, "x"])), SLACK_USER_MAP: '{"Maya Ortiz":"U01ABC"}' };
+    const all = { ...Object.fromEntries(LIVE_REQUIRED.map((k) => [k, "x"])), ...Object.fromEntries(GOOGLE_SIGN_INS.oauth.map((k) => [k, "x"])), SLACK_USER_MAP: '{"Maya Okafor":"U01ABC"}' };
     expect(resolveMode([], { ...all, LIVE_SPEND: "1" }).liveSpend).toBe(true);
     // A cost card is confirmed by the uploader, and the Slack user is the proof, so the person-to-Slack map must be real JSON of real-looking IDs.
-    for (const bad of ["not json", "{}", '{"Maya Ortiz": "maya"}', '["U01ABC"]']) expect(() => resolveMode([], { ...all, SLACK_USER_MAP: bad, LIVE_SPEND: "1" }), bad).toThrow(/SLACK_USER_MAP/);
+    for (const bad of ["not json", "{}", '{"Maya Okafor": "maya"}', '["U01ABC"]']) expect(() => resolveMode([], { ...all, SLACK_USER_MAP: bad, LIVE_SPEND: "1" }), bad).toThrow(/SLACK_USER_MAP/);
     for (const k of LIVE_REQUIRED) expect(() => resolveMode([], { ...all, [k]: " ", LIVE_SPEND: "1" })).toThrow(new RegExp(k));
   });
 });

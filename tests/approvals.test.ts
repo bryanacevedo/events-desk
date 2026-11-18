@@ -9,7 +9,7 @@ import { freshDb } from "./helpers.ts";
 
 const defaults: Settings = JSON.parse(readFileSync("config/defaults.json", "utf8"));
 const list = readFileSync("samples/attendees.csv", "utf8");
-const MAYA = "Maya Ortiz", DAN = "Dan Whitlock";
+const MAYA = "Maya Okafor", DAN = "Dan Whitlock";
 
 describe("title rule", () => {
   const k = defaults.title_keywords;
@@ -63,7 +63,7 @@ describe("approvals", () => {
 
   it("refuses self-approval", async () => {
     await patchSettings(db, id, MAYA, { contacts_per_company: 2 });
-    await db.query(`UPDATE event_settings SET settings = jsonb_set(settings, '{approvers}', '["Maya Ortiz"]') WHERE event_id = $1`, [id]);
+    await db.query(`UPDATE event_settings SET settings = jsonb_set(settings, '{approvers}', '["Maya Okafor"]') WHERE event_id = $1`, [id]);
     await expect(decideApproval(db, { approvalId: seats, actor: MAYA, decision: "approve" })).rejects.toThrow(/own request/);
     expect(await stage()).toBe("requested");
   });
@@ -80,9 +80,9 @@ describe("approvals", () => {
     await ingestUpload(db, id, MAYA, "a.csv", list);
     await requestCard(db, id, DAN);
     const card = await pending();
-    await expect(decideApproval(db, { approvalId: card, actor: DAN, decision: "approve" })).rejects.toThrow(/Only Maya Ortiz, who uploaded the attendee list, can confirm/);
-    await expect(decideApproval(db, { approvalId: card, actor: DAN, decision: "decline", reason: "no" })).rejects.toThrow(/Only Maya Ortiz/);
-    await expect(decideApproval(db, { approvalId: card, actor: "Random Person", decision: "approve" })).rejects.toThrow(/Only Maya Ortiz/);
+    await expect(decideApproval(db, { approvalId: card, actor: DAN, decision: "approve" })).rejects.toThrow(/Only Maya Okafor, who uploaded the attendee list, can confirm/);
+    await expect(decideApproval(db, { approvalId: card, actor: DAN, decision: "decline", reason: "no" })).rejects.toThrow(/Only Maya Okafor/);
+    await expect(decideApproval(db, { approvalId: card, actor: "Random Person", decision: "approve" })).rejects.toThrow(/Only Maya Okafor/);
     expect(await stage()).toBe("quoted");
     // The uploader may decline it, with a reason.
     await decideApproval(db, { approvalId: card, actor: MAYA, decision: "decline", reason: "Asked by mistake" });

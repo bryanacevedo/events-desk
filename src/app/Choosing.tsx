@@ -328,7 +328,7 @@ function TargetAccounts({ data, reload }: { data: Targets; reload: () => Promise
   return (
     <div className="rs-sec">
       <h3 className="rs-h">Target accounts</h3>
-      {data.total === 0 ? <Empty what="The companies the team most wants to meet. Choosing matches them against each event." example="Lumen Ledger, lumenledger.example, owner Maya Ortiz." /> : (
+      {data.total === 0 ? <Empty what="The companies the team most wants to meet. Choosing matches them against each event." example="Lumen Ledger, lumenledger.example, owner Maya Okafor." /> : (
         <dl className="pl-figs" aria-label="Target accounts">
           <div><dd>{num(data.total)}</dd><dt>target accounts{sources.length === 1 ? `, ${(SOURCE_WORDS[sources[0][0]] ?? sources[0][0]).toLowerCase()}` : ""}</dt></div>
           {sources.length > 1 && sources.map(([k, n]) => <div key={k}><dd>{num(n)}</dd><dt>{(SOURCE_WORDS[k] ?? k).toLowerCase()}</dt></div>)}

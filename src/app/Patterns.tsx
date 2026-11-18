@@ -75,6 +75,8 @@ export function ConfirmDialog({ title, confirm, cancel = "Go back", busy = false
   const id = useId();
   useEffect(() => {
     const FOCUSABLE = "button:not([disabled])";
+    // Remember the button that opened the dialog before focus moves into it, so closing returns there and not to the page's top.
+    const back = document.activeElement as HTMLElement | null;
     box.current?.querySelector<HTMLElement>("[data-keep]")?.focus();
     const onKey = (ev: globalThis.KeyboardEvent) => {
       if (ev.key === "Escape") { ev.preventDefault(); if (!busy) onClose(); return; }
@@ -87,7 +89,6 @@ export function ConfirmDialog({ title, confirm, cancel = "Go back", busy = false
     };
     document.addEventListener("keydown", onKey);
     document.body.classList.add("dlg-open");
-    const back = document.activeElement as HTMLElement | null;
     return () => { document.removeEventListener("keydown", onKey); document.body.classList.remove("dlg-open"); back?.focus?.(); };
   }, [busy, onClose]);
   return createPortal(

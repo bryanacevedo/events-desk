@@ -163,13 +163,13 @@ describe("identity against the world (authored vendor rates)", () => {
 describe("identity through the pipeline on the large list", () => {
   it("stays inside the Research card's caps, opens cases for what a person must settle, and the merged companies tier", async () => {
     const db = await freshDb();
-    const id = (await createEvent(db, "Maya Ortiz", { name: "Meridian", starts_on: "2027-03-30", seat_count: 60, seat_price_cents: 100, country: "Spain", flow: "two_card" })).id;
+    const id = (await createEvent(db, "Maya Okafor", { name: "Meridian", starts_on: "2027-03-30", seat_count: 60, seat_price_cents: 100, country: "Spain", flow: "two_card" })).id;
     const pending = async () => (await db.query<{ id: string }>("SELECT id FROM approvals WHERE event_id = $1 AND status = 'pending'", [id]))[0].id;
     await decideApproval(db, { approvalId: await pending(), actor: "Dan Whitlock", decision: "approve" });
-    await ingestUpload(db, id, "Maya Ortiz", "large.csv", csv);
-    await requestResearchCard(db, id, "Maya Ortiz", exampleDns);
+    await ingestUpload(db, id, "Maya Okafor", "large.csv", csv);
+    await requestResearchCard(db, id, "Maya Okafor", exampleDns);
     const [card] = await db.query<{ lines: Record<string, number>; step_caps: Record<string, { credits?: number }> }>("SELECT lines, step_caps FROM cost_cards WHERE event_id = $1", [id]);
-    await decideApproval(db, { approvalId: await pending(), actor: "Maya Ortiz", decision: "approve" });
+    await decideApproval(db, { approvalId: await pending(), actor: "Maya Okafor", decision: "approve" });
     const deps = simDeps(world);
     await processEvent(db, id, deps);
     const spent = Object.fromEntries((await spendByStep(db, id)).filter((s) => s.unit === "credits").map((s) => [s.step, s.n]));

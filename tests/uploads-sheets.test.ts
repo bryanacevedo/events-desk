@@ -14,7 +14,7 @@ import { cellText, sniff } from "../src/server/xlsx-read.ts";
 import { applyReviewDrops, buildWorkbook } from "../src/server/workbook.ts";
 import { finishTwoCard, freshDb } from "./helpers.ts";
 
-const MAYA = "Maya Ortiz", DAN = "Dan Whitlock";
+const MAYA = "Maya Okafor", DAN = "Dan Whitlock";
 const bytes = async (wb: ExcelJS.Workbook) => new Uint8Array((await wb.xlsx.writeBuffer()) as ArrayBuffer);
 
 /* ------------------------------------------------------------------ uploads */

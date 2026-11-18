@@ -18,9 +18,9 @@ describe("caches that outlive one event", () => {
   });
   it("lets a human correction overwrite, never age out, and never be replaced by a vendor", async () => {
     await putFirmographics(db, "acme.example", "Acme", { employees: 900 }, "vendor");
-    await correctFirmographics(db, "acme.example", "Acme Corp", { employees: 1200 }, "Maya Ortiz");
+    await correctFirmographics(db, "acme.example", "Acme Corp", { employees: 1200 }, "Maya Okafor");
     await age("company_cache", "fetched_at", 400);
-    expect(await getFirmographics(db, "acme.example")).toMatchObject({ corrected: true, firmographics: { employees: 1200 }, source: "human:Maya Ortiz" });
+    expect(await getFirmographics(db, "acme.example")).toMatchObject({ corrected: true, firmographics: { employees: 1200 }, source: "human:Maya Okafor" });
     await putFirmographics(db, "acme.example", "Acme", { employees: 5 }, "vendor");
     expect((await getFirmographics(db, "acme.example"))!.firmographics).toEqual({ employees: 1200 });
   });

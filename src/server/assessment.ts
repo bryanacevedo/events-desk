@@ -428,10 +428,10 @@ export async function markRequestCopied(db: Db, actor: string, eventId: string, 
   });
 }
 
-/** The follow-up date is made here, never typed: the day after the expected date when there is one, otherwise a week after it was sent. */
+/** The follow-up date is the day after the expected date when there is one, otherwise a week after it was sent, unless the person set one (m18, decision 116). */
 export const followUpOn = (sent_on: string | null, expected_on: string | null) => (expected_on ? addDays(expected_on, 1) : sent_on ? addDays(sent_on, 7) : null);
 
-export interface RequestPatch { sent_on?: string | null; expected_on?: string | null; status?: string; organizer_name?: string }
+export interface RequestPatch { sent_on?: string | null; expected_on?: string | null; follow_up_on?: string | null; status?: string; organizer_name?: string }
 
 /** The person says when they sent it, what the organizer answered and when the list comes. Dates are checked; the follow-up date is computed. */
 export async function patchOrganizerRequest(db: Db, actor: string, eventId: string, rid: string, b: RequestPatch) {
@@ -452,7 +452,9 @@ export async function patchOrganizerRequest(db: Db, actor: string, eventId: stri
     // Saying when it was sent moves a drafted or copied request to sent.
     if (b.sent_on && b.status === undefined && (status === "drafted" || status === "copied")) status = "sent";
     const closed = status === "will_not_share" || status === "received";
-    const follow = closed ? null : followUpOn(sent_on, expected_on);
+    const chosen = b.follow_up_on === undefined ? null : day(b.follow_up_on, "the day to follow up");
+    if (chosen && sent_on && chosen < sent_on) throw new AssessmentInvalid("The follow-up day cannot be before the day it was sent.");
+    const follow = closed ? null : chosen ?? followUpOn(sent_on, expected_on);
     await q("UPDATE organizer_requests SET status = $2, sent_on = $3, expected_on = $4, follow_up_on = $5, organizer_name = coalesce($6, organizer_name) WHERE id = $1", [rid, status, sent_on, expected_on, follow, b.organizer_name === undefined ? null : text(b.organizer_name).slice(0, 120)]);
     await logActivity(q, eventId, actor, "organizer", `Organizer request: ${status.replace(/_/g, " ")}${expected_on ? `, list expected ${expected_on}` : ""}`);
     return { id: rid, status, sent_on, expected_on, follow_up_on: follow };

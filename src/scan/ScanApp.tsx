@@ -149,6 +149,9 @@ function Camera(p: { atEnd: boolean; unsynced: number; online: boolean; syncing:
   const decoder = useRef<Decoder | null>(null);
   const last = useRef({ text: "", at: 0 });
   const { method, onCode } = p;
+  // A badge code can be typed when the camera cannot read it (week 2, J13): always on offer in Code mode, open at once when the camera is not there.
+  const [typing, setTyping] = useState(false), [typed, setTyped] = useState(""), [notRead, setNotRead] = useState(false);
+  const submitTyped = () => { const t = typed.trim(); if (!t) return; if (onCode(t)) { setTyped(""); setNotRead(false); } else setNotRead(true); };
 
   useEffect(() => {
     let dead = false;
@@ -216,6 +219,13 @@ function Camera(p: { atEnd: boolean; unsynced: number; online: boolean; syncing:
       </div>
       <div className="sc-foot">
         {p.atEnd && <div className="sc-end"><span>The day is over. {p.unsynced} {p.unsynced === 1 ? "scan is" : "scans are"} only on this phone.</span><button type="button" className="btn big" onClick={p.sync} disabled={!p.online || p.syncing}>{p.syncing ? "Syncing" : "Sync now"}</button></div>}
+        {method === "code" && (typing || state === "blocked" || state === "frozen") && (
+          <form className="sc-codebox" onSubmit={(e) => { e.preventDefault(); submitTyped(); }}>
+            <input className="sc-input" aria-label="Badge code" value={typed} onChange={(e) => { setTyped(e.target.value); setNotRead(false); }} placeholder="Badge code" autoComplete="off" autoCapitalize="off" spellCheck={false} />
+            <button type="submit" className="textlink" disabled={!typed.trim()}>Use the code</button>
+            {notRead && <p className="sc-notice" role="alert">That is not a badge code this desk can read.</p>}
+          </form>
+        )}
         <div className="sc-methods" role="group" aria-label="How to scan">
           {([["code", "Code"], ["photo", "Photo"], ["card", "Card"], ["type", "Type"]] as const).map(([k, label]) => (
             <button type="button" key={k} aria-pressed={method === k} onClick={() => { p.setMethod(k); if (k === "type") p.onType(); }}>{label}</button>
@@ -223,6 +233,7 @@ function Camera(p: { atEnd: boolean; unsynced: number; online: boolean; syncing:
         </div>
         <div className="sc-bar">
           <button type="button" className="textlink" onClick={p.onToday}>Today</button>
+          {method === "code" && state === "on" && !typing && <button type="button" className="textlink" onClick={() => setTyping(true)}>Type the code</button>}
           {photo && <button type="button" className="sc-shutter" aria-label="Take the photo" onClick={shutter} disabled={state !== "on"} />}
         </div>
         <p className="sc-notice">{p.cfg.notice.text}</p>

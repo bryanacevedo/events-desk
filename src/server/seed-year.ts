@@ -18,7 +18,7 @@ import { mockLlm, mockVendors } from "./providers.ts";
 import type { Settings } from "../shared/cost.ts";
 import { ingestUpload } from "./uploads.ts";
 
-const MAYA = "Maya Ortiz";
+const MAYA = "Maya Okafor";
 const DAN = "Dan Whitlock";
 
 type Upto = "requested" | "approved" | "mapped" | "quoted" | "delivered" | "declined" | "paused";

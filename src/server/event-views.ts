@@ -34,6 +34,7 @@ export function mountEventViews(app: Hono<{ Variables: { actor: string } }>, db:
     const q = like(c.req.query("q")), priority = ["A", "B", "C"].includes(c.req.query("priority") ?? "") ? c.req.query("priority")! : "";
     const tier = tierOf(c.req.query("tier")), status = ["all", "dropped"].includes(c.req.query("status") ?? "") ? c.req.query("status")! : "kept";
     const source = ["attendee", "prospect"].includes(c.req.query("source") ?? "") ? c.req.query("source")! : "";
+    const reason = (c.req.query("reason") ?? "").slice(0, 80);
     const limit = Math.min(MAX, int(c.req.query("limit"), PAGE) || PAGE), offset = int(c.req.query("offset"), 0);
     const rows = await db.query<PersonRow & { total: number }>(
       `SELECT c.id, c.full_name, c.title, c.email, c.priority, c.title_tier, c.drop_reason, c.source, c.linkedin, c.employer, c.list_source, c.read_note, c.read_terms,
@@ -52,8 +53,9 @@ export function mountEventViews(app: Hono<{ Variables: { actor: string } }>, db:
          AND ($4::int = 0 OR ($4 = -1 AND co.tier IS NULL) OR co.tier = $4)
          AND ($5::text = 'all' OR ($5 = 'kept' AND c.dropped_at IS NULL) OR ($5 = 'dropped' AND c.dropped_at IS NOT NULL))
          AND ($8::text = '' OR c.source = $8)
+         AND ($9::text = '' OR c.drop_reason = $9)
        ORDER BY c.dropped_at IS NOT NULL, c.priority NULLS LAST, co.tier NULLS LAST, co.name NULLS LAST, c.full_name, c.id
-       LIMIT $6 OFFSET $7`, [id, q, priority, tier, status, limit, offset, source]);
+       LIMIT $6 OFFSET $7`, [id, q, priority, tier, status, limit, offset, source, reason]);
     const total = rows[0]?.total ?? 0;
     return c.json({ total, offset, limit, rows: rows.map(({ total: _t, ...r }) => r) });
   });

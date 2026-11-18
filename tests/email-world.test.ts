@@ -34,20 +34,20 @@ const pct = (n: number, d: number) => `${((100 * n) / Math.max(1, d)).toFixed(1)
 /** Meridian through the Research card, its cases, and the Outreach card (approved, not yet run). */
 async function toOutreach(db: Db) {
   await seedIcp(db);
-  const id = (await createEvent(db, "Maya Ortiz", { name: "Meridian", starts_on: "2027-03-30", seat_count: 60, seat_price_cents: 100, country: "Spain", flow: "two_card" })).id;
+  const id = (await createEvent(db, "Maya Okafor", { name: "Meridian", starts_on: "2027-03-30", seat_count: 60, seat_price_cents: 100, country: "Spain", flow: "two_card" })).id;
   const pending = async () => (await db.query<{ id: string }>("SELECT id FROM approvals WHERE event_id = $1 AND status = 'pending'", [id]))[0].id;
   await decideApproval(db, { approvalId: await pending(), actor: "Dan Whitlock", decision: "approve" });
-  await ingestUpload(db, id, "Maya Ortiz", "large.csv", csv);
-  await requestResearchCard(db, id, "Maya Ortiz", exampleDns);
-  await decideApproval(db, { approvalId: await pending(), actor: "Maya Ortiz", decision: "approve" });
+  await ingestUpload(db, id, "Maya Okafor", "large.csv", csv);
+  await requestResearchCard(db, id, "Maya Okafor", exampleDns);
+  await decideApproval(db, { approvalId: await pending(), actor: "Maya Okafor", decision: "approve" });
   const deps = simDeps(world);
   await db.query("UPDATE event_settings SET settings = jsonb_set(settings, '{add_prospects}', 'true') WHERE event_id = $1", [id]);
   await processEvent(db, id, deps);
   for (const k of await listCases(db, id)) if (!k.decision) await answerCase(db, id, k.id, "Dan Whitlock", k.suggested ?? (k.options[0] as { value: string }).value);
   await processEvent(db, id, deps);
-  await requestOutreachCard(db, id, "Maya Ortiz");
+  await requestOutreachCard(db, id, "Maya Okafor");
   const [card] = await db.query<{ lines: Record<string, number>; step_caps: Record<string, { credits?: number; llm?: number }> }>("SELECT lines, step_caps FROM cost_cards WHERE event_id = $1 AND kind = 'outreach'", [id]);
-  await decideApproval(db, { approvalId: await pending(), actor: "Maya Ortiz", decision: "approve" });
+  await decideApproval(db, { approvalId: await pending(), actor: "Maya Okafor", decision: "approve" });
   return { id, deps, card };
 }
 
@@ -147,7 +147,7 @@ describe("under vendor failure (authored)", () => {
     expect(Object.values(dropped).reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(2);
     expect(paidVerify).toBe(0);
     down = false;
-    await moveEvent(d2, o.id, "finding_people", "Maya Ortiz", { detail: "Resumed" });
+    await moveEvent(d2, o.id, "finding_people", "Maya Okafor", { detail: "Resumed" });
     await processEvent(d2, o.id, failing);
     expect((await d2.query<{ stage: string }>("SELECT stage FROM events WHERE id = $1", [o.id]))[0].stage).toBe("delivered");
     const kept2 = (await d2.query<{ n: number }>("SELECT count(*)::int AS n FROM contacts WHERE event_id = $1 AND dropped_at IS NULL AND email IS NOT NULL", [o.id]))[0].n;

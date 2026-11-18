@@ -375,13 +375,15 @@ function Tiers({ spread, compact }: { spread: Spread; compact?: boolean }) {
 
 /** The narrowing, in one bar: rows uploaded to people kept, by priority, with the drop reasons under it. */
 /** One row of the brief: what it is, a thin bar for how much, the number. Every row on both sides uses this, so the columns line up. */
-function BriefRow({ label, n, of, tone }: { label: string; n: number; of: number; tone: string }) {
+function BriefRow({ label, n, of, tone, onOpen }: { label: string; n: number; of: number; tone: string; onOpen?: () => void }) {
+  if (onOpen) return <li className="brow opens" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(); } }}><span>{label}</span><i aria-hidden="true"><u className={tone} style={{ width: `${of > 0 ? (100 * n) / of : 0}%` }} /></i><b>{num(n)}</b></li>;
   return <li className="brow"><span>{label}</span><i aria-hidden="true"><u className={tone} style={{ width: `${of > 0 ? (100 * n) / of : 0}%` }} /></i><b>{num(n)}</b></li>;
 }
 
 /** What was researched, and who did not make the outreach list and why. */
 function ListBrief({ d }: { d: EventPayload }) {
   const [all, setAll] = useState(false);
+  const { go } = useActor();
   const c = d.spread?.counts;
   const tiers: [string, number, string][] = c ? [["Tier 1", c.tier1, "t1"], ["Tier 2", c.tier2, "t2"], ["Tier 3", c.tier3, "t3"], ...(c.unknown ? [["Unknown", c.unknown, "t0"] as [string, number, string]] : [])] : [];
   const reasons = all ? d.list.dropped : d.list.dropped.slice(0, 5);
@@ -398,7 +400,7 @@ function ListBrief({ d }: { d: EventPayload }) {
       {d.list.dropped.length > 0 && (
         <div>
           <h3>Excluded from outreach<span>{num(left)}</span></h3>
-          <ul>{reasons.map((r) => <BriefRow key={r.reason} label={dropWords(r.reason)} n={r.n} of={left} tone="t3" />)}</ul>
+          <ul>{reasons.map((r) => <BriefRow key={r.reason} label={dropWords(r.reason)} n={r.n} of={left} tone="t3" onOpen={() => go(`${location.pathname}?s=dropped&r=${encodeURIComponent(r.reason)}#list`)} />)}</ul>
           {d.list.dropped.length > 5 && <ShowMore open={all} n={d.list.dropped.length} noun="reasons" onClick={() => setAll(!all)} />}
         </div>
       )}
@@ -430,7 +432,7 @@ function ArriveAt({ id }: { id: string }) {
 
 /** The people on the list: searched, filtered and paged on the server. A row opens the person. */
 function PeopleTable({ id, hasPriorities, reloadKey, past = false }: { id: string; hasPriorities: boolean; reloadKey: number; past?: boolean }) {
-  const [f, setF] = useUrlState(["q", "p", "t", "s", "src", "page", "person"], { s: "kept" });
+  const [f, setF] = useUrlState(["q", "p", "t", "s", "src", "page", "person", "r"], { s: "kept" });
   const { go, sample } = useActor();
   const [typed, setTyped] = useState(f.q);
   const [page, setPage] = useState<Page<PersonRow> | null>(null);
@@ -447,10 +449,10 @@ function PeopleTable({ id, hasPriorities, reloadKey, past = false }: { id: strin
   useEffect(() => { const t = setTimeout(() => { if (typed !== f.q) setF({ q: typed, page: "" }); }, 250); return () => clearTimeout(t); }, [typed]);
   useEffect(() => {
     let live = true;
-    const qs = new URLSearchParams({ q: f.q, priority: f.p, tier: f.t, status: f.s || "kept", source: f.src, offset: String(offset), limit: String(PAGE) });
+    const qs = new URLSearchParams({ q: f.q, priority: f.p, tier: f.t, status: f.s || "kept", source: f.src, reason: f.r, offset: String(offset), limit: String(PAGE) });
     get<Page<PersonRow>>(`/api/events/${id}/people?${qs}`).then((p) => { if (live) { setPage(p); setGone(p === null); } });
     return () => { live = false; };
-  }, [id, f.q, f.p, f.t, f.s, f.src, offset, reloadKey, stale]);
+  }, [id, f.q, f.p, f.t, f.s, f.src, f.r, offset, reloadKey, stale]);
   const rows = page?.rows ?? [];
   return (
     <section className="plist" aria-label="People" data-people={page?.total ?? ""}>
@@ -469,9 +471,10 @@ function PeopleTable({ id, hasPriorities, reloadKey, past = false }: { id: strin
           <select value={f.src} onChange={(ev) => setF({ src: ev.target.value, page: "" })}><option value="">Everyone</option><option value="attendee">Attendees</option><option value="prospect">Prospects</option></select>
         </label>
         <label className="filter"><span className="sr-only">Kept or dropped</span>
-          <select value={f.s || "kept"} onChange={(ev) => setF({ s: ev.target.value, page: "" })}><option value="kept">Kept</option><option value="dropped">Dropped</option><option value="all">Kept and dropped</option></select>
+          <select value={f.s || "kept"} onChange={(ev) => setF({ s: ev.target.value, page: "", r: "" })}><option value="kept">Kept</option><option value="dropped">Dropped</option><option value="all">Kept and dropped</option></select>
         </label>
       </div>
+      {f.r && <p className="small">Set aside: {dropWords(f.r)}. <button type="button" className="textlink" onClick={() => setF({ r: "", page: "" })}>Show everyone</button></p>}
       {gone && sample.snapshot && <p className="mute">{NOT_IN_SNAPSHOT}</p>}
       <ul className="prows">
         {rows.map((c) => (

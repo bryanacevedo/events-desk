@@ -228,7 +228,7 @@ export function Events({ go, sheetId, requesting, preselect, search }: { go: (to
 
       <Glossary />
       {sheetId && <SideSheet id={sheetId} go={go} close={() => go(keepQuery())} />}
-      {planning && canPlanHere && <NewPlan onDone={(id) => go(`/events?event=${id}`)} onClose={() => go(keepQuery())} />}
+      {planning && canPlanHere && <NewPlan onDone={(id) => { toast("The plan is made."); go(`/events?event=${id}`); }} onClose={() => go(keepQuery())} />}
       {adding && canAdd && <AddEvent onDone={() => go(keepQuery())} onClose={() => go(keepQuery())} />}
     </>
   );

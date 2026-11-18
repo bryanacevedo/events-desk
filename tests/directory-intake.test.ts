@@ -111,7 +111,7 @@ describe("who gets in", () => {
   });
   it("a key reaches nothing outside the two capture routes, and the write routes still ask for the write key", async () => {
     const k = await keyFor(db, MAYA, "reach");
-    const h = { ...bearer(k.key), "x-actor": "Maya%20Ortiz" };
+    const h = { ...bearer(k.key), "x-actor": "Maya%20Okafor" };
     for (const [method, path] of [["POST", `/api/events/${ev}/upload`], ["POST", "/api/capture-keys"], ["POST", "/api/suppressions"], ["POST", `/api/events/${ev}/directory/bring-in`], ["POST", "/api/capture/other"], ["DELETE", `/api/capture-keys/${k.id}`], ["PATCH", `/api/events/${ev}/settings`], ["POST", "/api/capture/events"], ["DELETE", "/api/capture/people"]] as const) {
       const r = await app.request(path, { method, headers: h, body: method === "POST" ? "{}" : undefined });
       expect(r.status, `${method} ${path}`).toBe(401);
@@ -193,12 +193,12 @@ describe("a send", () => {
   it("the source sentence and the terms note come from the server, whatever the body says", async () => {
     const e = await approvedEvent(db, "Source Event");
     await confirmTerms(db, e, "Attendee data may not be copied");
-    const k = await keyFor(db, "Maya Ortiz", "source");
+    const k = await keyFor(db, "Maya Okafor", "source");
     await send(app, "/api/capture/people", k.key, { event_id: e, platform: "swapcard", source_text: "read by the Pope", terms_note: "All fine", read_by: "Dan Whitlock", read_on: "1999-01-01", people: [{ ...person("Ana Lima"), source_text: "forged", read_by: "Dan Whitlock", state: "brought_in" }] });
     const [r] = await db.query<any>("SELECT *, read_on::text AS on FROM directory_reads WHERE event_id = $1", [e]);
-    expect(r.source_text).toBe(`read from the Swapcard directory of Source Event by Maya Ortiz on ${new Date().toISOString().slice(0, 10)}`);
+    expect(r.source_text).toBe(`read from the Swapcard directory of Source Event by Maya Okafor on ${new Date().toISOString().slice(0, 10)}`);
     expect(r.terms_note).toBe("Terms: Attendee data may not be copied");
-    expect(r).toMatchObject({ read_by: "Maya Ortiz", state: "staged", via: "extension", platform: "swapcard" });
+    expect(r).toMatchObject({ read_by: "Maya Okafor", state: "staged", via: "extension", platform: "swapcard" });
     const e2 = await approvedEvent(db, "No Terms Event");
     await send(app, "/api/capture/people", k.key, { event_id: e2, platform: "brella", people: [person("Cy Ruiz")] });
     expect((await db.query<any>("SELECT terms_note, source_text FROM directory_reads WHERE event_id = $1", [e2]))[0]).toMatchObject({ terms_note: "Terms not assessed", source_text: expect.stringContaining("Brella directory") });

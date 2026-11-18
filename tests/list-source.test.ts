@@ -14,7 +14,7 @@ import { ingestUpload, listSummary } from "../src/server/uploads.ts";
 import { LIST_SOURCES, LIST_SOURCE_WORDS } from "../src/shared/plan.ts";
 import { finishTwoCard, freshDb } from "./helpers.ts";
 
-const MAYA = "Maya Ortiz", DAN = "Dan Whitlock";
+const MAYA = "Maya Okafor", DAN = "Dan Whitlock";
 const LIST = [
   "Company,Name,Title,Email,LinkedIn,Website",
   "Larkspur Freight Software,Ada Moss,VP Sales,ada@larkspur.example,,",

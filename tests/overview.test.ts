@@ -19,7 +19,7 @@ describe("the overview route", () => {
     const q = delivered.find((d) => d.id === "evt_quarry")!;
     expect(q.a + q.b + q.c).toBeGreaterThan(0);
     expect(q.c).toBe(0);
-    expect(await (await app.request("/api/overview", { method: "POST", headers: { "x-actor": "Maya Ortiz" }, body: "{}" })).status).toBe(404);
+    expect(await (await app.request("/api/overview", { method: "POST", headers: { "x-actor": "Maya Okafor" }, body: "{}" })).status).toBe(404);
   });
 });
 

@@ -17,7 +17,7 @@ import { employerMatches, emailDomainChoice, nameScore, weigh } from "../src/sha
 import type { Settings } from "../src/shared/cost.ts";
 import { freshDb } from "./helpers.ts";
 
-const MAYA = "Maya Ortiz", DAN = "Dan Whitlock";
+const MAYA = "Maya Okafor", DAN = "Dan Whitlock";
 const s: Settings = JSON.parse(readFileSync("config/defaults.json", "utf8"));
 
 /* A scripted identity vendor: a table of companies it knows, counters for what was asked. */

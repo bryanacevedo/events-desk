@@ -84,7 +84,7 @@ describe("what each person keeps", () => {
     await bringIn(db, ev, MAYA, NOW);
     const cs = await contacts(ev);
     const ana = cs.find((c) => c.full_name === "Ana Lima"), cy = cs.find((c) => c.full_name === "Cy Ruiz");
-    expect(ana.read_note).toBe(`read from the Swapcard directory of AWS re:Invent 2026 by Maya Ortiz on 2026-11-14`);
+    expect(ana.read_note).toBe(`read from the Swapcard directory of AWS re:Invent 2026 by Maya Okafor on 2026-11-14`);
     expect(ana.read_terms).toBe("Terms: No copying of attendee data");
     expect(ana).toMatchObject({ list_source: "directory_extension", person_location: "Lisbon, Portugal", source: "attendee" });
     expect(cy.linkedin).toBe("https://www.linkedin.com/in/cy-ruiz");
@@ -108,7 +108,7 @@ describe("what each person keeps", () => {
     const bySource = Object.fromEntries((await contacts(ev)).map((c) => [c.full_name, c.list_source]));
     expect(bySource).toEqual({ "Ana Lima": "directory_extension", "Ben Ode": "directory_extension", "Cy Ruiz": "screen_recording", "Di Park": "screen_recording" });
     const di = (await contacts(ev)).find((c) => c.full_name === "Di Park");
-    expect(di.read_note).toMatch(/^read from a screen recording of Brella for Mixed Event by Maya Ortiz on /);
+    expect(di.read_note).toMatch(/^read from a screen recording of Brella for Mixed Event by Maya Okafor on /);
     expect(di.person_location).toBe("Berlin, Germany");
     // Two from each: ties go to the extension, and the upload says where the list came from.
     expect((await db.query<any>("SELECT list_source, source_note FROM uploads WHERE event_id = $1", [ev]))[0]).toMatchObject({ list_source: "directory_extension" });
@@ -266,7 +266,7 @@ describe("over HTTP", () => {
     const app = createApp(db, { demo: true, autoQuote: true });
     const ev = await approvedEvent(db);
     await add(ev, [person("Ana Lima"), person("Madonna")]);
-    const h = { "x-actor": "Maya%20Ortiz", "content-type": "application/json" };
+    const h = { "x-actor": "Maya%20Okafor", "content-type": "application/json" };
     const panel = await (await app.request(`/api/events/${ev}/directory`, { headers: h })).json() as any;
     expect(panel.counts).toEqual({ staged: 1, to_check: 1, brought_in: 0, dismissed: 0 });
     expect(panel.rule).toMatch(/Italy, Switzerland, Sweden, Denmark, Belgium, Austria, Norway and Germany/);

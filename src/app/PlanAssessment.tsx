@@ -174,11 +174,12 @@ const requestWords = (r: OrganizerRequest) => {
 
 function DatesForm({ id, r, done, saved }: { id: string; r: OrganizerRequest; done: () => void; saved: () => Promise<void> }) {
   const { actor } = useActor();
-  const [sent, setSent] = useState(r.sent_on ?? ""), [expected, setExpected] = useState(r.expected_on ?? "");
+  const [sent, setSent] = useState(r.sent_on ?? ""), [expected, setExpected] = useState(r.expected_on ?? ""), [follow, setFollow] = useState(r.follow_up_on ?? ""), [followSet, setFollowSet] = useState(false);
   const [answer, setAnswer] = useState<"" | "will_share" | "will_not_share">(r.status === "will_share" ? "will_share" : r.status === "will_not_share" ? "will_not_share" : "");
   return (
     <Form onCancel={done} ready={sent !== ""} onSave={async () => {
       const body: Record<string, unknown> = { sent_on: sent || null, expected_on: expected || null };
+      if (followSet) body.follow_up_on = follow || null;
       body.status = answer || "sent";
       const res = await send("PATCH", `/api/events/${id}/organizer-request/${r.id}`, actor, body);
       if (res.ok) { await saved(); done(); }
@@ -192,6 +193,7 @@ function DatesForm({ id, r, done, saved }: { id: string; r: OrganizerRequest; do
           </select>
         </label>
         <label className="field"><span>List expected on</span><input className="input" type="date" value={expected} onChange={(e) => setExpected(e.target.value)} /></label>
+        <label className="field"><span>Follow up on</span><input className="input" type="date" value={follow} placeholder="Set from the dates" onChange={(e) => { setFollow(e.target.value); setFollowSet(true); }} /></label>
       </div>
     </Form>
   );

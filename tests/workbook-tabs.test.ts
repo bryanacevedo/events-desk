@@ -181,13 +181,13 @@ describe("later review cases, and the Review tab by case", () => {
     // Drop on the name case, Dismiss on the deal; a blank row stays open.
     ws.getCell(nameRow.row, dec).value = "Drop";
     ws.getCell(lateRow.row, dec).value = "Dismiss";
-    const out = await importReview(db, r.id, "Maya Ortiz", (await wb.xlsx.writeBuffer()) as ArrayBuffer);
+    const out = await importReview(db, r.id, "Maya Okafor", (await wb.xlsx.writeBuffer()) as ArrayBuffer);
     expect(out.answered).toBe(2);
     expect((await db.query<{ drop_reason: string }>("SELECT drop_reason FROM contacts WHERE id = $1", [c["Ana Ruiz"]]))[0].drop_reason).toBe("rejected_in_review");
     const after = await listCases(db, r.id);
     expect(after.find((x) => x.id === lateRow.caseId)).toMatchObject({ status: "answered", decision: "dismiss" });
     // Reading the same file again changes nothing.
-    expect(await importReview(db, r.id, "Maya Ortiz", (await wb.xlsx.writeBuffer()) as ArrayBuffer)).toMatchObject({ answered: 0 });
+    expect(await importReview(db, r.id, "Maya Okafor", (await wb.xlsx.writeBuffer()) as ArrayBuffer)).toMatchObject({ answered: 0 });
   });
   it("skips a decision the case does not allow, and a case from another event", async () => {
     const r = await delivered(LIST + "Acme Cloud,Ana,Ruiz,VP Sales,ana@acmecloud.example\n");
@@ -196,16 +196,16 @@ describe("later review cases, and the Review tab by case", () => {
     const late = (await listCases(db, r.id)).find((x) => x.kind === "late_stage_deal")!;
     const grid = [["case_id", "contact_id", "Case", "Decision"], [late.id, "", "Late-stage deal", "Drop"], ["case_nope", "", "x", "Keep"]];
     const { applyReviewGrid } = await import("../src/server/workbook.ts");
-    expect(await applyReviewGrid(db, r.id, "Maya Ortiz", grid)).toEqual({ dropped: 0, answered: 0, skipped: 2 });
+    expect(await applyReviewGrid(db, r.id, "Maya Okafor", grid)).toEqual({ dropped: 0, answered: 0, skipped: 2 });
     expect((await listCases(db, r.id)).find((x) => x.id === late.id)!.status).toBe("open");
-    await answerCase(db, r.id, late.id, "Maya Ortiz", "keep");
+    await answerCase(db, r.id, late.id, "Maya Okafor", "keep");
   });
 });
 
 describe("opting someone out", () => {
   it("stops the email loop with its own drop reason, takes them off a list they are on, and applies in every event", async () => {
     const app = createApp(db, { demo: true });
-    const post = (b: object) => app.request("/api/suppressions", { method: "POST", body: JSON.stringify(b), headers: { "x-actor": "Maya Ortiz", "content-type": "application/json" } });
+    const post = (b: object) => app.request("/api/suppressions", { method: "POST", body: JSON.stringify(b), headers: { "x-actor": "Maya Okafor", "content-type": "application/json" } });
     const r = await delivered();
     expect((await db.query("SELECT 1 FROM contacts WHERE event_id = $1 AND full_name = 'Ana Ruiz' AND dropped_at IS NULL", [r.id])).length).toBe(1);
     const res = await post({ email: "ana@acmecloud.example", reason: "Asked us to stop" });
@@ -215,7 +215,7 @@ describe("opting someone out", () => {
     expect((await post({})).status).toBe(409);
     expect((await post({ email: "not an address" })).status).toBe(409);
     const list = await (await app.request("/api/suppressions")).json() as { opt_outs: { email: string; created_by: string }[] };
-    expect(list.opt_outs[0]).toMatchObject({ email: "ana@acmecloud.example", created_by: "Maya Ortiz" });
+    expect(list.opt_outs[0]).toMatchObject({ email: "ana@acmecloud.example", created_by: "Maya Okafor" });
     // By name at a company, for the next event: stopped before anything is revealed or paid.
     expect((await post({ name: "Cy Moss", company: "Harbor Logistics" })).status).toBe(201);
     const next = await delivered(HEAD + "Acme Cloud,Ana,Ruiz,VP Sales,ana@acmecloud.example\nHarbor Logistics,,,,\n", { people: { "harborlogistics.example": [found("p1", "Cy", "Moss", "VP Sales"), found("p2", "Bo", "Lund", "VP Sales")] }, name: "Next" });

@@ -25,7 +25,7 @@ import { companyDisplayName } from "../shared/names.ts";
 
 const u = (s: string) => parseInt(createHash("sha256").update(s).digest("hex").slice(0, 8), 16) / 0xffffffff;
 const GTM = "GTM Team";
-const REP = "Maya Ortiz";
+const REP = "Maya Okafor";
 
 /* Each kind of answer comes in several wordings, so two people never send the same sentence. The classifier reads them the same way. */
 const WORDINGS: Record<string, string[]> = {
@@ -276,7 +276,7 @@ export async function seedDemoStages(db: Db, deps: LifecycleDeps, tools: Record<
       // Every reply that came in is read first, so a case it opens is settled here, not left for the server's first pass after boot.
       await processInbound(db, deps, 5000);
       for (const c of await db.query<{ id: string; suggested: string | null }>("SELECT id, suggested FROM review_cases WHERE event_id = $1 AND status = 'open'", [id])) {
-        try { await answerCase(db, id, c.id, (await currentUploader(db.query, id))?.uploaded_by ?? "Maya Ortiz", c.suggested ?? "dismiss"); } catch { /* a case its answer no longer fits stays open */ }
+        try { await answerCase(db, id, c.id, (await currentUploader(db.query, id))?.uploaded_by ?? "Maya Okafor", c.suggested ?? "dismiss"); } catch { /* a case its answer no longer fits stays open */ }
       }
     };
     if (stage === "closing" || stage === "scored") { await settle(); await twoWaves(id); await settle(); } else await toMarket(id);
@@ -294,7 +294,7 @@ export async function seedDemoStages(db: Db, deps: LifecycleDeps, tools: Record<
     for (const c of await db.query<{ id: string; suggested: string | null; kind: string; summary: string; model_code: string | null }>(
       `SELECT r.id, r.suggested, r.kind, r.summary, (SELECT i.model_code FROM inbound_messages i WHERE i.id = r.payload->>'inbound_id') AS model_code FROM review_cases r WHERE r.event_id = $1 AND r.status = 'open'`, [id])) {
       const answer = c.suggested ?? (c.kind === "reply_doubtful" ? (/unsubscribe/i.test(c.summary) ? "unsubscribe" : c.model_code && c.model_code !== "other" ? c.model_code : "not_interested") : "dismiss");
-      try { await answerCase(db, id, c.id, (await currentUploader(db.query, id))?.uploaded_by ?? "Maya Ortiz", answer); } catch { /* left open */ }
+      try { await answerCase(db, id, c.id, (await currentUploader(db.query, id))?.uploaded_by ?? "Maya Okafor", answer); } catch { /* left open */ }
     }
   }
   await redateDemo(db);

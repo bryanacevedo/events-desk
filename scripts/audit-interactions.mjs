@@ -58,9 +58,9 @@ async function sheet(name, actor, path, opener) {
 }
 
 await sheet("Overview event sheet", "Dan Whitlock", "/", "[data-opens-sheet][data-row]");
-await sheet("My day reply", "Maya Ortiz", "/my-day", ".ob-tray .ob-row");
-await sheet("My day meeting", "Maya Ortiz", "/my-day", ".ob-meet");
-await sheet("Event reply", "Maya Ortiz", "/event/evt_money20-20-usa-2026#outreach", ".m-replies .ob-row");
+await sheet("My day reply", "Maya Okafor", "/my-day", ".ob-tray .ob-row");
+await sheet("My day meeting", "Maya Okafor", "/my-day", ".ob-meet");
+await sheet("Event reply", "Maya Okafor", "/event/evt_money20-20-usa-2026#outreach", ".m-replies .ob-row");
 await sheet("Result deal meeting", "Dan Whitlock", "/event/evt_nrf-2026-retail-s-big-show#result", ".rs-deal");
 await sheet("Events sheet", "Dan Whitlock", "/events", "[data-opens-sheet]");
 
@@ -131,7 +131,7 @@ if (dinner) {
 // The Overview layout is each person's own pick (decision 81): the switcher changes the page at once, survives a reload, and leaves someone else on the default.
 {
   const pressed = () => page.locator('.seg[aria-label="Overview layout"] [aria-pressed="true"]').innerText().catch(() => "none");
-  await as("Maya Ortiz", "/");
+  await as("Maya Okafor", "/");
   if ((await pressed()) !== "Trays") problems.push(`Overview layout: a person with no pick should see Trays, saw ${await pressed()}`);
   await page.getByRole("button", { name: "Timeline", exact: true }).click(); await pause(500);
   if (!(await page.locator(".ovt .strip, .ovt .ovt-run").count())) problems.push("Overview layout: picking Timeline did not draw it");
@@ -139,7 +139,7 @@ if (dinner) {
   if ((await pressed()) !== "Timeline") problems.push("Overview layout: the pick did not survive a reload");
   await as("Dan Whitlock", "/");
   if ((await pressed()) !== "Trays") problems.push("Overview layout: one person's pick changed another person's page");
-  await as("Maya Ortiz", "/");
+  await as("Maya Okafor", "/");
   await page.getByRole("button", { name: "Trays", exact: true }).click(); await pause(400);
 }
 

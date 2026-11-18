@@ -172,7 +172,9 @@ export async function decideSeat(db: Db, d: SeatDecision) {
     if (d.decision === "approve" && same(d.actor) === same(r.requester)) throw new RuleError("Nobody can approve their own request.");
     if (d.decision === "decline" && !d.reason?.trim()) throw new RuleError("Say why before declining.");
     const status = d.decision === "approve" ? "approved" : "declined";
-    await q("UPDATE seat_requests SET status = $2, decided_by = $3, decided_at = now(), decline_reason = $4 WHERE id = $1", [r.id, status, d.actor, d.reason?.trim() || null]);
+    await q("UPDATE seat_requests SET status = $2, decided_by = $3, decided_at = now(), decline_reason = $4 WHERE id = $1", [r.id, status, d.actor, status === "declined" ? d.reason?.trim() || null : null]);
+    // A note on an approval is kept in the event's activity, beside the line that says who approved (decision 115).
+    const note = status === "approved" && d.reason?.trim() ? `: ${d.reason.trim().slice(0, 300)}` : "";
     const [ev] = await q<{ id: string; stage: string; approval_mode: string }>("SELECT id, stage, approval_mode FROM events WHERE id = $1 FOR UPDATE", [r.event_id]);
     if (status === "approved" && r.suggestion && !r.catalog_id) {
       // Approving a suggestion adds the event to the catalog.
@@ -186,11 +188,11 @@ export async function decideSeat(db: Db, d: SeatDecision) {
     const c = await recount(q, ev.id);
     if (ev.approval_mode === "budget") {
       // Seats on a plan are settled one by one here, and never move the plan: approving a seat cannot approve the plan, and declining the last seat cannot decline it.
-      await logActivity(q, ev.id, d.actor, "approval", status === "approved" ? `Approved ${r.requester}'s seat` : `Declined ${r.requester}'s seat: ${d.reason!.trim()}`);
+      await logActivity(q, ev.id, d.actor, "approval", status === "approved" ? `Approved ${r.requester}'s seat${note}` : `Declined ${r.requester}'s seat: ${d.reason!.trim()}`);
     } else if (status === "approved") {
       // Only an event still waiting on its first seat moves. A later seat, or a late one, just counts.
-      if (ev.stage === "requested") await moveWithin(q, ev.id, "approved", d.actor, { detail: `Approved ${r.requester}'s seat` });
-      else await logActivity(q, ev.id, d.actor, "approval", `Approved ${r.requester}'s seat`);
+      if (ev.stage === "requested") await moveWithin(q, ev.id, "approved", d.actor, { detail: `Approved ${r.requester}'s seat${note}` });
+      else await logActivity(q, ev.id, d.actor, "approval", `Approved ${r.requester}'s seat${note}`);
     } else if (ev.stage === "requested" && c.approved === 0 && c.pending === 0) {
       await moveWithin(q, ev.id, "declined", d.actor, { reason: d.reason, detail: `Declined the seats: ${d.reason!.trim()}` });
     } else await logActivity(q, ev.id, d.actor, "approval", `Declined ${r.requester}'s seat: ${d.reason!.trim()}`);

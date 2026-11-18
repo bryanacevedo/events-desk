@@ -43,7 +43,7 @@ describe("near matches", () => {
   it("finds a short form or a typo at the same company, and not a stranger", () => {
     expect(nearMatches(me, [{ id: "a", name: "Rob Kline", company: "Orrery", email: null }]).map((x) => x.id)).toEqual(["a"]);
     expect(nearMatches(me, [{ id: "b", name: "Robert Kilne", company: "Orrery", email: null }]).map((x) => x.id)).toEqual(["b"]);
-    expect(nearMatches(me, [{ id: "c", name: "Maya Ortiz", company: "Orrery", email: null }, { id: "d", name: "Rob Kline", company: "Other Co", email: null }])).toEqual([]);
+    expect(nearMatches(me, [{ id: "c", name: "Maya Okafor", company: "Orrery", email: null }, { id: "d", name: "Rob Kline", company: "Other Co", email: null }])).toEqual([]);
   });
   it("finds the same name written with another company at the same address domain", () => {
     expect(nearMatches(me, [{ id: "e", name: "Robert Kline", company: "Orrery Pay", email: "r.kline@orrery.example" }]).map((x) => x.id)).toEqual(["e"]);

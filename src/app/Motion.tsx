@@ -41,9 +41,10 @@ const shortWhen = (iso: string) => new Date(iso).toLocaleString("en-GB", { weekd
 const addDay = (ymd: string) => { const d = new Date(`${ymd}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + 1); return d.toISOString().slice(0, 10); };
 
 /** Opens one of the page's folds by its title and brings it into view: a figure that names a fold leads to it. */
-const openFold = (title: string) => {
+const openFold = (title: string): boolean => {
   const d = [...document.querySelectorAll<HTMLDetailsElement>("section.motion details.fold")].find((x) => x.querySelector(".fold-t")?.textContent === title);
   if (d) { d.open = true; d.scrollIntoView({ behavior: "smooth", block: "start" }); }
+  return Boolean(d);
 };
 /** The meetings behind each funnel row, by the same rules as the funnel (migrations/0041 event_funnel). */
 const MEET_VIEWS = {
@@ -134,7 +135,7 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
   const { actor, demo, needs, sample } = useActor();
   // What the event cost and returned is leadership's and GTM Engineering's view, as on Budget.
   const lead = isGtm(actor) || Boolean(needs?.approvers.includes(actor));
-  const [o, setO] = useState<Overview | null>(null);
+  const [o, setO] = useState<Overview | null>(null), [nothing, setNothing] = useState("");
   // Where Account Desk runs the outreach, this section hands over instead of building sequences (docs/SHARED-WORLD.md 7).
   const [deferTo, setDeferTo] = useState<{ sequencer: string; links: Record<string, string> } | null>(null);
   useEffect(() => { get<{ sequencer: string; links: Record<string, string> }>("/api/integration").then(setDeferTo).catch(() => setDeferTo(null)); }, []);
@@ -194,7 +195,7 @@ export function Motion({ id, onChange }: { id: string; onChange: () => void }) {
           <DeskPanel id={id} actor={actor} />
           <ul className="m-rows m-wide">
             {([["Badge scans and notes", "Met at the booth"], ["Replies", "Replies"], ["Meetings", "Meetings"]] as const).map(([label, fold]) => (
-              <li key={label} className="brow opens" role="button" tabIndex={0} onClick={() => openFold(fold)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openFold(fold); } }}><span>{label}</span><Chevron right /></li>
+              <li key={label} className="brow opens" role="button" tabIndex={0} onClick={() => setNothing(openFold(fold) ? "" : label)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setNothing(openFold(fold) ? "" : label); } }}><span>{label}{nothing === label && <span className="mute">, nothing yet: Account Desk has not reported back</span>}</span><Chevron right /></li>
             ))}
           </ul>
         </div>

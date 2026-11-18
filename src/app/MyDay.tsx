@@ -11,7 +11,7 @@ import { isGtm } from "../shared/roles";
 import { Icon } from "./icons";
 import { KitRows, KitSheet } from "./Kit";
 import { dayIn, headIn, MeetingRows, meetTime, NoteRows, ObjectSheets, openObject, ReplyRows, type NoteRowData } from "./Objects";
-import { Chevron } from "./Patterns";
+import { Chevron, ShowMore } from "./Patterns";
 import { PersonAvatar } from "./PersonAvatar";
 import { eventHref, personHref, To } from "./To";
 import { plural, todayYmd } from "./words";
@@ -141,7 +141,9 @@ export function MyDay() {
 }
 
 /** The guests this person owns at hosted events, by event: where each stands, as a word in ink, and the notes the host left. On the event's own day the way to its door sits beside it. */
+const GUESTS_SHOWN = 8;
 function HostedGuests({ mine, go }: { mine: HostedMine; go: (to: string) => void }) {
+  const [open, setOpen] = useState<Set<string>>(new Set());
   const events = [...new Set(mine.guests.map((g) => g.event_id))].map((id) => ({ id, rows: mine.guests.filter((g) => g.event_id === id) }));
   const today = todayYmd();
   return (
@@ -154,7 +156,7 @@ function HostedGuests({ mine, go }: { mine: HostedMine; go: (to: string) => void
             {rows[0].starts_on === today && !rows[0].closed && <Link to={`/event/${id}#check-in`} go={go} className="btn line small">Check-in</Link>}
           </div>
           <ul className="hr-rows">
-            {rows.map((g) => (
+            {(open.has(id) ? rows : rows.slice(0, GUESTS_SHOWN)).map((g) => (
               <li className="hr-row" key={g.id}>
                 <span className="hr-who"><b>{g.name}</b><span>{g.company}</span></span>
                 <span className={`hr-owner${g.group === "attended" || g.group === "no_show" ? "" : " plain"}`}>{g.status_word}</span>
@@ -163,6 +165,7 @@ function HostedGuests({ mine, go }: { mine: HostedMine; go: (to: string) => void
               </li>
             ))}
           </ul>
+          {rows.length > GUESTS_SHOWN && <ShowMore open={open.has(id)} n={rows.length} noun="guests" onClick={() => setOpen((o) => { const n = new Set(o); if (n.has(id)) n.delete(id); else n.add(id); return n; })} />}
         </section>
       ))}
     </div>

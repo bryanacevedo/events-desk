@@ -1,9 +1,9 @@
 /* Sponsorship on the Plan tab: the package, the deliverables by due date, and what was promised against what arrived. Rows edit in place, the way the budget lines do.
    A planner changes anything. The person a deliverable is assigned to marks their own done. Prices are leadership's and planners', and the server sends a rep none. */
 
-import { useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { send, type PlanData, type PlanDeliverable, type PlanPromise } from "./api";
-import { useActor } from "./App";
+import { PEOPLE, useActor } from "./App";
 import { Editable, Form } from "./PlanEdit";
 import { DELIVERABLE_KINDS, PROMISE_ITEMS } from "../shared/plan";
 import { money, shortDate } from "./words";
@@ -97,10 +97,10 @@ function DeliverableEdit({ id, d, saved }: { id: string; d: PlanDeliverable | nu
     await saved();
   };
   return (
-    <li className="pl-line" aria-label={d ? d.label : "New deliverable"}>
+    <li className={`pl-line${d ? " pl-nokind" : ""}`} aria-label={d ? d.label : "New deliverable"}>
       {!d && <label className="field"><span>Kind</span><select className="input" value={f.kind} onChange={set("kind")}>{DELIVERABLE_KINDS.map((k) => <option key={k} value={k}>{KIND_WORDS[k]}</option>)}</select></label>}
       <label className="field"><span>Deliverable</span><input className="input" value={f.label} maxLength={120} onChange={set("label")} autoComplete="off" /></label>
-      <label className="field"><span>Owner</span><input className="input" value={f.owner} maxLength={80} onChange={set("owner")} autoComplete="off" /></label>
+      <label className="field"><span>Owner</span><input className="input" list="deliverable-owners" value={f.owner} maxLength={80} onChange={set("owner")} autoComplete="off" /></label>
       <label className="field"><span>Due</span><input className="input" type="date" value={f.due} onChange={set("due")} /></label>
       <div className="actions pl-line-end"><button type="button" className="btn line small" disabled={busy || !dirty || f.label.trim() === ""} onClick={save}>{d ? "Save deliverable" : "Add deliverable"}</button></div>
       {error && <p role="alert" className="error small pl-line-err">{error}</p>}
@@ -135,6 +135,20 @@ function PromiseEdit({ id, pr, saved }: { id: string; pr: PlanPromise | null; sa
   );
 }
 
+/** The rows keep the order they had when the editor opened, so saving a due date does not make a row jump. The owner offers the team's names. */
+function DeliverablesEditor({ id, items, saved, done }: { id: string; items: PlanDeliverable[]; saved: () => Promise<void>; done: ReactNode }) {
+  const order = useRef(items.map((d) => d.id));
+  const rank = (d: PlanDeliverable) => { const i = order.current.indexOf(d.id); if (i >= 0) return i; order.current.push(d.id); return order.current.length - 1; };
+  const rows = [...items].sort((a, b) => rank(a) - rank(b));
+  return (
+    <div className="pl-edit">
+      <ul className="pl-lines" aria-label="Deliverables">{rows.map((d) => <DeliverableEdit key={d.id} id={id} d={d} saved={saved} />)}<DeliverableEdit key={`new-${items.length}`} id={id} d={null} saved={saved} /></ul>
+      <datalist id="deliverable-owners">{PEOPLE.map((p) => <option key={p} value={p} />)}</datalist>
+      {done}
+    </div>
+  );
+}
+
 /** The whole sponsorship section. */
 export function SponsorBlock({ id, p, canEdit, saved }: { id: string; p: PlanData; canEdit: boolean; saved: () => Promise<void> }) {
   const pkg = p.sponsorship;
@@ -146,7 +160,7 @@ export function SponsorBlock({ id, p, canEdit, saved }: { id: string; p: PlanDat
       <h3 className="pl-h3">Deliverables</h3>
       <Editable can={canEdit} label="Edit deliverables"
         view={p.deliverables.length ? <ul className="pl-rows">{p.deliverables.map((d) => <DeliverableLine key={d.id} id={id} d={d} planner={canEdit} saved={saved} />)}</ul> : <p className="mute">No deliverables yet.</p>}
-        editor={(close) => <div className="pl-edit"><ul className="pl-lines" aria-label="Deliverables">{p.deliverables.map((d) => <DeliverableEdit key={d.id} id={id} d={d} saved={saved} />)}<DeliverableEdit key={`new-${p.deliverables.length}`} id={id} d={null} saved={saved} /></ul>{finish(close)}</div>} />
+        editor={(close) => <DeliverablesEditor id={id} items={p.deliverables} saved={saved} done={finish(close)} />} />
       <h3 className="pl-h3">Promised and received</h3>
       <Editable can={canEdit} label="Edit promises"
         view={p.promises.length ? <ul className="pl-rows">{p.promises.map((x) => <li className="pl-row" key={x.id}><span className="pl-what"><b>{x.words}</b></span></li>)}</ul> : <p className="mute">Nothing promised yet.</p>}

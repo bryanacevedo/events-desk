@@ -15,7 +15,7 @@ import { askConcierge, connectConcierge, NO_MONEY, USED_UP } from "../src/concie
 import { seed } from "../src/server/seed.ts";
 import { finishTwoCard, freshDb } from "./helpers.ts";
 
-const MAYA = "Maya Ortiz", DAN = "Dan Whitlock";
+const MAYA = "Maya Okafor", DAN = "Dan Whitlock";
 const LIST = readFileSync("samples/attendees.csv", "utf8");
 const mock: Deps = { llm: mockLlm, vendorsFor: mockVendors };
 

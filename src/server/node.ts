@@ -150,7 +150,7 @@ if (!demoMotionReady) void (async () => {
         await seedDirectory(db);
         // Free meeting slots belong to an event still to come: the one in market before it starts.
         const tokyo = "evt_salesforce-world-tour-tokyo-2026";
-        const [rep] = await db.query<{ rep: string }>("SELECT requester AS rep FROM seat_requests WHERE event_id = $1 AND status = 'approved' ORDER BY (requester = 'Maya Ortiz') DESC, requester LIMIT 1", [tokyo]);
+        const [rep] = await db.query<{ rep: string }>("SELECT requester AS rep FROM seat_requests WHERE event_id = $1 AND status = 'approved' ORDER BY (requester = 'Maya Okafor') DESC, requester LIMIT 1", [tokyo]);
         if (rep) await addSlots(db, tokyo, "GTM Team", { rep: rep.rep, day: "2026-11-18", from: "09:00", to: "12:00", minutes: 30, location: "Booth 4" });
         break;
       }

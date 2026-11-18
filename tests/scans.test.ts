@@ -16,8 +16,8 @@ import { CAMILLE } from "./plan-helpers.ts";
 
 const NOW = new Date("2027-06-10T22:00:00Z");
 const crm = { ...fakeCrm({ owner: "Dana Owner" }), write: async () => ({ id: "x" }) } as never;
-const deps = (over: Partial<LifecycleDeps> = {}): LifecycleDeps => ({ connectors: {}, llm: mockLlm, now: () => NOW, crm, userMap: { "Maya Ortiz": "UMAYA", "Dana Owner": "UDANA" }, ...over } as never);
-const MAYA = "Maya Ortiz", LEO = "Leo Marsh";
+const deps = (over: Partial<LifecycleDeps> = {}): LifecycleDeps => ({ connectors: {}, llm: mockLlm, now: () => NOW, crm, userMap: { "Maya Okafor": "UMAYA", "Dana Owner": "UDANA" }, ...over } as never);
+const MAYA = "Maya Okafor", LEO = "Leo Marsh";
 let db: Db, ev: string, n = 0;
 const sid = () => `scan-${Date.now().toString(36)}-${++n}-aaaa`;
 const vcard = (name: string, email: string, company = "Orrery", title = "Head of Payments") => `BEGIN:VCARD\nVERSION:3.0\nFN:${name}\nORG:${company}\nTITLE:${title}\nEMAIL:${email}\nEND:VCARD`;

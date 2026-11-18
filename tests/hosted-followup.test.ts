@@ -51,7 +51,7 @@ describe("the two groups", () => {
     const notify = { post: async (_r: unknown, m: { text: string }, mention?: string[]) => { posts.push({ text: m.text, mention }); return "C123"; }, ops: async () => true };
     const r = await closeAttendance(db, depsAt(AFTER, { notify: notify as never, userMap: { [MAYA]: "U_MAYA" } }), CAMILLE, id);
     expect(r.notes_logged).toBe(2);
-    expect((await db.query<{ detail: string }>("SELECT detail FROM guest_log WHERE event_id = $1 AND kind = 'note' AND detail LIKE 'Notes for%' ORDER BY detail", [id])).map((x) => x.detail)).toEqual(["Notes for Leo Marsh: Left a message.", "Notes for Maya Ortiz: Wants a pilot in Q3."]);
+    expect((await db.query<{ detail: string }>("SELECT detail FROM guest_log WHERE event_id = $1 AND kind = 'note' AND detail LIKE 'Notes for%' ORDER BY detail", [id])).map((x) => x.detail)).toEqual(["Notes for Leo Marsh: Left a message.", "Notes for Maya Okafor: Wants a pilot in Q3."]);
     expect(r.owners_told).toEqual([MAYA]);
     expect(posts.filter((p) => p.mention?.includes("U_MAYA"))).toHaveLength(1);
     expect(posts.find((p) => p.mention?.includes("U_MAYA"))!.text).toContain("Ana Ruiz");

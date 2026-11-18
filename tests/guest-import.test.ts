@@ -129,10 +129,10 @@ describe("imports are uploads", () => {
 describe("target accounts and suggestions", () => {
   it("reads an export's usual headers (Account name, Website, Account owner) as the same columns", async () => {
     const db = await freshDb();
-    const r = await importTargetAccounts(db, CAMILLE, "Account name,Website,Country,Account owner,Open deal\nHarbor Ledger Systems,harborledger.example,United States,Maya Ortiz,Yes\nTessellate Payments,tessellatepay.example,United Kingdom,Priya Nair,No\n");
+    const r = await importTargetAccounts(db, CAMILLE, "Account name,Website,Country,Account owner,Open deal\nHarbor Ledger Systems,harborledger.example,United States,Maya Okafor,Yes\nTessellate Payments,tessellatepay.example,United Kingdom,Priya Nair,No\n");
     expect(r).toMatchObject({ rows: 2, added: 2, updated: 0, skipped: [] });
     expect(await db.query("SELECT name, domain, country, owner FROM target_accounts ORDER BY name")).toEqual([
-      { name: "Harbor Ledger Systems", domain: "harborledger.example", country: "US", owner: "Maya Ortiz" },
+      { name: "Harbor Ledger Systems", domain: "harborledger.example", country: "US", owner: "Maya Okafor" },
       { name: "Tessellate Payments", domain: "tessellatepay.example", country: "GB", owner: "Priya Nair" },
     ]);
     await expect(importTargetAccounts(db, CAMILLE, "Firm,Website\nAcme,acme.example\n")).rejects.toThrow("The file needs a name column.");
@@ -148,19 +148,19 @@ describe("target accounts and suggestions", () => {
   it("imports accounts, lists those with a deal or an owner that are not on the list, and never adds a person without an owner", async () => {
     const db = await freshDb();
     const id = await hostedDinner(db, { capacity: 10 });
-    const r = await importTargetAccounts(db, CAMILLE, "name,domain,country,owner,open_deal,deal_stage\nAcme,https://www.Acme.example/x,US,Maya Ortiz,Acme renewal,Proposal\nBeta,beta.example,US,,,\nGamma,,GB,Leo Marsh,,\n,x.example,,,,\n");
+    const r = await importTargetAccounts(db, CAMILLE, "name,domain,country,owner,open_deal,deal_stage\nAcme,https://www.Acme.example/x,US,Maya Okafor,Acme renewal,Proposal\nBeta,beta.example,US,,,\nGamma,,GB,Leo Marsh,,\n,x.example,,,,\n");
     expect(r).toMatchObject({ added: 3, updated: 0 });
     expect(r.skipped).toEqual([{ row: 5, why: "No name" }]);
     expect((await db.query("SELECT domain FROM target_accounts WHERE name = 'Acme'"))[0].domain).toBe("acme.example");
     expect((await importTargetAccounts(db, CAMILLE, "name,owner\nBeta,Leo Marsh\n"))).toMatchObject({ added: 0, updated: 1 });
     const s = await suggestions(db, id);
-    expect(s.accounts.map((a) => [a.name, a.owner])).toEqual([["Acme", "Maya Ortiz"], ["Beta", "Leo Marsh"], ["Gamma", "Leo Marsh"]]);
+    expect(s.accounts.map((a) => [a.name, a.owner])).toEqual([["Acme", "Maya Okafor"], ["Beta", "Leo Marsh"], ["Gamma", "Leo Marsh"]]);
     const acme = s.accounts[0];
     const app = createApp(db, { demo: true });
     const h = { "x-actor": encodeURIComponent(CAMILLE), "content-type": "application/json" };
     const add = await app.request(`/api/events/${id}/guests`, { method: "POST", headers: h, body: JSON.stringify({ name: "Ana Ruiz", account_id: acme.id, source: "account" }) });
     expect(add.status).toBe(201);
-    expect((await db.query("SELECT owner, company FROM event_guests WHERE event_id = $1", [id]))[0]).toEqual({ owner: "Maya Ortiz", company: "Acme" });
+    expect((await db.query("SELECT owner, company FROM event_guests WHERE event_id = $1", [id]))[0]).toEqual({ owner: "Maya Okafor", company: "Acme" });
     expect((await suggestions(db, id)).accounts.map((a) => a.name)).toEqual(["Beta", "Gamma"]);
     expect((await app.request("/api/target-accounts", { method: "POST", headers: { ...h, "x-actor": encodeURIComponent("Priya Natarajan") }, body: JSON.stringify({ name: "Nope" }) })).status).toBe(403);
   });

@@ -13,7 +13,7 @@ import { CAMILLE } from "./plan-helpers.ts";
 
 const crm = { ...fakeCrm({ owner: "Dana Owner" }), write: async () => ({ id: "x" }) } as never;
 const deps = { connectors: {}, llm: mockLlm, now: () => new Date("2027-06-10T22:00:00Z"), crm, userMap: {} } as never as LifecycleDeps;
-const DAN = "Dan Whitlock", MAYA = "Maya Ortiz";
+const DAN = "Dan Whitlock", MAYA = "Maya Okafor";
 let db: Db, ev: string, talk: string;
 const vcard = (name: string, email: string) => `BEGIN:VCARD\nVERSION:3.0\nFN:${name}\nORG:Orrery\nTITLE:Head\nEMAIL:${email}\nEND:VCARD`;
 

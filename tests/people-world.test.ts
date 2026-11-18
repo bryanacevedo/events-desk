@@ -41,21 +41,21 @@ const calls = { parse: 0 };
 beforeAll(async () => {
   db = await freshDb();
   await seedIcp(db);
-  id = (await createEvent(db, "Maya Ortiz", { name: "Meridian", starts_on: "2027-03-30", seat_count: 60, seat_price_cents: 100, country: "Spain", flow: "two_card" })).id;
+  id = (await createEvent(db, "Maya Okafor", { name: "Meridian", starts_on: "2027-03-30", seat_count: 60, seat_price_cents: 100, country: "Spain", flow: "two_card" })).id;
   const pending = async () => (await db.query<{ id: string }>("SELECT id FROM approvals WHERE event_id = $1 AND status = 'pending'", [id]))[0].id;
   await decideApproval(db, { approvalId: await pending(), actor: "Dan Whitlock", decision: "approve" });
-  await ingestUpload(db, id, "Maya Ortiz", "large.csv", csv);
-  await requestResearchCard(db, id, "Maya Ortiz", exampleDns);
-  await decideApproval(db, { approvalId: await pending(), actor: "Maya Ortiz", decision: "approve" });
+  await ingestUpload(db, id, "Maya Okafor", "large.csv", csv);
+  await requestResearchCard(db, id, "Maya Okafor", exampleDns);
+  await decideApproval(db, { approvalId: await pending(), actor: "Maya Okafor", decision: "approve" });
   const deps = simDeps(world);
   // Prospects on, so the search covers every attending company as well as the company-only rows.
   await db.query("UPDATE event_settings SET settings = jsonb_set(settings, '{add_prospects}', 'true') WHERE event_id = $1", [id]);
   await processEvent(db, id, deps);
   for (const k of await listCases(db, id)) if (!k.decision) await answerCase(db, id, k.id, "Dan Whitlock", k.suggested ?? (k.options[0] as { value: string }).value);
   await processEvent(db, id, deps);
-  await requestOutreachCard(db, id, "Maya Ortiz");
+  await requestOutreachCard(db, id, "Maya Okafor");
   [card] = await db.query<typeof card>("SELECT lines, step_caps, credits_cap, llm_cap FROM cost_cards WHERE event_id = $1 AND kind = 'outreach'", [id]);
-  await decideApproval(db, { approvalId: await pending(), actor: "Maya Ortiz", decision: "approve" });
+  await decideApproval(db, { approvalId: await pending(), actor: "Maya Okafor", decision: "approve" });
   await processEvent(db, id, deps);
   used = Object.fromEntries((await spendByStep(db, id)).filter((s) => s.kind === "outreach").map((s) => [`${s.step}/${s.unit}`, s.n]));
   contacts = await db.query<Contact>(

@@ -5,7 +5,7 @@
 import { send, GOAL_WORDS, type SeatRequest } from "./api";
 import { Link, useActor } from "./App";
 import { EventBanner } from "./EventBanner";
-import { ExpandRow, Flag } from "./Patterns";
+import { ConfirmDialog, ExpandRow, Flag } from "./Patterns";
 import { PersonAvatar } from "./PersonAvatar";
 import { RequestSeats } from "./RequestForm";
 import { useRef, useState } from "react";
@@ -15,20 +15,33 @@ import { sentTo } from "./waiting";
 import { firstName, money, shortDate } from "./words";
 import { PageSkeleton, Empty } from "./Skeleton";
 
+/** Approving a seat is asked for once, with what it costs and an optional note, so a click on the row never approves by itself. */
+export function ApproveSeat({ r, busy, error, onApprove, onClose }: { r: SeatRequest; busy: boolean; error: string; onApprove: (note: string) => void; onClose: () => void }) {
+  const [note, setNote] = useState("");
+  const left = r.budget ? (r.budget.left_after < 0 ? `Over Q${r.budget.quarter} by ${money(-r.budget.left_after)} after this seat.` : `${money(r.budget.left_after)} left in Q${r.budget.quarter} after this seat.`) : "";
+  return (
+    <ConfirmDialog title={`Approve ${r.requester}'s seat?`} confirm="Approve the seat" cancel="Not yet" busy={busy} error={error} onConfirm={() => onApprove(note.trim())} onClose={onClose}>
+      <p>{r.name}, {r.price_is_estimate ? "ticket est." : "ticket"} {money(r.seat_price_cents)}{r.travel_cents ? `, travel ${money(r.travel_cents)}` : ""}. {left}</p>
+      <label className="field"><span>Note, if any</span><input className="input" value={note} maxLength={300} onChange={(ev) => setNote(ev.target.value)} autoComplete="off" /></label>
+    </ConfirmDialog>
+  );
+}
+
 function Decide({ r, onDone }: { r: SeatRequest; onDone: () => void }) {
   const { actor, demo, decisions, needs, go } = useActor();
   const [declining, setDeclining] = useState(false);
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(false), [approving, setApproving] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  if (!demo) return <>{decisions === "slack" ? <DecisionLine decisions={decisions} /> : null}{needs?.approvers.includes(actor) && r.requester !== actor ? <p className="small"><Link to="/seat-decisions" go={go}>{decisions === "slack" ? "Or decide here" : "Decide here"}</Link></p> : decisions === "none" ? <DecisionLine decisions={decisions} /> : null}</>;
+  if (!demo) return <>{decisions === "slack" ? <DecisionLine decisions={decisions} /> : null}{needs?.approvers.includes(actor) && r.requester !== actor ? <p className="small"><Link to={`/seat-decisions?request=${r.id}`} go={go}>{decisions === "slack" ? "Or decide here" : "Decide here"}</Link></p> : decisions === "none" ? <DecisionLine decisions={decisions} /> : null}</>;
   if (!needs?.approvers.includes(actor) || r.requester === actor) return null;
-  const decide = async (decision: "approve" | "decline") => {
+  const decide = async (decision: "approve" | "decline", note = reason) => {
     setBusy(true);
-    const x = await send("POST", `/api/seat-requests/${r.id}/decision`, actor, { decision, reason });
+    const x = await send("POST", `/api/seat-requests/${r.id}/decision`, actor, { decision, reason: note });
     setBusy(false);
     if (!x.ok) { setError(x.error); return; }
+    setApproving(false);
     // The row leaves where it was decided: it slides out and the gap closes, then the list redraws.
     const row = ref.current?.closest<HTMLElement>(".xrow");
     if (row && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
@@ -40,10 +53,11 @@ function Decide({ r, onDone }: { r: SeatRequest; onDone: () => void }) {
   };
   return (
     <div ref={ref} style={{ display: "grid", gap: 10 }}>
+      {approving && <ApproveSeat r={r} busy={busy} error={error} onApprove={(note) => decide("approve", note)} onClose={() => { setApproving(false); setError(""); }} />}
       {declining && <label className="field"><span>Why are you declining?</span><input className="input" value={reason} onChange={(ev) => setReason(ev.target.value)} autoFocus /></label>}
       {error && <p role="alert" className="error small">{error}</p>}
       <div className="actions">
-        {!declining && <button className="btn small" type="button" disabled={busy} onClick={() => decide("approve")}>Approve</button>}
+        {!declining && <button className="btn small" type="button" disabled={busy} onClick={() => { setError(""); setApproving(true); }}>Approve</button>}
         {!declining && <button className="btn line small" type="button" disabled={busy} onClick={() => setDeclining(true)}>Decline</button>}
         {declining && <button className="btn small" type="button" disabled={busy || !reason.trim()} onClick={() => decide("decline")}>Send the decline</button>}
         {declining && <button className="textlink" type="button" onClick={() => { setDeclining(false); setError(""); }}>Back</button>}
@@ -164,7 +178,7 @@ export function Seats({ go, search, requesting, preselect }: { go: (to: string) 
             </article>
           );
         })}
-        {!groups.length && (all.length ? <p className="mute gap">Nothing matches.</p> : <Empty className="gap" what="Seat requests show here, grouped by event, one row per person." example="Maya Ortiz, SDR, asks for a seat at SaaStr Annual 2027: goal new pipeline, 6 meetings, ticket $2,495." />)}
+        {!groups.length && (all.length ? <p className="mute gap">Nothing matches.</p> : <Empty className="gap" what="Seat requests show here, grouped by event, one row per person." example="Maya Okafor, SDR, asks for a seat at SaaStr Annual 2027: goal new pipeline, 6 meetings, ticket $2,495." />)}
       </section>
     </>
   );

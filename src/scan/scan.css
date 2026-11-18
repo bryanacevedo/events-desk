@@ -99,3 +99,5 @@ select.sc-input { appearance: none; -webkit-appearance: none; padding-right: 34p
 .sc-end span { font-size: 14px; line-height: 20px; color: rgba(255, 255, 255, 0.86); }
 .sc-foot .btn.big { display: inline-flex; align-items: center; justify-content: center; height: 56px; width: 100%; border: 0; border-radius: 28px; background: var(--green); color: #FFFFFF; font: 500 16px/1 var(--sans); touch-action: manipulation; }
 .sc-foot .btn.big:disabled { opacity: 0.5; }
+.sc-codebox { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.sc-codebox p { grid-column: 1 / -1; }

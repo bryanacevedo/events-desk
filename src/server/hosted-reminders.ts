@@ -32,7 +32,7 @@ export interface ReminderPreview {
   integrated_with: string[];
 }
 
-function template(ev: { name: string; starts_on: string }, h: { doors_at: string | null; address: string; host_name: string }, venue: string, kind: ReminderKind, note: string) {
+function template(ev: { name: string; starts_on: string }, h: { doors_at: string | null; address: string; host_name: string }, venue: string, kind: ReminderKind, note: string, signer: string) {
   const place = [venue, h.address].filter(Boolean).join(", ");
   const lines = [
     "Hi {first_name}", "",
@@ -40,7 +40,7 @@ function template(ev: { name: string; starts_on: string }, h: { doors_at: string
       ? `A reminder that ${ev.name} is on ${longDay(ev.starts_on)}${h.doors_at ? `, doors at ${h.doors_at}` : ""}${place ? `, at ${place}` : ""}.`
       : `A note before ${ev.name} on ${longDay(ev.starts_on)}${h.doors_at ? `, doors at ${h.doors_at}` : ""}${place ? `, at ${place}` : ""}.`,
     ...(kind === "logistics" && note ? ["", note] : []),
-    "", "If your plans change, tell us on your link: {link}", "", h.host_name || "The team",
+    "", "If your plans change, tell us on your link: {link}", "", signer || h.host_name || "The team",
   ];
   return { subject: kind === "reminder" ? `Reminder: ${ev.name}` : `Details for ${ev.name}`, body: lines.join("\n").replace("Hi {first_name}", "Hi {first_name},") };
 }
@@ -69,14 +69,14 @@ const noteOf = (kind: ReminderKind, v: unknown) => {
 };
 
 /** The audience and the text, and what was skipped and why. Sends nothing. */
-export async function reminderPreview(db: Db, eventId: string, kind: ReminderKind, opts: { note?: string; origin?: string; live?: boolean; hasSender?: boolean } = {}): Promise<ReminderPreview> {
+export async function reminderPreview(db: Db, eventId: string, kind: ReminderKind, opts: { note?: string; origin?: string; live?: boolean; hasSender?: boolean; actor?: string } = {}): Promise<ReminderPreview> {
   if (kind !== "reminder" && kind !== "logistics") throw new HostedInvalid("A reminder is a reminder or logistics.");
   const ev = await hostedEvent(db.query, eventId);
   const h = await readHosted(db.query, eventId);
   const [v] = await db.query<{ name: string }>("SELECT name FROM event_venues WHERE event_id = $1", [eventId]);
   const { audience, skipped } = await audienceOf(db.query, eventId);
   const note = kind === "logistics" ? text(opts.note).slice(0, MAX_LOGISTICS) : "";
-  const t = template(ev, h, v?.name || ev.venue, kind, note);
+  const t = template(ev, h, v?.name || ev.venue, kind, note, opts.actor ?? "");
   const [last] = await db.query<{ id: string; kind: ReminderKind; created_at: string; sent_count: number; skipped: Skipped }>("SELECT id, kind, created_at::text AS created_at, sent_count, skipped FROM reminder_runs WHERE event_id = $1 ORDER BY created_at DESC, id DESC LIMIT 1", [eventId]);
   let refusal: string | null = null;
   if (ev.webinar) refusal = "A webinar has registrants, not reminders from here.";
@@ -109,7 +109,7 @@ export async function sendReminder(db: Db, deps: HostedDeps, actor: string, even
     const { audience, skipped } = await audienceOf(q, eventId);
     if (!audience.length) throw new RuleError("Nobody is registered with an email the desk may use.");
     const [v] = await q<{ name: string }>("SELECT name FROM event_venues WHERE event_id = $1", [eventId]);
-    const t = template(ev, h, v?.name || ev.venue, kind, note);
+    const t = template(ev, h, v?.name || ev.venue, kind, note, actor);
     const run = newId("rem");
     await q("INSERT INTO reminder_runs (id, event_id, kind, subject, body, created_by, created_at, skipped) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)", [run, eventId, kind, t.subject, t.body, actor, now.toISOString(), JSON.stringify(skipped)]);
     for (const g of audience) {

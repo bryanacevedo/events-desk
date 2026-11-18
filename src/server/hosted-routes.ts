@@ -106,7 +106,7 @@ export function mountHosted(app: Hono<any>, db: Db, cfg: Cfg) {
   app.get("/api/events/:id/reminders", async (c) => {
     if (!(await writer(c))) return refuse(WRITER_REFUSAL, 403);
     const kind = (c.req.query("kind") ?? "reminder") as "reminder" | "logistics";
-    return run(() => reminderPreview(db, id(c), kind, { note: c.req.query("note") ?? "", origin: origin(c), live: !cfg.demo, hasSender: Boolean(cfg.transactional ?? simulated) }));
+    return run(() => reminderPreview(db, id(c), kind, { note: c.req.query("note") ?? "", origin: origin(c), live: !cfg.demo, hasSender: Boolean(cfg.transactional ?? simulated), actor: actorOf(c) }));
   });
   app.post("/api/events/:id/reminders", async (c) => {
     if (!(await writer(c))) return refuse(WRITER_REFUSAL, 403);

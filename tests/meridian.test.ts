@@ -77,7 +77,7 @@ describe("Meridian Trade Expo, the large event", () => {
     for (const h of ["Why this event", "The list", "Where we stand", "Live from the tabs", "How the attendee list narrowed"]) expect(all).toContain(h);
     // The seat requests speak for themselves: the goal, who is going, a quote, the tickets.
     expect(all).toMatch(/New pipeline/);
-    expect(all).toMatch(/Maya Ortiz \(Field marketing\)/);
+    expect(all).toMatch(/Maya Okafor \(Field marketing\)/);
     expect(all).toMatch(/"Half of the logistics buyers/);
     expect(all).toMatch(/3 seats approved at \$1,899; 1 bought/);
     expect(all).toMatch(/Tier 1 \d+ \(\d+%\)/);

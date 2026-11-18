@@ -12,7 +12,7 @@ const writes: [string, string][] = [
 const as = (actor: string) => ({ "x-actor": encodeURIComponent(actor), "content-type": "application/json" });
 
 describe("Settings and ICP writes are for GTM Team only", () => {
-  it.each(["Maya Ortiz", "Dan Whitlock"])("refuses %s with a 403 on every write route", async (who) => {
+  it.each(["Maya Okafor", "Dan Whitlock"])("refuses %s with a 403 on every write route", async (who) => {
     const app = createApp(await freshDb(), { demo: true });
     for (const [method, path] of writes) {
       const r = await app.request(path, { method, headers: as(who), body: "{}" });
@@ -35,7 +35,7 @@ describe("Settings and ICP writes are for GTM Team only", () => {
     const view = await (await app.request("/api/settings/view")).json() as { connections: { name: string; state: string }[] };
     expect(view.connections.map((c) => c.name)).toContain("Apollo");
     expect(JSON.stringify(view)).not.toMatch(/sk-|api[_-]?key/i);
-    const r = await app.request("/api/events/nope/settings", { method: "PATCH", headers: as("Maya Ortiz"), body: "{}" });
+    const r = await app.request("/api/events/nope/settings", { method: "PATCH", headers: as("Maya Okafor"), body: "{}" });
     expect(r.status).not.toBe(403);
   });
 });

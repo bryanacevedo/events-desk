@@ -46,7 +46,7 @@ describe("the pipeline line of a goal", () => {
     // A planner's plan read carries the same words; a rep's carries neither the figure nor the goal.
     const lead = await planView(db, noCrm, M2020, CAMILLE) as any;
     expect(lead.result.words.at(-1)).toBe("Pipeline not read, no CRM connected (goal $800,000)");
-    const rep = await planView(db, noCrm, M2020, "Maya Ortiz") as any;
+    const rep = await planView(db, noCrm, M2020, "Maya Okafor") as any;
     expect(JSON.stringify(rep.result)).not.toMatch(/800,000|cents/);
   });
 });

@@ -92,7 +92,7 @@ describe("a file the code cannot map", () => {
     expect(m.error).toMatch(/No company, email or LinkedIn column/);
   });
   it("accepts a file with no company column when it has an email column", () => {
-    const { m, out } = run("Name,Email\nMaya Ortiz,maya@x.example\n");
+    const { m, out } = run("Name,Email\nMaya Okafor,maya@x.example\n");
     expect(m.error).toBeNull();
     expect(out.contacts[0].drop_reason).toBeNull();
     expect(out.companies).toHaveLength(0);

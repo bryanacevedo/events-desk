@@ -7,7 +7,7 @@ import { decideSeat, parseSeatRequest, requestSeat } from "../src/server/seats.t
 import { usageView } from "../src/server/usage.ts";
 import { freshDb } from "./helpers.ts";
 
-const MAYA = "Maya Ortiz", DAN = "Dan Whitlock", ANA = "Ana Duarte";
+const MAYA = "Maya Okafor", DAN = "Dan Whitlock", ANA = "Ana Duarte";
 const body = (catalog_id: string) => ({ catalog_id, team: "Sales", role: "SDR", goal: "new_pipeline", why_event: "Their buyers are the people we sell to.", why_you: "I run outreach for this region and know the accounts.", expected_meetings: 4 });
 const as = (a: string) => ({ "x-actor": encodeURIComponent(a), "content-type": "application/json" });
 let db: Db;

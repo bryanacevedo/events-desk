@@ -6,7 +6,7 @@ import { apollo, heyreach, instantly, smartlead } from "./tools.ts";
 import type { Connector } from "./types.ts";
 
 /** The demo's reps, who own its inboxes and LinkedIn accounts. */
-const REPS = ["Maya Ortiz", "Priya Nair", "Tomas Berg", "Camille Laurent", "Jonas Weber", "Leo Marsh"];
+const REPS = ["Maya Okafor", "Priya Nair", "Tomas Berg", "Camille Laurent", "Jonas Weber", "Leo Marsh"];
 export const SIM_SENDERS = (n: number, domains: string[]) => Array.from({ length: n }, (_, i) => ({ email: `${REPS[i % REPS.length].split(" ")[0].toLowerCase()}${i >= REPS.length ? Math.floor(i / REPS.length) + 1 : ""}@${domains[i % domains.length]}`, first_name: REPS[i % REPS.length].split(" ")[0], last_name: REPS[i % REPS.length].split(" ")[1], status: 1, daily_limit: 40, stat_warmup_score: 99 - (i % 9), timestamp_warmup_start: "2026-08-01T00:00:00Z" }));
 
 const INSTANTLY_STATE: Record<string, string> = { draft: "0", active: "1", paused: "2", archived: "3" };

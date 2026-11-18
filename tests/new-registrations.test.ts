@@ -28,7 +28,7 @@ import { OLD_SHEET_ERROR } from "../src/shared/domain.ts";
 import { defaultSettings, patchSettings } from "../src/server/approvals.ts";
 import { deliverEvent, freshDb } from "./helpers.ts";
 
-const MAYA = "Maya Ortiz", DAN = "Dan Whitlock";
+const MAYA = "Maya Okafor", DAN = "Dan Whitlock";
 const PARENT = [
   "Company,Name,Title,Email,LinkedIn,Website",
   "Larkspur Freight Software,Ada Moss,VP Sales,ada@larkspur.example,,",

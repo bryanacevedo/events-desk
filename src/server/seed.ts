@@ -21,7 +21,7 @@ import { ingestUpload } from "./uploads.ts";
 import { decideSeat, requestSeat, type Goal } from "./seats.ts";
 import { recordTicket } from "./budget.ts";
 
-const MAYA = "Maya Ortiz";
+const MAYA = "Maya Okafor";
 const DAN = "Dan Whitlock";
 const list = () => readFileSync(new URL("../../samples/attendees.csv", import.meta.url), "utf8");
 

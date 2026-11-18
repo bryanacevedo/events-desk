@@ -17,7 +17,7 @@ import { KitSheet } from "./Kit";
 import { TalkBlock } from "./PlanTalk";
 import { Tracker } from "./Tracker";
 import { LIST_SOURCE_WORDS } from "../shared/plan";
-import { money, num, shortDate } from "./words";
+import { money, num, plural, shortDate } from "./words";
 import { PageSkeleton } from "./Skeleton";
 import { ConfirmDialog } from "./Patterns";
 
@@ -136,12 +136,14 @@ export function PlanTab({ id, listRows, onChange }: { id: string; listRows: numb
   const isApprover = Boolean(needs?.approvers.includes(actor)) && actor !== p.approval.requested_by;
   const submitted = Boolean(p.approval.submitted_at);
   const planning = p.stage_line.plan_stage === "planning" && p.event.stage !== "declined";
-  const act: { label: string; run: () => Promise<unknown>; confirm?: boolean } | null =
+  /** The seats waiting on this plan that an approval takes in with it (the approver's own seat waits for someone else; the server takes the ones that fit the passes budget). */
+  const seatsWithIt = p.who_goes.filter((x) => x.seat_status === "pending" && x.person !== actor).length;
+  const act: { label: string; run: () => Promise<unknown>; confirm?: boolean; title?: string; body?: string } | null =
     planning && !submitted && money_ ? { label: "Ask for approval", run: () => send("POST", `/api/events/${id}/plan/submit`, actor) }
-    : planning && submitted && isApprover && decisions === "panel" ? { label: "Approve the plan", run: () => send("POST", `/api/events/${id}/plan/decision`, actor, { decision: "approve" }) }
+    : planning && submitted && isApprover && decisions === "panel" ? { label: "Approve the plan", run: () => send("POST", `/api/events/${id}/plan/decision`, actor, { decision: "approve" }), ...(seatsWithIt ? { confirm: true, title: "Approve the plan?", body: `Approving the plan also approves the ${plural(seatsWithIt, "waiting seat")} that fit the passes budget.` } : {}) }
     : !planning && p.approval.over_budget && isApprover && decisions === "panel" ? { label: "Approve again", run: () => send("POST", `/api/events/${id}/plan/decision`, actor, { decision: "approve" }) }
     // Decision 105: once the event is over and its sending never started (motion none), a planner closes plan against actual. An event with a motion is closed when it is scored, so the server (plan.ts closeResult) would refuse the button.
-    : p.can_plan && !p.judged_at && p.stage_line.plan_stage === "following_up" && p.event.motion === "none" && p.event.stage !== "declined" ? { label: "Close the result", confirm: true, run: () => send("POST", `/api/events/${id}/plan/close`, actor) }
+    : p.can_plan && !p.judged_at && p.stage_line.plan_stage === "following_up" && p.event.motion === "none" && p.event.stage !== "declined" ? { label: "Close the result", confirm: true, title: "Close the result?", body: closeSentence(p.result), run: () => send("POST", `/api/events/${id}/plan/close`, actor) }
     : null;
   const canEdit = p.can_plan && p.event.stage !== "declined";
   const waitingOnDecision = isApprover && !p.approval.approved_at && ((planning && submitted) || (!planning && p.approval.over_budget));
@@ -313,8 +315,8 @@ export function PlanTab({ id, listRows, onChange }: { id: string; listRows: numb
         </div>
       </header>
       {closing && act?.confirm && (
-        <ConfirmDialog title="Close the result?" confirm="Close the result" cancel="Not yet" busy={busy} error={error} onConfirm={go} onClose={() => setClosing(false)}>
-          <p>{closeSentence(p.result)}</p>
+        <ConfirmDialog title={act.title ?? "Are you sure?"} confirm={act.label} cancel="Not yet" busy={busy} error={error} onConfirm={go} onClose={() => setClosing(false)}>
+          <p>{act.body}</p>
         </ConfirmDialog>
       )}
       {error && !closing && <p role="alert" className="error small">{error}</p>}

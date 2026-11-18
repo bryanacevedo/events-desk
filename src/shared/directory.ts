@@ -116,12 +116,12 @@ export function checkFrame(text: string): { people: FramePerson[]; dropped: stri
 
 /* ------------------------------------------------------------------ what each person keeps */
 
-/** "read from the Swapcard directory of AWS re:Invent 2026 by Maya Ortiz on 2026-11-14". Built by the server; the extension sends none of it. */
+/** "read from the Swapcard directory of AWS re:Invent 2026 by Maya Okafor on 2026-11-14". Built by the server; the extension sends none of it. */
 export function extensionSource(p: { platform: CapturePlatform; eventName: string; by: string; on: string }): string {
   const where = p.platform === "other" ? "a web directory" : `the ${PLATFORM_LABELS[p.platform]} directory`;
   return `read from ${where} of ${p.eventName} by ${p.by} on ${p.on}`;
 }
-/** "read from a screen recording of Brella for AWS re:Invent 2026 by Maya Ortiz on 2026-11-14". */
+/** "read from a screen recording of Brella for AWS re:Invent 2026 by Maya Okafor on 2026-11-14". */
 export const recordingSource = (p: { app: string; eventName: string; by: string; on: string }) => `read from a screen recording of ${p.app} for ${p.eventName} by ${p.by} on ${p.on}`;
 /** The event's confirmed `terms` answer from the assessment, or the plain fact that there is none. */
 export const termsNote = (answer: string | null | undefined) => (answer && answer.trim() ? `Terms: ${answer.trim().slice(0, 300)}` : "Terms not assessed");

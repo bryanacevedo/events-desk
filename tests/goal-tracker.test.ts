@@ -82,7 +82,7 @@ describe("goal tracker", () => {
     const h = await event("2027-01-01");
     await going(h, MAYA); await going(h, LEO); await going(h, "Priya Natarajan", ["speak"]);
     await meet(h, "Ana Ruiz", "held", MAYA);
-    await meet(h, "Ben Ode", "booked", "maya ortiz");
+    await meet(h, "Ben Ode", "booked", "maya okafor");
     await meet(h, "Cleo Park", "booked", "Outside Rep");
     await meet(h, "Dan Ito", "booked", null);
     const t = await goalTracker(db, h.deps, h.id);

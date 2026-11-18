@@ -13,7 +13,7 @@ import { baselineTier, checkQuotes, diffIcp, evalHardRules, findGaps, findInstru
 import { draftFromDocument } from "../src/server/sim-icp.ts";
 import { freshDb } from "./helpers.ts";
 
-const MAYA = "Maya Ortiz", DAN = "Dan Whitlock";
+const MAYA = "Maya Okafor", DAN = "Dan Whitlock";
 const DOC = readFileSync("samples/orrery-icp.md", "utf8");
 const BENCH = JSON.parse(readFileSync("samples/orrery-bench.json", "utf8"));
 let db: Db;

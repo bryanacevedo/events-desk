@@ -8,7 +8,7 @@ import { fakeOrganizer } from "./organizer-api.ts";
 import { mockLlm, type Llm } from "./providers.ts";
 import { ingestScan, putPhotoChunk, putSettings, readPhoto, type ScanInput } from "./scans.ts";
 
-const CAMILLE = "Camille Laurent", MAYA = "Maya Ortiz", DAN = "Dan Whitlock";
+const CAMILLE = "Camille Laurent", MAYA = "Maya Okafor", DAN = "Dan Whitlock";
 export const SCAN_EVENT = "evt_money20-20-usa-2026", SCAN_EVENT_SETUP = "evt_salesforce-world-tour-tokyo-2026";
 const NOTICE_V2 = "We keep your details to follow up on our conversation. Tell us if you would rather we did not.";
 

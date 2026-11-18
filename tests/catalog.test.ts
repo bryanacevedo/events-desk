@@ -4,7 +4,7 @@ import type { Db } from "../src/server/db.ts";
 import { parseCatalogEntry, parseSeatRequest, requestSeat } from "../src/server/seats.ts";
 import { freshDb } from "./helpers.ts";
 
-const MAYA = "Maya Ortiz", DAN = "Dan Whitlock", GTM = "GTM Team";
+const MAYA = "Maya Okafor", DAN = "Dan Whitlock", GTM = "GTM Team";
 const as = (a: string) => ({ "x-actor": encodeURIComponent(a), "content-type": "application/json" });
 const entry = (o: Record<string, unknown> = {}) => ({ name: "Orbit Summit 2027", website: "https://orbit.example.com", starts_on: "2027-04-10", ends_on: "2027-04-12", city: "Lisbon", country: "Portugal", venue: "Pier 9 Hall", price_dollars: 900, ...o });
 

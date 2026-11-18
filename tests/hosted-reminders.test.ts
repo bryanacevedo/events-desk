@@ -169,7 +169,7 @@ describe("one send per guest, and live mode needs a key", () => {
     const db = await freshDb();
     const id = await hostedDinner(db, { capacity: 10 });
     await yes(db, depsAt(BEFORE), id, "Ana Ruiz");
-    await expect(sendReminder(db, { now: () => BEFORE, live: true }, CAMILLE, id, "reminder")).rejects.toThrow(/TRANSACTIONAL_URL/);
+    await expect(sendReminder(db, { now: () => BEFORE, live: true }, CAMILLE, id, "reminder")).rejects.toThrow(/no email sender is connected/);
     expect((await reminderPreview(db, id, "reminder", { live: true, hasSender: false })).can_send).toBe(false);
     expect(await sendReminder(db, { now: () => BEFORE }, CAMILLE, id, "reminder")).toMatchObject({ sent: 1 });
   });

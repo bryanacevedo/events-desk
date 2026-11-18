@@ -80,7 +80,7 @@ describe("budget lines", () => {
   it("the event's actual total equals eventCost to the cent, with a ticket, travel, a ledger line and AI all present", async () => {
     const h = await deliveredInMotion(db, { crm: fakeCrm() });
     const id = h.id;
-    await db.query("INSERT INTO seat_requests (id, event_id, requester, team, role, goal, why_event, why_you, expected_meetings, status, travel_cents, decided_by) VALUES ('sr_t', $1, 'Maya Ortiz', 'Sales', 'SDR', 'new_pipeline', '', '', 0, 'approved', 45000, 'Dan Whitlock')", [id]);
+    await db.query("INSERT INTO seat_requests (id, event_id, requester, team, role, goal, why_event, why_you, expected_meetings, status, travel_cents, decided_by) VALUES ('sr_t', $1, 'Maya Okafor', 'Sales', 'SDR', 'new_pipeline', '', '', 0, 'approved', 45000, 'Dan Whitlock')", [id]);
     await recordTicket(db, DAN, "sr_t", 700);
     await recordEventCost(db, id, DAN, "booth", 220_000, "");
     await setBudgetLine(db, CAMILLE, id, { category: "booth", planned_cents: 200_000 });
