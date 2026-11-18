@@ -24,7 +24,7 @@ Second pass on the same week (branch `wk2fix/events-desk`, decisions 114 to 117,
 - J16: investigated; a delivered list outside the 45 day window or delivered before the CRM was connected had no campaign in the CRM. The sweep now queues it; people follow in it once the window opens (117).
 - CI: the boot smoke step waits up to 90 s (was 30 s).
 - m21 was already fixed in 3f941f6 (upload line shows a source only when one was recorded); a test now pins it.
-- Not done: the roster from the shared team file (J15), bulk edit of deliverables (m15), the CRM hand-over state per scan (J11). `tests/directory-readers.test.ts` binds a local port and fails with EPERM inside the sandbox; not changed.
+- Third pass (review-fixall): a follow-up date set by hand survives later saves; each person row says where it stands in CRM Desk (outbox); bulk owner and due day on open deliverables; rename leftovers (CREDITS, `.env.example`, `gen-world.ts`). Not done: the roster from the shared team file (J15, it would change who may approve or spend); the duplicate campaigns (probable cause: two events with one name and first day, see decision 117); `samples/demo-snapshot.tgz` still holds Maya Ortiz and the pre-114 seed and needs a rebuild with `make demo-snapshot` before the next static deploy (the script binds a local port and reads a Google sheet, so it cannot run in the sandbox); prospect names in a few tests were renamed with the SDR's and are test data. `tests/directory-readers.test.ts` binds a local port and fails with EPERM inside the sandbox; not changed.
 
 ## CI fix: `npm ci` ERESOLVE on the optional OpenTelemetry packages (2026-11-17, branch `simfix/events-ci`)
 

@@ -430,6 +430,9 @@ function ArriveAt({ id }: { id: string }) {
   return null;
 }
 
+/** Where a person stands in CRM Desk, from the outbox: a plain word in ink. */
+const CRM_WORDS = { queued: "Waiting to send to the CRM", held: "CRM not ready for them", failed: "CRM refused them", done: "In the CRM" } as const;
+
 /** The people on the list: searched, filtered and paged on the server. A row opens the person. */
 function PeopleTable({ id, hasPriorities, reloadKey, past = false }: { id: string; hasPriorities: boolean; reloadKey: number; past?: boolean }) {
   const [f, setF] = useUrlState(["q", "p", "t", "s", "src", "page", "person", "r"], { s: "kept" });
@@ -481,7 +484,7 @@ function PeopleTable({ id, hasPriorities, reloadKey, past = false }: { id: strin
           <li key={c.id} className={open === c.id ? "open" : undefined} data-person={c.id}>
             <button type="button" className={`prow${c.drop_reason ? " off" : ""}`} aria-expanded={open === c.id} data-opens-sheet="" onClick={() => { setOpen(c.id); go(objectHref("person", c.id)); }}>
               <span className={`av sm ${c.drop_reason ? "off" : c.priority === "A" ? "a" : c.priority === "C" ? "c" : c.priority === "B" ? "b" : "none"}`} aria-hidden="true">{initials(c.full_name)}</span>
-              <span className="pname"><b>{c.full_name ?? "No name"}</b><span className="mute"><span className={`psrc ${c.source === "prospect" ? "prospect" : "attendee"}`}>{c.source === "prospect" ? "Prospect" : "Attendee"}</span>{c.title ? co(c.title) : "No title"}</span></span>
+              <span className="pname"><b>{c.full_name ?? "No name"}</b><span className="mute"><span className={`psrc ${c.source === "prospect" ? "prospect" : "attendee"}`}>{c.source === "prospect" ? "Prospect" : "Attendee"}</span>{c.title ? co(c.title) : "No title"}{c.crm ? `, ${CRM_WORDS[c.crm]}` : ""}</span></span>
               <span className="pco"><span className={c.company_id ? "pco-link" : undefined} data-opens-sheet={c.company_id ? "" : undefined} onClick={c.company_id ? (ev) => { ev.stopPropagation(); go(objectHref("company", `${id}|${c.company_id}`)); } : undefined}>{c.company ? co(c.company) : "No company"}</span><span className="mute">{c.company_tier ? `Tier ${c.company_tier}` : "No tier"}</span></span>
               <span className="pprio" aria-label={c.priority ? `Priority ${c.priority}` : undefined}>{c.priority ?? ""}</span>
               <span className={`pmail${c.drop_reason ? " orange" : c.email ? "" : " mute"}`}>{c.drop_reason ? dropWords(c.drop_reason) : c.email ?? "No email"}</span>

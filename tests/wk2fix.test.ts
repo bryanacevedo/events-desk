@@ -137,7 +137,9 @@ describe("m18: the follow-up date can be set", () => {
     const out = await patchOrganizerRequest(db, CAMILLE, id, r.id, { sent_on: "2027-01-10", expected_on: "2027-01-20", follow_up_on: "2027-01-15" });
     expect(out.follow_up_on).toBe("2027-01-15");
     await expect(patchOrganizerRequest(db, CAMILLE, id, r.id, { follow_up_on: "2027-01-05" })).rejects.toThrow(/before the day it was sent/);
-    expect((await patchOrganizerRequest(db, CAMILLE, id, r.id, { follow_up_on: null })).follow_up_on).toBe("2027-01-21");
+    // A later save that does not touch the follow-up date keeps the one set by hand.
+    expect((await patchOrganizerRequest(db, CAMILLE, id, r.id, { status: "will_share", expected_on: "2027-01-25" })).follow_up_on).toBe("2027-01-15");
+    expect((await patchOrganizerRequest(db, CAMILLE, id, r.id, { follow_up_on: null })).follow_up_on).toBe("2027-01-26");
     expect(src("src/app/PlanAssessment.tsx")).toContain("Follow up on");
   });
 });
@@ -188,5 +190,31 @@ describe("J15 and CI: the SDR is Maya Okafor, the smoke step waits up to 90 s", 
   });
   it("the boot smoke step in CI loops 90 times", () => {
     expect(src(".github/workflows/ci.yml")).toContain("for i in $(seq 1 90); do curl -sf localhost:8787/api/health");
+  });
+});
+
+describe("J11: where a person stands in CRM Desk, read from the outbox", () => {
+  it("each person row carries the latest member row for this event and address, and the screen says it in words", async () => {
+    const id = await deliverEvent(db, LIST, {}, "Handover");
+    const [a, b] = await db.query<{ email: string }>("SELECT lower(email) AS email FROM contacts WHERE event_id = $1 AND source = 'attendee' AND email IS NOT NULL ORDER BY email LIMIT 2", [id]);
+    const row = (key: string, email: string, status: string, at: string) => db.query("INSERT INTO crm_outbox (id, kind, payload, desk_key, status, created_at) VALUES ($1, 'campaign_member', $2::jsonb, $1, $3, $4::timestamptz)", [key, JSON.stringify({ email, event_id: id }), status, at]);
+    await row("o1", a.email, "queued", "2026-11-01T10:00:00Z");
+    await row("o2", a.email, "done", "2026-11-02T10:00:00Z");
+    await row("o3", b.email, "held", "2026-11-02T10:00:00Z");
+    const http = createApp(db, { demo: true });
+    const res = (await (await http.request(`/api/events/${id}/people?status=all&limit=50`, { headers: as(CAMILLE) })).json()) as { rows: { email: string; crm: string | null }[] };
+    expect(res.rows.find((r) => r.email.toLowerCase() === a.email)?.crm).toBe("done");
+    expect(res.rows.find((r) => r.email.toLowerCase() === b.email)?.crm).toBe("held");
+    expect(res.rows.filter((r) => r.crm === null).length).toBe(res.rows.length - 2);
+    expect(src("src/app/Event.tsx")).toContain('done: "In the CRM"');
+  });
+});
+
+describe("m15: bulk owner and due day on the open deliverables", () => {
+  it("the editor patches only the fields filled in, on every deliverable not yet done", () => {
+    const d = src("src/app/PlanSponsor.tsx");
+    expect(d).toContain("Set on all open");
+    expect(d).toContain("const open = items.filter((d) => !d.done);");
+    expect(d).toContain('if (all.owner.trim()) body.owner = all.owner.trim();');
   });
 });

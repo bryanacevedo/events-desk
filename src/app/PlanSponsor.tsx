@@ -140,8 +140,33 @@ function DeliverablesEditor({ id, items, saved, done }: { id: string; items: Pla
   const order = useRef(items.map((d) => d.id));
   const rank = (d: PlanDeliverable) => { const i = order.current.indexOf(d.id); if (i >= 0) return i; order.current.push(d.id); return order.current.length - 1; };
   const rows = [...items].sort((a, b) => rank(a) - rank(b));
+  const { actor } = useActor();
+  const [all, setAll] = useState({ owner: "", due: "" }), [busy, setBusy] = useState(false), [error, setError] = useState("");
+  const open = items.filter((d) => !d.done);
+  /** One owner and one due day on every deliverable not yet done: a patch of only the fields filled in. */
+  const applyAll = async () => {
+    setBusy(true); setError("");
+    const body: Record<string, string> = {};
+    if (all.owner.trim()) body.owner = all.owner.trim();
+    if (all.due) body.due_on = all.due;
+    for (const d of open) {
+      const r = await send("PATCH", `/api/events/${id}/deliverables/${d.id}`, actor, body);
+      if (!r.ok) { setError(r.error); break; }
+    }
+    setBusy(false);
+    setAll({ owner: "", due: "" });
+    await saved();
+  };
   return (
     <div className="pl-edit">
+      {open.length > 1 && (
+        <div className="pl-line pl-nokind" aria-label="All open deliverables">
+          <label className="field"><span>Owner of all {open.length} open</span><input className="input" list="deliverable-owners" value={all.owner} maxLength={80} onChange={(e) => setAll({ ...all, owner: e.target.value })} autoComplete="off" /></label>
+          <label className="field"><span>Due, all</span><input className="input" type="date" value={all.due} onChange={(e) => setAll({ ...all, due: e.target.value })} /></label>
+          <div className="actions"><button type="button" className="btn line small" disabled={busy || (!all.owner.trim() && !all.due)} onClick={applyAll}>Set on all open</button></div>
+          {error && <p role="alert" className="error small pl-line-err">{error}</p>}
+        </div>
+      )}
       <ul className="pl-lines" aria-label="Deliverables">{rows.map((d) => <DeliverableEdit key={d.id} id={id} d={d} saved={saved} />)}<DeliverableEdit key={`new-${items.length}`} id={id} d={null} saved={saved} /></ul>
       <datalist id="deliverable-owners">{PEOPLE.map((p) => <option key={p} value={p} />)}</datalist>
       {done}

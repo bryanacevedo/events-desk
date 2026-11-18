@@ -436,7 +436,7 @@ export interface RequestPatch { sent_on?: string | null; expected_on?: string | 
 /** The person says when they sent it, what the organizer answered and when the list comes. Dates are checked; the follow-up date is computed. */
 export async function patchOrganizerRequest(db: Db, actor: string, eventId: string, rid: string, b: RequestPatch) {
   return db.tx(async (q) => {
-    const [r] = await q<{ status: RequestStatus; sent_on: string | null; expected_on: string | null }>("SELECT status, sent_on::text AS sent_on, expected_on::text AS expected_on FROM organizer_requests WHERE id = $1 AND event_id = $2 FOR UPDATE", [rid, eventId]);
+    const [r] = await q<{ status: RequestStatus; sent_on: string | null; expected_on: string | null; follow_up_on: string | null }>("SELECT status, sent_on::text AS sent_on, expected_on::text AS expected_on, follow_up_on::text AS follow_up_on FROM organizer_requests WHERE id = $1 AND event_id = $2 FOR UPDATE", [rid, eventId]);
     if (!r) throw new RuleError("That request is not on this event.");
     if (r.status === "received") throw new RuleError("The list has arrived, so this request is closed.");
     const day = (v: unknown, what: string) => { if (v === null || v === "") return null; if (!ymdOk(v)) throw new AssessmentInvalid(`Give ${what} as a date.`); return v; };
@@ -452,7 +452,9 @@ export async function patchOrganizerRequest(db: Db, actor: string, eventId: stri
     // Saying when it was sent moves a drafted or copied request to sent.
     if (b.sent_on && b.status === undefined && (status === "drafted" || status === "copied")) status = "sent";
     const closed = status === "will_not_share" || status === "received";
-    const chosen = b.follow_up_on === undefined ? null : day(b.follow_up_on, "the day to follow up");
+    // A date set by hand (one that is not what the old dates would have computed) stays through a save that does not touch it.
+    const byHand = r.follow_up_on !== null && r.follow_up_on !== followUpOn(r.sent_on, r.expected_on) ? r.follow_up_on : null;
+    const chosen = b.follow_up_on === undefined ? byHand : day(b.follow_up_on, "the day to follow up");
     if (chosen && sent_on && chosen < sent_on) throw new AssessmentInvalid("The follow-up day cannot be before the day it was sent.");
     const follow = closed ? null : chosen ?? followUpOn(sent_on, expected_on);
     await q("UPDATE organizer_requests SET status = $2, sent_on = $3, expected_on = $4, follow_up_on = $5, organizer_name = coalesce($6, organizer_name) WHERE id = $1", [rid, status, sent_on, expected_on, follow, b.organizer_name === undefined ? null : text(b.organizer_name).slice(0, 120)]);

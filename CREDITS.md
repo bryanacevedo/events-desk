@@ -14,7 +14,7 @@ The photographers are credited here anyway. The names are invented and do not de
 | Fictional name | Photographer | Photo |
 |---|---|---|
 | Dan Whitlock | [@linkedinsalesnavigator](https://unsplash.com/@linkedinsalesnavigator) | https://unsplash.com/photos/pAtA8xe_iVM |
-| Maya Ortiz | [@wocintechchat](https://unsplash.com/@wocintechchat) | https://unsplash.com/photos/SJvDxw0azqw |
+| Maya Okafor | [@wocintechchat](https://unsplash.com/@wocintechchat) | https://unsplash.com/photos/SJvDxw0azqw |
 | Priya Nair | [@ibidsy](https://unsplash.com/@ibidsy) | https://unsplash.com/photos/mpDV4xaFP8c |
 | Tomas Berg | [@dargonesti](https://unsplash.com/@dargonesti) | https://unsplash.com/photos/EZ4TYgXPNWk |
 | Camille Laurent | [@sigmund](https://unsplash.com/@sigmund) | https://unsplash.com/photos/jzz_3jWMzHA |

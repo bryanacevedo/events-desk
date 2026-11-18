@@ -369,7 +369,7 @@ export function buildWorld(seed = SEED): Built {
   /* ---- people ---- */
   const people: WorldPerson[] = [];
   const titles: Record<string, WTier> = {};
-  const usedNames = new Set<string>(["maya serrano", "omar haddad", "ana beltran", "ines duarte", "petra novak", "sam okafor", "maya ortiz", "dan whitlock"]);
+  const usedNames = new Set<string>(["maya serrano", "omar haddad", "ana beltran", "ines duarte", "petra novak", "sam okafor", "maya okafor", "dan whitlock"]);
   const usedEmails = new Set<string>();
   const usedLinkedin = new Set<string>();
   let pcount = 0;

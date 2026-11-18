@@ -101,7 +101,7 @@ export function App() {
   useEffect(() => { refresh(); }, [pathname, refresh]);
   // How many people are waiting on whoever is acting, across events.
   const [decide, setDecide] = useState(0);
-  useEffect(() => { get<{ total: number }>("/api/waiting").then((d) => setDecide(d?.total ?? 0)); }, [actor, pathname]);
+  useEffect(() => { get<{ total: number }>("/api/waiting").then((d) => setDecide(d?.total ?? 0)); }, [actor, needs?.requests.length, pathname === "/waiting" || pathname === "/seat-decisions"]);
   const [waiting, setWaiting] = useState(0), [dayHas, setDayHas] = useState(false), [speaks, setSpeaks] = useState(false), [kits, setKits] = useState(0);
   useEffect(() => { get<{ replies: unknown[]; meetings: unknown[]; captures: unknown[]; notes?: unknown[] }>(`/api/motion/my-day?rep=${encodeURIComponent(actor)}`).then((d) => { setWaiting((d?.replies.length ?? 0) + (d?.notes?.length ?? 0)); setDayHas(Boolean(d && (d.replies.length || d.meetings.length || d.captures.length || d.notes?.length))); }); }, [actor, pathname]);
 

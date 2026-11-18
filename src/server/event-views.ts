@@ -22,6 +22,8 @@ export interface PersonRow {
   outreach: { state: string; cause: string | null; channel: string } | null; reply_code: string | null; meeting: string | null;
   /** Where this person's list came from, and for a person read from a directory or a recording the sentence and terms note the server wrote. */
   list_source: string | null; read_note: string | null; read_terms: string | null;
+  /** Where this person stands in CRM Desk: the latest member row of this event's campaign in the outbox (queued, held, failed or done). Null where nothing was queued. */
+  crm: "queued" | "held" | "failed" | "done" | null;
 }
 export interface CompanyRow {
   id: string; name: string; tier: 1 | 2 | 3 | null; tier_fact: string | null; industry: string | null; employees: string | null; country: string | null;
@@ -45,6 +47,7 @@ export function mountEventViews(app: Hono<{ Variables: { actor: string } }>, db:
               (SELECT json_build_object('state', n.state, 'cause', n.cause, 'channel', n.channel) FROM enrollments n WHERE n.contact_id = c.id ORDER BY n.changed_at DESC LIMIT 1) AS outreach,
               (SELECT m.code FROM inbound_messages m WHERE m.contact_id = c.id AND m.signal = 'reply' ORDER BY m.received_at DESC LIMIT 1) AS reply_code,
               (SELECT mt.status FROM meetings mt WHERE mt.contact_id = c.id ORDER BY mt.scheduled_at DESC LIMIT 1) AS meeting,
+              (SELECT o.status FROM crm_outbox o WHERE o.kind = 'campaign_member' AND o.status IN ('queued', 'held', 'failed', 'done') AND o.payload->>'event_id' = c.event_id AND lower(o.payload->>'email') = lower(c.email) ORDER BY o.created_at DESC, o.id DESC LIMIT 1) AS crm,
               count(*) OVER()::int AS total
        FROM contacts c LEFT JOIN companies co ON co.id = c.company_id
        WHERE c.event_id = $1
