@@ -9,9 +9,9 @@ import { forgetPerson } from "../src/server/operating.ts";
 import { pruneOrphans } from "../src/server/person-record.ts";
 import { CrmUnknownStatus } from "../src/server/providers.ts";
 import { integrationCounts } from "../src/server/integration.ts";
-import { freshDb } from "./helpers.ts";
+import { deliverEvent, freshDb } from "./helpers.ts";
 import { bookMeeting } from "../src/server/meetings.ts";
-import { MAYA, clock, deliveredInMotion, fakeCrm, personAt } from "./lifecycle-harness.ts";
+import { LIST, MAYA, clock, deliveredInMotion, fakeCrm, personAt } from "./lifecycle-harness.ts";
 import { BEFORE, depsAt, guest, hostedDinner } from "./hosted-helpers.ts";
 
 let db: Db;
@@ -339,5 +339,52 @@ describe("counts", () => {
     await guest(db, id, "Ana Ruiz"); await guest(db, id, "Bo Chen", { country: "IT" });
     await syncCrm(db, r.crm);
     expect(await integrationCounts(db)).toMatchObject({ members: { targeted: 1, declined: 0 }, held: 0, targeted_barred: 1, targeted_over_cap: 0, awaiting_contract: 0, features_read: expect.arrayContaining(["targeted"]) });
+  });
+});
+
+describe("a delivered list reaches the CRM whenever the CRM is connected (week 2, J16)", () => {
+  /** A list delivered while no CRM could be written to, so the delivery queued nothing. */
+  async function deliveredBeforeTheCrm(days: number) {
+    const id = await deliverEvent(db, LIST, {}, "Qatar Summit");
+    await db.query("UPDATE contacts SET priority = 'A', verify_1 = 'deliverable', verify_2 = 'deliverable' WHERE event_id = $1 AND dropped_at IS NULL", [id]);
+    await near(id, days);
+    expect(await db.query("SELECT 1 FROM crm_outbox WHERE desk_key = $1", [`campaign:${id}`])).toHaveLength(0);
+    return id;
+  }
+
+  it("an event outside the target window still gets its campaign once the CRM is there, and its people follow when the window opens, in the same campaign", async () => {
+    const id = await deliveredBeforeTheCrm(TARGET_LEAD_DAYS + 40);
+    const r = recorder();
+    const first = await syncCrm(db, r.crm);
+    expect(first.campaigns).toBe(1);
+    expect(first.members).toBe(0);                                  // not announced as targets yet: the window is 45 days (decision of 13.9 item 11)
+    await drain(r.crm);
+    expect(r.of("campaign")).toHaveLength(1);
+    await syncCrm(db, r.crm); await drain(r.crm);
+    expect(r.of("campaign")).toHaveLength(1);                       // a second sweep queues nothing new
+    await near(id, TARGET_LEAD_DAYS - 5);
+    const later = await syncCrm(db, r.crm);
+    expect(later.campaigns).toBe(0);
+    expect(later.members).toBe(4);
+    await drain(r.crm);
+    expect(r.of("campaign")).toHaveLength(1);                       // no duplicate campaign
+    expect(r.sent()).toEqual(["targeted", "targeted", "targeted", "targeted"]);
+  });
+
+  it("a delivered list inside the window is written as targeted members on the first sweep after the CRM is connected", async () => {
+    await deliveredBeforeTheCrm(20);
+    const r = recorder();
+    const out = await syncCrm(db, r.crm);
+    expect(out).toMatchObject({ campaigns: 1, members: 4 });
+    await drain(r.crm);
+    expect(r.of("campaign")).toHaveLength(1);
+    expect(r.of("member")).toHaveLength(4);
+  });
+
+  it("an event with no delivered list and no member gets no campaign", async () => {
+    const id = await hostedDinner(db); await near(id, TARGET_LEAD_DAYS + 40);
+    const r = recorder();
+    expect((await syncCrm(db, r.crm)).campaigns).toBe(0);
+    void id;
   });
 });

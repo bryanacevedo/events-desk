@@ -130,9 +130,12 @@ export async function syncCrm(db: Db, crm: Crm | null | undefined, env: Record<s
       wanted.push({ m, status, ref, was });
     }
 
-    // 2. Every event that has a member to write (one the CRM carries), or a plan asked for, has its campaign queued (the key makes a repeat a no-op).
+    // 2. Every event that has a member to write (one the CRM carries), or a plan asked for, or a delivered list, has its campaign queued (the key makes a repeat a no-op).
+    // A delivered list counts so that a list delivered before the CRM was connected, or for an event still outside the 45 day target window, has its campaign in the CRM
+    // (its people follow as members once the window opens). Without this such an event had no campaign at all (week 2, J16).
     const eventIds = new Set<string>(wanted.map((w) => w.m.event_id));
     for (const r of await q<{ id: string }>("SELECT e.id FROM events e WHERE e.plan_submitted_at IS NOT NULL AND " + IN_WINDOW)) eventIds.add(r.id);
+    for (const r of await q<{ id: string }>(`SELECT e.id FROM events e WHERE e.stage = 'delivered' AND e.parent_event_id IS NULL AND ${IN_WINDOW} AND EXISTS (SELECT 1 FROM contacts k WHERE k.event_id = e.id AND k.dropped_at IS NULL AND k.priority IS NOT NULL AND k.email IS NOT NULL)`)) eventIds.add(r.id);
     for (const id of eventIds) {
       const [has] = await q("SELECT 1 FROM crm_outbox WHERE desk_key = $1", [`campaign:${id}`]);
       if (!has) { await queueCampaign(q, id, crm); out.campaigns++; }
