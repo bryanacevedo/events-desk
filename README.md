@@ -6,7 +6,7 @@ Events Desk is for a person who runs events all year. You go to a lot of confere
 
 You ask for a seat. Someone approves it. You upload the attendee list. The desk works out which companies and people matter, finds and checks their emails, and hands back a Google Sheet (or an Excel file) your sales team can work from. If more people register later, you upload the new file and the desk adds only the new ones.
 
-**[Try the live demo](https://events-desk.onrender.com)** · [Film (3:41)](https://bryanacevedo.github.io/project-videos/video/events-desk.mp4) · [Decisions](docs/DECISIONS.md). Everything in the demo is invented and every vendor is simulated. If it has been idle, the first load takes about a minute. The hosted demo is redeployed by hand, not on every push, so it can be behind the code in this repository.
+The hosted demo is offline (its Render service was suspended on 2026-11-18); run the demo locally as shown below. [Film (3:41)](https://bryanacevedo.github.io/project-videos/video/events-desk.mp4) · [Decisions](docs/DECISIONS.md). Everything in the demo is invented and every vendor is simulated.
 
 It is a portfolio project. Read "What is proven and what is not" below before you trust any number in it.
 
@@ -242,7 +242,7 @@ The license is noncommercial. Running this inside a business needs a separate li
 | Project | What it does | Links |
 |---|---|---|
 | Account Desk | Signal-based, account-based outbound with a person on the send decision | [Code](https://github.com/bryanacevedo/account-desk) · [Live demo](https://account-desk-x4ko.onrender.com) · [Film](https://bryanacevedo.github.io/project-videos/video/account-desk.mp4) |
-| Events Desk (this repository) | For someone who runs events all year: seat requests and approvals, attendee lists turned into the companies and people worth meeting, with checked emails, handed back as a sheet for sales | [Live demo](https://events-desk.onrender.com) · [Film](https://bryanacevedo.github.io/project-videos/video/events-desk.mp4) |
+| Events Desk (this repository) | For someone who runs events all year: seat requests and approvals, attendee lists turned into the companies and people worth meeting, with checked emails, handed back as a sheet for sales | Hosted demo offline · [Film](https://bryanacevedo.github.io/project-videos/video/events-desk.mp4) |
 | Market Desk | Decides who a B2B team sells to from its own deals, sizes that market and splits it into territories | [Code](https://github.com/bryanacevedo/market-desk) · [Live demo](https://market-desk-3kou.onrender.com) · [Film](https://bryanacevedo.github.io/project-videos/video/market-desk.mp4) |
 | CRM Desk | A CRM for teams of one to fifty with Salesforce's data model and a simpler experience; Account Desk and Events Desk can use it as their CRM | [Live demo](https://crm-desk-sevh.onrender.com) · [Film](https://bryanacevedo.github.io/project-videos/video/crm-desk.mp4) (code private) |
 
