@@ -55,7 +55,8 @@ describe("J10: one page for what waits on a person", () => {
     expect(page).toContain("`/event/${p.event_id}#plan`");
     expect(page).toContain('new URLSearchParams(location.search).get("request")');
     expect(src("src/app/Seats.tsx")).toContain("`/seat-decisions?request=${r.id}`");
-    expect(src("src/app/App.tsx")).toContain('pathname === "/waiting"');
+    // The badge refetches on every page change, so an approval on an event page is counted.
+    expect(src("src/app/App.tsx")).toMatch(/\/api\/waiting"\)[^\n]*\[actor, needs\?\.requests\.length, pathname\]\)/);
     expect(src("scripts/build-static-snapshot.ts")).toContain('"/api/waiting"');
   });
 
@@ -136,6 +137,9 @@ describe("m18: the follow-up date can be set", () => {
     const [r] = await db.query<{ id: string }>("INSERT INTO organizer_requests (id, event_id, template, subject, body, status, created_by) VALUES ('org_t1', $1, 'ask_for_list', 's', 'b', 'copied', 'Camille Laurent') RETURNING id", [id]);
     const out = await patchOrganizerRequest(db, CAMILLE, id, r.id, { sent_on: "2027-01-10", expected_on: "2027-01-20", follow_up_on: "2027-01-15" });
     expect(out.follow_up_on).toBe("2027-01-15");
+    // Moving the sent day past a hand-set date drops it instead of failing the save.
+    expect((await patchOrganizerRequest(db, CAMILLE, id, r.id, { sent_on: "2027-01-18" })).follow_up_on).toBe("2027-01-21");
+    await patchOrganizerRequest(db, CAMILLE, id, r.id, { sent_on: "2027-01-10", follow_up_on: "2027-01-15" });
     await expect(patchOrganizerRequest(db, CAMILLE, id, r.id, { follow_up_on: "2027-01-05" })).rejects.toThrow(/before the day it was sent/);
     // A later save that does not touch the follow-up date keeps the one set by hand.
     expect((await patchOrganizerRequest(db, CAMILLE, id, r.id, { status: "will_share", expected_on: "2027-01-25" })).follow_up_on).toBe("2027-01-15");
@@ -206,7 +210,9 @@ describe("J11: where a person stands in CRM Desk, read from the outbox", () => {
     expect(res.rows.find((r) => r.email.toLowerCase() === a.email)?.crm).toBe("done");
     expect(res.rows.find((r) => r.email.toLowerCase() === b.email)?.crm).toBe("held");
     expect(res.rows.filter((r) => r.crm === null).length).toBe(res.rows.length - 2);
-    expect(src("src/app/Event.tsx")).toContain('done: "In the CRM"');
+    expect(src("src/app/Event.tsx")).toContain('done: "in the CRM"');
+    const [ix] = await db.query<{ indexname: string }>("SELECT indexname FROM pg_indexes WHERE indexname = 'crm_outbox_member_person'");
+    expect(ix?.indexname).toBe("crm_outbox_member_person");
   });
 });
 
@@ -216,5 +222,7 @@ describe("m15: bulk owner and due day on the open deliverables", () => {
     expect(d).toContain("Set on all open");
     expect(d).toContain("const open = items.filter((d) => !d.done);");
     expect(d).toContain('if (all.owner.trim()) body.owner = all.owner.trim();');
+    expect(d).toContain("`Set on ${set} of ${open.length}. ${failed}`");
+    expect(d).toContain('else setAll({ owner: "", due: "" });');
   });
 });

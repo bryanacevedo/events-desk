@@ -454,7 +454,9 @@ export async function patchOrganizerRequest(db: Db, actor: string, eventId: stri
     const closed = status === "will_not_share" || status === "received";
     // A date set by hand (one that is not what the old dates would have computed) stays through a save that does not touch it.
     const byHand = r.follow_up_on !== null && r.follow_up_on !== followUpOn(r.sent_on, r.expected_on) ? r.follow_up_on : null;
-    const chosen = b.follow_up_on === undefined ? byHand : day(b.follow_up_on, "the day to follow up");
+    // A save that moves the sent day past that date drops it and computes a new one.
+    const kept = byHand && sent_on && byHand < sent_on ? null : byHand;
+    const chosen = b.follow_up_on === undefined ? kept : day(b.follow_up_on, "the day to follow up");
     if (chosen && sent_on && chosen < sent_on) throw new AssessmentInvalid("The follow-up day cannot be before the day it was sent.");
     const follow = closed ? null : chosen ?? followUpOn(sent_on, expected_on);
     await q("UPDATE organizer_requests SET status = $2, sent_on = $3, expected_on = $4, follow_up_on = $5, organizer_name = coalesce($6, organizer_name) WHERE id = $1", [rid, status, sent_on, expected_on, follow, b.organizer_name === undefined ? null : text(b.organizer_name).slice(0, 120)]);

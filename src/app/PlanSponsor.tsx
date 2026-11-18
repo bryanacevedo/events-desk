@@ -149,12 +149,15 @@ function DeliverablesEditor({ id, items, saved, done }: { id: string; items: Pla
     const body: Record<string, string> = {};
     if (all.owner.trim()) body.owner = all.owner.trim();
     if (all.due) body.due_on = all.due;
+    let set = 0, failed = "";
     for (const d of open) {
       const r = await send("PATCH", `/api/events/${id}/deliverables/${d.id}`, actor, body);
-      if (!r.ok) { setError(r.error); break; }
+      if (!r.ok) { failed = r.error; break; }
+      set++;
     }
     setBusy(false);
-    setAll({ owner: "", due: "" });
+    if (failed) setError(`Set on ${set} of ${open.length}. ${failed}`);
+    else setAll({ owner: "", due: "" });
     await saved();
   };
   return (

@@ -431,7 +431,7 @@ function ArriveAt({ id }: { id: string }) {
 }
 
 /** Where a person stands in CRM Desk, from the outbox: a plain word in ink. */
-const CRM_WORDS = { queued: "Waiting to send to the CRM", held: "CRM not ready for them", failed: "CRM refused them", done: "In the CRM" } as const;
+const CRM_WORDS = { queued: "waiting to send to the CRM", held: "CRM not ready for them", failed: "not sent to the CRM", done: "in the CRM" } as const;
 
 /** The people on the list: searched, filtered and paged on the server. A row opens the person. */
 function PeopleTable({ id, hasPriorities, reloadKey, past = false }: { id: string; hasPriorities: boolean; reloadKey: number; past?: boolean }) {

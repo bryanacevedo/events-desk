@@ -168,5 +168,7 @@ Asked by #, #
 Nothing is waiting on you.
 Over Q# by # after this seat.
 # left in Q# after this seat.
-Waiting to send to the CRM
+waiting to send to the CRM
 CRM not ready for them
+not sent to the CRM
+in the CRM
