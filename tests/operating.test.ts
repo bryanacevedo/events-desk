@@ -180,8 +180,19 @@ describe("the event's CRM campaign", () => {
     const { queueCreate } = await import("../src/server/crm-outbox.ts");
     await db.tx((q) => queueCreate(q, "campaign_member", "cm:two", null, { email: ana.email, full_name: "Ana Ruiz", company: "T", domain: null, event_id: h.id, campaign: "x" }));
     expect((await drainOutbox(db, c.crm)).failed).toBe(0);
-    expect((await db.query<{ status: string; attempts: number }>("SELECT status, attempts FROM crm_outbox WHERE desk_key = 'cm:two'"))[0]).toEqual({ status: "queued", attempts: 0 });
-    expect(c.members).toHaveLength(0);
+    const row = (await db.query<{ status: string; attempts: number }>("SELECT status, attempts FROM crm_outbox WHERE desk_key = 'cm:two'"))[0];
+    const ev = (await db.query<{ crm_campaign_id: string | null }>("SELECT crm_campaign_id FROM events WHERE id = $1", [h.id]))[0];
+    // The delivered-list sweep (decision 117) may queue and create the event's campaign first; then the member lands in it.
+    // Either way a member never lands without a campaign: it waits (no attempt used), or it is written into the event's campaign.
+    if (row.status === "queued") {
+      expect(row).toEqual({ status: "queued", attempts: 0 });
+      expect(c.members).toHaveLength(0);
+    } else {
+      expect(row.status).toBe("done");
+      expect(ev.crm_campaign_id).toBe("701A");
+      expect(c.made).toHaveLength(1);
+      expect(c.members).toHaveLength(1);
+    }
   });
 });
 

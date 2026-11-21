@@ -8,6 +8,8 @@ Docs are part of done: README, PROJECT-STATUS and docs change in the same commit
 
 From the integrated week re-run (`workday-sim-plan/runs/s8-week2`): a target account file headed "Account name, Website, Account owner" was refused ("The file needs a name column."). The import now maps those usual export headers to its columns (decision 112, `tests/guest-import.test.ts`). Nothing else changed.
 
+Test changed, not weakened (2026-11-21): `tests/operating.test.ts` "a member waits until the campaign exists" failed about 1 run in 3 since decision 117, because the delivered-list sweep can create the event's campaign before the drain; the member then lands in that campaign, which is correct. The test now accepts either correct outcome and still fails if a member is written with no campaign. The new bulk-edit sentence "Set on # of #. #" is in `docs/SCREEN-COPY.txt`.
+
 Four small fixes from the same week (branch `wk2fix/events-desk`, `tests/simfix.test.ts`):
 
 - Results: a result a planner closed reads "Scored", as the Plan tab does (`/api/results` `final` is true when `motion` is scored or `judged_at` is set).
