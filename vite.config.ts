@@ -12,7 +12,15 @@ const scanAssets = (): Plugin => ({
 });
 
 export default defineConfig({
-  test: { globalSetup: ["tests/pg-cleanup.ts"] },
+  test: {
+    globalSetup: ["tests/pg-cleanup.ts"],
+    /* Two parts. First the cause: freshDb now starts from a migrated copy (tests/pg-cleanup.ts), which took the full run from 1071 s to 345 to 410 s under the same load. What is left is real
+       work inside the test body: a whole event taken from upload to a delivered workbook in-process (2 to 7 s alone on a busy laptop), with one worker per core, and directory-readers also
+       waits on a real Chrome and a local port. The 5 s default sits on the slower of those, so a busier machine tipped them over (4 tests and a 10 s hook in one of three runs after the
+       first part). A hang still fails, in 30 s. Global on purpose: simpler than a list of files that goes stale; per-file budgets would be tighter. A test that needs more says so itself. */
+    testTimeout: 30_000,
+    hookTimeout: 60_000,
+  },
   plugins: [react(), scanAssets()],
   server: { port: 5173, proxy: { "/api": "http://localhost:8787" } },
   build: { outDir: "dist", emptyOutDir: true },

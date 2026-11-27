@@ -17,6 +17,8 @@ export interface Db {
   /** Runs a multi-statement script (migrations, seed) in one transaction. */
   exec(sql: string): Promise<void>;
   close(): Promise<void>;
+  /** PGlite only: the whole data directory as a tarball, so a migrated database can seed many fresh ones (tests/helpers.ts). */
+  dump?(): Promise<Blob>;
 }
 
 /* Normalise driver output: Date -> ISO string, numeric strings -> numbers. */
@@ -33,11 +35,12 @@ export function clean<T>(rows: Row[]): T[] {
   });
 }
 
-export async function pglite(dataDir?: string): Promise<Db> {
+export async function pglite(dataDir?: string, opts: { loadDataDir?: Blob } = {}): Promise<Db> {
   const { PGlite } = await import("@electric-sql/pglite");
   // A small host: Postgres keeps its caches short. Queries get slower, not wrong.
   const small = process.env.PUBLIC_DEMO === "1" ? { startParams: [...(PGlite as unknown as { defaultStartParams: string[] }).defaultStartParams, "-c", "shared_buffers=16MB", "-c", "temp_buffers=1MB", "-c", "work_mem=2MB", "-c", "maintenance_work_mem=8MB", "-c", "wal_buffers=1MB"] } : {};
-  const pg = new PGlite(dataDir, small);
+  /* PGlite reads its options from the second argument only when the first is a directory, so `small` has never applied to an in-memory database; that stays as it was. */
+  const pg = dataDir === undefined ? new PGlite(opts) : new PGlite(dataDir, { ...small, ...opts });
   await pg.exec("SET TIME ZONE 'UTC'");
   const query = async <T>(text: string, params: unknown[] = []) => clean<T>((await pg.query<Row>(text, params)).rows);
   return {
@@ -45,6 +48,7 @@ export async function pglite(dataDir?: string): Promise<Db> {
     tx: (fn) => pg.transaction(async (t) => fn(async <T>(text: string, params: unknown[] = []) => clean<T>((await t.query<Row>(text, params)).rows))),
     exec: async (sql) => { await pg.transaction(async (t) => { await t.exec(sql); }); },
     close: () => pg.close(),
+    dump: async () => { await pg.exec("CHECKPOINT"); return (await pg.dumpDataDir("none")) as Blob; },
   };
 }
 
