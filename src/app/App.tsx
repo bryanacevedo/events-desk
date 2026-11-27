@@ -177,13 +177,13 @@ export function App() {
           {demo === null ? <PageSkeleton /> : <Suspense fallback={<PageSkeleton />}>
           {place === "overview" && <Overview go={go} sheetId={search.get("event")} />}
           {place === "events" && <Events go={go} sheetId={search.get("event")} requesting={search.get("request") === "1"} preselect={search.get("catalog")} search={search} />}
-          {place === "seats" && (lead ? <Seats go={go} search={search} requesting={search.get("request") === "1"} preselect={search.get("catalog")} /> : <p className="md-clear">Seats are for leadership and GTM Engineering.</p>)}
-          {place === "seatdecisions" && (plans ? <SeatDecisions /> : <p className="md-clear">Decisions are for leadership, planners and GTM Engineering.</p>)}
-          {place === "budget" && (lead ? <Budget go={go} search={search} /> : <p className="md-clear">Budget is for leadership and GTM Engineering.</p>)}
+          {place === "seats" && (lead ? <Seats go={go} search={search} requesting={search.get("request") === "1"} preselect={search.get("catalog")} /> : needs === null ? <PageSkeleton /> : <p className="md-clear">Seats are for leadership and GTM Engineering.</p>)}
+          {place === "seatdecisions" && (plans ? <SeatDecisions /> : needs === null ? <PageSkeleton /> : <p className="md-clear">Decisions are for leadership, planners and GTM Engineering.</p>)}
+          {place === "budget" && (lead ? <Budget go={go} search={search} /> : needs === null ? <PageSkeleton /> : <p className="md-clear">Budget is for leadership and GTM Engineering.</p>)}
           {place === "results" && (planner === "yes" ? <Results go={go} /> : planner === "loading" ? <PageSkeleton /> : <p className="md-clear">Results are for planners, leadership and GTM Engineering.</p>)}
           {place === "choosing" && (planner === "yes" ? <Choosing go={go} /> : planner === "loading" ? <PageSkeleton /> : <p className="md-clear">Choosing is for planners, leadership and GTM Engineering.</p>)}
           {place === "speaking" && <Speaking />}
-          {place === "usage" && (lead ? <Usage go={go} search={search} /> : <p className="md-clear">Usage is for leadership and GTM Engineering.</p>)}
+          {place === "usage" && (lead ? <Usage go={go} search={search} /> : needs === null ? <PageSkeleton /> : <p className="md-clear">Usage is for leadership and GTM Engineering.</p>)}
           {/* A reply, meeting or deal opened from an event sheet opens over whichever page the sheet was on. The event page and My day draw their own. */}
           {!["event", "myday"].includes(place) && <Suspense fallback={null}><ObjectSheets /></Suspense>}
           {place === "myday" && <MyDay />}
