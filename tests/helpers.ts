@@ -2,8 +2,20 @@ import { postgresJs } from "../src/server/db.ts";
 import { readdirSync, readFileSync } from "node:fs";
 import { migrate, pglite, type Db } from "../src/server/db.ts";
 
-/** A throwaway real Postgres with every migration applied. */
-/** TEST_ALL_ON_POSTGRES points every test at real Postgres, one schema per database. Used to find what PGlite hides. */
+/** The migrated PGlite data directory that tests/pg-cleanup.ts builds once per run (a test's 5 s budget cannot also pay for a boot and 52 migrations). A file run on its own
+    outside vitest's globalSetup has no path, and builds the same thing once for itself. */
+let template: Promise<Blob> | undefined;
+async function migratedTemplate(): Promise<Blob> {
+  const file = process.env.EVENTS_DESK_PG_TEMPLATE;
+  if (file) return new Blob([readFileSync(file)]);
+  const db = await pglite();
+  await migrate(db, readdirSync("migrations").filter((f) => f.endsWith(".sql")).map((name) => ({ name, sql: readFileSync(`migrations/${name}`, "utf8") })));
+  const blob = await db.dump!();
+  await db.close();
+  return blob;
+}
+
+/** A throwaway database with every migration applied: PGlite from the template, or with TEST_ALL_ON_POSTGRES real Postgres, one schema per database. Used to find what PGlite hides. */
 export async function freshDb(): Promise<Db> {
   const url = process.env.TEST_ALL_ON_POSTGRES;
   let db: Db;
@@ -14,8 +26,8 @@ export async function freshDb(): Promise<Db> {
     await admin.exec(`CREATE SCHEMA ${schema}`);
     await admin.close();
     db = await postgresJs(url, { max: 3, schema });
-  } else db = await pglite();
-  await migrate(db, readdirSync("migrations").filter((f) => f.endsWith(".sql")).map((name) => ({ name, sql: readFileSync(`migrations/${name}`, "utf8") })));
+    await migrate(db, readdirSync("migrations").filter((f) => f.endsWith(".sql")).map((name) => ({ name, sql: readFileSync(`migrations/${name}`, "utf8") })));
+  } else db = await pglite(undefined, { loadDataDir: await (template ??= migratedTemplate()) });
   /* The Concierge role reaches public by default; a throwaway schema has to grant it. */
   if (schema) await db.exec(`GRANT USAGE ON SCHEMA ${schema} TO concierge_reader`);
   return db;
