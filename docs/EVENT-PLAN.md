@@ -1,6 +1,6 @@
 # The event as a plan (redesign step 1)
 
-Status: SPEC, not built. Written 2026-11-13. Brief: `~/Developer/events-rethink/steps/step-1.md`. Plan: `~/Developer/events-rethink/PLAN.md` sections 3, 5, 6.1, 8, 9. This file extends `docs/SPEC.md`; where they disagree on anything listed under "Must not change", `docs/SPEC.md` wins.
+Status: SPEC, not built. Written 2026-11-13. 2026-11-27: built and on main (migrations 0049 to 0051; README "The event as a plan"). Brief: `~/Developer/events-rethink/steps/step-1.md`. Plan: `~/Developer/events-rethink/PLAN.md` sections 3, 5, 6.1, 8, 9. This file extends `docs/SPEC.md`; where they disagree on anything listed under "Must not change", `docs/SPEC.md` wins.
 
 ## 1. The job
 

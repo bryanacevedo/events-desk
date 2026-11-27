@@ -3,14 +3,15 @@
 ## Static snapshot
 
 The public demo as plain files, for a host that has no server and costs nothing. It is a read-only copy: the same screens, the
-demo's own sample data (Lumen Ledger, invented), and a note at the top of every page that says so. It is staged: its address is
-in no README, no post and no link, and the whole bundle tells search engines to stay away.
+demo's own sample data (Lumen Ledger, invented), and a note at the top of every page that says so. The whole bundle tells search
+engines to stay away. It was staged at first (no README link); since the Render demo was suspended on 2026-11-18 it is the only
+public demo, and the README links it (96d39c0).
 
 ### What it is
 
 `scripts/build-static-snapshot.ts` (run by `make snapshot`):
 
-1. Unpacks `samples/demo-snapshot.tgz`, the database the Render demo opens, into a temporary folder and opens it in this process.
+1. Unpacks `samples/demo-snapshot.tgz`, the database the Render demo opened (suspended 2026-11-18), into a temporary folder and opens it in this process.
    It reads nothing else. It refuses to start when `DATABASE_URL` is set, and the copy it reads is thrown away afterwards.
 2. Runs the app in the same process (`createApp(...).fetch`, no port) with `PUBLIC_DEMO=1`, the sample's own day (2026-11-24)
    and the same start the hosted demo makes (`src/server/node.ts`).
@@ -25,7 +26,8 @@ in no README, no post and no link, and the whole bundle tells search engines to 
 In the browser `scripts/static-snapshot/shim.js` runs before the app and answers every `/api` call from the shards. Every change
 (`POST`, `PATCH`, `PUT`, `DELETE`) is refused with the desk's own kind of sentence, the one its server uses for files:
 "This public demo does not take changes. To try them, run the desk yourself: the README shows how." The app shows it where it
-shows any refusal. The bar at the top of every screen says it is a snapshot, takes no Hide button, and links to no other desk.
+shows any refusal. The bar at the top of every screen says it is a snapshot and links to no other desk. On a wide screen it has no Hide button; on a
+phone (760 px or less) it can be hidden for the session (decision 109, revised 2026-11-26).
 
 ### Build and look
 
@@ -47,7 +49,8 @@ The token and account id come from Infisical into the wrangler process only. Nev
 
 From GitHub Actions: `.github/workflows/static-snapshot.yml` (run by hand, or by a push to `main` that touches the app, the
 sample or the snapshot code). It builds on every run and keeps the bundle as an artifact for 30 days. It publishes only when both
-secrets exist, and passes without them:
+secrets exist, and passes without them. Both secrets are set (2026-11-18), so a push to `main` that touches those paths publishes;
+the last publish was run 45962646217 on 2026-11-27, for 3ad7fe1. To set them again:
 
     gh secret set CLOUDFLARE_API_TOKEN -R bryanacevedo/events-desk
     gh secret set CLOUDFLARE_ACCOUNT_ID -R bryanacevedo/events-desk

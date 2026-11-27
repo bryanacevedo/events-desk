@@ -1,6 +1,6 @@
 # After delivery: the rest of an event's life (v2 spec)
 
-Status: built on branch `v2`, 2026-11-09, on simulated tools and fakes; none of it has run against a real sequencer, CRM or calendar account. Decisions taken while building are in `docs/DECISIONS.md`, sections 33 to 38.
+Status: built on branch `v2`, 2026-11-09 (2026-11-27: now on `main`), on simulated tools and fakes; none of it has run against a real sequencer, CRM or calendar account. Decisions taken while building are in `docs/DECISIONS.md`, sections 33 to 38.
 
 v1 ends at a delivered list. This covers what happens until the event has a score and its lessons reach the next event.
 
