@@ -63,6 +63,8 @@ Decision 111. The buyer tour's last line is "Next step: " plus a mail link, "Wri
 
 ## Static snapshot on Cloudflare Pages (2026-11-17, bl_116, branch `simfix/events-snapshot`)
 
+2026-11-27 (demo links): the public demo has its own address, https://events-desk-demo.leandrive.io (proxied CNAME in the leandrive.io zone, custom domain on the Pages project `events-desk-demo`). The old https://events-desk-demo.pages.dev keeps working with the same content. Both answer 200 with `x-robots-tag: noindex, nofollow`; nothing indexes either. The README and docs link the leandrive.io address. Rollback: delete the Pages custom domain, then the DNS record.
+
 Worktree `.wt/simfix-events-snapshot`, from `origin/main` df54e74, not pushed at the time (2026-11-27: on main, ee36a77). Decisions 109 and 110 (the Overview week block says "This week" once). `make snapshot` builds the demo as read-only static files (`docs/RUNBOOK.md`); `.github/workflows/static-snapshot.yml` builds it and publishes to the Pages project `events-desk-demo` only with both Cloudflare secrets. Staged and noindex: no README link, no address in any doc. 2026-11-27: the Render demo was suspended on 2026-11-18 and the README links the snapshot (96d39c0); it is still noindex.
 
 **Not proven:** Safari and Firefox (the shim needs `DecompressionStream`, Safari 16.4 and up); the workflow's own run on GitHub (the YAML was read, not run; 2026-11-27: it has since run on `main` and published, last in run 45962646217); every one of the 3,274 people sheets opened in a browser (coverage is by the build's checks and spot checks).
