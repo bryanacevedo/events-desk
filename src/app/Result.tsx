@@ -67,9 +67,9 @@ export function Result({ eventId, eventName, motion, lastDay, live, scorecards, 
       <header className="md-hero rs-hero">
         <div className="md-hello">
           <p>{kicker}</p>
-          {lead && m.influence.available
-            ? <h2><b className={thin ? "thin" : undefined} title={thin ? "Fewer than five held meetings" : undefined}>{ratio === null ? "None" : times(ratio)}</b><span>{["pipeline per dollar", thin ? "under 5 meetings" : null, m.roi.cost_missing.length ? `${m.roi.cost_missing.length} ${m.roi.cost_missing.length === 1 ? "cost" : "costs"} not entered yet` : null].filter(Boolean).join(", ")}</span></h2>
-            : <h2><b>{num(m.held_all)}</b><span>{m.held_all === 1 ? "meeting held" : "meetings held"}</span></h2>}
+          {lead && m.influence.available && ratio !== null
+            ? <h2><b className={thin ? "thin" : undefined} title={thin ? "Fewer than five held meetings" : undefined}>{times(ratio)}</b><span>{["pipeline per dollar", thin ? "under 5 meetings" : null, m.roi.cost_missing.length ? `${m.roi.cost_missing.length} ${m.roi.cost_missing.length === 1 ? "cost" : "costs"} not entered yet` : null].filter(Boolean).join(", ")}</span></h2>
+            : <h2><b>{num(m.held_all)}</b><span>{[m.held_all === 1 ? "meeting held" : "meetings held", lead && m.roi.cost_missing.length ? `${m.roi.cost_missing.length} ${m.roi.cost_missing.length === 1 ? "cost" : "costs"} not entered yet` : null].filter(Boolean).join(", ")}</span></h2>}
         </div>
         <div className="md-figs">
           {lead ? <><p><b>{money(m.influence.pipeline_cents)}</b><span>pipeline</span></p><p><b>{money(m.cost.dollars_cents)}</b><span>cost</span></p><p><b>{num(m.held_all)}</b><span>{m.held_all === 1 ? "meeting held" : "meetings held"}</span></p><p><b>{num(deals.length)}</b><span>{deals.length === 1 ? "deal" : "deals"}</span></p></>

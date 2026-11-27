@@ -43,7 +43,7 @@ export function MyDay() {
   const load = async () => { const day = await get<Day>(`/api/motion/my-day?rep=${encodeURIComponent(actor)}`); setD(day); setDone(true); setMine(await get<HostedMine>("/api/hosted/mine")); setKits(((await get<{ offers: KitOffer[] }>("/api/kit/offers"))?.offers ?? []).filter((o) => o.person === actor)); };
   useEffect(() => { load(); }, [actor]);
   if (!d) return done ? <p className="md-clear">{NOT_AVAILABLE("My day")}</p> : <PageSkeleton />;;
-  const today = new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
+  const today = new Date(`${todayYmd()}T12:00:00`).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
   const figures: [number, string][] = [[d.replies.length, d.replies.length === 1 ? "reply to answer" : "replies to answer"], [d.meetings.length, d.meetings.length === 1 ? "meeting" : "meetings"], [d.captures.length, d.captures.length === 1 ? "person met" : "people met"]];
 
   return (

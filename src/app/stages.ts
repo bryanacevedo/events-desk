@@ -1,6 +1,7 @@
 /* After delivery, the steps an event goes through, shared by the event header and the Overview cards so the two never disagree. */
 
 import type { EventRow } from "../shared/domain";
+import { todayYmd } from "./words";
 import { addDays } from "../shared/motion";
 import { POST_START_LATEST_DAYS, POST_WAVE_END_DAYS } from "../shared/policy";
 
@@ -14,7 +15,7 @@ export const AFTER: [string, string, string][] = [["none", "List ready", "Ready 
 
 /** Where a delivered event is. In market is the outreach before it; Follow-up is from the day after its last day until the wave ends (LIFECYCLE §5b). */
 export function afterStep(e: EventRow): { key: string; caption?: string } {
-  const m = e.motion ?? "none", last = e.last_day, today = new Date().toISOString().slice(0, 10);
+  const m = e.motion ?? "none", last = e.last_day, today = todayYmd();
   // After the event, with no follow-up started: sequences that are still being set up are the follow-up waiting for its press.
   if (last && m === "sequencing" && today > last && !e.post_started_at) return { key: "follow_up", caption: windowOpen(last, today) ? "Ready to start" : "Not started" };
   if (!last || !["in_market", "closing"].includes(m) || today <= last) return { key: m };
@@ -31,6 +32,6 @@ export function deliveredWords(e: EventRow): { words: string; waiting: boolean }
   const s = afterStep(e);
   if (s.key === "follow_up" && !e.post_started_at) return { words: s.caption === "Not started" ? "Follow-up not started" : "Follow-up ready", waiting: s.caption !== "Not started" };
   // A list that was never taken to outreach, on an event now over, is not still ready: it went unused.
-  if (s.key === "none" && e.last_day && new Date().toISOString().slice(0, 10) > e.last_day) return { words: "No outreach", waiting: false };
+  if (s.key === "none" && e.last_day && todayYmd() > e.last_day) return { words: "No outreach", waiting: false };
   return { words: STEP_WORDS[s.key] ?? STEP_WORDS.none, waiting: false };
 }

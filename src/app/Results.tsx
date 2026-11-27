@@ -48,7 +48,7 @@ export function Results({ go }: { go: (to: string) => void }) {
           <header className="md-hero rs-hero">
             <div className="md-hello">
               <p>{rows.length === 1 ? "One finished event" : `${rows.length} finished events`}</p>
-              <h2><b>{cost ? times(pipeline / cost) : "None"}</b><span>pipeline per dollar</span></h2>
+              {cost ? <h2><b>{times(pipeline / cost)}</b><span>pipeline per dollar</span></h2> : null}
             </div>
             <div className="md-figs">
               <p><b>{money(pipeline)}</b><span>pipeline</span></p>
@@ -65,7 +65,7 @@ export function Results({ go }: { go: (to: string) => void }) {
                 <Link to={withSheet(r.id)} go={go} className="ob-row rs-event" data-opens-sheet="" data-row={r.id}>
                   <span className="ob-logo"><EventLogo name={r.name} website={r.website} size={30} /></span>
                   <span className="ob-who"><b>{r.name}</b><span>{[shortDate(r.starts_on), r.venue?.split(",").pop()?.trim(), r.notes.asked ? `${r.notes.written} of ${r.notes.asked} notes` : null, r.costs_missing ? `${r.costs_missing} ${r.costs_missing === 1 ? "cost" : "costs"} not entered yet` : null].filter(Boolean).join(" · ")}</span></span>
-                  <span className={`rs-fig${r.scored ? "" : " thin"}`}><b>{r.per_dollar === null ? "None" : times(r.per_dollar)}</b><span>{r.held < 5 ? "per dollar, under 5 meetings" : "per dollar"}</span></span>
+                  {r.per_dollar === null ? <span className="rs-fig" /> : <span className={`rs-fig${r.scored ? "" : " thin"}`}><b>{times(r.per_dollar)}</b><span>{r.held < 5 ? "per dollar, under 5 meetings" : "per dollar"}</span></span>}
                   <span className="rs-fig"><b>{money(r.pipeline_cents)}</b><span>pipeline</span></span>
                   <span className="ob-end"><span className="ob-when">{r.final ? "Scored" : "Closing"}</span><span className="ob-go">Open<Arrow /></span></span>
                 </Link>

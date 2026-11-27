@@ -3,6 +3,7 @@
    the clock, the thread, who they are, and every step so far. The sheet lives in the URL (?reply= or ?meeting=), so it survives a reload. */
 
 import { companyDisplayName as co, dealDisplayName } from "../shared/names";
+import { nowMs, todayYmd } from "./words";
 import { toolName } from "./tools";
 import { isGtm } from "../shared/roles";
 import { useEffect, useState, type CSSProperties } from "react";
@@ -35,7 +36,7 @@ export function meetTime(iso: string, tz?: string | null) {
   const time = `${clockAt} ${name}`.trim();
   const ymd = (d: Date) => d.toLocaleDateString("en-CA", { timeZone: zone });
   // The meeting's day where it happens, counted from the reader's today: the same count Overview gives the event.
-  const n = Math.round((Date.parse(ymd(at)) - Date.parse(new Date().toLocaleDateString("en-CA"))) / 86_400_000);
+  const n = Math.round((Date.parse(ymd(at)) - Date.parse(todayYmd())) / 86_400_000);
   const soon = n === 0 ? "Today" : n === 1 ? "Tomorrow" : n === -1 ? "Yesterday" : n > 1 ? `In ${n} days` : `${-n} days ago`;
   const part = (o: Intl.DateTimeFormatOptions) => at.toLocaleDateString("en-GB", { ...o, timeZone: zone });
   return { time, clock: clockAt, zone: name, soon, today: n === 0, past: n < 0, day: part({ day: "numeric" }), month: part({ month: "short" }), weekday: part({ weekday: "short" }) };
@@ -326,7 +327,7 @@ export function ReplySheet({ id, close, changed }: { id: string; close: () => vo
   useEffect(() => { setR(null); load(); }, [id]);
   useEffect(() => {
     if (!r || r === "missing" || r.meeting) return;
-    get<{ slots: typeof slots }>(`/api/events/${r.event_id}/motion/roster`).then((x) => setSlots((x?.slots ?? []).filter((s) => !s.meeting_id && new Date(s.starts_at) > new Date()))).catch(() => setSlots([]));
+    get<{ slots: typeof slots }>(`/api/events/${r.event_id}/motion/roster`).then((x) => setSlots((x?.slots ?? []).filter((s) => !s.meeting_id && new Date(s.starts_at).getTime() > nowMs()))).catch(() => setSlots([]));
   }, [r && r !== "missing" ? r.id : null]);
   if (r === "missing") return <Shell label="Reply" close={close}><p className="mute">That reply is no longer here.</p></Shell>;
   if (!r) return <Shell label="Reply" close={close} />;

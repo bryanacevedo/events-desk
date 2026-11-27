@@ -11,7 +11,12 @@ export const seatBudget = (e: Pick<EventRow, "seat_count" | "seat_price_cents">)
 export const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 const noon = (ymd: string) => new Date(`${ymd.slice(0, 10)}T12:00:00`);
-export const todayYmd = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+/** The static snapshot cannot move its clock, so its today is the day its sample was set around (set once from /api/health); every other desk reads the real clock. */
+let sampleToday: string | null = null;
+export const setSampleToday = (ymd: string | null) => { sampleToday = ymd; };
+/** Now, as a moment: the real one, or noon of the sample day in the snapshot. */
+export const nowMs = () => (sampleToday ? new Date(`${sampleToday}T12:00:00`).getTime() : Date.now());
+export const todayYmd = () => { if (sampleToday) return sampleToday; const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 export const daysTo = (ymd: string) => Math.round((noon(ymd).getTime() - noon(todayYmd()).getTime()) / 86_400_000);
 export const shortDate = (ymd: string) => noon(ymd).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
 export const longDate = (ymd: string) => noon(ymd).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });

@@ -32,7 +32,7 @@ import { EventLogo } from "./EventLogo";
 import { Icon, Mark } from "./icons";
 import { STEPS, stepAt, waiting as waitingOn } from "./waiting";
 import { PersonAvatar } from "./PersonAvatar";
-import { canEnd, countdown, daysTo, dropWords, firstName, initials, isRunning, longDate, money, moneyFine, num, plural, stageSentence } from "./words";
+import { canEnd, countdown, daysTo, dropWords, firstName, initials, isRunning, longDate, money, moneyFine, num, plural, stageSentence, todayYmd } from "./words";
 import { cardBreakdown, creditWork } from "../shared/vendors";
 import { PageSkeleton } from "./Skeleton";
 
@@ -80,7 +80,7 @@ export function useEvent(id: string): EventState {
     const k = e.stage === "delivered" ? afterStep(e) : null;
     if (k?.key === "follow_up" && !e.post_started_at) note = "The event is over. The follow-up is ready to start.";
     else if (k && MOTION_NOTE[k.key]) note = "";
-    else if (e.stage === "delivered" && e.last_day && new Date().toISOString().slice(0, 10) > e.last_day) note = "";
+    else if (e.stage === "delivered" && e.last_day && todayYmd() > e.last_day) note = "";
     else if (e.stage === "delivered") note = `Outreach list ready. ${plural(data.list.people, "person", "people")} to reach${open.length ? `, ${open.length} to settle` : ""}.`;
     else if (e.stage === "quoted") note = `${card?.kind === "research" ? "Research card" : "Cost card"} waiting on ${who}.`;
     else if (e.stage === "ready_for_review") note = card ? `Companies researched. Waiting on ${who} to verify and find contacts.` : (data.open_cases ?? 0) > 0 ? `Research done. ${plural(data.open_cases ?? 0, "case")} to settle before verifying contacts.` : "Research done. Ready for the Outreach card.";
@@ -710,7 +710,7 @@ export function StageBlock({ ev, go, compact }: { ev: EventState; go: (to: strin
             <>
               <ListBrief d={d} />
               <Cases eventId={e.id} cases={ev.cases.filter((c) => c.kind !== "reply_doubtful")} onChange={reload} />
-              <ListTables id={e.id} hasPriorities={d.list.priorities.length > 0} reloadKey={reloads} past={Boolean(e.last_day && new Date().toISOString().slice(0, 10) > e.last_day)} />
+              <ListTables id={e.id} hasPriorities={d.list.priorities.length > 0} reloadKey={reloads} past={Boolean(e.last_day && todayYmd() > e.last_day)} />
             </>
           )}
         </>

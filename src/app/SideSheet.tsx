@@ -15,7 +15,7 @@ import { StageBlock, Stages, useEvent } from "./Event";
 import { useActor } from "./App";
 import { EventLogo } from "./EventLogo";
 import { PersonAvatar } from "./PersonAvatar";
-import { city, countdown, daysTo, money, num, plural, shortDate } from "./words";
+import { city, countdown, daysTo, money, num, plural, nowMs, shortDate } from "./words";
 import { deliveredWords } from "./stages";
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"])';
@@ -120,7 +120,7 @@ function SheetStory({ id, done }: { id: string; done: boolean }) {
       <>
         <div className="md-figs ob-figs sheet-figs">
           {lead && m.influence.available
-            ? [fig(ratio === null ? "None" : `${ratio.toFixed(1)}x`, "per dollar"), fig(money(m.influence.pipeline_cents), "pipeline"), fig(money(m.cost.dollars_cents), "cost"), fig(num(m.held_all), m.held_all === 1 ? "meeting held" : "meetings held")]
+            ? [...(ratio === null ? [] : [fig(`${ratio.toFixed(1)}x`, "per dollar")]), fig(money(m.influence.pipeline_cents), "pipeline"), fig(money(m.cost.dollars_cents), "cost"), fig(num(m.held_all), m.held_all === 1 ? "meeting held" : "meetings held")]
             : [fig(num(m.held_all), m.held_all === 1 ? "meeting held" : "meetings held"), fig(num(m.funnel.replied), m.funnel.replied === 1 ? "reply" : "replies"), fig(num(m.funnel.sent), "reached")]}
         </div>
         {lead && deals.length > 0 && (
@@ -149,7 +149,7 @@ function SheetStory({ id, done }: { id: string; done: boolean }) {
   }
 
   const f = o.funnel;
-  const now = Date.now();
+  const now = nowMs();
   const next = o.meetings.filter((x) => ["booked", "rescheduled"].includes(x.status) && new Date(x.scheduled_at).getTime() >= now).sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at));
   const booked = o.meetings.filter((x) => ["booked", "rescheduled", "held", "no_show"].includes(x.status)).length;
   return (

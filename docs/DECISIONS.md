@@ -584,6 +584,8 @@ The tracker, ranking and repeat reads use the deps clock, else `DEMO_TODAY` only
 
 **Who decided.** Bryan's task of 2026-11-17 (hosting, bl_116). Code: `scripts/build-static-snapshot.ts`, `scripts/static-snapshot/shim.js`, `src/app/DemoBar.tsx`, `.github/workflows/static-snapshot.yml`. Tests: `tests/static-snapshot.test.ts`.
 
+**Revised 2026-11-26 (demo pass, bl_135).** The snapshot's note no longer says the day it was taken; the snapshot has one date, the day its sample was set around ("Today in the sample is Tue, 24 Nov 2026."), and the snapshot's day counts (days to go, "Was due", the Today marks, meeting days, upcoming lists) run from that day (`setSampleToday` and `nowMs` in `src/app/words.ts`, set from `/api/health`; the "N days ago" notes and reply deadlines in the sheets still read the real clock), since a frozen copy cannot move its clock and would otherwise read differently every day. On a wide screen the note still stays. On a phone (760 px or less) it takes the first screen, so it has a Hide button for the session. `tests/static-snapshot.test.ts` locks the new words.
+
 ## 110. The Overview week block says "This week" once (2026-11-17)
 
 **What.** When every open deadline falls in the "This week" group, the group label (a tray header in layout B, a ledger label in layout A) is not drawn, because it repeats the section heading and its count. In layout B the two columns collapse to one full-width column whenever one side is empty, so a lone tray no longer sits in the right half of the row. Layout C and the year blocks are unchanged.

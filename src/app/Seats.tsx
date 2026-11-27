@@ -12,7 +12,7 @@ import { useRef, useState } from "react";
 import { Icon } from "./icons";
 import { DecisionLine } from "./access";
 import { sentTo } from "./waiting";
-import { firstName, money, shortDate } from "./words";
+import { firstName, money, shortDate, todayYmd } from "./words";
 import { PageSkeleton, Empty } from "./Skeleton";
 
 /** Approving a seat is asked for once, with what it costs and an optional note, so a click on the row never approves by itself. */
@@ -162,7 +162,7 @@ export function Seats({ go, search, requesting, preselect }: { go: (to: string) 
                       <span><b>{r.expected_meetings}</b><i>Meetings</i></span>
                       <span><b>{money(r.seat_price_cents)}</b><i>{r.price_is_estimate ? "Ticket est." : "Ticket"}</i></span>
                       <span>{r.travel_cents ? <><b>{money(r.travel_cents)}</b><i>Travel</i></> : null}</span>
-                      <span>{r.decide_by ? <><b>{shortDate(r.decide_by)}</b><i>{r.decide_by < new Date().toISOString().slice(0, 10) && r.status === "pending" ? "Was due" : "Decide by"}</i></> : null}</span>
+                      <span>{r.decide_by ? <><b>{shortDate(r.decide_by)}</b><i>{r.decide_by < todayYmd() && r.status === "pending" ? "Was due" : "Decide by"}</i></> : null}</span>
                     </span>
                   </>}
                   side={r.status === "pending" ? <Decide r={r} onDone={refresh} />

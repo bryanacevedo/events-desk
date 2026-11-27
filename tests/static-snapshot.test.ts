@@ -108,9 +108,22 @@ describe("the bundle is noindex everywhere", () => {
 describe("the demo bar", () => {
   it("says it is a snapshot, and that nothing is saved", () => {
     const words = demoBarWords({ publicDemo: true, day: "2026-11-24", snapshot: "17 November 2026" }).join(" ");
-    expect(words).toContain("read-only snapshot taken 17 November 2026");
+    expect(words).toContain("This is a read-only snapshot. Nothing");
+    expect(words).toContain("Today in the sample is Tue, 24 Nov 2026.");
+    expect(words).not.toContain("taken");
     expect(words).toContain("Nothing you change is saved");
     expect(words).not.toContain("shared with the next visitor");
+  });
+});
+
+describe("the snapshot clock", () => {
+  it("counts from the sample day only when one is set, and goes back to the real clock when it is cleared", async () => {
+    const { setSampleToday, todayYmd, nowMs } = await import("../src/app/words");
+    setSampleToday("2026-11-24");
+    expect(todayYmd()).toBe("2026-11-24");
+    expect(new Date(nowMs()).getDate()).toBe(24);
+    setSampleToday(null);
+    expect(todayYmd()).not.toBe("2026-11-24");
   });
 });
 

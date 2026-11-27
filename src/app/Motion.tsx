@@ -9,7 +9,7 @@ import { Icon } from "./icons";
 import { PersonAvatar } from "./PersonAvatar";
 import { companyHref, personHref, To } from "./To";
 import { CODE_WORDS, dayIn, headIn, MeetingRows, meetTime, objectHref, ObjectSheets, openObject, ReplyRows, SeqName } from "./Objects";
-import { money, num, plural, shortDate } from "./words";
+import { money, num, plural, shortDate, todayYmd } from "./words";
 import { isGtm } from "../shared/roles";
 import { BlockSkeleton } from "./Skeleton";
 
@@ -410,7 +410,7 @@ function SequenceLanes({ list, eventId }: { list: SeqList; eventId: string }) {
   const { go } = useActor();
   const shown = list.sequences.filter((s) => s.people > 0 || s.state !== "draft" || (s.reached ?? 0) > 0);
   // Both halves always show; an empty one says what happened or when it will.
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayYmd();
   const halves = (["pre", "post"] as const).map((ph) => [ph, shown.filter((s) => s.phase === ph)] as const);
   const empty = (ph: "pre" | "post") => ph === "pre"
     ? (list.starts_on && today >= list.starts_on ? "None before the event" : "None yet")

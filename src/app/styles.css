@@ -3232,8 +3232,12 @@ a:hover > .swap .due, a:focus-visible > .swap .due { opacity: 0; transform: tran
 .empty-ex .ex b { color: var(--ink); font-weight: 500; }
 .tl-state .tl-words b, .tl-state .tl-words span { min-width: 0; }
 
+/* The snapshot's note stays on a wide screen (decision 109); on a phone it can be hidden, so it does not take the first screen. */
+.demo-bar.snap button { display: none; }
 @media (max-width: 760px) {
   .demo-bar { padding: 8px 12px; }
+  .demo-bar.snap button { display: block; }
+  .demo-bar.snap.off { display: none; }
 }
 
 .toast { position: fixed; left: 50%; bottom: 24px; z-index: 80; display: flex; align-items: center; gap: 12px; max-width: min(520px, calc(100vw - 32px)); padding: 12px 16px; border-radius: 12px; background: var(--ink); color: #fff; font-size: 14px; line-height: 20px; transform: translateX(-50%); box-shadow: 0 16px 40px -12px rgba(21, 35, 27, 0.5); }
@@ -3246,3 +3250,5 @@ a:hover > .swap .due, a:focus-visible > .swap .due { opacity: 0; transform: tran
 .gloss dl { display: grid; gap: 10px; margin-top: 10px; }
 .gloss dt { font-weight: 500; }
 .gloss dd { color: var(--mute); }
+
+.ov-key { margin: 0 0 12px; max-width: 720px; font-size: 13px; line-height: 18px; }

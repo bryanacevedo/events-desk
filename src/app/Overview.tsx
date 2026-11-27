@@ -409,6 +409,7 @@ export function Overview({ go, sheetId }: { go: (to: string) => void; sheetId: s
           <button type="button" className="arrow" onClick={() => step(1)} aria-label="Later events">→</button>
         </div>
       </header>
+      <p className="ov-key mute">Ledger, Trays and Timeline show the same events three ways. Cases to settle are places where the lists disagree and the desk needs your answer.</p>
 
       {demo && <StartHere go={go} />}
 
