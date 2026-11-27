@@ -4,6 +4,11 @@
 
 Docs are part of done: README, PROJECT-STATUS and docs change in the same commit as the behaviour, counts or setup they describe. `make docs-check` (also run by the suite) enforces it.
 
+
+## Phone scanner on the iOS Simulator (bl_157, simulator part, 2026-11-27)
+
+Run by the master against a local demo (`make demo`, ports 8790 and 8791), iPhone 18 Pro Max, iOS 27.2, Safari. **Proven:** the scanner loads in iPhone Safari and shows its fallbacks when no camera is present; a typed badge opens the post-scan sheet; a scan saved with the server down stays on the phone (1 unsynced, the day's-end prompt shows), and after the server returned, two Sync taps stored exactly one scan (state lookup_pending, no organizer set up). **Fixed on branch fix/scanner-sim-findings:** the camera-blocked message told a Safari user to open the page in Safari (it now says to allow the camera in the browser's settings; the home-screen frozen case keeps the Safari advice), and the "By" date field ran past the right edge on iPhone (WebKit's intrinsic date width; appearance reset). **Not proven, needs a real phone:** the live camera decode, Android Chrome, the WebKit home-screen camera, a real vision read of a real card (the demo's model is mocked), and the ten-second target. The header still says Online while the server is unreachable; left as is (it reflects the phone's network, and the unsynced count is the signal).
+
 ## Integrated week 2: the target account import reads an export's headers (2026-11-18, branch `wk2fix/events-desk`)
 
 From the integrated week re-run (`workday-sim-plan/runs/s8-week2`): a target account file headed "Account name, Website, Account owner" was refused ("The file needs a name column."). The import now maps those usual export headers to its columns (decision 112, `tests/guest-import.test.ts`). Nothing else changed.

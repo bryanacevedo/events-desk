@@ -211,7 +211,7 @@ function Camera(p: { atEnd: boolean; unsynced: number; online: boolean; syncing:
         {(state === "blocked" || state === "frozen") && (
           <div className="sc-dark">
             <p>{state === "blocked" ? "The camera is not available here." : "The camera opened but shows nothing. This happens in some home-screen web apps."}</p>
-            <p>Open this page in Safari to scan codes, or take a photo with the phone's camera, or type the person.</p>
+            <p>{state === "blocked" ? "Allow the camera for this page in the browser's settings, or take a photo with the phone's camera, or type the person." : "Open this page in Safari to scan codes, or take a photo with the phone's camera, or type the person."}</p>
             <label className="textlink" style={{ cursor: "pointer" }}>Take a photo<input type="file" accept="image/*" capture="environment" className="sc-hidden" onChange={(e) => pick(e.target.files?.[0])} /></label>
           </div>
         )}
