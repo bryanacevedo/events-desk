@@ -6,7 +6,7 @@ Events Desk is for a person who runs events all year. You go to a lot of confere
 
 You ask for a seat. Someone approves it. You upload the attendee list. The desk works out which companies and people matter, finds and checks their emails, and hands back a Google Sheet (or an Excel file) your sales team can work from. If more people register later, you upload the new file and the desk adds only the new ones.
 
-[Live demo](https://events-desk-demo.leandrive.io) (a read-only static snapshot; its Render service was suspended on 2026-11-18, and the full demo runs locally as shown below) · [Film (3:41)](https://bryanacevedo.github.io/project-videos/video/events-desk.mp4) · [Decisions](docs/DECISIONS.md). Everything in the demo is invented and every vendor is simulated.
+[Live demo](https://events-desk-demo.leandrive.io) (a read-only static snapshot; the earlier Render service was deleted on 2026-11-27, and the full demo runs locally as shown below) · [Film (3:41)](https://bryanacevedo.github.io/project-videos/video/events-desk.mp4) · [Decisions](docs/DECISIONS.md). Everything in the demo is invented and every vendor is simulated.
 
 It is a portfolio project. Read "What is proven and what is not" below before you trust any number in it.
 

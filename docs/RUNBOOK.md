@@ -4,14 +4,14 @@
 
 The public demo as plain files, for a host that has no server and costs nothing. It is a read-only copy: the same screens, the
 demo's own sample data (Lumen Ledger, invented), and a note at the top of every page that says so. The whole bundle tells search
-engines to stay away. It was staged at first (no README link); since the Render demo was suspended on 2026-11-18 it is the only
+engines to stay away. It was staged at first (no README link); since the Render demo was deleted on 2026-11-27 it is the only
 public demo, and the README links it (96d39c0).
 
 ### What it is
 
 `scripts/build-static-snapshot.ts` (run by `make snapshot`):
 
-1. Unpacks `samples/demo-snapshot.tgz`, the database the Render demo opened (suspended 2026-11-18), into a temporary folder and opens it in this process.
+1. Unpacks `samples/demo-snapshot.tgz`, the database the Render demo opened (deleted 2026-11-27), into a temporary folder and opens it in this process.
    It reads nothing else. It refuses to start when `DATABASE_URL` is set, and the copy it reads is thrown away afterwards.
 2. Runs the app in the same process (`createApp(...).fetch`, no port) with `PUBLIC_DEMO=1`, the sample's own day (2026-11-24)
    and the same start the hosted demo makes (`src/server/node.ts`).
@@ -49,7 +49,7 @@ The token and account id come from Infisical into the wrangler process only. Nev
 
 From GitHub Actions: `.github/workflows/static-snapshot.yml` (run by hand, or by a push to `main` that touches the app, the
 sample or the snapshot code). It builds on every run and keeps the bundle as an artifact for 30 days. It publishes only when both
-secrets exist, and passes without them. Both secrets are set (2026-11-18), so a push to `main` that touches those paths publishes (nothing here touches Render, whose service stays suspended);
+secrets exist, and passes without them. Both secrets are set (2026-11-18), so a push to `main` that touches those paths publishes (nothing here touches Render, whose service was deleted on 2026-11-27);
 the last publish was run 45962646217 on 2026-11-27, for 3ad7fe1. To set them again:
 
     gh secret set CLOUDFLARE_API_TOKEN -R bryanacevedo/events-desk

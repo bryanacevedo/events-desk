@@ -210,6 +210,8 @@ The plan called for two videos, a short one for visitors and a narrated one for 
 
 Cloudflare Workers and Vercel run code in short requests. This app runs long jobs and keeps its demo database in the process, so either would have needed a port and a separate database. Render runs it unchanged as a normal server, on the free plan. Three things make it fit in 512 MB: prebuilt sample data, small Postgres caches, and Node 26, which alone cut startup from about 840 MB to about 300. With no login, whatever one visitor uploaded the next could read, so the hosted demo takes no files.
 
+Superseded (2026-11-27): the Render service was deleted. The public demo is the static snapshot on Cloudflare Pages (decisions 109 and 110); `render.yaml` stays only as an unused reference.
+
 ## 33. Everything after delivery, as built (2026-11-09)
 
 Built on branch `v2` from `docs/LIFECYCLE.md`. What changed from the spec while building, and why:

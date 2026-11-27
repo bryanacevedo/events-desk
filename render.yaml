@@ -1,3 +1,5 @@
+# UNUSED since 2026-11-27: every Render service was deleted and nothing builds from this file. Kept as a reference for a server install.
+# The public demo is the static snapshot on Cloudflare Pages.
 # The public demo: simulated vendors, invented people, no keys. Its database lives in the running instance, so every restart is a fresh copy.
 services:
   - type: web
