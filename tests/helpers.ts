@@ -15,6 +15,18 @@ async function migratedTemplate(): Promise<Blob> {
   return blob;
 }
 
+/** Every PGlite is a WebAssembly instance that keeps 200 to 500 MB of the process until it is closed, and 146 of the 151 test files never closed theirs (a beforeEach opens one per test).
+    One file of 66 tests grew to 15 GB on the 16 GB CI runner, which then shut down (run 46017579500, 2026-11-27). tests/close-dbs.ts closes what a test opened, when the test ends. A
+    database made outside a test (a beforeAll) is left to its file. */
+const openInTest = new Set<Db>();
+let inTest = false;
+export function testStarts() { inTest = true; }
+export async function testEnds() {
+  inTest = false;
+  const dbs = [...openInTest]; openInTest.clear();
+  await Promise.all(dbs.map(async (d) => { try { await d.close(); } catch { /* closed by the test itself */ } }));
+}
+
 /** A throwaway database with every migration applied: PGlite from the template, or with TEST_ALL_ON_POSTGRES real Postgres, one schema per database. Used to find what PGlite hides. */
 export async function freshDb(): Promise<Db> {
   const url = process.env.TEST_ALL_ON_POSTGRES;
@@ -30,6 +42,7 @@ export async function freshDb(): Promise<Db> {
   } else db = await pglite(undefined, { loadDataDir: await (template ??= migratedTemplate()) });
   /* The Concierge role reaches public by default; a throwaway schema has to grant it. */
   if (schema) await db.exec(`GRANT USAGE ON SCHEMA ${schema} TO concierge_reader`);
+  if (inTest) openInTest.add(db);
   return db;
 }
 

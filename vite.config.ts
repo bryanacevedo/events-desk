@@ -17,6 +17,7 @@ export default defineConfig({
     // Worktrees made inside the repo (.claude/worktrees) carry their own copy of the tests; never run those (2026-11-27: they doubled the local run).
     exclude: [...configDefaults.exclude, ".claude/**", ".wt/**"],
     globalSetup: ["tests/pg-cleanup.ts"],
+    setupFiles: ["tests/close-dbs.ts"],
     /* Two parts. First the cause: freshDb now starts from a migrated copy (tests/pg-cleanup.ts), which took the full run from 1071 s to 345 to 410 s under the same load. What is left is real
        work inside the test body: a whole event taken from upload to a delivered workbook in-process (2 to 7 s alone on a busy laptop), with one worker per core, and directory-readers also
        waits on a real Chrome and a local port. The 5 s default sits on the slower of those, so a busier machine tipped them over (4 tests and a 10 s hook in one of three runs after the
