@@ -13,7 +13,7 @@ import { fill, promptHash } from "./prompts.ts";
 import { companyKey } from "../shared/ingest.ts";
 import { addDays } from "../shared/motion.ts";
 import {
-  classifyPayload, csvRow, CSV_HEAD, DEFAULT_NOTICE, FIELD_NAMES, imageMime, MAX_QUALIFIERS, METHOD_WORDS, METHODS, nearMatches, normEmail, placeable, SCAN_ID, STATE_WORDS, TEMPERATURES,
+  classifyPayload, csvRow, CSV_HEAD, DEFAULT_NOTICE, FIELD_NAMES, imageMime, looksLikeIdentityDocument, MAX_QUALIFIERS, METHOD_WORDS, METHODS, nearMatches, normEmail, placeable, SCAN_ID, STATE_WORDS, TEMPERATURES,
   type FieldName, type Fields, type Method, type Qualifier, type ScanState,
 } from "../shared/scan.ts";
 
@@ -112,9 +112,10 @@ export async function ingestScan(db: Db, deps: LifecycleDeps, eventId: string, r
   let registrant = s(input.registrant_id, 200) || null;
   const raw = s(input.raw_payload, 4000);
   // The server reads the code again, so a phone that sent the wrong class cannot put a made-up person in. A code that carries a person fills the fields the phone left empty.
+  if (raw && looksLikeIdentityDocument(raw)) throw new ScanInvalid("That code is from an ID card, not a badge. Nothing was kept.");
   if (method === "badge_code" || method === "badge_id") {
     const c = raw ? classifyPayload(raw) : null;
-    if (c && c.kind !== "id") { method = "badge_code"; fields = { ...c.fields, ...fields }; }
+    if (c && c.kind !== "id" && c.kind !== "identity") { method = "badge_code"; fields = { ...c.fields, ...fields }; }
     else if (c?.kind === "id") { method = "badge_id"; registrant = registrant ?? c.id; }
     else if (!Object.keys(fields).length) throw new ScanInvalid("That code did not read as a person or a badge id.");
   }

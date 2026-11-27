@@ -38,6 +38,7 @@ export function ScanApp() {
   const [mode, setMode] = useState<"scan" | "today">("scan");
   const [method, setMethod] = useState<"code" | "photo" | "card" | "type">("code");
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [idNote, setIdNote] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState("");
   const actorRef = useRef(actor);
@@ -108,6 +109,7 @@ export function ScanApp() {
       {mode === "scan" && !draft && <Camera method={method} setMethod={setMethod} cfg={cfg} cfgNote={cfgNote} onCode={(raw) => {
         const c = classifyPayload(raw);
         if (!c) return false;
+        if (c.kind === "identity") { setIdNote(true); setTimeout(() => setIdNote(false), 5000); return true; }
         if (c.kind === "id") open({ id: newScanId(), method: "badge_id", raw: c.id, fields: {} });
         else open({ id: newScanId(), method: "badge_code", raw, fields: c.fields });
         return true;
@@ -116,6 +118,7 @@ export function ScanApp() {
         confirm={(it) => open({ id: it.id, method: it.input.method, raw: it.input.raw_payload ?? "", fields: { ...(it.server?.fields ?? {}), ...(it.input.fields as Fields | undefined) }, uncertain: it.server?.uncertain ?? [], confirm: it })}
         retake={(kind) => { setMode("scan"); setMethod(kind); }} />}
       {draft && <Sheet key={draft.id} draft={draft} cfg={cfg} actor={actor} unsynced={unsynced} onClose={() => { setDraft(null); }} onSaved={async () => { setDraft(null); setMode("scan"); await reload(); void sync(); }} />}
+      {idNote && <div className="sc-notice" role="status" style={{ padding: "0 16px 12px" }}>That is an ID card, not a badge. Nothing was kept.</div>}
       {!durable && <div className="sc-notice" style={{ padding: "0 16px 12px" }}>This browser will not keep scans after the page closes. Sync before you leave.</div>}
     </div>
   );

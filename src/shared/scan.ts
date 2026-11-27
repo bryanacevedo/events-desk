@@ -83,12 +83,25 @@ function drop(f: Fields): Fields {
 
 export type Payload =
   | { kind: "vcard" | "mecard" | "link"; fields: Fields }
-  | { kind: "id"; id: string };
+  | { kind: "id"; id: string }
+  | { kind: "identity" };
+
+/** A government ID read by mistake: a national ID card (a number and a name in capitals, joined by a bar, as on the
+ *  Dominican cedula), a US driver's licence (AAMVA, "ANSI " and "DAQ"/"DCS" fields) or a passport line ("P<" and "<<").
+ *  Never kept: not on the phone, not on the server (Bryan, 2026-11-27, scanned his own cedula on the Pixel test). */
+export function looksLikeIdentityDocument(text: string): boolean {
+  const t = text.trim();
+  return /^@?\s*ANSI \d{6}/.test(t) || /\bD(AQ|CS|AC|BB)[A-Z0-9]/.test(t) && /ANSI/.test(t)
+    || /^[PIAC][A-Z<][A-Z]{3}[A-Z<]{2,}/.test(t) && t.includes("<<")
+    || /^\d{6,}\s*\|\s*\p{Lu}{2,}(?:\s+\p{Lu}{2,})+/u.test(t)
+    || /\|\s*\p{Lu}{2,}(?:\s+\p{Lu}{2,})+\s*\|/u.test(t);
+}
 
 /** What a decoded code is. A contact link has a query that names a person; anything else short enough is an id for the organizer to resolve. */
 export function classifyPayload(raw: string): Payload | null {
   const text = raw.trim().slice(0, 4000);
   if (!text) return null;
+  if (looksLikeIdentityDocument(text)) return { kind: "identity" };
   if (/^BEGIN:VCARD/i.test(text)) { const f = parseVCard(text); return Object.keys(f).length ? { kind: "vcard", fields: f } : null; }
   if (/^MECARD:/i.test(text)) { const f = parseMeCard(text); return Object.keys(f).length ? { kind: "mecard", fields: f } : null; }
   if (/^https?:\/\//i.test(text)) {

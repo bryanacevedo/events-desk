@@ -69,3 +69,15 @@ describe("the photo's type", () => {
     expect(imageMime(new TextEncoder().encode("<svg onload=alert(1)>"))).toBeNull();
   });
 });
+
+describe("ID documents are never a badge (2026-11-27: a cedula scanned on the Pixel read as a badge id)", () => {
+  it("refuses a national ID card, a driver's licence and a passport line, and keeps real badge ids", () => {
+    expect(classifyPayload("00112345678|JUAN PEREZ")).toEqual({ kind: "identity" });
+    expect(classifyPayload("00112345678|JUAN CARLOS PEREZ|M|1990")).toEqual({ kind: "identity" });
+    expect(classifyPayload("ANSI 636014080102DL00410288ZC03290024DLDAQD1234567DCSDOE")).toEqual({ kind: "identity" });
+    expect(classifyPayload("P<UTOERIKSSON<<ANNA<MARIA<<<<<<<<<<<<<<<<<<<")).toEqual({ kind: "identity" });
+    expect(classifyPayload("48213-A7")).toEqual({ kind: "id", id: "48213-A7" });
+    expect(classifyPayload("40222681815")).toEqual({ kind: "id", id: "40222681815" });          // a bare number may be a badge
+    expect(classifyPayload("REG|12345")).toEqual({ kind: "id", id: "REG|12345" });
+  });
+});
