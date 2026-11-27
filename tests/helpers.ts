@@ -15,7 +15,7 @@ async function migratedTemplate(): Promise<Blob> {
   return blob;
 }
 
-/** Every PGlite is a WebAssembly instance that keeps 200 to 500 MB of the process until it is closed, and 146 of the 151 test files never closed theirs (a beforeEach opens one per test).
+/** Every PGlite is a WebAssembly instance that keeps 200 to 500 MB of the process until it is closed, and none of the test files that open one closed it (a beforeEach opens one per test).
     One file of 66 tests grew to 15 GB on the 16 GB CI runner, which then shut down (run 46017579500, 2026-11-27). tests/close-dbs.ts closes what a test opened, when the test ends. A
     database made outside a test (a beforeAll) is left to its file. */
 const openInTest = new Set<Db>();

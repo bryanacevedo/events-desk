@@ -40,7 +40,7 @@ The scanner's read is the one read that touches the database: it retries the bad
 
 ### Deploy
 
-Cloudflare Pages project `events-desk-demo` (free plan, no custom domain). From the laptop:
+Cloudflare Pages project `events-desk-demo` (free plan, served at https://events-desk-demo.leandrive.io). From the laptop:
 
     infisical run --projectId ce8806da-34c3-4f9a-85f0-555617ccb710 --env prod --recursive -- \
       npx --yes wrangler@4.156.1 pages deploy .snapshot --project-name events-desk-demo --branch main --commit-dirty=true
@@ -49,7 +49,7 @@ The token and account id come from Infisical into the wrangler process only. Nev
 
 From GitHub Actions: `.github/workflows/static-snapshot.yml` (run by hand, or by a push to `main` that touches the app, the
 sample or the snapshot code). It builds on every run and keeps the bundle as an artifact for 30 days. It publishes only when both
-secrets exist, and passes without them. Both secrets are set (2026-11-18), so a push to `main` that touches those paths publishes;
+secrets exist, and passes without them. Both secrets are set (2026-11-18), so a push to `main` that touches those paths publishes (nothing here touches Render, whose service stays suspended);
 the last publish was run 45962646217 on 2026-11-27, for 3ad7fe1. To set them again:
 
     gh secret set CLOUDFLARE_API_TOKEN -R bryanacevedo/events-desk
